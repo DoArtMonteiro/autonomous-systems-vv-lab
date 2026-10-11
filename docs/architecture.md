@@ -119,7 +119,7 @@ flowchart LR
     Independent --> Sidecar
 ```
 
-Uma configuração sem falhas preserva a ação do M2. As falhas declarativas incluem perda de movimento, atraso determinístico e continuação do último movimento depois de um pedido de paragem. A semente própria do atuador é combinada com a semente da missão, num fluxo pseudoaleatório separado do gerador dos sensores. As janelas usam passos inclusivos; comandos atrasados podem executar depois da janela e sobrepor-se a uma paragem posterior, segundo a ordem documentada no módulo.
+Uma configuração sem falhas preserva a ação do M2. As falhas declarativas incluem perda de movimento, atraso determinístico e continuação de um movimento ainda em curso depois de um pedido de paragem. O estado guardado acompanha a ação física final: uma paragem realizada elimina o movimento anterior; um comando atrasado executado depois de uma paragem pode iniciar movimento e conserva o seu passo de origem. A semente própria do atuador é combinada com a semente da missão, num fluxo pseudoaleatório separado do gerador dos sensores. As janelas usam passos inclusivos; comandos atrasados podem executar depois da janela e sobrepor-se a uma paragem posterior, segundo a ordem documentada no módulo.
 
 O artefacto novo `verification.json` guarda a configuração do atuador, os contratos usados, os resultados do monitor, as evidências e as referências aos eventos de origem. O formato legado `events.json` e `report.json` mantém-se v1. A reprodução M3 valida ambos os artefactos, executa novamente a simulação e o monitor e compara as evidências. Python escolhe cenários e organiza campanhas limitadas; não calcula o resultado autoritativo dos contratos.
 

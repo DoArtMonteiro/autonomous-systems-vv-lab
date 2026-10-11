@@ -63,22 +63,24 @@ O hash canónico é o campo `artifact_sha256` do artefacto de eventos v1 e liga 
 
 ## Campanha M3
 
-Execução de CI em 09/10/2026, [workflow 37934787966](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/actions/runs/37934787966), em Ubuntu 24.04 e Windows, com as sementes 42, 1337 e 2026, dez cenários, limite de 30 casos, 90 invocações, 64 MiB de artefactos e 120 s:
+Execução de CI em 11/10/2026, [workflow 38170117451](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/actions/runs/38170117451), em Ubuntu 24.04 e Windows, com as sementes 42, 1337 e 2026, dez cenários, limite de 30 casos, 90 invocações, 64 MiB de artefactos e 120 s. A execução verificou a revisão `29b7b1be363a9acd0fc334dfb9d773cf1034cd44`:
 
 ```powershell
 python scripts/run_campaign.py --binary target/release/vv-lab.exe --suite m3 --seeds 42,1337,2026 --max-runs 90 --max-cases 30 --max-artifact-bytes 67108864 --time-budget-seconds 120 --output-root runs/m3-campaign
 ```
 
-Os 30 casos previstos passaram as expectativas em ambos os sistemas. Cada campanha fez 30 repetições determinísticas e 30 reproduções, sem resultados inesperados. A execução de ponta a ponta demorou 1,0847 s em Linux e 1,4823 s em Windows. O tempo somado dos processos de reprodução foi 0,3168 s em Linux e 0,3873 s em Windows. Os resultados agregados foram:
+Os 30 casos previstos passaram as expectativas em ambos os sistemas. Cada campanha repetiu os 30 casos para verificar o determinismo e reproduziu os 30 artefactos, sem resultados inesperados. A campanha demorou 1,0559 s em Linux e 2,0460 s em Windows; os processos de reprodução demoraram 0,3132 s no total em Linux e 0,5320 s em Windows. Os resultados agregados foram:
 
 | Dimensão | Resultado |
 | --- | --- |
-| Contratos temporais | 9 `PASS`, 18 `FAIL` esperados e 3 `INCONCLUSIVE` esperados |
-| Segurança | 21 `PASS` e 9 casos com violações esperadas |
+| Contratos temporais | 12 `PASS`, 15 `FAIL` esperados e 3 `INCONCLUSIVE` esperados |
+| Segurança | 24 `PASS` e 6 casos com violações esperadas |
 | Progresso da missão | 15 concluídas e 15 incompletas |
-| Falhas temporais por contrato | `command_applied`: 3; `command_resolution`: 3; `fallback_response`: 3; `mission_progress`: 3; `no_motion_in_fallback`: 6; `restricted_zone_clear`: 3; `stop_response`: 3 |
+| Falhas temporais por contrato | `command_applied`: 3; `command_resolution`: 3; `fallback_response`: 3; `mission_progress`: 3; `no_motion_in_fallback`: 3; `restricted_zone_clear`: 3; `stop_response`: 3 |
 
-A campanha de regressão M1/M2 passou 58 casos e 216 invocações por plataforma. As 58 repetições e 58 reproduções passaram, sem resultados inesperados. As verificações dos hashes de referência M1 e M2 passaram, assim como a comparação dos resultados canónicos entre Linux e Windows. O SHA-256 do conjunto de impressões digitais dessa campanha foi `430FA8FBB0A09CE8BF9B2DDD9F3E191270E96F5745BBCDF73DDA3341ECAB8C7C`; o conjunto M3 foi `681C3969BCDEF961680CAEC8AE621B0180212214A5D74BAB09B4D380B8EFACD6`.
+A falha simultânea provocou a perda de um comando de movimento no passo 4. A posição real ficou imóvel durante o *fallback* dos passos 6 a 13; a falha de continuação não reativou o movimento anterior. Por isso, `no_motion_in_fallback` passou nas três sementes. Os movimentos retomaram no passo 14, após a recuperação da localização.
+
+A campanha de regressão M1/M2 passou 58 casos e 216 invocações por plataforma. As 58 repetições e 58 reproduções passaram, sem resultados inesperados. As verificações dos hashes de referência M1 e M2 passaram, assim como a comparação dos resultados canónicos entre Linux e Windows. O SHA-256 do conjunto de impressões digitais M1/M2 foi `430fa8fbb0a09ce8bf9b2ddd9f3e191270e96f5745bbcdf73dda3341ecab8c7c`. O SHA-256 do conjunto M3 foi `e5a5af6e9bc1b0f5f5fc85ad9fee4574a4a8986860feed0431292524a6b85bbc`, idêntico em Linux e Windows.
 
 O catálogo inclui controlo nominal, degradação GPS com resposta de segurança dentro e fora do prazo, paragem cumprida e ignorada, movimento atrasado depois de `fallback`, falhas simultâneas, perda intermitente com recuperação, missão segura incompleta e missão insegura concluída. A combinação de resultados mostra por que motivo conclusão da missão, progresso e segurança são dimensões separadas.
 
@@ -117,6 +119,6 @@ target\release\vv-lab.exe benchmark scenarios/basic-mission.json --seed 42 --ite
 
 ## Verificação e limites
 
-No [workflow 37934787966](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/actions/runs/37934787966), Linux e Windows passaram formatação, Clippy sem avisos, 84 testes Rust e um teste de documentação. Os 72 testes Python passaram nos dois sistemas. Em Linux, `cargo llvm-cov --locked --all-targets --fail-under-lines 80` mediu 87,95% de cobertura de linhas, acima do limiar de 80%; a auditoria de dependências verificou 22 pacotes bloqueados e passou. A compilação de lançamento, as campanhas M1/M2 e M3, as reproduções original e reduzida, ambos os minimizadores e a comparação canónica Linux/Windows também passaram.
+No [workflow 38170117451](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/actions/runs/38170117451), Linux e Windows passaram `cargo fmt --all -- --check`, Clippy com `-D warnings`, 88 testes Rust unitários e de integração e um teste de documentação. Os 74 testes Python passaram nos dois sistemas com Python 3.10. Em Linux, `cargo llvm-cov --locked --all-targets --fail-under-lines 80` mediu 87,28% de cobertura de linhas, acima do limiar de 80%; `cargo audit` verificou 22 dependências e passou. A compilação de lançamento, as campanhas M1/M2 e M3, a minimização e reprodução dos contraexemplos e a comparação dos resultados canónicos entre Linux e Windows também passaram. Os hashes canónicos M1/M2 e as impressões digitais M3 coincidiram entre plataformas; a impressão digital M3 foi `e5a5af6e9bc1b0f5f5fc85ad9fee4574a4a8986860feed0431292524a6b85bbc`. O contraexemplo de paragem conservou os hashes original `d9bcdb476f651bff9650762b7cb3375a39d9c060953f9999a61093257cf8cc7e` e reduzido `36e276570cc256120abb9fa435eec20357d243581180548198c82aa53e7f2b97` em Linux e Windows. A CI validou a revisão `29b7b1be363a9acd0fc334dfb9d773cf1034cd44`.
 
 O exemplo verifica um modelo determinístico finito e as entradas configuradas. Não demonstra segurança para todo o futuro possível, não modela motores ou dinâmica física e não constitui certificação de segurança no mundo real. Uma campanha aprovada confirma que resultados e expectativas deste conjunto de casos são reproduzíveis, não que qualquer veículo ou missão esteja certificado.
