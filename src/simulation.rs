@@ -20,7 +20,9 @@ pub use verification::{
     VERIFICATION_SCHEMA_VERSION, VerificationArtifact, VerificationSummary,
     parse_verification_artifact,
 };
-use verification::{verification_digest, verify_verification_integrity};
+use verification::{
+    validate_reproduction_command, verification_digest, verify_verification_integrity,
+};
 
 const MAX_SCENARIO_BYTES: usize = 2 * 1024 * 1024;
 const MAX_ARTIFACT_BYTES: usize = 128 * 1024 * 1024;
@@ -77,6 +79,7 @@ pub fn run_verified_scenario(
     mission_policy: MissionPolicy,
     reproduction_command: String,
 ) -> Result<VerifiedRunOutcome, LabError> {
+    validate_reproduction_command(&reproduction_command)?;
     scenario
         .validate()
         .map_err(|error| LabError(error.to_string()))?;

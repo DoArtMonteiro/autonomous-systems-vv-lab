@@ -182,13 +182,7 @@ fn validate_verification_shape(verification: &VerificationArtifact) -> Result<()
         .actuator_config
         .validate(10_000)
         .map_err(LabError)?;
-    if verification.reproduction_command.trim().is_empty()
-        || verification.reproduction_command.len() > 4096
-    {
-        return Err(LabError(
-            "reproduction_command must contain 1 to 4096 bytes".into(),
-        ));
-    }
+    validate_reproduction_command(&verification.reproduction_command)?;
     if verification.contract_results.len() != verification.contract_set.contracts.len() {
         return Err(LabError(
             "contract_results count does not match the contract set".into(),
@@ -244,6 +238,15 @@ fn validate_verification_shape(verification: &VerificationArtifact) -> Result<()
     if verification.verification_sha256 != verification_digest(verification) {
         return Err(LabError(
             "verification_sha256 does not match the verification artifact".into(),
+        ));
+    }
+    Ok(())
+}
+
+pub(super) fn validate_reproduction_command(command: &str) -> Result<(), LabError> {
+    if command.trim().is_empty() || command.len() > 4096 {
+        return Err(LabError(
+            "reproduction_command must contain 1 to 4096 bytes".into(),
         ));
     }
     Ok(())
