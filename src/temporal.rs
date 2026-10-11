@@ -419,8 +419,6 @@ fn evaluate_ordered_transition(
             first_edge_index.get_or_insert(index);
             next_edge += 1;
             if next_edge == sequence.len() {
-                // The declared sequence is exact. An additional transition in
-                // this domain is also outside the declared path.
                 continue;
             }
         }

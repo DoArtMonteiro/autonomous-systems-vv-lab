@@ -390,8 +390,6 @@ impl ActuatorModel {
             ));
         }
 
-        // A due stale command executes after the current request. This explicit
-        // order makes a delayed movement capable of defeating a later stop.
         if let Some(index) = self
             .pending
             .iter()

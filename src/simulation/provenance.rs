@@ -115,9 +115,6 @@ pub(super) fn build_temporal_trace(
         progress.sample(source.truth_position, scenario);
 
         let mut facts = Vec::new();
-        // The event stream records an absent GPS observation as a known
-        // localization failure. Missing monitor telemetry without this fact
-        // remains unknown inside the temporal monitor.
         let localization_unreliable = source.observed.as_ref().is_none_or(|observation| {
             !observation.fresh
                 || observation.confidence_permille < scenario.safety.confidence_threshold_permille

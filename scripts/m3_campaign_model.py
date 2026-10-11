@@ -1,5 +1,3 @@
-"""Validate campaign inputs and build a deterministic M3 plan."""
-
 from __future__ import annotations
 
 import argparse

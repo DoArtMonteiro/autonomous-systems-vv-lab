@@ -161,8 +161,6 @@ pub(super) fn evaluate_bounded_response(
     evidence
 }
 
-/// Use keyed maps for per-command obligations so one command response cannot
-/// satisfy another command and monitoring remains linear in the trace length.
 fn evaluate_correlated_response(
     required: Predicate,
     within_ticks: u32,

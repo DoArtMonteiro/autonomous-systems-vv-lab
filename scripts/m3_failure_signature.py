@@ -1,5 +1,3 @@
-"""Stable temporal-failure identity for M3 campaign and minimization tooling."""
-
 from __future__ import annotations
 
 from typing import Any
@@ -108,6 +106,8 @@ def temporal_failure_signature(
     The temporal evaluator supplies the contract identity and obligation ticks.
     The broad mechanism comes only from recorded ActuationOutcome values; this
     function does not infer a cause from the trajectory or a scenario name.
+    For bounded response and progress, the failure trigger and deadline come
+    from the failed obligation, even when an earlier obligation also passed.
     """
     if not isinstance(contract_result, dict) or contract_result.get("outcome") != "FAIL":
         raise M3FailureSignatureError("only an explicitly failed temporal contract is minimizable")
@@ -175,8 +175,6 @@ def temporal_failure_signature(
             )
         if evidence_deadline < evidence_trigger or violation_tick < evidence_trigger:
             raise M3FailureSignatureError("temporal violation or deadline precedes its failed trigger")
-        # A contract result reports the earliest trigger across all obligations.
-        # Failure identity must instead use the obligation that actually failed.
         trigger_tick = evidence_trigger
         deadline_tick = evidence_deadline
     else:

@@ -1,5 +1,3 @@
-"""Run a bounded M3 verification campaign."""
-
 from __future__ import annotations
 
 import argparse

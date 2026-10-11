@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-"""Reduce an M3 scenario horizon while preserving its temporal failure."""
-
 from __future__ import annotations
 
 import argparse

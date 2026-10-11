@@ -36,8 +36,6 @@ pub(super) fn evaluate_bounded_progress(
             missing_measurement_count += 1;
         }
 
-        // Progress and each obligation's target are monotonic, so resolving the
-        // queue head first keeps overlapping windows linear in trace length.
         if let Some(value) = progress {
             while pending.front().is_some_and(|obligation| {
                 value.saturating_sub(obligation.baseline_mm) >= minimum_increase_mm
@@ -64,9 +62,6 @@ pub(super) fn evaluate_bounded_progress(
             }
         }
 
-        // Progress obligations apply only while the mission remains active. If
-        // it completes first, unfinished windows are inconclusive rather than
-        // failures caused by the completed mission no longer advancing.
         if !matches!(active, ObservedCondition::True(_)) {
             while let Some(obligation) = pending.pop_front() {
                 let (observation, reason) = if active == ObservedCondition::Unknown {
