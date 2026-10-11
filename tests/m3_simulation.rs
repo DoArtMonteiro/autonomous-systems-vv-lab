@@ -119,6 +119,23 @@ fn verified_simulation_records_real_actuator_failure_and_replays_exactly() {
         .iter()
         .find(|tick| tick.tick == 9)
         .expect("violation tick retained in counterexample");
+    for counterexample_tick in &evidence.counterexample_ticks {
+        let source_sequences = outcome
+            .artifact
+            .events
+            .iter()
+            .filter(|event| event.tick == counterexample_tick.tick)
+            .map(|event| event.sequence)
+            .collect::<Vec<_>>();
+        assert_eq!(counterexample_tick.source_event_sequences, source_sequences);
+        let expected_fault_events = evidence
+            .fault_events
+            .iter()
+            .filter(|event| event.event.tick == counterexample_tick.tick)
+            .cloned()
+            .collect::<Vec<_>>();
+        assert_eq!(counterexample_tick.fault_events, expected_fault_events);
+    }
     assert_eq!(evidence.truth_position, Some(violation_tick.truth_position));
     assert_ne!(violation_tick.truth_from, violation_tick.truth_position);
     assert!(

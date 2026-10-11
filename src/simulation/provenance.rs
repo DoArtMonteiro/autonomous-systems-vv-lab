@@ -6,7 +6,7 @@ use crate::contracts::{CommandOutcome, TraceFact, TransitionDomain, TransitionSt
 use crate::error::LabError;
 use crate::model::{
     Action, EventPayload, EventRecord, EventsArtifact, MissionState, ObservedTelemetry, Point,
-    SafetyState, Scenario,
+    SafetyState, Scenario, TickTelemetry,
 };
 use crate::temporal::{ContractOutcome, ContractResult, TraceTick, TraceTransition};
 
@@ -232,6 +232,14 @@ pub(super) fn build_failure_evidence(
     reproduction_command: &str,
 ) -> Result<Vec<ContractFailureEvidence>, LabError> {
     let tick_sequences = tick_result_sequences(&artifact.events)?;
+    let mut events_by_tick = BTreeMap::<u32, Vec<&EventRecord>>::new();
+    for event in &artifact.events {
+        events_by_tick.entry(event.tick).or_default().push(event);
+    }
+    let mut telemetry_by_tick = BTreeMap::<u32, &TickTelemetry>::new();
+    for telemetry in &artifact.expected_report.telemetry {
+        telemetry_by_tick.entry(telemetry.tick).or_insert(telemetry);
+    }
     let outcomes_by_tick: BTreeMap<_, _> = actuation
         .iter()
         .map(|outcome| (outcome.tick, outcome))
@@ -275,8 +283,9 @@ pub(super) fn build_failure_evidence(
             &source_commands,
         )?;
         let counterexample_ticks = build_counterexample_ticks(
-            artifact,
-            actuation,
+            &events_by_tick,
+            &telemetry_by_tick,
+            &outcomes_by_tick,
             &tick_sequences,
             &relevant_ticks,
             &linked_events,
@@ -284,10 +293,10 @@ pub(super) fn build_failure_evidence(
         let mut source_event_sequences = BTreeSet::new();
         for tick in &relevant_ticks {
             source_event_sequences.extend(
-                artifact
-                    .events
-                    .iter()
-                    .filter(|event| event.tick == *tick)
+                events_by_tick
+                    .get(tick)
+                    .into_iter()
+                    .flatten()
                     .map(|event| event.sequence),
             );
         }
@@ -297,17 +306,22 @@ pub(super) fn build_failure_evidence(
             source_event_sequences.extend(event.execution_event_sequence);
         }
         let trigger_command = trigger_tick
-            .map(|tick| command_at_tick(artifact, &tick_sequences, tick))
+            .map(|tick| command_at_tick(&telemetry_by_tick, &tick_sequences, tick))
             .transpose()?;
-        let violation_command = Some(command_at_tick(artifact, &tick_sequences, violation_tick)?);
+        let violation_command = Some(command_at_tick(
+            &telemetry_by_tick,
+            &tick_sequences,
+            violation_tick,
+        )?);
         let trigger_source = trigger_tick.and_then(|tick| outcomes_by_tick.get(&tick).copied());
         let violation_source = outcomes_by_tick.get(&violation_tick).copied();
-        let violation_event = artifact
-            .events
-            .iter()
-            .find(|event| {
-                event.tick == violation_tick
-                    && matches!(event.event, EventPayload::TickResult { .. })
+        let violation_event = events_by_tick
+            .get(&violation_tick)
+            .and_then(|events| {
+                events.iter().copied().find(|event| {
+                    event.tick == violation_tick
+                        && matches!(event.event, EventPayload::TickResult { .. })
+                })
             })
             .ok_or_else(|| {
                 LabError(format!(
@@ -329,11 +343,9 @@ pub(super) fn build_failure_evidence(
                     "missing temporal observation at violation tick {violation_tick}"
                 ))
             })?;
-        let actual_source = artifact
-            .expected_report
-            .telemetry
-            .iter()
-            .find(|telemetry| telemetry.tick == violation_tick)
+        let actual_source = telemetry_by_tick
+            .get(&violation_tick)
+            .copied()
             .ok_or_else(|| {
                 LabError(format!(
                     "missing telemetry at violation tick {violation_tick}"
@@ -401,15 +413,13 @@ fn tick_result_sequences(events: &[EventRecord]) -> Result<BTreeMap<u32, u64>, L
 }
 
 fn command_at_tick(
-    artifact: &EventsArtifact,
+    telemetry_by_tick: &BTreeMap<u32, &TickTelemetry>,
     tick_sequences: &BTreeMap<u32, u64>,
     tick: u32,
 ) -> Result<CommandAtTick, LabError> {
-    let telemetry = artifact
-        .expected_report
-        .telemetry
-        .iter()
-        .find(|telemetry| telemetry.tick == tick)
+    let telemetry = telemetry_by_tick
+        .get(&tick)
+        .copied()
         .ok_or_else(|| LabError(format!("missing telemetry at tick {tick}")))?;
     let event_sequence = tick_sequences
         .get(&tick)
@@ -484,23 +494,28 @@ fn sequence_for_tick(tick_sequences: &BTreeMap<u32, u64>, tick: u32) -> Result<u
 }
 
 fn build_counterexample_ticks(
-    artifact: &EventsArtifact,
-    actuation: &[ActuationOutcome],
+    events_by_tick: &BTreeMap<u32, Vec<&EventRecord>>,
+    telemetry_by_tick: &BTreeMap<u32, &TickTelemetry>,
+    outcomes_by_tick: &BTreeMap<u32, &ActuationOutcome>,
     tick_sequences: &BTreeMap<u32, u64>,
     selected_ticks: &BTreeSet<u32>,
     linked_events: &[LinkedActuatorFaultEvent],
 ) -> Result<Vec<CounterexampleTick>, LabError> {
-    let outcomes_by_tick: BTreeMap<_, _> = actuation
-        .iter()
-        .map(|outcome| (outcome.tick, outcome))
-        .collect();
+    let mut fault_events_by_tick = BTreeMap::<u32, Vec<&LinkedActuatorFaultEvent>>::new();
+    for event in linked_events {
+        fault_events_by_tick
+            .entry(event.event.tick)
+            .or_default()
+            .push(event);
+    }
     let mut result = Vec::with_capacity(selected_ticks.len());
     for tick in selected_ticks {
-        let event = artifact
-            .events
-            .iter()
-            .find(|event| {
-                event.tick == *tick && matches!(event.event, EventPayload::TickResult { .. })
+        let event = events_by_tick
+            .get(tick)
+            .and_then(|events| {
+                events.iter().copied().find(|event| {
+                    matches!(event.event, EventPayload::TickResult { .. })
+                })
             })
             .ok_or_else(|| LabError(format!("missing tick result at tick {tick}")))?;
         let (truth_from, truth_position) = match event.event {
@@ -511,25 +526,24 @@ fn build_counterexample_ticks(
             } => (truth_from, truth_position),
             _ => unreachable!("filtered to tick result"),
         };
-        let telemetry = artifact
-            .expected_report
-            .telemetry
-            .iter()
-            .find(|telemetry| telemetry.tick == *tick)
+        let telemetry = telemetry_by_tick
+            .get(tick)
+            .copied()
             .ok_or_else(|| LabError(format!("missing telemetry at tick {tick}")))?;
         let outcome = outcomes_by_tick
             .get(tick)
             .copied()
             .ok_or_else(|| LabError(format!("missing actuator outcome at tick {tick}")))?;
-        let fault_events = linked_events
-            .iter()
-            .filter(|linked| linked.event.tick == *tick)
-            .cloned()
+        let fault_events = fault_events_by_tick
+            .get(tick)
+            .into_iter()
+            .flatten()
+            .map(|event| (*event).clone())
             .collect();
-        let source_event_sequences = artifact
-            .events
-            .iter()
-            .filter(|source| source.tick == *tick)
+        let source_event_sequences = events_by_tick
+            .get(tick)
+            .into_iter()
+            .flatten()
             .map(|source| source.sequence)
             .chain(std::iter::once(sequence_for_tick(tick_sequences, *tick)?))
             .collect::<BTreeSet<_>>()
