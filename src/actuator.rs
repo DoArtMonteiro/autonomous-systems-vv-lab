@@ -681,6 +681,21 @@ mod tests {
     }
 
     #[test]
+    fn continued_fault_does_not_restart_motion_after_successful_stop() {
+        let mut model = ActuatorModel::new(config(vec![continued("stuck", 3, 3)]), 9, 3).unwrap();
+        assert_eq!(apply(&mut model, 1, movement()).realized_action, movement());
+
+        let stopped = apply(&mut model, 2, Action::hold());
+        assert_eq!(stopped.realized_action, Action::hold());
+        assert_eq!(stopped.behavior, ActuatorBehavior::Identity);
+
+        let late_fault = apply(&mut model, 3, Action::hold());
+        assert_eq!(late_fault.realized_action, Action::hold());
+        assert_eq!(late_fault.behavior, ActuatorBehavior::Identity);
+        assert_eq!(late_fault.fault_events[0].kind, ActuatorEventKind::FaultWindowActive);
+    }
+
+    #[test]
     fn simultaneous_faults_have_stable_order_and_lost_precedes_delayed() {
         let mut first = ActuatorModel::new(
             config(vec![
