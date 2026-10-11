@@ -629,6 +629,33 @@ mod tests {
     }
 
     #[test]
+    fn continued_fault_does_not_restart_movement_lost_on_previous_tick() {
+        let mut model = ActuatorModel::new(
+            config(vec![lost("loss", 2, 2, 1000), continued("stuck", 3, 3)]),
+            9,
+            3,
+        )
+        .unwrap();
+        assert_eq!(apply(&mut model, 1, movement()).realized_action, movement());
+
+        let lost_movement = apply(&mut model, 2, movement());
+        assert_eq!(lost_movement.behavior, ActuatorBehavior::Lost);
+        assert_eq!(lost_movement.realized_action, Action::hold());
+
+        let late_fault = apply(&mut model, 3, Action::hold());
+        assert_eq!(late_fault.behavior, ActuatorBehavior::Identity);
+        assert_eq!(late_fault.realized_action, Action::hold());
+        assert_eq!(
+            late_fault.fault_events[0].kind,
+            ActuatorEventKind::FaultWindowActive
+        );
+        assert!(!late_fault
+            .fault_events
+            .iter()
+            .any(|event| event.kind == ActuatorEventKind::ContinuedMovement));
+    }
+
+    #[test]
     fn delayed_command_executes_after_later_stop_and_preserves_source_tick() {
         let mut model = ActuatorModel::new(config(vec![delayed("delay", 1, 1, 2)]), 7, 4).unwrap();
         let scheduled = apply(&mut model, 1, movement());

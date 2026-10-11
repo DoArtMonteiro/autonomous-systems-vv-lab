@@ -93,9 +93,9 @@
       "contract_set": "fallback-response",
       "fault_combination": "simultaneous",
       "expected_by_seed": {
-        "42": { "temporal": "FAIL", "safety": "invariant_failed", "progress": "incomplete", "contracts": { "restricted_zone_clear": "PASS", "fallback_response": "PASS", "no_motion_in_fallback": "FAIL" } },
-        "1337": { "temporal": "FAIL", "safety": "invariant_failed", "progress": "incomplete", "contracts": { "restricted_zone_clear": "PASS", "fallback_response": "PASS", "no_motion_in_fallback": "FAIL" } },
-        "2026": { "temporal": "FAIL", "safety": "invariant_failed", "progress": "incomplete", "contracts": { "restricted_zone_clear": "PASS", "fallback_response": "PASS", "no_motion_in_fallback": "FAIL" } }
+        "42": { "temporal": "PASS", "safety": "passed", "progress": "incomplete", "contracts": { "restricted_zone_clear": "PASS", "fallback_response": "PASS", "no_motion_in_fallback": "PASS" } },
+        "1337": { "temporal": "PASS", "safety": "passed", "progress": "incomplete", "contracts": { "restricted_zone_clear": "PASS", "fallback_response": "PASS", "no_motion_in_fallback": "PASS" } },
+        "2026": { "temporal": "PASS", "safety": "passed", "progress": "incomplete", "contracts": { "restricted_zone_clear": "PASS", "fallback_response": "PASS", "no_motion_in_fallback": "PASS" } }
       }
     },
     {
