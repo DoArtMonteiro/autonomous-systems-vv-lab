@@ -641,18 +641,21 @@ mod tests {
         let lost_movement = apply(&mut model, 2, movement());
         assert_eq!(lost_movement.behavior, ActuatorBehavior::Lost);
         assert_eq!(lost_movement.realized_action, Action::hold());
+        assert_eq!(lost_movement.source_command_tick, 2);
 
         let late_fault = apply(&mut model, 3, Action::hold());
         assert_eq!(late_fault.behavior, ActuatorBehavior::Identity);
         assert_eq!(late_fault.realized_action, Action::hold());
+        assert_eq!(late_fault.source_command_tick, 3);
         assert_eq!(
             late_fault.fault_events[0].kind,
             ActuatorEventKind::FaultWindowActive
         );
-        assert!(!late_fault
+        let continued_movement = late_fault
             .fault_events
             .iter()
-            .any(|event| event.kind == ActuatorEventKind::ContinuedMovement));
+            .any(|event| event.kind == ActuatorEventKind::ContinuedMovement);
+        assert!(!continued_movement);
     }
 
     #[test]
