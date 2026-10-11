@@ -51,6 +51,8 @@ target/release/vv-lab.exe replay runs/m3-stop-counterexample/reduced/events.json
 
 Em Linux, usar `target/release/vv-lab` nos dois comandos de reprodução. A reprodução localiza os artefactos laterais M3 junto a `events.json`, volta a executar a simulação e o monitor e compara os resultados. Em ambos os sistemas, a campanha também repete cada caso e compara os hashes canónicos.
 
+O campo `reproduction_command` em `verification.json` usa o caminho relativo `events.json`. Execute esse comando na pasta de saída que contém `events.json` e `verification.json`.
+
 O minimizador reduziu o horizonte de 16 para 9 passos. Conservou `stop_response`, o operador `bounded_response`, o gatilho no passo 7, o prazo no passo 9, a primeira violação no passo 9 e o mecanismo `continuing_actuation`. O monitor escolhe o gatilho da obrigação falhada mesmo quando uma obrigação anterior do mesmo contrato passou. Também representa falhas temporais sem falha do atuador como `no_actuator_fault_observed`. Os eventos original e reduzido foram reproduzidos em Linux e Windows; ambos mantêm a mesma identidade da falha e os mesmos hashes. A pesquisa verificou um candidato e terminou em 0,0493 s em Linux e 0,0661 s em Windows. É uma redução limitada, não uma garantia de mínimo global.
 
 | Hash SHA-256 | Original | Reduzido |
@@ -83,6 +85,8 @@ A falha simultânea provocou a perda de um comando de movimento no passo 4. A po
 A campanha de regressão M1/M2 passou 58 casos e 216 invocações por plataforma. As 58 repetições e 58 reproduções passaram, sem resultados inesperados. As verificações dos hashes de referência M1 e M2 passaram, assim como a comparação dos resultados canónicos entre Linux e Windows. O SHA-256 do conjunto de impressões digitais M1/M2 foi `430fa8fbb0a09ce8bf9b2ddd9f3e191270e96f5745bbcdf73dda3341ecab8c7c`. O SHA-256 do conjunto M3 foi `e5a5af6e9bc1b0f5f5fc85ad9fee4574a4a8986860feed0431292524a6b85bbc`, idêntico em Linux e Windows.
 
 O catálogo inclui controlo nominal, degradação GPS com resposta de segurança dentro e fora do prazo, paragem cumprida e ignorada, movimento atrasado depois de `fallback`, falhas simultâneas, perda intermitente com recuperação, missão segura incompleta e missão insegura concluída. A combinação de resultados mostra por que motivo conclusão da missão, progresso e segurança são dimensões separadas.
+
+O parâmetro `--output-root` também aceita uma pasta fora do repositório. Nesses casos, o resumo guarda o caminho absoluto com separadores POSIX; os hashes dos artefactos canónicos não incluem esse caminho.
 
 ## Desempenho comparável
 
@@ -119,6 +123,10 @@ target\release\vv-lab.exe benchmark scenarios/basic-mission.json --seed 42 --ite
 
 ## Verificação e limites
 
-No [workflow 38170117451](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/actions/runs/38170117451), Linux e Windows passaram `cargo fmt --all -- --check`, Clippy com `-D warnings`, 88 testes Rust unitários e de integração e um teste de documentação. Os 74 testes Python passaram nos dois sistemas com Python 3.10. Em Linux, `cargo llvm-cov --locked --all-targets --fail-under-lines 80` mediu 87,28% de cobertura de linhas, acima do limiar de 80%; `cargo audit` verificou 22 dependências e passou. A compilação de lançamento, as campanhas M1/M2 e M3, a minimização e reprodução dos contraexemplos e a comparação dos resultados canónicos entre Linux e Windows também passaram. Os hashes canónicos M1/M2 e as impressões digitais M3 coincidiram entre plataformas; a impressão digital M3 foi `e5a5af6e9bc1b0f5f5fc85ad9fee4574a4a8986860feed0431292524a6b85bbc`. O contraexemplo de paragem conservou os hashes original `d9bcdb476f651bff9650762b7cb3375a39d9c060953f9999a61093257cf8cc7e` e reduzido `36e276570cc256120abb9fa435eec20357d243581180548198c82aa53e7f2b97` em Linux e Windows. A CI validou a revisão `29b7b1be363a9acd0fc334dfb9d773cf1034cd44`.
+O [workflow 38170785258](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/actions/runs/38170785258) validou o código no commit `c2a7e0ade838ba3f269c901014dc50d0167a3da6`, em Linux e Windows. Ambos passaram as verificações de formatação e Clippy, 88 testes Rust unitários e de integração e um teste de documentação. Também passaram 75 testes Python com Python 3.10, a compilação de lançamento, as campanhas, a minimização, a reprodução e a comparação canónica entre plataformas.
+
+Em Linux, a cobertura de linhas foi 87,28%, acima do limiar de 80%. `cargo audit` verificou 22 dependências e passou. As campanhas M1 e M2 passaram 58 casos e 216 invocações por plataforma. A campanha M3 passou 30 casos e 90 invocações por plataforma.
+
+Os resultados detalhados e as impressões digitais abaixo vêm do workflow 38170117451, no commit `29b7b1be363a9acd0fc334dfb9d773cf1034cd44`. O workflow 38170785258 voltou a validar as mesmas campanhas depois da correção dos destinos externos.
 
 O exemplo verifica um modelo determinístico finito e as entradas configuradas. Não demonstra segurança para todo o futuro possível, não modela motores ou dinâmica física e não constitui certificação de segurança no mundo real. Uma campanha aprovada confirma que resultados e expectativas deste conjunto de casos são reproduzíveis, não que qualquer veículo ou missão esteja certificado.
