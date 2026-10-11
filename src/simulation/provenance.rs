@@ -513,9 +513,10 @@ fn build_counterexample_ticks(
         let event = events_by_tick
             .get(tick)
             .and_then(|events| {
-                events.iter().copied().find(|event| {
-                    matches!(event.event, EventPayload::TickResult { .. })
-                })
+                events
+                    .iter()
+                    .copied()
+                    .find(|event| matches!(event.event, EventPayload::TickResult { .. }))
             })
             .ok_or_else(|| LabError(format!("missing tick result at tick {tick}")))?;
         let (truth_from, truth_position) = match event.event {
