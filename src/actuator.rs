@@ -692,7 +692,10 @@ mod tests {
         let late_fault = apply(&mut model, 3, Action::hold());
         assert_eq!(late_fault.realized_action, Action::hold());
         assert_eq!(late_fault.behavior, ActuatorBehavior::Identity);
-        assert_eq!(late_fault.fault_events[0].kind, ActuatorEventKind::FaultWindowActive);
+        assert_eq!(
+            late_fault.fault_events[0].kind,
+            ActuatorEventKind::FaultWindowActive
+        );
     }
 
     #[test]
