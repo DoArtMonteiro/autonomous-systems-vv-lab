@@ -195,6 +195,23 @@ fn verified_simulation_and_benchmark_reject_invalid_inputs() {
 }
 
 #[test]
+fn verified_simulation_rejects_invalid_reproduction_commands() {
+    for reproduction_command in [String::new(), "x".repeat(4097)] {
+        assert!(
+            run_verified_scenario(
+                stop_scenario(),
+                42,
+                ActuatorConfig::default(),
+                stop_contracts(),
+                MissionPolicy::default(),
+                reproduction_command,
+            )
+            .is_err()
+        );
+    }
+}
+
+#[test]
 fn verified_benchmark_measures_the_configured_iterations_and_is_seed_deterministic() {
     let scenario = stop_scenario();
     let actuator = continued_stop_actuator();

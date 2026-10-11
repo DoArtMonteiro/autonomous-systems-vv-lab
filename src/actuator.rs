@@ -419,8 +419,8 @@ impl ActuatorModel {
             ));
         }
 
-        self.last_realized_movement = is_movement(realized_action)
-            .then_some((realized_action, source_command_tick));
+        self.last_realized_movement =
+            is_movement(realized_action).then_some((realized_action, source_command_tick));
 
         let pending_commands_at_termination = if tick == self.steps {
             for pending in &self.pending {
@@ -705,8 +705,14 @@ mod tests {
             5,
         )
         .unwrap();
-        assert_eq!(apply(&mut model, 1, movement()).realized_action, Action::hold());
-        assert_eq!(apply(&mut model, 2, Action::hold()).realized_action, Action::hold());
+        assert_eq!(
+            apply(&mut model, 1, movement()).realized_action,
+            Action::hold()
+        );
+        assert_eq!(
+            apply(&mut model, 2, Action::hold()).realized_action,
+            Action::hold()
+        );
 
         let executed = apply(&mut model, 3, Action::hold());
         assert_eq!(executed.realized_action, movement());

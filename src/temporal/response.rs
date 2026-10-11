@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, VecDeque};
 
 use super::{
-    ContractEvidence, ContractOutcome, EvidenceDraft, EvidenceReason,
-    ExpectedCondition, ObservationState, ObservedCondition, TraceTick, evidence_row, observe,
+    ContractEvidence, ContractOutcome, EvidenceDraft, EvidenceReason, ExpectedCondition,
+    ObservationState, ObservedCondition, TraceTick, evidence_row, observe,
 };
 use crate::contracts::{CommandOutcome, Correlation, Predicate, TraceFact};
 

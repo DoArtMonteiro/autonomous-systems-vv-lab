@@ -249,11 +249,9 @@ pub fn evaluate(contracts: &ContractSet, trace: &[TraceTick]) -> Vec<ContractRes
                     within_ticks,
                     minimum_increase_mm,
                     ..
-                } => progress::evaluate_bounded_progress(
-                    *within_ticks,
-                    *minimum_increase_mm,
-                    trace,
-                ),
+                } => {
+                    progress::evaluate_bounded_progress(*within_ticks, *minimum_increase_mm, trace)
+                }
             };
             build_result(contracts.schema_version, contract, evidence)
         })

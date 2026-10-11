@@ -1,8 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use super::{
-    CommandAtTick, ContractFailureEvidence, CounterexampleTick, LinkedActuatorFaultEvent,
-};
+use super::{CommandAtTick, ContractFailureEvidence, CounterexampleTick, LinkedActuatorFaultEvent};
 use crate::actuator::{ActuationOutcome, ActuatorBehavior};
 use crate::contracts::{CommandOutcome, TraceFact, TransitionDomain, TransitionState};
 use crate::error::LabError;
@@ -10,10 +8,7 @@ use crate::model::{
     Action, EventPayload, EventRecord, EventsArtifact, MissionState, ObservedTelemetry, Point,
     SafetyState, Scenario,
 };
-use crate::temporal::{
-    ContractOutcome, ContractResult, EvidenceReason, ExpectedCondition, ObservationState, TraceTick,
-    TraceTransition,
-};
+use crate::temporal::{ContractOutcome, ContractResult, TraceTick, TraceTransition};
 
 pub(super) fn build_temporal_trace(
     artifact: &EventsArtifact,

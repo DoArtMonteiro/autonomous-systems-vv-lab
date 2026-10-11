@@ -115,7 +115,7 @@ pub struct CounterexampleTick {
     pub source_event_sequences: Vec<u64>,
 }
 
-fn verification_digest(verification: &VerificationArtifact) -> String {
+pub(super) fn verification_digest(verification: &VerificationArtifact) -> String {
     hash_serializable(&UnsignedVerificationArtifact {
         schema_version: verification.schema_version,
         source_artifact_sha256: &verification.source_artifact_sha256,
@@ -249,7 +249,7 @@ fn validate_verification_shape(verification: &VerificationArtifact) -> Result<()
     Ok(())
 }
 
-fn verify_verification_integrity(
+pub(super) fn verify_verification_integrity(
     verification: &VerificationArtifact,
     artifact: &EventsArtifact,
 ) -> Result<(), LabError> {

@@ -8,21 +8,19 @@ use crate::contracts::ContractSet;
 use crate::engine::{CoreOutput, execute, execute_with_actuator};
 use crate::error::LabError;
 use crate::mission_analysis::{MissionAnalysis, MissionOutcome, MissionPolicy, analyze_mission};
-use crate::model::{
-    EventRecord, EventsArtifact, RunReport, RunStatus, SCHEMA_VERSION, Scenario,
-};
+use crate::model::{EventRecord, EventsArtifact, RunReport, RunStatus, SCHEMA_VERSION, Scenario};
 use crate::temporal::{ContractOutcome, evaluate};
 
 mod provenance;
 mod verification;
 
 use provenance::{build_failure_evidence, build_temporal_trace};
-use verification::{verification_digest, verify_verification_integrity};
 pub use verification::{
-    parse_verification_artifact, CommandAtTick, ContractFailureEvidence,
-    CounterexampleTick, LinkedActuatorFaultEvent, VerificationArtifact,
-    VerificationSummary, VERIFICATION_SCHEMA_VERSION,
+    CommandAtTick, ContractFailureEvidence, CounterexampleTick, LinkedActuatorFaultEvent,
+    VERIFICATION_SCHEMA_VERSION, VerificationArtifact, VerificationSummary,
+    parse_verification_artifact,
 };
+use verification::{verification_digest, verify_verification_integrity};
 
 const MAX_SCENARIO_BYTES: usize = 2 * 1024 * 1024;
 const MAX_ARTIFACT_BYTES: usize = 128 * 1024 * 1024;
