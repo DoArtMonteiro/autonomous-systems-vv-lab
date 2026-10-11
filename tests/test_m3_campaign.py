@@ -537,6 +537,78 @@ class M3FingerprintTests(unittest.TestCase):
 
 @unittest.skipUnless(M3_BINARY, "build vv-lab with the M3 CLI before running integration tests")
 class M3CampaignCliTests(unittest.TestCase):
+    def test_empty_counterexample_reference_is_reported_as_available_not_verified(self):
+        binary = M3_BINARY
+        assert binary is not None
+        with tempfile.TemporaryDirectory(dir=ROOT) as temporary:
+            temporary_root = Path(temporary)
+            manifest_dir = temporary_root / "manifest"
+            manifest_dir.mkdir()
+            source_dir = ROOT / "scenarios" / "m3"
+            for name in (
+                "nominal-stop.json",
+                "contracts-stop.json",
+                "actuator-continued-stop.json",
+            ):
+                (manifest_dir / name).write_bytes((source_dir / name).read_bytes())
+
+            reference_dir = temporary_root / "empty-reference"
+            reference_dir.mkdir()
+            reference_paths = {}
+            for name in ("original", "reduced", "summary"):
+                path = reference_dir / name
+                path.write_bytes(b"")
+                reference_paths[name] = path.relative_to(ROOT).as_posix()
+
+            source_manifest = load_m3_manifest()
+            case = copy.deepcopy(
+                next(case for case in source_manifest["cases"] if case["id"] == "ignored-stop")
+            )
+            case["id"] = "empty-reference"
+            case["minimized_counterexample"] = reference_paths
+            manifest = {
+                "schema_version": 1,
+                "default_seeds": [42],
+                "contract_sets": {"stop-response": "contracts-stop.json"},
+                "fault_combinations": {"continued-stop": "actuator-continued-stop.json"},
+                "cases": [case],
+                "budgets": {
+                    "max_cases": 1,
+                    "max_runs": 3,
+                    "max_artifact_bytes": 67_108_864,
+                    "time_budget_seconds": 120,
+                },
+            }
+            manifest_path = manifest_dir / "expectations.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            output_root = temporary_root / "campaign"
+            process = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "run_campaign.py"),
+                    "--suite",
+                    "m3",
+                    "--binary",
+                    str(binary),
+                    "--seeds",
+                    "42",
+                    "--m3-manifest",
+                    str(manifest_path),
+                    "--output-root",
+                    str(output_root),
+                ],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+            )
+            self.assertEqual(process.returncode, 0, process.stdout + process.stderr)
+            summary_path = next(output_root.rglob("summary.json"))
+            case_summary = json.loads(summary_path.read_text(encoding="utf-8"))["cases"][0]
+            self.assertTrue(case_summary["minimized_counterexample_available"])
+            self.assertNotIn("minimized_counterexample_verified", case_summary)
+
     def test_nominal_and_real_actuator_failure_runs_replay_and_remain_classified_separately(self):
         binary = M3_BINARY
         assert binary is not None

@@ -353,6 +353,67 @@ class M3TemporalFailureSignatureTests(unittest.TestCase):
 
 @unittest.skipUnless(M3_BINARY, "build vv-lab with the M3 CLI before running minimization integration tests")
 class M3StopCounterexampleMinimizationTests(unittest.TestCase):
+    def test_reduction_preserves_the_mission_progress_outcome(self):
+        binary = M3_BINARY
+        assert binary is not None
+        scenario = ROOT / "scenarios" / "m3" / "unsafe-complete.json"
+        contracts = ROOT / "scenarios" / "m3" / "contracts-unsafe-complete.json"
+        actuator = ROOT / "scenarios" / "m3" / "actuator-none.json"
+        with tempfile.TemporaryDirectory(dir=ROOT) as temporary:
+            output = Path(temporary) / "minimized"
+            process = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "m3_minimize_failure.py"),
+                    str(scenario),
+                    "--contracts",
+                    str(contracts),
+                    "--actuator",
+                    str(actuator),
+                    "--contract-id",
+                    "restricted_zone_clear",
+                    "--seed",
+                    "42",
+                    "--output",
+                    str(output),
+                    "--binary",
+                    str(binary),
+                    "--max-candidates",
+                    "32",
+                    "--time-budget-seconds",
+                    "30",
+                ],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                timeout=40,
+                check=False,
+            )
+            self.assertEqual(process.returncode, 0, process.stdout + process.stderr)
+            original_mission = json.loads(
+                (output / "original" / "mission.json").read_text(encoding="utf-8")
+            )
+            reduced_mission = json.loads(
+                (output / "reduced" / "mission.json").read_text(encoding="utf-8")
+            )
+            reduced_verification = json.loads(
+                (output / "reduced" / "verification.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(original_mission["outcome"], "completed")
+            self.assertEqual(reduced_mission["outcome"], "completed")
+            self.assertLess(
+                json.loads((output / "summary.json").read_text(encoding="utf-8"))[
+                    "reduced_steps"
+                ],
+                20,
+            )
+            lifecycle = next(
+                result
+                for result in reduced_verification["contract_results"]
+                if result["contract_id"] == "mission_lifecycle"
+            )
+            self.assertEqual(lifecycle["outcome"], "PASS")
+
     def test_continued_stop_failure_is_reduced_and_both_traces_replay(self):
         binary = M3_BINARY
         assert binary is not None

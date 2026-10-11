@@ -419,9 +419,8 @@ impl ActuatorModel {
             ));
         }
 
-        if is_movement(realized_action) {
-            self.last_realized_movement = Some((realized_action, source_command_tick));
-        }
+        self.last_realized_movement = is_movement(realized_action)
+            .then_some((realized_action, source_command_tick));
 
         let pending_commands_at_termination = if tick == self.steps {
             for pending in &self.pending {
@@ -662,7 +661,7 @@ mod tests {
     }
 
     #[test]
-    fn continued_actuation_reuses_last_realized_movement_after_stop() {
+    fn continued_actuation_reuses_last_realized_movement_after_failed_stop() {
         let mut model = ActuatorModel::new(config(vec![continued("stuck", 2, 3)]), 9, 3).unwrap();
         assert_eq!(apply(&mut model, 1, movement()).realized_action, movement());
         let stopped = apply(&mut model, 2, Action::hold());
@@ -692,6 +691,36 @@ mod tests {
         let late_fault = apply(&mut model, 3, Action::hold());
         assert_eq!(late_fault.realized_action, Action::hold());
         assert_eq!(late_fault.behavior, ActuatorBehavior::Identity);
+        assert_eq!(
+            late_fault.fault_events[0].kind,
+            ActuatorEventKind::FaultWindowActive
+        );
+    }
+
+    #[test]
+    fn continued_fault_does_not_restart_delayed_motion_after_successful_stop() {
+        let mut model = ActuatorModel::new(
+            config(vec![delayed("delay", 1, 1, 2), continued("stuck", 5, 5)]),
+            9,
+            5,
+        )
+        .unwrap();
+        assert_eq!(apply(&mut model, 1, movement()).realized_action, Action::hold());
+        assert_eq!(apply(&mut model, 2, Action::hold()).realized_action, Action::hold());
+
+        let executed = apply(&mut model, 3, Action::hold());
+        assert_eq!(executed.realized_action, movement());
+        assert_eq!(executed.source_command_tick, 1);
+        assert_eq!(executed.behavior, ActuatorBehavior::DelayedExecution);
+
+        let stopped = apply(&mut model, 4, Action::hold());
+        assert_eq!(stopped.realized_action, Action::hold());
+        assert_eq!(stopped.behavior, ActuatorBehavior::Identity);
+
+        let late_fault = apply(&mut model, 5, Action::hold());
+        assert_eq!(late_fault.realized_action, Action::hold());
+        assert_eq!(late_fault.behavior, ActuatorBehavior::Identity);
+        assert_eq!(late_fault.fault_events.len(), 1);
         assert_eq!(
             late_fault.fault_events[0].kind,
             ActuatorEventKind::FaultWindowActive

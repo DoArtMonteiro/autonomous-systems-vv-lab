@@ -335,6 +335,9 @@ def execute(args: argparse.Namespace) -> int:
         )
         del original_raw
         ensure_tree_size(temp_root, args.max_temp_bytes, "temporary M3 minimization data")
+        original_mission_outcome = original_parsed["mission"].get("outcome")
+        if not isinstance(original_mission_outcome, str) or not original_mission_outcome:
+            raise M3MinimizationError("original mission has no progress outcome")
 
         violation = original_signature["violation_tick"]
         candidate_horizons = range(max(1, violation), steps)
@@ -364,6 +367,8 @@ def execute(args: argparse.Namespace) -> int:
                 ensure_tree_size(temp_root, args.max_temp_bytes, "temporary M3 minimization data")
                 continue
             ensure_tree_size(temp_root, args.max_temp_bytes, "temporary M3 minimization data")
+            if candidate_parsed["mission"].get("outcome") != original_mission_outcome:
+                continue
             try:
                 normalized_result, _evidence, observed_actuation = _failed_contract(
                     candidate_parsed["verification"], args.contract_id
