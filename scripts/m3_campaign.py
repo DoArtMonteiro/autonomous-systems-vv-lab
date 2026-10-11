@@ -47,7 +47,11 @@ def _unique_campaign_dir(base: Path) -> Path:
 
 
 def _portable_path(path: Path, root: Path) -> str:
-    return path.resolve().relative_to(root.resolve()).as_posix()
+    resolved = path.resolve()
+    try:
+        return resolved.relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return resolved.as_posix()
 
 
 def _remaining_time(deadline: float) -> float:

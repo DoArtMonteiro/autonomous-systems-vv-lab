@@ -537,6 +537,39 @@ class M3FingerprintTests(unittest.TestCase):
 
 @unittest.skipUnless(M3_BINARY, "build vv-lab with the M3 CLI before running integration tests")
 class M3CampaignCliTests(unittest.TestCase):
+    def test_external_output_root_writes_complete_summary(self):
+        binary = M3_BINARY
+        assert binary is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            output_root = Path(temporary) / "campaign"
+            process = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "run_campaign.py"),
+                    "--suite",
+                    "m3",
+                    "--binary",
+                    str(binary),
+                    "--seeds",
+                    "42",
+                    "--m3-scenarios",
+                    "nominal-control",
+                    "--output-root",
+                    str(output_root),
+                ],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+            )
+            self.assertEqual(process.returncode, 0, process.stdout + process.stderr)
+            summary_path = next(output_root.rglob("summary.json"))
+            summary = json.loads(summary_path.read_text(encoding="utf-8"))
+            self.assertEqual(summary["status"], "passed")
+            events_path = Path(summary["cases"][0]["output_paths"]["events"])
+            self.assertTrue(events_path.is_file())
+
     def test_empty_counterexample_reference_is_reported_as_available_not_verified(self):
         binary = M3_BINARY
         assert binary is not None
