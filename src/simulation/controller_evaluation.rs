@@ -142,6 +142,7 @@ pub fn source_sha256() -> String {
         ("src/error.rs", include_str!("../error.rs")),
         ("src/geometry.rs", include_str!("../geometry.rs")),
         ("src/lib.rs", include_str!("../lib.rs")),
+        ("src/m4_cli.rs", include_str!("../m4_cli.rs")),
         (
             "src/mission_analysis.rs",
             include_str!("../mission_analysis.rs"),
