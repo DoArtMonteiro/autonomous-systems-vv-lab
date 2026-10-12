@@ -12,9 +12,24 @@ use crate::model::{EventRecord, EventsArtifact, RunReport, RunStatus, SCHEMA_VER
 use crate::temporal::{ContractOutcome, evaluate};
 
 mod provenance;
+mod controller_evaluation;
+mod controller_comparison;
 mod verification;
 
 use provenance::{build_failure_evidence, build_temporal_trace};
+pub use controller_evaluation::{
+    ArtifactReference, CONTROLLER_COMPARISON_SCHEMA_VERSION,
+    CONTROLLER_EVALUATION_SCHEMA_VERSION, CONTROLLER_INTERFACE_VERSION,
+    ControllerEvaluationManifest, ControllerEvaluationMetrics, ControllerEvaluationOutcome,
+    ControllerEvaluationProvenance, POLICY_BEHAVIOR_VERSION, controller_id,
+    parse_controller_evaluation_manifest, parse_controller_id, replay_controller_evaluation,
+    run_controller_evaluation, source_sha256, validate_controller_evaluation_files,
+    validate_relative_reference,
+};
+pub use controller_comparison::{
+    ComparisonPolicyReferences, ComparisonProvenance, ControllerComparisonArtifact,
+    ComparedController, create_controller_comparison, parse_controller_comparison_artifact,
+};
 pub use verification::{
     CommandAtTick, ContractFailureEvidence, CounterexampleTick, LinkedActuatorFaultEvent,
     VERIFICATION_SCHEMA_VERSION, VerificationArtifact, VerificationSummary,

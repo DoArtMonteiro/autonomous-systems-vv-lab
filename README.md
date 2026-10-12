@@ -2,7 +2,7 @@
 
 Laboratório em Rust para verificar missões de um veículo autónomo terrestre em duas dimensões. Combina falhas de sensores, comunicação e atuadores com invariantes de segurança, contratos temporais e reprodução determinística. Python coordena campanhas limitadas e a redução de contraexemplos.
 
-**Estado: M3, protótipo de verificação e campanhas limitadas.** Rust executa a simulação e avalia os contratos; Python seleciona cenários, organiza campanhas e reduz contraexemplos. O controlador recebe observações, nunca o estado real. O laboratório não controla equipamento real.
+**Estado: M4 em desenvolvimento.** Rust executa a simulação, aplica as políticas de controlo e avalia os contratos; Python seleciona cenários, organiza campanhas e reduz contraexemplos. O controlador recebe apenas observações e configuração da missão. O laboratório não controla equipamento real.
 
 ## Executar uma missão
 
@@ -153,9 +153,11 @@ python scripts/run_campaign.py --suite m3 --seeds 42,1337,2026 --max-runs 90 --m
 
 Cada campanha grava JSON, resumo Markdown e evidência por cenário, variante e semente. Verifica a repetição canónica e reproduz cada caso. A campanha M3 apresenta separadamente contratos temporais, segurança e progresso da missão, e identifica contratos e contraexemplos reduzidos.
 
+A campanha M4 compara `DominantAxis` e `XFirst` em quatro cenários e três sementes. Compara os calendários externos regenerados por reprodução independente e regista segurança, contratos, progresso, hashes, duração e espaço retido. [Instruções para executar a campanha M4](docs/reproducibility.md).
+
 `--suite m2 --seeds 42 --variants standard` seleciona dez casos. `--max-cases`, `--max-runs`, `--max-artifact-bytes` e `--time-budget-seconds` limitam a campanha antes e durante a execução. `--max-runs` conta invocações do simulador, incluindo repetições, reprodução e análise. Uma expectativa satisfeita não transforma uma missão insegura numa missão bem-sucedida.
 
-GitHub Actions executa formatação, Clippy, testes Rust e Python, cobertura mínima de 80%, as campanhas M1/M2 e M3, minimização e reprodução em Linux e Windows. Compara os hashes canónicos entre os dois sistemas, incluindo os artefactos M3 reduzidos. [Resultados do M3](docs/m3-results.md), [resultados do M2](docs/m2-results.md), [resultados do M1](docs/m1-results.md) e [contrato de reprodução](docs/reproducibility.md).
+GitHub Actions executa formatação, Clippy, testes Rust e Python, cobertura mínima de 80%, as campanhas M1, M2, M3 e M4, minimização e reprodução em Linux e Windows. Compara os hashes canónicos entre os dois sistemas. [Resultados do M3](docs/m3-results.md), [resultados do M2](docs/m2-results.md), [resultados do M1](docs/m1-results.md) e [contrato de reprodução](docs/reproducibility.md).
 
 ## Reduzir uma falha
 
@@ -186,4 +188,4 @@ Também é possível selecionar `--property mission:stalled` para reduzir uma es
 - As mensagens transportam observações do GPS. Não há protocolo de rede real, múltiplos agentes ou controlo de equipamento.
 - A integridade do registo não prova a segurança de um sistema real. O laboratório verifica propriedades deste modelo e das entradas fornecidas.
 - Sem interface gráfica, serviços distribuídos ou alojamento. A pesquisa tem uma ordem determinística, mas um orçamento de tempo atingido pode interrompê-la mais cedo numa máquina lenta.
-- As regras de identidade da falha são conservadoras e específicas deste modelo. Um M4 poderá avaliar uma interface versionada entre simulador e controlador, mantendo a execução determinística num único processo.
+- A avaliação M4 cobre duas políticas determinísticas neste modelo. O calendário externo iguala as falhas e o ruído, mas não força observações iguais quando as trajetórias divergem.

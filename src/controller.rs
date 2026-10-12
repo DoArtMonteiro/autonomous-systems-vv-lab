@@ -1,6 +1,7 @@
 use crate::model::{
     Action, Bounds, Heading, MissionConfig, MissionState, ObservedTelemetry, Point, SafetyState,
 };
+use serde::{Deserialize, Serialize};
 
 /// Entrada limitada do controlador, composta por observações e configuração.
 ///
@@ -20,6 +21,14 @@ pub struct ControllerInput<'a> {
     pub step_mm: i32,
     pub bounds: &'a Bounds,
     pub confidence_threshold_permille: u16,
+}
+
+/// Conjunto fechado e versionado de políticas de controlo determinísticas.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ControllerPolicyV1 {
+    DominantAxis,
+    XFirst,
 }
 
 #[derive(Clone, Debug)]
@@ -145,6 +154,11 @@ pub(crate) fn update_safety(
 
 /// Escolhe uma ação apenas com base na entrada observável do controlador.
 pub fn choose_action(input: &ControllerInput<'_>) -> Action {
+    choose_action_v1(ControllerPolicyV1::DominantAxis, input)
+}
+
+/// Escolhe uma ação através de uma política V1 e apenas com dados observáveis.
+pub fn choose_action_v1(policy: ControllerPolicyV1, input: &ControllerInput<'_>) -> Action {
     if input.mission_state == MissionState::Completed || input.safety_state == SafetyState::Fallback
     {
         return Action::hold();
@@ -158,7 +172,7 @@ pub fn choose_action(input: &ControllerInput<'_>) -> Action {
     let Some(target) = input.target else {
         return Action::hold();
     };
-    let Some(heading) = desired_heading(observed.position, target) else {
+    let Some(heading) = desired_heading(policy, observed.position, target) else {
         return Action::hold();
     };
     let destination = observed.position.translated(heading, input.step_mm);
@@ -168,13 +182,17 @@ pub fn choose_action(input: &ControllerInput<'_>) -> Action {
     Action::step(heading, input.step_mm)
 }
 
-fn desired_heading(position: Point, target: Point) -> Option<Heading> {
+fn desired_heading(policy: ControllerPolicyV1, position: Point, target: Point) -> Option<Heading> {
     let delta_x = target.x_mm - position.x_mm;
     let delta_y = target.y_mm - position.y_mm;
     if delta_x == 0 && delta_y == 0 {
         return None;
     }
-    if delta_x.abs() >= delta_y.abs() && delta_x != 0 {
+    let prefer_x_axis = match policy {
+        ControllerPolicyV1::DominantAxis => delta_x.abs() >= delta_y.abs(),
+        ControllerPolicyV1::XFirst => delta_x != 0,
+    };
+    if prefer_x_axis && delta_x != 0 {
         Some(if delta_x > 0 {
             Heading::East
         } else {
