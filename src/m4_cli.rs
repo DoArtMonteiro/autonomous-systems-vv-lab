@@ -10,8 +10,8 @@ use autonomous_systems_vv_lab::mission_analysis::MissionPolicy;
 use autonomous_systems_vv_lab::{
     ArtifactReference, ComparisonPolicyReferences, create_controller_comparison,
     parse_controller_evaluation_manifest, parse_controller_id, parse_scenario,
-    replay_controller_evaluation, run_controller_evaluation,
-    status_exit_code, validate_controller_evaluation_files,
+    replay_controller_evaluation, run_controller_evaluation, status_exit_code,
+    validate_controller_evaluation_files,
 };
 
 pub(super) fn run_m4_command(args: &[String]) -> Result<u8, String> {
