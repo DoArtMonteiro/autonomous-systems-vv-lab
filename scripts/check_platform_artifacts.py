@@ -90,7 +90,7 @@ def load_m4_outputs(path: Path) -> dict[tuple[str, int], dict[str, Any]]:
             or set(metrics) != expected_controllers
             or not isinstance(input_hashes, dict)
             or set(input_hashes) != {"scenario", "contracts", "actuator"}
-            or any(not isinstance(digest, str) or len(digest) != 64 for digest in digests)
+            or any(not is_m4_sha256(digest) for digest in digests)
         ):
             raise CampaignError(f"M4 fingerprints are invalid for {identity}")
         for hashes in repeat_hashes.values():
@@ -102,10 +102,18 @@ def load_m4_outputs(path: Path) -> dict[tuple[str, int], dict[str, Any]]:
                 "m4.json",
             }:
                 raise CampaignError(f"M4 repeat hashes are incomplete for {identity}")
-            if any(not isinstance(digest, str) or len(digest) != 64 for digest in hashes.values()):
+            if any(not is_m4_sha256(digest) for digest in hashes.values()):
                 raise CampaignError(f"M4 repeat hash is malformed for {identity}")
         selected[identity] = entry
     return selected
+
+
+def is_m4_sha256(value: Any) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
+    )
 
 
 def compare_m4_platform_outputs(root: Path) -> dict[str, Any]:

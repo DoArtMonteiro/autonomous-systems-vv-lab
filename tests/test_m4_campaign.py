@@ -127,6 +127,38 @@ class M4CampaignPlanningTests(unittest.TestCase):
             self.assertEqual(result["status"], "passed")
             self.assertEqual(result["pair_count"], 12)
 
+            for digest_path in (
+                ("calendar_sha256",),
+                ("comparison_sha256",),
+                ("input_sha256", "scenario"),
+                ("repeat_output_sha256", "x_first", "m4.json"),
+            ):
+                malformed = json.loads(json.dumps(entries))
+                value = malformed[0]
+                for key in digest_path[:-1]:
+                    value = value[key]
+                value[digest_path[-1]] = "z" * 64
+                for platform in ("linux-campaign", "windows-campaign"):
+                    (root / platform / "m4-fingerprints.json").write_text(
+                        json.dumps(
+                            {
+                                "schema_version": 1,
+                                "suite": "m4",
+                                "outputs": malformed,
+                            }
+                        ),
+                        encoding="utf-8",
+                    )
+                with self.subTest(digest_path=digest_path):
+                    with self.assertRaises(CampaignError):
+                        compare_m4_platform_outputs(root)
+
+            for platform in ("linux-campaign", "windows-campaign"):
+                (root / platform / "m4-fingerprints.json").write_text(
+                    json.dumps({"schema_version": 1, "suite": "m4", "outputs": entries}),
+                    encoding="utf-8",
+                )
+
             changed = json.loads(
                 (root / "windows-campaign" / "m4-fingerprints.json").read_text(
                     encoding="utf-8"
