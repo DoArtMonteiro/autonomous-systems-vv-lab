@@ -64,3 +64,5 @@ python scripts/m4_campaign.py --binary target/release/vv-lab --seeds 42,1337,202
 ```
 
 No Windows, usar `target/release/vv-lab.exe`. `results.json` regista métricas, hashes, repetibilidade, reproduções e consumo de recursos. `m4-fingerprints.json` contém os hashes canónicos usados para a comparação entre plataformas.
+
+Os resultados da campanha aprovada em Linux e Windows, incluindo os calendários, as métricas por política, os hashes de proveniência e os limites medidos, estão em [resultados do M4](m4-results.md). Os artefactos completos ficam associados à execução de CI indicada nesse documento.
