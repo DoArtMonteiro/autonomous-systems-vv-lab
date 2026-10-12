@@ -309,39 +309,29 @@ fn exogenous_calendar(
         }
         let tick = &mut ticks[record.tick as usize - 1];
         match &record.event {
+            EventPayload::GpsSample { .. } if tick.gps.is_some() => {
+                return Err(LabError(format!(
+                    "duplicate M4 GPS sample at tick {}",
+                    record.tick
+                )));
+            }
             EventPayload::GpsSample {
                 dropped,
                 noise_x_mm,
                 noise_y_mm,
                 ..
-            } => {
-                if tick
-                    .gps
-                    .replace((*dropped, *noise_x_mm, *noise_y_mm))
-                    .is_some()
-                {
-                    return Err(LabError(format!(
-                        "duplicate M4 GPS sample at tick {}",
-                        record.tick
-                    )));
-                }
+            } => tick.gps = Some((*dropped, *noise_x_mm, *noise_y_mm)),
+            EventPayload::PacketOutcome { .. } if tick.communication.is_some() => {
+                return Err(LabError(format!(
+                    "duplicate M4 communication outcome at tick {}",
+                    record.tick
+                )));
             }
             EventPayload::PacketOutcome {
                 delivered,
                 delay_ticks,
                 ..
-            } => {
-                if tick
-                    .communication
-                    .replace((*delivered, *delay_ticks))
-                    .is_some()
-                {
-                    return Err(LabError(format!(
-                        "duplicate M4 communication outcome at tick {}",
-                        record.tick
-                    )));
-                }
-            }
+            } => tick.communication = Some((*delivered, *delay_ticks)),
             _ => {}
         }
     }
