@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use super::{enforce_output_limit, parse_seed, parse_u32, parse_u64, read_text_file};
 use autonomous_systems_vv_lab::actuator::ActuatorConfig;
 use autonomous_systems_vv_lab::contracts::ContractSet;
 use autonomous_systems_vv_lab::controller::ControllerPolicyV1;
@@ -12,7 +13,6 @@ use autonomous_systems_vv_lab::{
     parse_verification_artifact, replay_controller_evaluation, run_controller_evaluation,
     status_exit_code, validate_controller_evaluation_files,
 };
-use super::{enforce_output_limit, parse_seed, parse_u32, parse_u64, read_text_file};
 
 pub(super) fn run_m4_command(args: &[String]) -> Result<u8, String> {
     let arguments = parse_m4_run_arguments(args)?;
