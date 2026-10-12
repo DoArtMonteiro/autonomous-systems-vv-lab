@@ -3,8 +3,8 @@ use std::collections::BTreeMap;
 use crate::actuator::{ActuationOutcome, ActuatorConfig, ActuatorModel};
 use crate::artifact::{ExogenousTick, GpsExogenous, PacketExogenous, Recorder};
 use crate::controller::{
-    ControllerInput, ControllerState, TransitionIntent, choose_action, update_mission,
-    update_safety,
+    ControllerInput, ControllerPolicyV1, ControllerState, TransitionIntent, choose_action_v1,
+    update_mission, update_safety,
 };
 use crate::error::LabError;
 use crate::model::{
@@ -52,7 +52,13 @@ pub(crate) fn execute(
     seed: u64,
     prerecorded: Option<&BTreeMap<u32, ExogenousTick>>,
 ) -> Result<CoreOutput, LabError> {
-    execute_inner(scenario, seed, prerecorded, None)
+    execute_inner(
+        scenario,
+        seed,
+        prerecorded,
+        None,
+        ControllerPolicyV1::DominantAxis,
+    )
 }
 
 pub(crate) fn execute_with_actuator(
@@ -61,7 +67,22 @@ pub(crate) fn execute_with_actuator(
     prerecorded: Option<&BTreeMap<u32, ExogenousTick>>,
     actuator_config: &ActuatorConfig,
 ) -> Result<CoreOutput, LabError> {
-    execute_inner(scenario, seed, prerecorded, Some(actuator_config))
+    execute_inner(
+        scenario,
+        seed,
+        prerecorded,
+        Some(actuator_config),
+        ControllerPolicyV1::DominantAxis,
+    )
+}
+
+pub(crate) fn execute_with_controller_policy(
+    scenario: &Scenario,
+    seed: u64,
+    actuator_config: &ActuatorConfig,
+    policy: ControllerPolicyV1,
+) -> Result<CoreOutput, LabError> {
+    execute_inner(scenario, seed, None, Some(actuator_config), policy)
 }
 
 fn execute_inner(
@@ -69,6 +90,7 @@ fn execute_inner(
     seed: u64,
     prerecorded: Option<&BTreeMap<u32, ExogenousTick>>,
     actuator_config: Option<&ActuatorConfig>,
+    controller_policy: ControllerPolicyV1,
 ) -> Result<CoreOutput, LabError> {
     let mut recorder = Recorder::new();
     let mut rng = XorShift64Star::new(seed);
@@ -178,7 +200,7 @@ fn execute_inner(
             bounds: &scenario.bounds,
             confidence_threshold_permille: scenario.safety.confidence_threshold_permille,
         };
-        let action = choose_action(&controller_input);
+        let action = choose_action_v1(controller_policy, &controller_input);
         let actuation_outcome = actuator.as_mut().map(|model| model.apply(tick, action));
         let realized_action = actuation_outcome
             .as_ref()

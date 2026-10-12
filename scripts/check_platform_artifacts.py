@@ -45,6 +45,107 @@ def find_fingerprints(root: Path, platform: str) -> list[Path]:
     return sorted(matches)
 
 
+def find_m4_fingerprint(root: Path, platform: str) -> Path | None:
+    matches = []
+    for path in root.rglob("m4-fingerprints.json"):
+        relative_parts = [part.lower() for part in path.relative_to(root).parts]
+        if any(part.startswith(platform.lower()) for part in relative_parts):
+            matches.append(path)
+    if len(matches) > 1:
+        raise CampaignError(
+            f"expected at most one {platform} M4 fingerprint file below {root}, found {len(matches)}"
+        )
+    return matches[0] if matches else None
+
+
+def load_m4_outputs(path: Path) -> dict[tuple[str, int], dict[str, Any]]:
+    value = load_fingerprints(path)
+    outputs = value.get("outputs")
+    if value.get("suite") != "m4" or not isinstance(outputs, list) or not outputs:
+        raise CampaignError(f"M4 fingerprints file is incomplete: {path}")
+    selected: dict[tuple[str, int], dict[str, Any]] = {}
+    for entry in outputs:
+        if not isinstance(entry, dict):
+            raise CampaignError(f"M4 fingerprint entry is malformed in {path}")
+        scenario = entry.get("scenario")
+        seed = entry.get("seed")
+        if not isinstance(scenario, str) or type(seed) is not int:
+            raise CampaignError(f"M4 fingerprint identity is incomplete in {path}")
+        identity = (scenario, seed)
+        if identity in selected:
+            raise CampaignError(f"duplicate M4 fingerprint identity in {path}: {identity}")
+        expected_controllers = {"dominant_axis", "x_first"}
+        repeat_hashes = entry.get("repeat_output_sha256")
+        metrics = entry.get("policy_metrics")
+        input_hashes = entry.get("input_sha256")
+        digests = [
+            entry.get("calendar_sha256"),
+            entry.get("comparison_sha256"),
+            *(input_hashes.values() if isinstance(input_hashes, dict) else []),
+        ]
+        if (
+            not isinstance(repeat_hashes, dict)
+            or set(repeat_hashes) != expected_controllers
+            or not isinstance(metrics, dict)
+            or set(metrics) != expected_controllers
+            or not isinstance(input_hashes, dict)
+            or set(input_hashes) != {"scenario", "contracts", "actuator"}
+            or any(not is_m4_sha256(digest) for digest in digests)
+        ):
+            raise CampaignError(f"M4 fingerprints are invalid for {identity}")
+        for hashes in repeat_hashes.values():
+            if not isinstance(hashes, dict) or set(hashes) != {
+                "events.json",
+                "report.json",
+                "mission.json",
+                "verification.json",
+                "m4.json",
+            }:
+                raise CampaignError(f"M4 repeat hashes are incomplete for {identity}")
+            if any(not is_m4_sha256(digest) for digest in hashes.values()):
+                raise CampaignError(f"M4 repeat hash is malformed for {identity}")
+        selected[identity] = entry
+    return selected
+
+
+def is_m4_sha256(value: Any) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
+def compare_m4_platform_outputs(root: Path) -> dict[str, Any]:
+    linux_path = find_m4_fingerprint(root, "linux-campaign")
+    windows_path = find_m4_fingerprint(root, "windows-campaign")
+    if linux_path is None and windows_path is None:
+        return {}
+    if linux_path is None or windows_path is None:
+        raise CampaignError("M4 fingerprints are missing for one platform")
+    linux = load_m4_outputs(linux_path)
+    windows = load_m4_outputs(windows_path)
+    expected = {
+        (scenario, seed)
+        for scenario in (
+            "nominal",
+            "x-first-overshoot",
+            "gps-fallback",
+            "intermittent-actuation",
+        )
+        for seed in (42, 1337, 2026)
+    }
+    if set(linux) != expected or set(windows) != expected:
+        raise CampaignError("M4 platform fingerprints do not cover all 12 planned pairs")
+    if linux != windows:
+        raise CampaignError("M4 canonical controller outputs differ between Linux and Windows")
+    return {
+        "status": "passed",
+        "pair_count": len(linux),
+        "outputs": {f"{scenario}:seed-{seed}": entry for (scenario, seed), entry in sorted(linux.items())},
+    }
+
+
 def load_fingerprints(path: Path) -> dict[str, Any]:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
@@ -226,7 +327,7 @@ def seed42_outputs(value: dict[str, Any]) -> dict[str, dict[str, str]]:
     return selected
 
 
-def compare_platforms(root: Path) -> dict[str, Any]:
+def compare_platforms(root: Path, *, require_m4: bool = False) -> dict[str, Any]:
     linux_paths = find_fingerprints(root, "linux-campaign")
     windows_paths = find_fingerprints(root, "windows-campaign")
     linux = merge_fingerprints(linux_paths)
@@ -326,6 +427,9 @@ def compare_platforms(root: Path) -> dict[str, Any]:
         raise CampaignError("M3 outputs are present but the fingerprint omits the M3 suite")
     if linux.get("fixture_checksums_sha256") != expected_fixture_hashes:
         raise CampaignError("fingerprints do not match the checked-in scenario fixtures")
+    m4_outputs = compare_m4_platform_outputs(root)
+    if require_m4 and not m4_outputs:
+        raise CampaignError("M4 platform fingerprints are required but missing")
     return {
         "status": "passed",
         "scenario_count": len(linux_outputs),
@@ -334,6 +438,7 @@ def compare_platforms(root: Path) -> dict[str, Any]:
         "output_checksums": linux_outputs,
         "minimized_output_checksums": linux_minimized,
         "m3_minimized_output_checksums": linux_m3_minimized,
+        "m4_output_checksums": m4_outputs,
         "fingerprint_files": {
             "linux": [str(path) for path in linux_paths],
             "windows": [str(path) for path in windows_paths],
@@ -344,10 +449,11 @@ def compare_platforms(root: Path) -> dict[str, Any]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, required=True)
+    parser.add_argument("--require-m4", action="store_true")
     args = parser.parse_args()
     root = args.root if args.root.is_absolute() else ROOT / args.root
     try:
-        result = compare_platforms(root.resolve())
+        result = compare_platforms(root.resolve(), require_m4=args.require_m4)
         print(json.dumps(result, indent=2, sort_keys=True))
         return 0
     except CampaignError as error:

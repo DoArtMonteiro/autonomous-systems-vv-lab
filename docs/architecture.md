@@ -123,6 +123,20 @@ Uma configuração sem falhas preserva a ação do M2. As falhas declarativas in
 
 O artefacto novo `verification.json` guarda a configuração do atuador, os contratos usados, os resultados do monitor, as evidências e as referências aos eventos de origem. O formato legado `events.json` e `report.json` mantém-se v1. A reprodução M3 valida ambos os artefactos, executa novamente a simulação e o monitor e compara as evidências. Python escolhe cenários e organiza campanhas limitadas; não calcula o resultado autoritativo dos contratos.
 
+## Interfaces de controlo e avaliação diferencial no M4
+
+O M4 acrescenta `ControllerPolicyV1`, um conjunto fechado com `DominantAxis` e `XFirst`. `choose_action_v1` recebe o mesmo `ControllerInput` observável do controlador atual. Ambos os comportamentos passam pelos mesmos bloqueios de conclusão, segurança, observação ausente ou antiga, confiança, destino e limites. `choose_action` mantém a assinatura anterior e delega em `DominantAxis`.
+
+O motor recebe a política na chamada de escolha da ação. A supervisão da missão, a atualização do estado físico, a ordem dos sorteios, o atuador e o verificador mantêm a sequência existente. Cada política é executada numa simulação nova. A segunda execução não reutiliza objetos `ExogenousTick`, porque estes contêm a posição real e coordenadas observadas derivadas da trajetória.
+
+Cada execução M4 calcula uma projeção canónica versionada da agenda externa, com um registo por passo lógico. Cada registo contém perda de GPS, ruído GPS X/Y sem transformação, entrega e atraso da comunicação e a lista ordenada de identificadores de falhas ativas no atuador. Inclui passos sem falhas, com uma lista vazia. Exclui posição real, coordenadas observadas, ação pedida e efeitos físicos. O hash da projeção tem a versão 1.
+
+Calendários iguais significam que os controladores receberam a mesma agenda de estímulos externos. Não garantem observações iguais: a posição real de amostragem pode divergir e o GPS deriva as coordenadas observadas dessa posição mais o mesmo ruído. A geração de sensor e comunicação consome os mesmos sorteios por passo. O atuador sorteia identificadores ativos antes de aplicar a ação e usa um gerador separado. Se uma alteração futura fizer uma decisão do controlador alterar a sequência externa, a comparação falha quando os hashes diferirem.
+
+O manifesto `m4.json` liga `interface_version`, `controller_id`, `policy_behavior_version`, hashes de fonte, cenário e configuração, referências dos artefactos v1/M3, hash da agenda e métricas separadas de segurança, contratos e progresso. `compare-m4` volta a executar cada política e só compara os hashes de calendário regenerados; regista a diferença de ações e as métricas por política. `replay-m4` escolhe a política pelo manifesto, volta a executar a simulação e recalcula eventos, relatório, missão, invariantes, contratos temporais e calendário. A reprodução rejeita versões desconhecidas, caminhos laterais inesperados e hashes divergentes.
+
+O M4 mantém os esquemas `events.json`, `report.json` e `verification.json`, bem como os comandos `run` e `replay` existentes. Os comandos novos `run-m4`, `replay-m4` e `compare-m4` mantêm o âmbito no mesmo processo. ROS 2, processos externos, protocolos de rede, equipamento físico, interface gráfica e integração com o Flight Systems Lab ficam fora deste marco.
+
 ## Evolução do contrato
 
 Alterações na ordem de eventos, arredondamentos, gerador, confiança, grafo ou serialização podem mudar o comportamento. Exigem cenários de regressão e decisão explícita sobre a versão do contrato. Separar serviços ou introduzir um protocolo só se houver uma necessidade real de interface.

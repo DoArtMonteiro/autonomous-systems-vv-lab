@@ -90,6 +90,9 @@ jobs:
       - name: Run bounded M3 verification campaign
         run: python scripts/run_campaign.py --binary target/release/vv-lab${{ matrix.exe_suffix }} --suite m3 --seeds 42,1337,2026 --max-runs 90 --max-cases 30 --max-artifact-bytes 67108864 --time-budget-seconds 120 --output-root runs/ci-m3-${{ runner.os }}
 
+      - name: Run bounded M4 controller evaluation campaign
+        run: python scripts/m4_campaign.py --binary target/release/vv-lab${{ matrix.exe_suffix }} --seeds 42,1337,2026 --max-invocations 90 --max-pairs 30 --max-artifact-bytes 67108864 --time-budget-seconds 120 --output-root runs/ci-m4-${{ runner.os }}
+
       - name: Minimize the seeded natural sensor fault
         env:
           VV_LAB_BINARY: target/release/vv-lab${{ matrix.exe_suffix }}
@@ -106,6 +109,7 @@ jobs:
           path: |
             runs/ci-${{ runner.os }}/campaign-*
             runs/ci-m3-${{ runner.os }}/campaign-*
+            runs/ci-m4-${{ runner.os }}/campaign-m4-*
             runs/ci-minimized
             runs/m3-stop-counterexample
           if-no-files-found: warn
@@ -135,5 +139,5 @@ jobs:
           merge-multiple: false
 
       - name: Compare pinned fixture outputs
-        run: python scripts/check_platform_artifacts.py --root platform-campaigns
+        run: python scripts/check_platform_artifacts.py --root platform-campaigns --require-m4
         shell: bash

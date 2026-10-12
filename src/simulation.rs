@@ -11,9 +11,24 @@ use crate::mission_analysis::{MissionAnalysis, MissionOutcome, MissionPolicy, an
 use crate::model::{EventRecord, EventsArtifact, RunReport, RunStatus, SCHEMA_VERSION, Scenario};
 use crate::temporal::{ContractOutcome, evaluate};
 
+mod controller_comparison;
+mod controller_evaluation;
 mod provenance;
 mod verification;
 
+pub use controller_comparison::{
+    ComparedController, ComparisonPolicyReferences, ComparisonProvenance,
+    ControllerComparisonArtifact, create_controller_comparison,
+    parse_controller_comparison_artifact,
+};
+pub use controller_evaluation::{
+    ArtifactReference, CONTROLLER_COMPARISON_SCHEMA_VERSION, CONTROLLER_EVALUATION_SCHEMA_VERSION,
+    CONTROLLER_INTERFACE_VERSION, ControllerEvaluationManifest, ControllerEvaluationMetrics,
+    ControllerEvaluationOutcome, ControllerEvaluationProvenance, POLICY_BEHAVIOR_VERSION,
+    controller_id, parse_controller_evaluation_manifest, parse_controller_id,
+    replay_controller_evaluation, run_controller_evaluation, source_sha256,
+    validate_controller_evaluation_files, validate_relative_reference,
+};
 use provenance::{build_failure_evidence, build_temporal_trace};
 pub use verification::{
     CommandAtTick, ContractFailureEvidence, CounterexampleTick, LinkedActuatorFaultEvent,

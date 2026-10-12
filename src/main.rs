@@ -1,3 +1,5 @@
+mod m4_cli;
+
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -22,6 +24,13 @@ fn main() -> ExitCode {
             eprintln!("usage: vv-lab run <scenario.json> --seed <u64> --output <directory>");
             eprintln!("       vv-lab replay <events.json>");
             eprintln!(
+                "       vv-lab run-m4 <scenario.json> --seed <u64> --controller <id> --output <directory> --contracts <properties.json>"
+            );
+            eprintln!("       vv-lab replay-m4 <m4.json>");
+            eprintln!(
+                "       vv-lab compare-m4 <dominant/m4.json> <xfirst/m4.json> --output <comparison.json>"
+            );
+            eprintln!(
                 "       vv-lab run <scenario.json> --seed <u64> --output <directory> --contracts <properties.json> [--actuator <actuator.json>]"
             );
             eprintln!("       vv-lab replay <events.json> [--verification <verification.json>]");
@@ -35,6 +44,9 @@ fn main() -> ExitCode {
 fn execute_cli(args: Vec<String>) -> Result<u8, String> {
     match args.first().map(String::as_str) {
         Some("run") => run_command(&args[1..]),
+        Some("run-m4") => m4_cli::run_m4_command(&args[1..]),
+        Some("replay-m4") => m4_cli::replay_m4_command(&args[1..]),
+        Some("compare-m4") => m4_cli::compare_m4_command(&args[1..]),
         Some("replay") => replay_command(&args[1..]),
         Some("analyze") => analyze_command(&args[1..]),
         Some("benchmark") => benchmark_command(&args[1..]),
@@ -527,6 +539,11 @@ fn print_usage() {
     );
     println!("vv-lab replay <events.json>");
     println!("vv-lab replay <events.json> [--verification <verification.json>]");
+    println!(
+        "vv-lab run-m4 <scenario.json> --seed <u64> --controller <id> --output <directory> --contracts <properties.json> [--actuator <actuator.json>]"
+    );
+    println!("vv-lab replay-m4 <m4.json>");
+    println!("vv-lab compare-m4 <dominant/m4.json> <xfirst/m4.json> --output <comparison.json>");
     println!("vv-lab analyze <events.json> --output <mission.json>");
     println!("vv-lab benchmark <scenario.json> --seed <u64> --iterations <count>");
     println!(
