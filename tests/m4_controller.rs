@@ -3,22 +3,20 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use autonomous_systems_vv_lab::actuator::{ActuatorConfig, ActuatorFault, ActuatorFaultWindow};
+use autonomous_systems_vv_lab::contracts::ContractSet;
 use autonomous_systems_vv_lab::controller::{
     ControllerInput, ControllerPolicyV1, choose_action, choose_action_v1,
 };
-use autonomous_systems_vv_lab::actuator::{
-    ActuatorConfig, ActuatorFault, ActuatorFaultWindow,
-};
-use autonomous_systems_vv_lab::contracts::ContractSet;
+use autonomous_systems_vv_lab::mission_analysis::{MissionOutcome, MissionPolicy};
 use autonomous_systems_vv_lab::model::{
     Action, Bounds, Heading, MissionState, ObservedTelemetry, Point, RunStatus, SafetyState,
 };
-use autonomous_systems_vv_lab::mission_analysis::{MissionOutcome, MissionPolicy};
 use autonomous_systems_vv_lab::{
     ArtifactReference, ComparisonPolicyReferences, ControllerEvaluationManifest,
-    create_controller_comparison,
-    parse_controller_comparison_artifact, parse_controller_evaluation_manifest,
-    replay_controller_evaluation, run_controller_evaluation, run_verified_scenario,
+    create_controller_comparison, parse_controller_comparison_artifact,
+    parse_controller_evaluation_manifest, replay_controller_evaluation, run_controller_evaluation,
+    run_verified_scenario,
 };
 use sha2::{Digest, Sha256};
 
@@ -29,10 +27,7 @@ struct TempDirectory(PathBuf);
 impl TempDirectory {
     fn new() -> Self {
         let id = NEXT_TEMP.fetch_add(1, Ordering::Relaxed);
-        let path = std::env::temp_dir().join(format!(
-            "vv-lab-m4-{}-{id}",
-            std::process::id()
-        ));
+        let path = std::env::temp_dir().join(format!("vv-lab-m4-{}-{id}", std::process::id()));
         fs::create_dir_all(&path).expect("create temporary test directory");
         Self(path)
     }
@@ -89,7 +84,10 @@ fn policies_intentionally_choose_different_axes() {
     let controller_input = input(
         &bounds,
         Some(&observation),
-        Some(Point { x_mm: 40, y_mm: 100 }),
+        Some(Point {
+            x_mm: 40,
+            y_mm: 100,
+        }),
         MissionState::Running,
         SafetyState::Nominal,
     );
@@ -111,7 +109,10 @@ fn legacy_controller_is_the_dominant_axis_policy() {
     let controller_input = input(
         &bounds,
         Some(&observation),
-        Some(Point { x_mm: 40, y_mm: 100 }),
+        Some(Point {
+            x_mm: 40,
+            y_mm: 100,
+        }),
         MissionState::Running,
         SafetyState::Nominal,
     );
@@ -136,35 +137,50 @@ fn both_policies_share_completion_confidence_observation_target_and_bounds_guard
         input(
             &bounds,
             Some(&observation),
-            Some(Point { x_mm: 40, y_mm: 100 }),
+            Some(Point {
+                x_mm: 40,
+                y_mm: 100,
+            }),
             MissionState::Completed,
             SafetyState::Nominal,
         ),
         input(
             &bounds,
             Some(&observation),
-            Some(Point { x_mm: 40, y_mm: 100 }),
+            Some(Point {
+                x_mm: 40,
+                y_mm: 100,
+            }),
             MissionState::Running,
             SafetyState::Fallback,
         ),
         input(
             &bounds,
             None,
-            Some(Point { x_mm: 40, y_mm: 100 }),
+            Some(Point {
+                x_mm: 40,
+                y_mm: 100,
+            }),
             MissionState::Running,
             SafetyState::Nominal,
         ),
         input(
             &bounds,
             Some(&stale),
-            Some(Point { x_mm: 40, y_mm: 100 }),
+            Some(Point {
+                x_mm: 40,
+                y_mm: 100,
+            }),
             MissionState::Running,
             SafetyState::Nominal,
         ),
         input(
             &bounds,
             Some(&uncertain),
-            Some(Point { x_mm: 40, y_mm: 100 }),
+            Some(Point {
+                x_mm: 40,
+                y_mm: 100,
+            }),
             MissionState::Running,
             SafetyState::Nominal,
         ),
@@ -197,7 +213,10 @@ fn both_policies_share_completion_confidence_observation_target_and_bounds_guard
     let controller_input = input(
         &tight_bounds,
         Some(&edge_observation),
-        Some(Point { x_mm: 40, y_mm: 100 }),
+        Some(Point {
+            x_mm: 40,
+            y_mm: 100,
+        }),
         MissionState::Running,
         SafetyState::Nominal,
     );
@@ -211,15 +230,15 @@ fn both_policies_share_completion_confidence_observation_target_and_bounds_guard
     );
 }
 
-fn evaluation(policy: ControllerPolicyV1) -> autonomous_systems_vv_lab::ControllerEvaluationOutcome {
+fn evaluation(
+    policy: ControllerPolicyV1,
+) -> autonomous_systems_vv_lab::ControllerEvaluationOutcome {
     let scenario = autonomous_systems_vv_lab::parse_scenario(include_str!(
         "../scenarios/m4/x-first-overshoot.json"
     ))
     .expect("M4 fixture is valid");
-    let contracts = ContractSet::from_json(include_str!(
-        "../scenarios/m3/contracts-nominal.json"
-    ))
-    .expect("M3 contract fixture is valid");
+    let contracts = ContractSet::from_json(include_str!("../scenarios/m3/contracts-nominal.json"))
+        .expect("M3 contract fixture is valid");
     run_controller_evaluation(
         scenario,
         42,
@@ -239,10 +258,8 @@ fn paired_policies_use_equal_external_calendars_and_show_the_axis_overshoot_effe
         "../scenarios/m4/x-first-overshoot.json"
     ))
     .expect("M4 fixture is valid");
-    let contracts = ContractSet::from_json(include_str!(
-        "../scenarios/m3/contracts-nominal.json"
-    ))
-    .expect("M3 contract fixture is valid");
+    let contracts = ContractSet::from_json(include_str!("../scenarios/m3/contracts-nominal.json"))
+        .expect("M3 contract fixture is valid");
     let legacy = run_verified_scenario(
         scenario,
         42,
@@ -255,24 +272,18 @@ fn paired_policies_use_equal_external_calendars_and_show_the_axis_overshoot_effe
     assert_eq!(dominant.artifact, legacy.artifact);
 
     assert_eq!(
-        dominant
-            .manifest
-            .normalized_exogenous_calendar_sha256,
-        x_first
-            .manifest
-            .normalized_exogenous_calendar_sha256
+        dominant.manifest.normalized_exogenous_calendar_sha256,
+        x_first.manifest.normalized_exogenous_calendar_sha256
     );
-    assert_eq!(
-        dominant
-            .manifest
-            .normalized_exogenous_calendar_version,
-        1
-    );
+    assert_eq!(dominant.manifest.normalized_exogenous_calendar_version, 1);
     assert_eq!(dominant.manifest.metrics.safety_status, RunStatus::Passed);
     assert_eq!(x_first.manifest.metrics.safety_status, RunStatus::Passed);
     assert_eq!(dominant.mission.outcome, MissionOutcome::Completed);
     assert_ne!(x_first.mission.outcome, MissionOutcome::Completed);
-    assert!(dominant.manifest.metrics.waypoints_completed > x_first.manifest.metrics.waypoints_completed);
+    assert!(
+        dominant.manifest.metrics.waypoints_completed
+            > x_first.manifest.metrics.waypoints_completed
+    );
     assert_ne!(
         dominant.artifact.expected_report.telemetry[0].action,
         x_first.artifact.expected_report.telemetry[0].action
@@ -298,10 +309,8 @@ fn calendar_hash_includes_ordered_active_actuator_fault_ids() {
         "../scenarios/m4/x-first-overshoot.json"
     ))
     .expect("M4 fixture is valid");
-    let contracts = ContractSet::from_json(include_str!(
-        "../scenarios/m3/contracts-nominal.json"
-    ))
-    .expect("M3 contract fixture is valid");
+    let contracts = ContractSet::from_json(include_str!("../scenarios/m3/contracts-nominal.json"))
+        .expect("M3 contract fixture is valid");
     let active_fault = ActuatorConfig {
         schema_version: 1,
         seed: 0,
@@ -334,18 +343,14 @@ fn calendar_hash_includes_ordered_active_actuator_fault_ids() {
     .expect("M4 X-first run with the same active actuator fault");
 
     assert_eq!(
-        with_fault
-            .manifest
-            .normalized_exogenous_calendar_sha256,
+        with_fault.manifest.normalized_exogenous_calendar_sha256,
         x_first_with_fault
             .manifest
             .normalized_exogenous_calendar_sha256
     );
     assert_ne!(
         no_fault.manifest.normalized_exogenous_calendar_sha256,
-        with_fault
-            .manifest
-            .normalized_exogenous_calendar_sha256
+        with_fault.manifest.normalized_exogenous_calendar_sha256
     );
 }
 
@@ -363,14 +368,8 @@ fn m4_run_is_repeatable_and_explicit_replay_recomputes_every_artifact() {
     let mission = serde_json::to_string(&first.mission).expect("serialize mission");
     let verification = serde_json::to_string(&first.verification).expect("serialize verification");
     let manifest = serde_json::to_string(&first.manifest).expect("serialize M4 manifest");
-    let replay = replay_controller_evaluation(
-        &manifest,
-        &events,
-        &report,
-        &mission,
-        &verification,
-    )
-    .expect("policy-aware M4 replay");
+    let replay = replay_controller_evaluation(&manifest, &events, &report, &mission, &verification)
+        .expect("policy-aware M4 replay");
     assert_eq!(replay.manifest, first.manifest);
 }
 
@@ -440,15 +439,12 @@ fn m4_comparison_is_strictly_versioned_and_binds_both_policy_runs() {
 fn m4_comparison_rejects_a_consistently_resigned_false_calendar_hash() {
     let mut dominant = evaluation(ControllerPolicyV1::DominantAxis);
     let mut x_first = evaluation(ControllerPolicyV1::XFirst);
-    let false_calendar_hash = if dominant
-        .manifest
-        .normalized_exogenous_calendar_sha256
-        == "0".repeat(64)
-    {
-        "1".repeat(64)
-    } else {
-        "0".repeat(64)
-    };
+    let false_calendar_hash =
+        if dominant.manifest.normalized_exogenous_calendar_sha256 == "0".repeat(64) {
+            "1".repeat(64)
+        } else {
+            "0".repeat(64)
+        };
     for manifest in [&mut dominant.manifest, &mut x_first.manifest] {
         manifest.normalized_exogenous_calendar_sha256 = false_calendar_hash.clone();
         resign_manifest(manifest);
@@ -517,32 +513,51 @@ fn m4_cli_runs_replays_compares_and_rejects_tampered_references() {
             ])
             .output()
             .expect("run M4 command");
-        assert!(result.status.success(), "{}", String::from_utf8_lossy(&result.stderr));
+        assert!(
+            result.status.success(),
+            "{}",
+            String::from_utf8_lossy(&result.stderr)
+        );
     }
 
     let comparison = scratch.0.join("comparison.json");
     let result = Command::new(binary)
         .args([
             "compare-m4",
-            dominant.join("m4.json").to_str().expect("dominant manifest"),
+            dominant
+                .join("m4.json")
+                .to_str()
+                .expect("dominant manifest"),
             x_first.join("m4.json").to_str().expect("X-first manifest"),
             "--output",
             comparison.to_str().expect("comparison path"),
         ])
         .output()
         .expect("compare M4 runs");
-    assert!(result.status.success(), "{}", String::from_utf8_lossy(&result.stderr));
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
     let comparison: serde_json::Value =
         serde_json::from_slice(&fs::read(&comparison).expect("read comparison"))
             .expect("parse comparison");
-    assert!(comparison["external_calendar_equivalent"].as_bool().unwrap_or(false));
+    assert!(
+        comparison["external_calendar_equivalent"]
+            .as_bool()
+            .unwrap_or(false)
+    );
 
     let replay = Command::new(binary)
         .arg("replay-m4")
         .arg(dominant.join("m4.json"))
         .output()
         .expect("replay M4 run");
-    assert!(replay.status.success(), "{}", String::from_utf8_lossy(&replay.stderr));
+    assert!(
+        replay.status.success(),
+        "{}",
+        String::from_utf8_lossy(&replay.stderr)
+    );
     fs::write(dominant.join("report.json"), b"{}").expect("tamper report");
     let tampered = Command::new(binary)
         .arg("replay-m4")

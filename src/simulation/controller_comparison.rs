@@ -82,7 +82,9 @@ pub fn validate_controller_comparison_artifact(
         || artifact.normalized_exogenous_calendar_version != EXOGENOUS_CALENDAR_VERSION
         || !artifact.external_calendar_equivalent
     {
-        return Err(LabError("unsupported or non-equivalent M4 comparison".into()));
+        return Err(LabError(
+            "unsupported or non-equivalent M4 comparison".into(),
+        ));
     }
     for (digest, name) in [
         (&artifact.source_sha256, "source_sha256"),
@@ -99,8 +101,7 @@ pub fn validate_controller_comparison_artifact(
     if artifact.controllers.len() != 2
         || artifact.controllers[0].controller_id != "dominant_axis"
         || artifact.controllers[1].controller_id != "x_first"
-        || artifact.provenance.comparison_method
-            != "independent_policy_replays_calendar_hash_v1"
+        || artifact.provenance.comparison_method != "independent_policy_replays_calendar_hash_v1"
         || artifact.provenance.compared_execution_count != 2
         || artifact.scenario_name.is_empty()
         || artifact.horizon_ticks == 0
@@ -108,7 +109,8 @@ pub fn validate_controller_comparison_artifact(
             controller.metrics.ticks != artifact.horizon_ticks
                 || !comparison_paths_are_siblings(controller)
         })
-        || (artifact.action_difference_ticks == 0) != artifact.first_action_difference_tick.is_none()
+        || (artifact.action_difference_ticks == 0)
+            != artifact.first_action_difference_tick.is_none()
         || artifact
             .first_action_difference_tick
             .is_some_and(|tick| tick == 0 || tick > artifact.horizon_ticks)
@@ -164,10 +166,11 @@ pub fn create_controller_comparison(
         || dominant.normalized_exogenous_calendar_version
             != x_first.normalized_exogenous_calendar_version
     {
-        return Err(LabError("M4 controller pair provenance does not match".into()));
+        return Err(LabError(
+            "M4 controller pair provenance does not match".into(),
+        ));
     }
-    if dominant.normalized_exogenous_calendar_sha256
-        != x_first.normalized_exogenous_calendar_sha256
+    if dominant.normalized_exogenous_calendar_sha256 != x_first.normalized_exogenous_calendar_sha256
     {
         return Err(LabError(
             "M4 controller pair has different external disturbance calendars".into(),
@@ -180,7 +183,9 @@ pub fn create_controller_comparison(
         || dominant_report.scenario_name != x_first_report.scenario_name
         || dominant_report.seed != x_first_report.seed
     {
-        return Err(LabError("M4 controller reports have different horizons".into()));
+        return Err(LabError(
+            "M4 controller reports have different horizons".into(),
+        ));
     }
     for (manifest, report) in [(dominant, dominant_report), (x_first, x_first_report)] {
         if report.status != manifest.metrics.safety_status
@@ -188,13 +193,16 @@ pub fn create_controller_comparison(
             || report.seed != manifest.seed
             || report.ticks != manifest.metrics.ticks
             || report.final_truth != manifest.metrics.final_truth
-            || report.telemetry
+            || report
+                .telemetry
                 .iter()
                 .filter(|tick| tick.action.heading.is_some())
                 .count() as u32
                 != manifest.metrics.movement_action_ticks
         {
-            return Err(LabError("M4 metrics do not match the recorded report".into()));
+            return Err(LabError(
+                "M4 metrics do not match the recorded report".into(),
+            ));
         }
     }
     let differences = dominant_report
@@ -214,11 +222,8 @@ pub fn create_controller_comparison(
         scenario_name: dominant.provenance.scenario_name.clone(),
         seed: dominant.seed,
         horizon_ticks: dominant.provenance.horizon_ticks,
-        normalized_exogenous_calendar_version: dominant
-            .normalized_exogenous_calendar_version,
-        normalized_exogenous_calendar_sha256: dominant
-            .normalized_exogenous_calendar_sha256
-            .clone(),
+        normalized_exogenous_calendar_version: dominant.normalized_exogenous_calendar_version,
+        normalized_exogenous_calendar_sha256: dominant.normalized_exogenous_calendar_sha256.clone(),
         external_calendar_equivalent: true,
         controllers: vec![
             compared_controller("dominant_axis", dominant, dominant_references),
@@ -227,8 +232,10 @@ pub fn create_controller_comparison(
         action_difference_ticks: differences.len() as u32,
         first_action_difference_tick: differences.first().copied(),
         safety_outcomes_differ: dominant.metrics.safety_status != x_first.metrics.safety_status,
-        temporal_outcomes_differ: dominant.metrics.temporal_status != x_first.metrics.temporal_status,
-        mission_outcomes_differ: dominant.metrics.mission_outcome != x_first.metrics.mission_outcome,
+        temporal_outcomes_differ: dominant.metrics.temporal_status
+            != x_first.metrics.temporal_status,
+        mission_outcomes_differ: dominant.metrics.mission_outcome
+            != x_first.metrics.mission_outcome,
         provenance: ComparisonProvenance {
             comparison_method: "independent_policy_replays_calendar_hash_v1".into(),
             compared_execution_count: 2,
@@ -248,12 +255,17 @@ fn validate_comparison_references(
         || references.event_artifact.sha256 != manifest.event_artifact.sha256
         || references.verification_artifact.sha256 != manifest.verification_artifact.sha256
     {
-        return Err(LabError("M4 comparison artifact references do not match the manifest".into()));
+        return Err(LabError(
+            "M4 comparison artifact references do not match the manifest".into(),
+        ));
     }
     let manifest_parent = Path::new(&references.evaluation_manifest.path)
         .parent()
         .ok_or_else(|| LabError("M4 evaluation manifest reference has no parent".into()))?;
-    let expected_event = manifest_parent.join("events.json").to_string_lossy().replace('\\', "/");
+    let expected_event = manifest_parent
+        .join("events.json")
+        .to_string_lossy()
+        .replace('\\', "/");
     let expected_verification = manifest_parent
         .join("verification.json")
         .to_string_lossy()
@@ -261,7 +273,9 @@ fn validate_comparison_references(
     if references.event_artifact.path != expected_event
         || references.verification_artifact.path != expected_verification
     {
-        return Err(LabError("M4 comparison references are not sibling run artifacts".into()));
+        return Err(LabError(
+            "M4 comparison references are not sibling run artifacts".into(),
+        ));
     }
     validate_comparison_reference(&references.evaluation_manifest)?;
     validate_comparison_reference(&references.event_artifact)?;
@@ -273,7 +287,10 @@ fn comparison_paths_are_siblings(controller: &ComparedController) -> bool {
     let Some(parent) = parent else {
         return false;
     };
-    let events = parent.join("events.json").to_string_lossy().replace('\\', "/");
+    let events = parent
+        .join("events.json")
+        .to_string_lossy()
+        .replace('\\', "/");
     let verification = parent
         .join("verification.json")
         .to_string_lossy()

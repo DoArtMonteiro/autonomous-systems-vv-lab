@@ -82,13 +82,7 @@ pub(crate) fn execute_with_controller_policy(
     actuator_config: &ActuatorConfig,
     policy: ControllerPolicyV1,
 ) -> Result<CoreOutput, LabError> {
-    execute_inner(
-        scenario,
-        seed,
-        None,
-        Some(actuator_config),
-        policy,
-    )
+    execute_inner(scenario, seed, None, Some(actuator_config), policy)
 }
 
 fn execute_inner(

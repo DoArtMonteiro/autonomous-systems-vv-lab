@@ -9,9 +9,7 @@ use crate::contracts::ContractSet;
 use crate::controller::ControllerPolicyV1;
 use crate::engine::{CoreOutput, execute_with_controller_policy};
 use crate::error::LabError;
-use crate::mission_analysis::{
-    MissionAnalysis, MissionOutcome, MissionPolicy, analyze_mission,
-};
+use crate::mission_analysis::{MissionAnalysis, MissionOutcome, MissionPolicy, analyze_mission};
 use crate::model::{EventPayload, EventsArtifact, Point, RunReport, RunStatus, Scenario};
 use crate::temporal::ContractOutcome;
 
@@ -144,7 +142,10 @@ pub fn source_sha256() -> String {
         ("src/error.rs", include_str!("../error.rs")),
         ("src/geometry.rs", include_str!("../geometry.rs")),
         ("src/lib.rs", include_str!("../lib.rs")),
-        ("src/mission_analysis.rs", include_str!("../mission_analysis.rs")),
+        (
+            "src/mission_analysis.rs",
+            include_str!("../mission_analysis.rs"),
+        ),
         ("src/main.rs", include_str!("../main.rs")),
         ("src/model.rs", include_str!("../model.rs")),
         ("src/prng.rs", include_str!("../prng.rs")),
@@ -244,8 +245,10 @@ fn assemble_controller_evaluation(
     )?;
     let report_bytes = serde_json::to_vec(&artifact.expected_report)
         .map_err(|error| LabError(error.to_string()))?;
-    let mission_bytes = serde_json::to_vec(&mission).map_err(|error| LabError(error.to_string()))?;
-    let events_bytes = serde_json::to_vec(&artifact).map_err(|error| LabError(error.to_string()))?;
+    let mission_bytes =
+        serde_json::to_vec(&mission).map_err(|error| LabError(error.to_string()))?;
+    let events_bytes =
+        serde_json::to_vec(&artifact).map_err(|error| LabError(error.to_string()))?;
     let verification_bytes =
         serde_json::to_vec(&verification).map_err(|error| LabError(error.to_string()))?;
     let metrics = metrics(&artifact.expected_report, &mission, &verification);
@@ -253,11 +256,8 @@ fn assemble_controller_evaluation(
     let actuator_config_sha256 = hash_serializable(&actuator_config);
     let contract_set_sha256 = hash_serializable(&contract_set);
     let mission_policy_sha256 = hash_serializable(&mission_policy);
-    let configuration_sha256 = hash_serializable(&(
-        &actuator_config,
-        &contract_set,
-        mission_policy,
-    ));
+    let configuration_sha256 =
+        hash_serializable(&(&actuator_config, &contract_set, mission_policy));
     let mut manifest = ControllerEvaluationManifest {
         schema_version: CONTROLLER_EVALUATION_SCHEMA_VERSION,
         interface_version: CONTROLLER_INTERFACE_VERSION,
@@ -303,7 +303,9 @@ fn exogenous_calendar(
     let mut ticks = vec![CalendarTickBuilder::default(); steps as usize];
     for record in events {
         if record.tick == 0 || record.tick > steps {
-            return Err(LabError("M4 event is outside the configured horizon".into()));
+            return Err(LabError(
+                "M4 event is outside the configured horizon".into(),
+            ));
         }
         let tick = &mut ticks[record.tick as usize - 1];
         match &record.event {
@@ -313,8 +315,15 @@ fn exogenous_calendar(
                 noise_y_mm,
                 ..
             } => {
-                if tick.gps.replace((*dropped, *noise_x_mm, *noise_y_mm)).is_some() {
-                    return Err(LabError(format!("duplicate M4 GPS sample at tick {}", record.tick)));
+                if tick
+                    .gps
+                    .replace((*dropped, *noise_x_mm, *noise_y_mm))
+                    .is_some()
+                {
+                    return Err(LabError(format!(
+                        "duplicate M4 GPS sample at tick {}",
+                        record.tick
+                    )));
                 }
             }
             EventPayload::PacketOutcome {
@@ -337,11 +346,15 @@ fn exogenous_calendar(
         }
     }
     if actuation.len() != steps as usize {
-        return Err(LabError("M4 actuator outcomes do not cover every tick".into()));
+        return Err(LabError(
+            "M4 actuator outcomes do not cover every tick".into(),
+        ));
     }
     for outcome in actuation {
         if outcome.tick == 0 || outcome.tick > steps {
-            return Err(LabError("M4 actuator outcome is outside the configured horizon".into()));
+            return Err(LabError(
+                "M4 actuator outcome is outside the configured horizon".into(),
+            ));
         }
         let tick = &mut ticks[outcome.tick as usize - 1];
         let active_fault_ids = outcome
@@ -351,10 +364,15 @@ fn exogenous_calendar(
             .map(|event| event.fault_id.clone())
             .collect::<Vec<_>>();
         if active_fault_ids.windows(2).any(|pair| pair[0] >= pair[1]) {
-            return Err(LabError("M4 active actuator fault identifiers are not ordered".into()));
+            return Err(LabError(
+                "M4 active actuator fault identifiers are not ordered".into(),
+            ));
         }
         if tick.active_fault_ids.replace(active_fault_ids).is_some() {
-            return Err(LabError(format!("duplicate M4 actuator outcome at tick {}", outcome.tick)));
+            return Err(LabError(format!(
+                "duplicate M4 actuator outcome at tick {}",
+                outcome.tick
+            )));
         }
     }
     let ticks = ticks
@@ -364,12 +382,16 @@ fn exogenous_calendar(
             let (gps_dropout, gps_noise_x_mm, gps_noise_y_mm) = tick
                 .gps
                 .ok_or_else(|| LabError(format!("missing M4 GPS sample at tick {}", index + 1)))?;
-            let (communication_delivered, communication_delay_ticks) = tick
-                .communication
-                .ok_or_else(|| LabError(format!("missing M4 communication outcome at tick {}", index + 1)))?;
-            let active_actuator_fault_ids = tick
-                .active_fault_ids
-                .ok_or_else(|| LabError(format!("missing M4 actuator outcome at tick {}", index + 1)))?;
+            let (communication_delivered, communication_delay_ticks) =
+                tick.communication.ok_or_else(|| {
+                    LabError(format!(
+                        "missing M4 communication outcome at tick {}",
+                        index + 1
+                    ))
+                })?;
+            let active_actuator_fault_ids = tick.active_fault_ids.ok_or_else(|| {
+                LabError(format!("missing M4 actuator outcome at tick {}", index + 1))
+            })?;
             Ok(ExogenousCalendarTick {
                 tick: index as u32 + 1,
                 gps_dropout,
@@ -428,8 +450,11 @@ pub(super) fn verify_controller_evaluation(
         &outcome.verification.actuator_config,
         policy,
     )?;
-    if output.events != outcome.artifact.events || output.report != outcome.artifact.expected_report {
-        return Err(LabError("M4 replay differs from events.json or report.json".into()));
+    if output.events != outcome.artifact.events || output.report != outcome.artifact.expected_report
+    {
+        return Err(LabError(
+            "M4 replay differs from events.json or report.json".into(),
+        ));
     }
     let replayed = assemble_controller_evaluation(
         outcome.artifact.scenario.clone(),
@@ -459,16 +484,30 @@ pub fn validate_controller_evaluation_files(
     verification_text: &str,
 ) -> Result<ControllerEvaluationOutcome, LabError> {
     let manifest = parse_controller_evaluation_manifest(manifest_text)?;
-    validate_reference(&manifest.event_artifact, "events.json", events_text.as_bytes())?;
-    validate_reference(&manifest.report_artifact, "report.json", report_text.as_bytes())?;
-    validate_reference(&manifest.mission_artifact, "mission.json", mission_text.as_bytes())?;
+    validate_reference(
+        &manifest.event_artifact,
+        "events.json",
+        events_text.as_bytes(),
+    )?;
+    validate_reference(
+        &manifest.report_artifact,
+        "report.json",
+        report_text.as_bytes(),
+    )?;
+    validate_reference(
+        &manifest.mission_artifact,
+        "mission.json",
+        mission_text.as_bytes(),
+    )?;
     validate_reference(
         &manifest.verification_artifact,
         "verification.json",
         verification_text.as_bytes(),
     )?;
     if manifest.source_sha256 != source_sha256() {
-        return Err(LabError("M4 source_sha256 does not match this build".into()));
+        return Err(LabError(
+            "M4 source_sha256 does not match this build".into(),
+        ));
     }
     let artifact: EventsArtifact =
         serde_json::from_str(events_text).map_err(|error| LabError(error.to_string()))?;
@@ -502,7 +541,9 @@ pub fn validate_controller_evaluation_files(
         || verification.summary.safety_status != report.status
         || metrics(&report, &mission, &verification) != manifest.metrics
     {
-        return Err(LabError("M4 manifest provenance does not match its artifacts".into()));
+        return Err(LabError(
+            "M4 manifest provenance does not match its artifacts".into(),
+        ));
     }
     Ok(ControllerEvaluationOutcome {
         artifact,
@@ -577,7 +618,9 @@ pub(super) fn validate_controller_evaluation_manifest(
         || manifest.provenance.horizon_ticks == 0
         || manifest.provenance.scenario_name.is_empty()
     {
-        return Err(LabError("M4 manifest provenance or metrics are malformed".into()));
+        return Err(LabError(
+            "M4 manifest provenance or metrics are malformed".into(),
+        ));
     }
     if manifest.manifest_sha256 != manifest_digest(manifest) {
         return Err(LabError("M4 manifest_sha256 mismatch".into()));
@@ -598,14 +641,23 @@ fn reference(path: &str, bytes: &[u8]) -> ArtifactReference {
     }
 }
 
-fn validate_fixed_reference(reference: &ArtifactReference, expected_path: &str) -> Result<(), LabError> {
+fn validate_fixed_reference(
+    reference: &ArtifactReference,
+    expected_path: &str,
+) -> Result<(), LabError> {
     if reference.path != expected_path {
-        return Err(LabError(format!("M4 reference path must be {expected_path}")));
+        return Err(LabError(format!(
+            "M4 reference path must be {expected_path}"
+        )));
     }
     validate_sha256(&reference.sha256, "artifact reference sha256")
 }
 
-fn validate_reference(reference: &ArtifactReference, expected_path: &str, bytes: &[u8]) -> Result<(), LabError> {
+fn validate_reference(
+    reference: &ArtifactReference,
+    expected_path: &str,
+    bytes: &[u8],
+) -> Result<(), LabError> {
     validate_fixed_reference(reference, expected_path)?;
     if reference.sha256 != sha256(bytes) {
         return Err(LabError(format!("M4 {} hash mismatch", reference.path)));
@@ -621,12 +673,14 @@ pub fn validate_relative_reference(path: &str) -> Result<(), LabError> {
     if path.is_empty()
         || parsed.is_absolute()
         || has_windows_drive_prefix
-        || parsed.components().any(|component| {
-            !matches!(component, Component::Normal(_))
-        })
+        || parsed
+            .components()
+            .any(|component| !matches!(component, Component::Normal(_)))
         || path.contains('\\')
     {
-        return Err(LabError("M4 comparison reference path is not a safe relative path".into()));
+        return Err(LabError(
+            "M4 comparison reference path is not a safe relative path".into(),
+        ));
     }
     Ok(())
 }
@@ -637,7 +691,9 @@ pub(super) fn validate_sha256(value: &str, label: &str) -> Result<(), LabError> 
             .bytes()
             .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
     {
-        return Err(LabError(format!("{label} must be a lowercase SHA-256 digest")));
+        return Err(LabError(format!(
+            "{label} must be a lowercase SHA-256 digest"
+        )));
     }
     Ok(())
 }

@@ -1,5 +1,5 @@
-use std::fs;
 use std::collections::BTreeSet;
+use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -11,12 +11,11 @@ use autonomous_systems_vv_lab::controller::ControllerPolicyV1;
 use autonomous_systems_vv_lab::mission_analysis::{MissionPolicy, analyze_mission};
 use autonomous_systems_vv_lab::model::RunStatus;
 use autonomous_systems_vv_lab::{
-    ArtifactReference, ComparisonPolicyReferences, analyze_artifact,
-    benchmark_verified_scenario, create_controller_comparison, parse_artifact,
-    parse_controller_evaluation_manifest, parse_controller_id, parse_scenario,
-    parse_verification_artifact, replay_artifact, replay_controller_evaluation,
-    replay_verified_artifact, run_controller_evaluation, run_scenario,
-    run_verified_scenario, status_exit_code, validate_controller_evaluation_files,
+    ArtifactReference, ComparisonPolicyReferences, analyze_artifact, benchmark_verified_scenario,
+    create_controller_comparison, parse_artifact, parse_controller_evaluation_manifest,
+    parse_controller_id, parse_scenario, parse_verification_artifact, replay_artifact,
+    replay_controller_evaluation, replay_verified_artifact, run_controller_evaluation,
+    run_scenario, run_verified_scenario, status_exit_code, validate_controller_evaluation_files,
 };
 
 fn main() -> ExitCode {
@@ -26,9 +25,13 @@ fn main() -> ExitCode {
             eprintln!("error: {error}");
             eprintln!("usage: vv-lab run <scenario.json> --seed <u64> --output <directory>");
             eprintln!("       vv-lab replay <events.json>");
-            eprintln!("       vv-lab run-m4 <scenario.json> --seed <u64> --controller <id> --output <directory> --contracts <properties.json>");
+            eprintln!(
+                "       vv-lab run-m4 <scenario.json> --seed <u64> --controller <id> --output <directory> --contracts <properties.json>"
+            );
             eprintln!("       vv-lab replay-m4 <m4.json>");
-            eprintln!("       vv-lab compare-m4 <dominant/m4.json> <xfirst/m4.json> --output <comparison.json>");
+            eprintln!(
+                "       vv-lab compare-m4 <dominant/m4.json> <xfirst/m4.json> --output <comparison.json>"
+            );
             eprintln!(
                 "       vv-lab run <scenario.json> --seed <u64> --output <directory> --contracts <properties.json> [--actuator <actuator.json>]"
             );
@@ -227,17 +230,28 @@ fn replay_m4_command(args: &[String]) -> Result<u8, String> {
     }
     let manifest_path = PathBuf::from(&args[0]);
     let manifest_text = read_text_file(&manifest_path, 4 * 1024 * 1024)?;
-    let manifest = parse_controller_evaluation_manifest(&manifest_text)
-        .map_err(|error| error.to_string())?;
+    let manifest =
+        parse_controller_evaluation_manifest(&manifest_text).map_err(|error| error.to_string())?;
     let parent = manifest_path
         .parent()
         .filter(|path| !path.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."));
-    let events_text = read_text_file(&parent.join(&manifest.event_artifact.path), 128 * 1024 * 1024)?;
-    let report_text = read_text_file(&parent.join(&manifest.report_artifact.path), 32 * 1024 * 1024)?;
-    let mission_text = read_text_file(&parent.join(&manifest.mission_artifact.path), 4 * 1024 * 1024)?;
-    let verification_text =
-        read_text_file(&parent.join(&manifest.verification_artifact.path), 32 * 1024 * 1024)?;
+    let events_text = read_text_file(
+        &parent.join(&manifest.event_artifact.path),
+        128 * 1024 * 1024,
+    )?;
+    let report_text = read_text_file(
+        &parent.join(&manifest.report_artifact.path),
+        32 * 1024 * 1024,
+    )?;
+    let mission_text = read_text_file(
+        &parent.join(&manifest.mission_artifact.path),
+        4 * 1024 * 1024,
+    )?;
+    let verification_text = read_text_file(
+        &parent.join(&manifest.verification_artifact.path),
+        32 * 1024 * 1024,
+    )?;
     let replayed = replay_controller_evaluation(
         &manifest_text,
         &events_text,
@@ -258,9 +272,7 @@ fn replay_m4_command(args: &[String]) -> Result<u8, String> {
 
 fn compare_m4_command(args: &[String]) -> Result<u8, String> {
     if args.len() != 4 || args[2] != "--output" {
-        return Err(
-            "compare-m4 requires two m4.json paths and --output <comparison.json>".into(),
-        );
+        return Err("compare-m4 requires two m4.json paths and --output <comparison.json>".into());
     }
     let dominant_path = PathBuf::from(&args[0]);
     let x_first_path = PathBuf::from(&args[1]);
@@ -273,47 +285,47 @@ fn compare_m4_command(args: &[String]) -> Result<u8, String> {
         .map_err(|error| format!("could not create comparison directory: {error}"))?;
     let dominant = load_m4_evaluation(&dominant_path)?;
     let x_first = load_m4_evaluation(&x_first_path)?;
-    let dominant_references = comparison_references(
-        &dominant_path,
-        &dominant,
-        comparison_parent,
-    )?;
-    let x_first_references = comparison_references(
-        &x_first_path,
-        &x_first,
-        comparison_parent,
-    )?;
-    let comparison = create_controller_comparison(
-        &dominant,
-        &x_first,
-        dominant_references,
-        x_first_references,
-    )
-    .map_err(|error| error.to_string())?;
+    let dominant_references = comparison_references(&dominant_path, &dominant, comparison_parent)?;
+    let x_first_references = comparison_references(&x_first_path, &x_first, comparison_parent)?;
+    let comparison =
+        create_controller_comparison(&dominant, &x_first, dominant_references, x_first_references)
+            .map_err(|error| error.to_string())?;
     let bytes = serde_json::to_vec(&comparison).map_err(|error| error.to_string())?;
     fs::write(&comparison_path, bytes)
         .map_err(|error| format!("could not write M4 comparison: {error}"))?;
     println!(
         "M4 comparison verified: calendar={}, action_differences={}",
-        comparison.normalized_exogenous_calendar_sha256,
-        comparison.action_difference_ticks,
+        comparison.normalized_exogenous_calendar_sha256, comparison.action_difference_ticks,
     );
     Ok(0)
 }
 
-fn load_m4_evaluation(manifest_path: &Path) -> Result<autonomous_systems_vv_lab::ControllerEvaluationOutcome, String> {
+fn load_m4_evaluation(
+    manifest_path: &Path,
+) -> Result<autonomous_systems_vv_lab::ControllerEvaluationOutcome, String> {
     let manifest_text = read_text_file(&manifest_path.to_path_buf(), 4 * 1024 * 1024)?;
-    let manifest = parse_controller_evaluation_manifest(&manifest_text)
-        .map_err(|error| error.to_string())?;
+    let manifest =
+        parse_controller_evaluation_manifest(&manifest_text).map_err(|error| error.to_string())?;
     let parent = manifest_path
         .parent()
         .filter(|path| !path.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."));
-    let events_text = read_text_file(&parent.join(&manifest.event_artifact.path), 128 * 1024 * 1024)?;
-    let report_text = read_text_file(&parent.join(&manifest.report_artifact.path), 32 * 1024 * 1024)?;
-    let mission_text = read_text_file(&parent.join(&manifest.mission_artifact.path), 4 * 1024 * 1024)?;
-    let verification_text =
-        read_text_file(&parent.join(&manifest.verification_artifact.path), 32 * 1024 * 1024)?;
+    let events_text = read_text_file(
+        &parent.join(&manifest.event_artifact.path),
+        128 * 1024 * 1024,
+    )?;
+    let report_text = read_text_file(
+        &parent.join(&manifest.report_artifact.path),
+        32 * 1024 * 1024,
+    )?;
+    let mission_text = read_text_file(
+        &parent.join(&manifest.mission_artifact.path),
+        4 * 1024 * 1024,
+    )?;
+    let verification_text = read_text_file(
+        &parent.join(&manifest.verification_artifact.path),
+        32 * 1024 * 1024,
+    )?;
     validate_controller_evaluation_files(
         &manifest_text,
         &events_text,
@@ -354,7 +366,11 @@ fn comparison_references(
     })
 }
 
-fn reference_relative_to(parent: &Path, file: &Path, digest: &str) -> Result<ArtifactReference, String> {
+fn reference_relative_to(
+    parent: &Path,
+    file: &Path,
+    digest: &str,
+) -> Result<ArtifactReference, String> {
     let parent = parent
         .canonicalize()
         .map_err(|error| format!("could not resolve comparison directory: {error}"))?;
@@ -656,16 +672,16 @@ fn parse_m4_run_arguments(args: &[String]) -> Result<M4RunArguments, String> {
             "--output" => output = Some(PathBuf::from(value)),
             "--contracts" => contracts = Some(PathBuf::from(value)),
             "--actuator" => actuator = Some(PathBuf::from(value)),
-            "--stall-window-ticks" => {
-                mission_policy.stall_window_ticks = parse_u32(value, flag)?
-            }
+            "--stall-window-ticks" => mission_policy.stall_window_ticks = parse_u32(value, flag)?,
             "--min-progress-mm" => mission_policy.min_progress_mm = parse_u32(value, flag)?,
             "--max-output-bytes" => max_output_bytes = Some(parse_u64(value, flag)?),
             _ => return Err(format!("unknown run-m4 option: {flag}")),
         }
         index += 2;
     }
-    mission_policy.validate().map_err(|error| error.to_string())?;
+    mission_policy
+        .validate()
+        .map_err(|error| error.to_string())?;
     Ok(M4RunArguments {
         scenario_path,
         seed: seed.ok_or_else(|| "--seed is required".to_owned())?,
@@ -812,7 +828,9 @@ fn print_usage() {
     );
     println!("vv-lab replay <events.json>");
     println!("vv-lab replay <events.json> [--verification <verification.json>]");
-    println!("vv-lab run-m4 <scenario.json> --seed <u64> --controller <id> --output <directory> --contracts <properties.json> [--actuator <actuator.json>]");
+    println!(
+        "vv-lab run-m4 <scenario.json> --seed <u64> --controller <id> --output <directory> --contracts <properties.json> [--actuator <actuator.json>]"
+    );
     println!("vv-lab replay-m4 <m4.json>");
     println!("vv-lab compare-m4 <dominant/m4.json> <xfirst/m4.json> --output <comparison.json>");
     println!("vv-lab analyze <events.json> --output <mission.json>");
