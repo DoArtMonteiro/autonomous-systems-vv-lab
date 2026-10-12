@@ -170,7 +170,8 @@ fn run_m4_command(args: &[String]) -> Result<u8, String> {
     let scenario_text = read_text_file(&arguments.scenario_path, 2 * 1024 * 1024)?;
     let scenario = parse_scenario(&scenario_text).map_err(|error| error.to_string())?;
     let contracts_text = read_text_file(&arguments.contracts_path, 1024 * 1024)?;
-    let contract_set = ContractSet::from_json(&contracts_text)?;
+    let contract_set =
+        ContractSet::from_json(&contracts_text).map_err(|error| error.to_string())?;
     let actuator_config = match &arguments.actuator_path {
         Some(path) => ActuatorConfig::from_json(&read_text_file(path, 1024 * 1024)?)?,
         None => ActuatorConfig::default(),

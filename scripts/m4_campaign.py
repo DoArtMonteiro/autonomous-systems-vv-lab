@@ -64,8 +64,7 @@ CASES = (
 
 
 class M4CampaignError(ValueError):
-    """Invalid M4 plan or failed paired-controller evaluation."""
-
+    pass
 
 def plan_campaign(
     seeds: tuple[int, ...],
