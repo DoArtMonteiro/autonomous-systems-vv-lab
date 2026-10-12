@@ -213,10 +213,7 @@ fn both_policies_share_completion_confidence_observation_target_and_bounds_guard
     let controller_input = input(
         &tight_bounds,
         Some(&edge_observation),
-        Some(Point {
-            x_mm: 40,
-            y_mm: 10,
-        }),
+        Some(Point { x_mm: 40, y_mm: 10 }),
         MissionState::Running,
         SafetyState::Nominal,
     );
