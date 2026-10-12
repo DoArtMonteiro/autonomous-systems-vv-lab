@@ -10,7 +10,7 @@ use autonomous_systems_vv_lab::mission_analysis::MissionPolicy;
 use autonomous_systems_vv_lab::{
     ArtifactReference, ComparisonPolicyReferences, create_controller_comparison,
     parse_controller_evaluation_manifest, parse_controller_id, parse_scenario,
-    parse_verification_artifact, replay_controller_evaluation, run_controller_evaluation,
+    replay_controller_evaluation, run_controller_evaluation,
     status_exit_code, validate_controller_evaluation_files,
 };
 
