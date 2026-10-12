@@ -215,7 +215,7 @@ fn both_policies_share_completion_confidence_observation_target_and_bounds_guard
         Some(&edge_observation),
         Some(Point {
             x_mm: 40,
-            y_mm: 100,
+            y_mm: 10,
         }),
         MissionState::Running,
         SafetyState::Nominal,
