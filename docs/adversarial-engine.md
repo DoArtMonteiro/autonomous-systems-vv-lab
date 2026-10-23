@@ -15,7 +15,7 @@ python scripts/adversarial_campaign.py --output-root runs/adversarial
 python scripts/adversarial_ablation.py --output-root runs/adversarial-ablation
 ```
 
-`campaign` grava `campaign.json`, `report.md`, as entradas exatas em `inputs/` e, por falha mantida, `cases/<NN>-<política>-<propriedade>/{original,minimized}/` com o conjunto completo de artefactos M4. `replay` volta a gerar a campanha inteira em memória, exige os mesmos bytes em todos os ficheiros, rejeita ficheiros a mais e ligações simbólicas, e executa `replay_controller_evaluation` sobre cada caso. Os nomes dos casos dependem da semente; o nome usado acima é o da semente 1337 nesta versão.
+`campaign` grava `campaign.json`, `report.md`, as entradas exatas em `inputs/` e, por falha mantida, `cases/<NN>-<política>-<propriedade>/{original,minimized}/` com o conjunto completo de artefactos M4. `replay` volta a gerar a campanha inteira em memória, exige os mesmos bytes em todos os ficheiros, rejeita ficheiros a mais, ligações simbólicas e nomes terminados em ponto ou espaço ou com `:`, e executa `replay_controller_evaluation` sobre os bytes de cada caso já verificados, sem voltar a ler o disco. Só aceita um argumento cujo nome seja exatamente `campaign.json`, o que exclui fluxos alternativos NTFS como `campaign.json:x`. Recusa `campaign.json` acima de 32 MiB antes de o analisar. O tamanho cresce com o orçamento e com o número e o comprimento dos contratos: com os contratos do repositório e orçamento 512, o maior medido tinha 872 KB; com 128 contratos de 64 bytes, 5,6 a 9,4 MB; o máximo derivado dos limites das entradas ronda 12 MB. Antes da verificação, `replay` só lê `prng`, `limits` e `inputs`; as falhas são lidas dos bytes regenerados, depois de `campaign.json` coincidir com eles. A campanha recusa-se a gravar um `campaign.json` acima do limite. Os nomes dos casos dependem da semente; o nome usado acima é o da semente 1337 nesta versão.
 
 ## Falhas injetadas
 
@@ -62,7 +62,7 @@ Máquina: Windows 11 (10.0.26300), Python 3.14.6, 16 CPUs, Rust 1.99.0. Linux: W
 - Falsos positivos: o controlo limpo não teve violações. Nenhum recálculo independente discordou do monitor (0 `disagree`) e não houve violações sem identidade. Os casos `not_applicable` não têm verificação independente.
 - Redução total na base limpa: átomos 34 para 17, ticks de falha ativos 242 para 72, passos 192 para 78. Uma falha global (taxa, ruído, atraso de comunicações) conta `steps` ticks ativos, por isso parte desta redução vem da truncagem do horizonte.
 - Custo em Windows: 9 campanhas, 99 invocações e 15,8 s no total, entre 0,0011 e 0,0013 s por avaliação, incluindo o arranque do processo.
-- Plataformas: a campanha da base limpa nas três sementes produziu 207 ficheiros iguais byte a byte em Windows e em Linux. Em Linux passaram também `cargo fmt --check`, Clippy, 116 testes Rust, 123 testes Python, as campanhas M1 a M4 e a campanha adversarial.
+- Plataformas: a campanha da base limpa nas três sementes produziu 207 ficheiros iguais byte a byte em Windows e em Linux. Em Linux passaram também `cargo fmt --check`, Clippy, 118 testes Rust, 127 testes Python, as campanhas M1 a M4 e a campanha adversarial.
 
 ### Falhas encontradas
 
@@ -91,6 +91,8 @@ Por semente, `uniform` encontrou mais classes do que `guided` em 13 e 15 das 20 
 - As probabilidades do atuador não são reduzidas na simplificação; só as taxas dos sensores.
 - O traço causal de uma violação de segurança não inclui eventos do atuador; a ação realizada é inferida do movimento real.
 - Os tempos medidos incluem o arranque dos processos e não são um ensaio de desempenho controlado.
-- O limite de 512 MiB de saída só é verificado depois de a campanha ser gerada em memória. Um cenário com 10000 passos e orçamento máximo pode ocupar centenas de MiB antes de ser recusado.
+- O limite de 512 MiB de saída só é verificado depois de a campanha ser gerada em memória, e é independente do limite de 32 MiB de leitura de `campaign.json`. A memória cresce com o volume gerado: com `x-first-overshoot` a 10000 passos, `--search guided --budget 128 --minimize-budget 16 --max-failures 16`, uma campanha de cerca de 763 MB recusada atingiu cerca de 811 MB de memória residente e 1,46 GB de memória comprometida antes da recusa; uma revisão independente com orçamento 512 mediu 721 MB recusados, 773 MB residentes e 1,34 GB comprometidos. Só quem executa a campanha controla estes parâmetros. `replay` de uma campanha válida grande custa o mesmo que gerá-la.
+- Um `campaign.json` hostil de 32 MiB (milhões de `[]` em `failures[0].identity` ou numa chave desconhecida, ou milhões de entradas em `limits.policies`) não é materializado: as medições ficaram entre 21 e 69 MB de memória residente quando as entradas faltavam, e em 199 MB quando a campanha inteira foi regenerada, perto dos 182 a 186 MB da reprodução válida da mesma campanha. Antes desta correção, o mesmo ficheiro de 32 MiB ocupava 580 MB e um de 256 MiB ocupava 6,4 GB. Acima de 32 MiB é recusado antes da análise, com 4 MB.
+- `replay` verifica apenas o fluxo principal de cada ficheiro. Fluxos alternativos NTFS e pastas vazias dentro da campanha não são lidos nem recusados; nunca entram nos dados verificados.
 - A estratégia predefinida `uniform` não usa os valores de fronteira; para os explorar, usar `--search biased` ou `--search guided`.
-- A cobertura foi medida só em Windows, com `cargo llvm-cov --locked --all-targets --fail-under-lines 80` (cargo-llvm-cov 0.9.1): 89,41% das linhas no total. A CI executa este limite em Linux, onde não foi medido.
+- Cobertura com `cargo llvm-cov --locked --all-targets --fail-under-lines 80` (cargo-llvm-cov 0.9.1): 89,43% das linhas em Windows. A CI aplica o mesmo limite em Linux; no commit anterior mediu 89,42%.

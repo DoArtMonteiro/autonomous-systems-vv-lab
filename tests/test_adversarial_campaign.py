@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import io
 import json
 import sys
@@ -580,6 +581,45 @@ class RealBinaryIntegrationTests(unittest.TestCase):
             for pair in summary["deterministic"]["pairs"]:
                 self.assertEqual(pair["failures"], [])
                 self.assertEqual(pair["determinism"]["difference_count"], 0)
+
+
+class CompatibilityAndInputLimitTests(unittest.TestCase):
+    def test_streaming_hash_matches_sha256_without_file_digest(self):
+        # Python 3.10 has no hashlib.file_digest; the driver must not need it.
+        only_sha256 = SimpleNamespace(sha256=hashlib.sha256)
+        with tempfile.TemporaryDirectory() as directory, patch.object(ac, "hashlib", only_sha256):
+            root = Path(directory)
+            payloads = {"empty.bin": b"", "small.json": b"{}", "big.bin": bytes(range(256)) * 9000}
+            for name, data in payloads.items():
+                (root / name).write_bytes(data)
+            self.assertGreater(len(payloads["big.bin"]), ac.HASH_CHUNK_BYTES)
+            tree = ac.hash_tree(root)
+            for name, data in payloads.items():
+                self.assertEqual(tree[name], hashlib.sha256(data).hexdigest())
+
+    def test_oversized_campaign_json_is_rejected_before_parsing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "campaign.json"
+            path.write_bytes(b"[" + b"[]," * (ac.MAX_CAMPAIGN_JSON_BYTES // 3) + b"[]]")
+            with patch.object(ac.json, "loads", side_effect=AssertionError("parsed")):
+                with self.assertRaises(ac.CampaignDocError) as raised:
+                    ac.load_campaign_json(path)
+            self.assertIn("larger than", str(raised.exception))
+
+    def test_ablation_reader_shares_the_bounded_loader(self):
+        import adversarial_ablation
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "campaign.json"
+            path.write_bytes(b" " * (ac.MAX_CAMPAIGN_JSON_BYTES + 1))
+            with self.assertRaises(ac.CampaignDocError):
+                adversarial_ablation.campaign_metrics(path)
+
+    def test_campaign_json_at_the_limit_is_accepted(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "campaign.json"
+            path.write_bytes(b"{}" + b" " * (ac.MAX_CAMPAIGN_JSON_BYTES - 2))
+            self.assertEqual(ac.load_campaign_json(path), {})
 
 
 if __name__ == "__main__":

@@ -1,11 +1,11 @@
 //! `vv-adversary replay`: refaz a campanha em memória e compara byte a byte.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use autonomous_systems_vv_lab::controller::ControllerPolicyV1;
 use autonomous_systems_vv_lab::mission_analysis::MissionPolicy;
-use autonomous_systems_vv_lab::{parse_controller_id, replay_controller_evaluation};
+use autonomous_systems_vv_lab::replay_controller_evaluation;
 use serde::Deserialize;
 
 use crate::campaign::{Inputs, generate};
@@ -13,14 +13,21 @@ use crate::eval::{Params, Search};
 use crate::identity;
 use crate::io::{
     MAX_CAMPAIGN_BYTES, MAX_CASE_FILE_BYTES, MAX_SCENARIO_BYTES, MAX_SMALL_JSON_BYTES, list_files,
-    read_bounded, read_text, sha256_hex,
+    read_bounded, sha256_hex,
 };
 
+/// Campos lidos antes da verificação. O resto do documento é saltado pelo
+/// serde sem alocação, por isso um `campaign.json` hostil não é materializado.
 #[derive(Deserialize)]
 struct Recorded {
     prng: RecordedPrng,
     limits: RecordedLimits,
     inputs: RecordedInputs,
+}
+
+/// Lido só dos bytes regenerados, depois de serem iguais aos do disco.
+#[derive(Deserialize)]
+struct VerifiedFailures {
     failures: Vec<RecordedFailure>,
 }
 
@@ -35,7 +42,7 @@ struct RecordedLimits {
     budget: u32,
     minimize_budget: u32,
     max_failures: u32,
-    policies: Vec<String>,
+    policies: Vec<ControllerPolicyV1>,
     stall_window_ticks: u32,
     min_progress_mm: u32,
     search: String,
@@ -77,6 +84,10 @@ fn load_input(
 }
 
 pub fn run(campaign_path: &Path) -> Result<Vec<String>, String> {
+    // Só o ficheiro principal comparado abaixo; recusa `campaign.json:fluxo` e outros nomes.
+    if campaign_path.file_name().and_then(|name| name.to_str()) != Some("campaign.json") {
+        return Err("replay expects a path whose file name is exactly campaign.json".into());
+    }
     let directory = campaign_path
         .parent()
         .filter(|path| !path.as_os_str().is_empty())
@@ -84,17 +95,11 @@ pub fn run(campaign_path: &Path) -> Result<Vec<String>, String> {
     let campaign_bytes = read_bounded(campaign_path, MAX_CAMPAIGN_BYTES)?;
     let recorded: Recorded = serde_json::from_slice(&campaign_bytes)
         .map_err(|error| format!("campaign.json is not a valid campaign: {error}"))?;
-    let policies: Vec<ControllerPolicyV1> = recorded
-        .limits
-        .policies
-        .iter()
-        .map(|name| parse_controller_id(name).map_err(|error| error.to_string()))
-        .collect::<Result<_, _>>()?;
     let params = Params {
         search: Search::parse(&recorded.limits.search)?,
         campaign_seed: recorded.prng.campaign_seed,
         sim_seed: recorded.prng.sim_seed,
-        policies,
+        policies: recorded.limits.policies,
         budget: recorded.limits.budget,
         minimize_budget: recorded.limits.minimize_budget,
         max_failures: recorded.limits.max_failures,
@@ -151,12 +156,23 @@ pub fn run(campaign_path: &Path) -> Result<Vec<String>, String> {
         "regenerated {} files byte-identical (campaign.json, report.md, inputs, cases)",
         generated.files.len()
     ));
-    for failure in &recorded.failures {
+    // Os casos reproduzem-se a partir dos bytes já verificados, sem reler o disco.
+    let verified: BTreeMap<&str, &[u8]> = generated
+        .files
+        .iter()
+        .map(|(name, bytes)| (name.as_str(), bytes.as_slice()))
+        .collect();
+    let campaign = verified
+        .get("campaign.json")
+        .ok_or("regenerated campaign has no campaign.json")?;
+    let VerifiedFailures { failures } = serde_json::from_slice(campaign)
+        .map_err(|error| format!("regenerated campaign.json is not readable: {error}"))?;
+    for failure in &failures {
         for (label, side) in [
             ("original", &failure.original),
             ("minimized", &failure.minimized),
         ] {
-            let outcome = replay_case(directory, &side.dir, &side.m4_sha256)?;
+            let outcome = replay_case(&verified, &side.dir, &side.m4_sha256)?;
             if label == "minimized" {
                 let policy = failure
                     .identity
@@ -187,22 +203,30 @@ pub fn run(campaign_path: &Path) -> Result<Vec<String>, String> {
     Ok(lines)
 }
 
-fn replay_case(
-    directory: &Path,
+pub(crate) fn replay_case(
+    verified: &BTreeMap<&str, &[u8]>,
     case_dir: &str,
     expected_m4_sha256: &str,
 ) -> Result<autonomous_systems_vv_lab::ControllerEvaluationOutcome, String> {
-    let read = |name: &str| read_text(&directory.join(case_dir).join(name), MAX_CASE_FILE_BYTES);
-    let (m4_bytes, manifest) = read("m4.json")?;
-    if sha256_hex(&m4_bytes) != expected_m4_sha256 {
+    let read = |name: &str| -> Result<&str, String> {
+        let path = format!("{case_dir}/{name}");
+        let bytes = verified
+            .get(path.as_str())
+            .ok_or_else(|| format!("{path} is not part of the verified campaign"))?;
+        std::str::from_utf8(bytes).map_err(|_| format!("{path} is not valid UTF-8"))
+    };
+    let manifest = read("m4.json")?;
+    if sha256_hex(manifest.as_bytes()) != expected_m4_sha256 {
         return Err(format!(
             "{case_dir}/m4.json hash differs from campaign.json"
         ));
     }
-    let (_, events) = read("events.json")?;
-    let (_, report) = read("report.json")?;
-    let (_, mission) = read("mission.json")?;
-    let (_, verification) = read("verification.json")?;
-    replay_controller_evaluation(&manifest, &events, &report, &mission, &verification)
+    let (events, report, mission, verification) = (
+        read("events.json")?,
+        read("report.json")?,
+        read("mission.json")?,
+        read("verification.json")?,
+    );
+    replay_controller_evaluation(manifest, events, report, mission, verification)
         .map_err(|error| format!("{case_dir}: {error}"))
 }

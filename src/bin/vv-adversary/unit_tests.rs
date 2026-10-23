@@ -307,3 +307,19 @@ fn violations_without_identity_are_reported_not_dropped() {
             .contains(&"temporal:no_motion_in_fallback:unidentified".to_owned())
     );
 }
+
+#[test]
+fn replay_case_reads_only_verified_bytes_and_rejects_unknown_paths() {
+    let verified = std::collections::BTreeMap::from([("cases/01/original/m4.json", &b"{}"[..])]);
+    for dir in ["../../outside", "cases/02/original", "C:/Windows"] {
+        let error = crate::replay::replay_case(&verified, dir, "00")
+            .expect_err("unknown case paths are refused");
+        assert!(
+            error.contains("is not part of the verified campaign"),
+            "{error}"
+        );
+    }
+    let error = crate::replay::replay_case(&verified, "cases/01/original", "00")
+        .expect_err("hash mismatch");
+    assert!(error.contains("hash differs"), "{error}");
+}

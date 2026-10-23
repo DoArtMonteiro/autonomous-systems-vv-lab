@@ -18,6 +18,7 @@ import sys
 import time
 from pathlib import Path
 
+from adversarial_campaign import CampaignDocError, load_campaign_json
 from process_limits import ProcessLimitError, run_bounded_process
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -32,7 +33,6 @@ BUDGET = 32
 MAX_FAILURES = 16
 MAX_SEEDS = 20
 MAX_TIME_SECONDS = 600
-MAX_CAMPAIGN_JSON_BYTES = 16 * 1024 * 1024
 
 
 def default_binary() -> Path:
@@ -41,9 +41,7 @@ def default_binary() -> Path:
 
 
 def campaign_metrics(path: Path) -> tuple[int, int]:
-    if path.stat().st_size > MAX_CAMPAIGN_JSON_BYTES:
-        raise ValueError(f"{path} is too large")
-    document = json.loads(path.read_text(encoding="utf-8"))
+    document = load_campaign_json(path)  # bounded read before parsing, shared with the campaign driver
     if document.get("schema") != "vv-adversary.campaign.v1":
         raise ValueError(f"{path} has an unexpected schema")
     metrics = document["metrics"]
@@ -123,7 +121,7 @@ def main() -> int:
         parser.error(f"binary not found: {args.binary}")
     try:
         summary = run(args.binary.resolve(), output_root, args.seeds)
-    except (ProcessLimitError, ValueError, KeyError, OSError) as error:
+    except (CampaignDocError, ProcessLimitError, ValueError, KeyError, OSError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
     (output_root / "ablation.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")

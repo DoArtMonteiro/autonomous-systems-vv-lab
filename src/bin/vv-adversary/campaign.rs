@@ -10,7 +10,7 @@ use crate::atoms::{self, Spec};
 use crate::cases;
 use crate::eval::{Ctx, Params, PolicySummary, Search, policy_name, summarize};
 use crate::identity::Identity;
-use crate::io::{pretty_json, sha256_hex};
+use crate::io::{MAX_CAMPAIGN_BYTES, pretty_json, sha256_hex};
 use crate::minimize::minimize;
 use crate::model::*;
 use crate::recheck::recheck;
@@ -175,6 +175,13 @@ pub fn generate(inputs: &Inputs, params: Params) -> Result<Generated, String> {
         body: &body,
         campaign_sha256: Some(hash.clone()),
     })?;
+    // `replay` só lê até este limite; uma campanha que o excede não seria reprodutível.
+    if campaign.len() > MAX_CAMPAIGN_BYTES {
+        return Err(format!(
+            "campaign.json of {} bytes exceeds the {MAX_CAMPAIGN_BYTES} byte replay limit",
+            campaign.len()
+        ));
+    }
     let summary = format!(
         "vv-adversary campaign: candidates={} evaluations={} violating_candidates={} classes_found={} novel_classes={} inherited_classes={} cases={} control_violations={} unidentified_violations={} campaign_sha256={hash}",
         body.metrics.candidates,

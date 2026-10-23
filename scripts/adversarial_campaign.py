@@ -61,7 +61,8 @@ BUDGET_RANGE = (1, 512)
 MINIMIZE_BUDGET_RANGE = (1, 256)
 MAX_FAILURES_RANGE = (1, 16)
 OUTPUT_LIMIT_BYTES = 1024 * 1024
-MAX_CAMPAIGN_JSON_BYTES = 32 * 1024 * 1024
+MAX_CAMPAIGN_JSON_BYTES = 32 * 1024 * 1024  # same pre-parse limit as `vv-adversary replay`
+HASH_CHUNK_BYTES = 1024 * 1024
 MAX_LISTED_DIFFERENCES = 50
 
 ROLE_CLEAN = "clean"
@@ -191,9 +192,17 @@ def hash_tree(root: Path) -> dict[str, str]:
         return result
     for path in sorted(root.rglob("*")):
         if not path.is_symlink() and path.is_file():
-            with path.open("rb") as handle:
-                result[path.relative_to(root).as_posix()] = hashlib.file_digest(handle, "sha256").hexdigest()
+            result[path.relative_to(root).as_posix()] = file_sha256(path)
     return result
+
+
+def file_sha256(path: Path) -> str:
+    """Streaming SHA-256 in fixed chunks (hashlib.file_digest needs Python 3.11; CI runs 3.10)."""
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(HASH_CHUNK_BYTES), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def compare_trees(first: Path, repeat: Path) -> dict[str, Any]:
@@ -226,9 +235,12 @@ def percent_reduction(before: int, after: int) -> float | None:
 
 def load_campaign_json(path: Path) -> dict[str, Any]:
     try:
-        if path.stat().st_size > MAX_CAMPAIGN_JSON_BYTES:
+        # Bounded read before parsing: the size is checked on the bytes read, not a prior stat.
+        with path.open("rb") as handle:
+            raw = handle.read(MAX_CAMPAIGN_JSON_BYTES + 1)
+        if len(raw) > MAX_CAMPAIGN_JSON_BYTES:
             raise CampaignDocError(f"{path.name} is larger than {MAX_CAMPAIGN_JSON_BYTES} bytes")
-        value = json.loads(path.read_text(encoding="utf-8"))
+        value = json.loads(raw.decode("utf-8"))
     except (OSError, ValueError, RecursionError) as error:  # ValueError covers JSON, Unicode and int-digit limits
         raise CampaignDocError(f"cannot read {path.name}: {error}") from error
     if not isinstance(value, dict):

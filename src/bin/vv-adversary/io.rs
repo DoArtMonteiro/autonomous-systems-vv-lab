@@ -9,7 +9,10 @@ use sha2::{Digest, Sha256};
 
 pub const MAX_SCENARIO_BYTES: usize = 2 * 1024 * 1024;
 pub const MAX_SMALL_JSON_BYTES: usize = 1024 * 1024;
-pub const MAX_CAMPAIGN_BYTES: usize = 256 * 1024 * 1024;
+/// Limite antes da leitura de `campaign.json`. O tamanho cresce com o orçamento e
+/// com o número e o comprimento dos contratos: 128 contratos de 64 bytes, com
+/// orçamento 512, chegam a cerca de 9 MB; o máximo derivado ronda 12 MB.
+pub const MAX_CAMPAIGN_BYTES: usize = 32 * 1024 * 1024;
 pub const MAX_CASE_FILE_BYTES: usize = 128 * 1024 * 1024;
 pub const MAX_TOTAL_OUTPUT_BYTES: usize = 512 * 1024 * 1024;
 
@@ -34,13 +37,6 @@ pub fn read_bounded(path: &Path, maximum: usize) -> Result<Vec<u8>, String> {
         ));
     }
     Ok(bytes)
-}
-
-pub fn read_text(path: &Path, maximum: usize) -> Result<(Vec<u8>, String), String> {
-    let bytes = read_bounded(path, maximum)?;
-    let text = String::from_utf8(bytes.clone())
-        .map_err(|_| format!("{} is not valid UTF-8", path.display()))?;
-    Ok((bytes, text))
 }
 
 /// O diretório de saída tem de não existir ou estar vazio; verificado antes da geração.
@@ -123,6 +119,11 @@ pub fn list_files(root: &Path) -> Result<BTreeSet<String>, String> {
                 ));
             }
             let path = entry.path();
+            // Em Windows, `x.` e `x ` abrem `x`: o conteúdo real nunca seria listado.
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if name.ends_with('.') || name.ends_with(' ') || name.contains(':') {
+                return Err(format!("{} has a non-canonical name", path.display()));
+            }
             let kind = fs::symlink_metadata(&path)
                 .map_err(|error| format!("could not inspect {}: {error}", path.display()))?
                 .file_type();

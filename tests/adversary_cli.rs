@@ -327,3 +327,37 @@ fn known_faulty_base_reports_inherited_classes_and_replays() {
     let replay = adversary(&["replay", output.join("campaign.json").to_str().unwrap()]);
     assert!(replay.status.success(), "{replay:?}");
 }
+
+#[test]
+fn replay_hardening_rejects_noncanonical_paths_and_oversized_campaigns() {
+    let scratch = Scratch::new("hardening");
+    let output = scratch.join("out");
+    assert!(campaign(&output, "42", &[]).status.success());
+    // Só o nome exato `campaign.json`; um fluxo alternativo ou outro nome é recusado antes de ler.
+    for argument in ["campaign.json:alt", "campaign.json::$DATA", "CAMPAIGN.JSON"] {
+        let result = adversary(&["replay", output.join(argument).to_str().unwrap()]);
+        assert!(!result.status.success(), "{argument}: {result:?}");
+        let stderr = String::from_utf8_lossy(&result.stderr);
+        assert!(
+            stderr.contains("exactly campaign.json"),
+            "{argument}: {stderr}"
+        );
+    }
+    // Um nome terminado em ponto esconde conteúdo em Windows; é recusado em todos os sistemas.
+    let dotted = output.join("ex.");
+    #[cfg(windows)]
+    let dotted = std::path::PathBuf::from(format!(r"\\?\{}", dotted.display()));
+    fs::create_dir(&dotted).unwrap();
+    fs::write(dotted.join("hidden.txt"), b"x").unwrap();
+    replay_fails(&output, "non-canonical name");
+    fs::remove_file(dotted.join("hidden.txt")).unwrap();
+    fs::remove_dir(&dotted).unwrap();
+    // `campaign.json` acima do limite é recusado antes de ser analisado.
+    let campaign_path = output.join("campaign.json");
+    let original = fs::read(&campaign_path).unwrap();
+    fs::write(&campaign_path, vec![b' '; 32 * 1024 * 1024 + 1]).unwrap();
+    replay_fails(&output, "exceeds the 33554432 byte input limit");
+    fs::write(&campaign_path, original).unwrap();
+    let ok = adversary(&["replay", campaign_path.to_str().unwrap()]);
+    assert!(ok.status.success(), "{ok:?}");
+}
