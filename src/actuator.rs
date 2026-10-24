@@ -39,6 +39,14 @@ pub struct ActuatorConfig {
     pub seed: u64,
     #[serde(default)]
     pub faults: Vec<ActuatorFault>,
+    /// Opcional: em *fallback*, cancela os comandos atrasados ainda pendentes.
+    /// Desativado por omissão e omitido do JSON, para preservar os artefactos existentes.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub cancel_pending_on_fallback: bool,
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 impl Default for ActuatorConfig {
@@ -47,6 +55,7 @@ impl Default for ActuatorConfig {
             schema_version: ACTUATOR_SCHEMA_VERSION,
             seed: 0,
             faults: Vec::new(),
+            cancel_pending_on_fallback: false,
         }
     }
 }
@@ -234,6 +243,8 @@ pub enum ActuatorEventKind {
     DelayedCommandExecuted,
     CurrentCommandIgnoredByDelayedCommand,
     PendingAtTermination,
+    /// Comando atrasado descartado porque o controlador estava em *fallback*.
+    PendingCancelledOnFallback,
 }
 
 /// Evidência observada ao aplicar uma falha do atuador.
@@ -285,12 +296,14 @@ pub struct ActuatorModel {
     rng: XorShift64Star,
     pending: Vec<PendingActuationCommand>,
     last_realized_movement: Option<(Action, u32)>,
+    cancel_pending_on_fallback: bool,
 }
 
 impl ActuatorModel {
     /// Cria o modelo e combina a semente da missão com a semente do atuador.
     pub fn new(config: ActuatorConfig, mission_seed: u64, steps: u32) -> Result<Self, String> {
         config.validate(steps)?;
+        let cancel_pending_on_fallback = config.cancel_pending_on_fallback;
         let mut faults = config.faults;
         faults.sort_by(|left, right| left.id().cmp(right.id()));
         Ok(Self {
@@ -300,6 +313,7 @@ impl ActuatorModel {
             rng: XorShift64Star::new(combine_seeds(mission_seed, config.seed)),
             pending: Vec::new(),
             last_realized_movement: None,
+            cancel_pending_on_fallback,
         })
     }
 
@@ -309,6 +323,18 @@ impl ActuatorModel {
     /// `1..=steps`; uma chamada fora de ordem indica um erro de integração e
     /// provoca uma asserção em vez de produzir uma trajetória ambígua.
     pub fn apply(&mut self, tick: u32, requested_action: Action) -> ActuationOutcome {
+        self.apply_in_state(tick, requested_action, false)
+    }
+
+    /// Como `apply`, sabendo se o controlador está em *fallback*. Com
+    /// `cancel_pending_on_fallback`, os comandos pendentes são descartados
+    /// antes de qualquer execução neste passo.
+    pub fn apply_in_state(
+        &mut self,
+        tick: u32,
+        requested_action: Action,
+        in_fallback: bool,
+    ) -> ActuationOutcome {
         assert_eq!(
             tick, self.next_tick,
             "actuator ticks must be applied sequentially from 1"
@@ -326,6 +352,19 @@ impl ActuatorModel {
                 due_tick: None,
                 execution_tick: None,
             });
+        }
+
+        if in_fallback && self.cancel_pending_on_fallback {
+            for pending in self.pending.drain(..) {
+                fault_events.push(event(
+                    tick,
+                    &pending.fault_id,
+                    ActuatorEventKind::PendingCancelledOnFallback,
+                    pending.source_command_tick,
+                    Some(pending.due_tick),
+                    None,
+                ));
+            }
         }
 
         let mut realized_action = requested_action;
@@ -587,6 +626,7 @@ mod tests {
             schema_version: ACTUATOR_SCHEMA_VERSION,
             seed: 55,
             faults,
+            cancel_pending_on_fallback: false,
         }
     }
 
@@ -596,6 +636,101 @@ mod tests {
 
     fn apply(model: &mut ActuatorModel, tick: u32, action: Action) -> ActuationOutcome {
         model.apply(tick, action)
+    }
+
+    fn cancelling(faults: Vec<ActuatorFault>) -> ActuatorConfig {
+        ActuatorConfig {
+            cancel_pending_on_fallback: true,
+            ..config(faults)
+        }
+    }
+
+    fn cancellations(outcome: &ActuationOutcome) -> usize {
+        outcome
+            .fault_events
+            .iter()
+            .filter(|event| event.kind == ActuatorEventKind::PendingCancelledOnFallback)
+            .count()
+    }
+
+    #[test]
+    fn default_configuration_still_executes_pending_commands_in_fallback() {
+        let mut model = ActuatorModel::new(config(vec![delayed("late", 1, 1, 2)]), 7, 4).unwrap();
+        assert_eq!(
+            model.apply_in_state(1, movement(), false).behavior,
+            ActuatorBehavior::Delayed
+        );
+        model.apply_in_state(2, Action::hold(), true);
+        let due = model.apply_in_state(3, Action::hold(), true);
+        assert_eq!(due.behavior, ActuatorBehavior::DelayedExecution);
+        assert_eq!(due.realized_action, movement());
+        assert_eq!(cancellations(&due), 0);
+    }
+
+    #[test]
+    fn fallback_cancels_pending_commands_before_they_execute() {
+        let mut model =
+            ActuatorModel::new(cancelling(vec![delayed("late", 1, 1, 2)]), 7, 4).unwrap();
+        model.apply_in_state(1, movement(), false);
+        let entry = model.apply_in_state(2, Action::hold(), true);
+        assert_eq!(cancellations(&entry), 1);
+        assert!(model.pending_commands().is_empty());
+        let cancelled = entry
+            .fault_events
+            .iter()
+            .find(|e| e.kind == ActuatorEventKind::PendingCancelledOnFallback)
+            .unwrap();
+        assert_eq!(
+            (
+                cancelled.source_command_tick,
+                cancelled.due_tick,
+                cancelled.execution_tick
+            ),
+            (1, Some(3), None)
+        );
+        let due = model.apply_in_state(3, Action::hold(), true);
+        assert_eq!(due.behavior, ActuatorBehavior::Identity);
+        assert_eq!(due.realized_action, Action::hold());
+        assert_eq!(cancellations(&due), 0, "cancellation is idempotent");
+        let last = model.apply_in_state(4, Action::hold(), true);
+        assert!(last.pending_commands_at_termination.is_empty());
+    }
+
+    #[test]
+    fn cancellation_happens_before_execution_on_the_due_tick() {
+        let mut model =
+            ActuatorModel::new(cancelling(vec![delayed("late", 1, 1, 1)]), 7, 3).unwrap();
+        model.apply_in_state(1, movement(), false);
+        let due = model.apply_in_state(2, Action::hold(), true);
+        assert_eq!(cancellations(&due), 1);
+        assert_eq!(due.realized_action, Action::hold());
+        assert_ne!(due.behavior, ActuatorBehavior::DelayedExecution);
+    }
+
+    #[test]
+    fn delays_work_again_after_recovery_and_nominal_ticks_never_cancel() {
+        let mut model =
+            ActuatorModel::new(cancelling(vec![delayed("late", 1, 4, 1)]), 7, 5).unwrap();
+        model.apply_in_state(1, movement(), false);
+        assert_eq!(
+            cancellations(&model.apply_in_state(2, Action::hold(), true)),
+            1
+        );
+        let restarted = model.apply_in_state(3, movement(), false);
+        assert_eq!(restarted.behavior, ActuatorBehavior::Delayed);
+        let executed = model.apply_in_state(4, movement(), false);
+        assert_eq!(executed.behavior, ActuatorBehavior::DelayedExecution);
+        assert_eq!(cancellations(&executed), 0);
+    }
+
+    #[test]
+    fn the_flag_is_omitted_from_json_when_disabled() {
+        let text = serde_json::to_string(&ActuatorConfig::default()).unwrap();
+        assert!(!text.contains("cancel_pending_on_fallback"));
+        let enabled = serde_json::to_string(&cancelling(Vec::new())).unwrap();
+        assert!(enabled.contains("\"cancel_pending_on_fallback\":true"));
+        let parsed = ActuatorConfig::from_json(&enabled).unwrap();
+        assert!(parsed.cancel_pending_on_fallback);
     }
 
     #[test]

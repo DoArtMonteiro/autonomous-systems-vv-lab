@@ -157,6 +157,8 @@ A campanha M4 compara `DominantAxis` e `XFirst` em quatro cenários e três seme
 
 O binário `vv-adversary` gera falhas a partir de uma semente, procura violações nas duas políticas, reduz cada falha e grava casos que `replay-m4` reproduz. Não usa cenários de falha predefinidos. [Motor adversarial, resultados medidos e ablação](docs/adversarial-engine.md).
 
+O binário `vv-repair` compara configurações do controlador nas mesmas cargas de falhas, reproduz os contraexemplos conhecidos em cada candidata, procura classes de falha novas e aplica os critérios de aceitação escritos no ficheiro da experiência. `python scripts/m6_repair_lab.py --output-root runs/m6` gera a evidência, a análise emparelhada e um relatório HTML estático. [Reparação do controlador, resultados e limitações](docs/m6-controller-repair.md).
+
 `--suite m2 --seeds 42 --variants standard` seleciona dez casos. `--max-cases`, `--max-runs`, `--max-artifact-bytes` e `--time-budget-seconds` limitam a campanha antes e durante a execução. `--max-runs` conta invocações do simulador, incluindo repetições, reprodução e análise. Uma expectativa satisfeita não transforma uma missão insegura numa missão bem-sucedida.
 
 GitHub Actions executa formatação, Clippy, testes Rust e Python, cobertura mínima de 80%, as campanhas M1, M2, M3 e M4, minimização e reprodução em Linux e Windows. Compara os hashes canónicos entre os dois sistemas. [Resultados do M4](docs/m4-results.md), [resultados do M3](docs/m3-results.md), [resultados do M2](docs/m2-results.md), [resultados do M1](docs/m1-results.md) e [contrato de reprodução](docs/reproducibility.md).

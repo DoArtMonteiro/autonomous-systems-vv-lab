@@ -319,6 +319,7 @@ fn calendar_hash_includes_ordered_active_actuator_fault_ids() {
             }],
             probability_permille: 1000,
         }],
+        cancel_pending_on_fallback: false,
     };
     let with_fault = run_controller_evaluation(
         scenario.clone(),
