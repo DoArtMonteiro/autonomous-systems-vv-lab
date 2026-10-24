@@ -2,7 +2,9 @@
 
 A bancada gera uma página HTML local, só de leitura, a partir de uma execução M6 gravada. Mostra o que aconteceu num contraexemplo, porque falhou uma propriedade e como reproduzir o caso. Não simula nada, não interpola posições e não é uma interface de voo PX4.
 
-Este ramo (`feat/replay-workbench`) assenta no commit local do M6 `efad24e` (`feat/m6-controller-repair`), que ainda não foi integrado em `main`. A bancada lê o formato de evidência do `vv-repair` introduzido nesse commit.
+O M6 já está integrado em `main` (PR #6, commit de merge `eec47d9`). A bancada lê o formato de evidência do `vv-repair` introduzido no M6.
+
+Manifestos M4 e M5 históricos, gravados com `source_sha256` `38039c255f6f60c8b1a5d50332c2280665df469a1a00ad43b06f5df47bf643cb`, só se reproduzem com uma compilação da revisão `d491b4a`. A compilação atual recusa-os com `M4 source_sha256 does not match this build`, e a bancada mostra essa recusa como falha de reprodução.
 
 ## Executar
 
