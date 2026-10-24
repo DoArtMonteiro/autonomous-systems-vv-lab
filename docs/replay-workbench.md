@@ -20,7 +20,11 @@ Abrir `http://127.0.0.1:8765/m6-cancel-confirm.html`. A página é um único fic
 ## O que a página mostra
 
 - **Veredicto**, tal como está em `analysis.json`: decisão, eixos de segurança e progresso, notas, cada critério fixo, os pares reservados e de controlo (corrigidos, quebrados, diferença estrita, missões perdidas por mil, distância) e, por suite, a diferença de risco estrita e o p exato, com a suite que falha a regra a vermelho.
-- **Aviso de origem do traço**: quando o traço foi gravado noutra configuração (normalmente a base), a página diz que o veredicto da candidata assenta nos pares da campanha e não nesse traço.
+- **Resumo em linguagem corrente** no topo do veredicto: alteração testada (`overrides` de `analysis.json`), pares corrigidos e quebrados e decisão.
+- **Seletor de cenário**: os casos agrupados por suite, com a descrição da suite gravada em `evidence.json`.
+- **Aviso de origem do traço**: a faixa "Trace shown: BASELINE run" e uma nota com o estado da candidata nesse caso e as violações que mantém. A página diz que não há traço da candidata e que o veredicto assenta nos pares da campanha.
+- **Arena e vista ampliada**: a arena mostra o mundo gravado (limites, zona restrita, partida, ponto de passagem) e a caixa da vista ampliada. A vista ampliada mostra os deslocamentos gravados (tracejados em *fallback*), a direção gravada, a observação usada, a ligação entre observação e posição verdadeira, a perda de amostra GPS e o estado de *fallback*. Nada é interpolado entre ticks.
+- **Ação realizada**: para os ticks dentro das janelas de falha, a ação pedida, a ação realizada e o comportamento do atuador gravados em `verification.json failures[].counterexample_ticks`; fora dessas janelas a página diz que não foram gravados.
 - **Traço do contraexemplo**, de um caso reduzido do corpus ou de uma classe nova: resumo do que o traço contém, mapa 2D com os deslocamentos gravados por tick (`truth_from` para `truth_position` em `tick_result`), a observação usada pelo controlador, linha temporal (estado de *fallback*, amostras GPS perdidas, pacotes perdidos, janela de falha do atuador configurada, eventos do atuador gravados, movimento comandado, movimento real e violações), avanço passo a passo e reprodução automática, e os resultados dos contratos com o gatilho, o prazo e a violação da instância que falhou (de `verification.json failures[]`) e as condições esperada e observada gravadas. A geometria vem do cenário embebido em `events.json` e a janela do atuador de `actuator_config` em `verification.json`, ambos cobertos pelos hashes.
 - **Mesmo caso nas outras configurações**: estado (`persisted`, `resolved`, ...), violações e missão, tal como estão em `evidence.json`.
 - **Pares quebrados** pela candidata, recontados a partir das linhas de `evidence.json`. Estes pares não têm traço por tick gravado; a página di-lo.
@@ -43,7 +47,7 @@ Máquina Windows 11, Python 3.14, compilação `release` de `efad24e`:
 - `runs/m6-main-final2`: 40 casos, 40 verificados.
 - Cópia com um byte alterado em `corpus/delayed_after_fallback/07/events.json`: o caso aparece com `events.json sha256 mismatch` e falha a reprodução; `vv-repair replay` também a recusa.
 - Um manifesto M4 histórico (revisão `d491b4a`) dá `M4 source_sha256 does not match this build` com esta compilação.
-- `tests/test_replay_workbench.py`: 19 testes com um caso real gerado por `vv-lab run-m4` (ficheiro alterado, ficheiro em falta, hash de `m4.json` diferente da evidência, manifesto editado, `actuator.json` alterado, cadeia de eventos partida, `case_dir` fora de `run/`, sem binário, `summary.json` diferente, recontagem dos pares, traço igual aos `tick_result` gravados, gatilho e prazo da instância violada, eventos do atuador gravados, escape do HTML, saída dentro de `run/`) e 2 testes sobre uma execução real, ativados com `VV_WORKBENCH_RUN=<raiz da execução>`.
+- `tests/test_replay_workbench.py`: 26 testes com um caso real gerado por `vv-lab run-m4` (ficheiro alterado, ficheiro em falta, hash de `m4.json` diferente da evidência, manifesto editado, `actuator.json` alterado, cadeia de eventos partida, `case_dir` fora de `run/`, sem binário, `summary.json` diferente, recontagem dos pares, traço igual aos `tick_result` gravados, gatilho e prazo da instância violada, eventos do atuador gravados, escape do HTML, saída dentro de `run/`) e 2 testes sobre uma execução real, ativados com `VV_WORKBENCH_RUN=<raiz da execução>`.
 
 ## Limitações
 
@@ -53,7 +57,14 @@ Máquina Windows 11, Python 3.14, compilação `release` de `efad24e`:
 - Os números do veredicto vêm de `analysis.json`; só os pares corrigidos e quebrados por suite são recontados a partir das linhas.
 - As frases do resumo são calculadas a partir dos campos gravados (por exemplo, o deslocamento é a distância entre `truth_from` e `truth_position`).
 - A página é gerada uma vez: a verificação vale para a compilação e o momento indicados na proveniência.
-- Em ecrãs estreitos o mapa fica pequeno quando o percurso é quase horizontal.
+- Em ecrãs estreitos o texto dentro da vista ampliada fica pequeno; os mesmos valores aparecem na ficha do tick. Em casos com percurso vertical, alguns rótulos da vista ampliada podem sobrepor-se.
+- Os controlos de passo, reprodução e deslizador, os botões "Jump to tick" e os dois seletores mantêm o foco do teclado. O tick atual é exposto numa região `role="status"` com `aria-live="polite"` (desligada durante a reprodução automática); a reprodução avança tick a tick, sem animação, por isso não depende de `prefers-reduced-motion`.
+- A página não é totalmente acessível. Limitações conhecidas:
+  - a grelha da linha temporal é só visual (`aria-hidden`); o acesso por teclado e leitor de ecrã faz-se pelos botões "Jump to tick", cujo rótulo resume as faixas ativas de cada tick, e não célula a célula;
+  - a 390 px a grelha exige deslocamento horizontal dentro do seu painel e os rótulos das faixas saem do ecrã ao deslocar; os botões "Jump to tick" ficam todos visíveis;
+  - o texto dentro da arena e da vista ampliada fica pequeno em ecrãs estreitos;
+  - a árvore de acessibilidade foi verificada no Chrome (botões e região de estado expostos, nenhum controlo dentro do SVG), mas não foi feito nenhum teste com leitor de ecrã real, por isso os anúncios não estão confirmados;
+  - os títulos dos painéis do mapa não indicam a configuração; essa informação está na faixa "Trace shown" acima dos controlos.
 
 ## Próximos passos
 
