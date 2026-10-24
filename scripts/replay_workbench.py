@@ -134,6 +134,7 @@ def candidate_view(cand: dict) -> dict[str, Any]:
     return {
         "id": cand["id"],
         "role": cand.get("role"),
+        "overrides": cand.get("overrides", {}),
         "verdict": cand.get("verdict", {}),
         "gates": cand.get("gates", {}),
         "heldout": {k: held[k] for k in keep if k in held},
@@ -295,6 +296,16 @@ def trace(case_dir: Path) -> dict[str, Any] | None:
                 | {k: item.get(k) for k in ("observed_event_sequence", "source_command_event_sequence")}
             )
     actuator_events.sort(key=lambda e: (e["tick"] or 0, e["observed_event_sequence"] or 0))
+    # Requested vs realized action per tick, recorded only for ticks inside a failure window.
+    actuation: dict[int, dict] = {}
+    for f in (verification or {}).get("failures", []):
+        for row in f.get("counterexample_ticks", []):
+            entry = {k: row.get(k) for k in ("requested_action", "realized_action", "actuator_behavior")}
+            previous = actuation.setdefault(row.get("tick"), entry)
+            if {k: previous.get(k) for k in entry} != entry:
+                previous["conflict"] = True
+    for row in ticks:
+        row["actuation"] = actuation.get(row["tick"])
     faults = [
         {
             "kind": f.get("kind"),
@@ -459,6 +470,7 @@ def build_payload(root: Path, binary: Path | None) -> dict[str, Any]:
         "tuning_seeds": experiment.get("tuning_seeds"),
         "heldout_seeds": experiment.get("heldout_seeds"),
         "acceptance": experiment.get("acceptance"),
+        "suites": {s.get("id"): s.get("description") for s in evidence.get("suites", [])},
     }
     run_checks(evidence, analysis, summary, payload)
     items = evidence.get("corpus", []) + evidence.get("introduced", [])
@@ -517,12 +529,23 @@ svg .lane-label{font-size:11px;fill:var(--text2)}
 .zone{fill:var(--bad);fill-opacity:.12;stroke:var(--bad)}
 .wp{fill:none;stroke:var(--good);stroke-width:2}
 .seg{stroke:var(--s1);stroke-width:3;stroke-linecap:round}
-.seg.fb{stroke:var(--s2)}
+.seg.fb{stroke:var(--s2);stroke-dasharray:6 4}
+.stale{stroke:var(--text2);stroke-width:1;stroke-dasharray:3 3}
+.heading{stroke:var(--text);stroke-width:2}
+.zoombox{fill:none;stroke:var(--text2);stroke-width:1;stroke-dasharray:4 3}
+.fbbg{fill:var(--warn);fill-opacity:.10}
+svg .fbtext{fill:var(--warn);font-weight:700;font-size:12px}
+svg .gpsx{fill:var(--s2);font-weight:700}
+.ribbon{display:inline-block;font-weight:700;border:2px solid var(--text2);border-radius:6px;padding:2px 10px;margin:4px 0}
+.chip{border-left:4px solid var(--warn);padding:4px 10px;background:var(--panel);overflow-wrap:anywhere}
+.lede{max-width:80ch}
 .truth{fill:var(--s1)}.obs{fill:none;stroke:var(--text2);stroke-width:2}
-.tick-btn{cursor:pointer}
+.tick-btn{cursor:pointer}.tick-btn:focus-visible{outline:2px solid var(--s1);outline-offset:1px}
+svg.zoom{overflow:visible}
 dl.kv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 12px;margin:0}
 dl.kv dt{color:var(--muted)}dl.kv dd{margin:0;overflow-wrap:anywhere}
 pre{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.4 ui-monospace,Consolas,monospace;margin:4px 0}
+@media (max-width:480px){dl.kv{grid-template-columns:minmax(0,1fr)}dl.kv dt{margin-top:6px}}
 """
 
 APP_JS = r"""
@@ -599,16 +622,30 @@ function verdictPanel() {
   const lostPm = h.baseline_completed ? (1000 * (h.completion_lost || 0) / h.baseline_completed).toFixed(1) : 'n/a';
   const rd = h.risk_difference_strict;
   const pp = x => (100 * x).toFixed(2);
+  const shown = P.cases.find(c => c.id === state.case);
+  const tickMs = ((shown && shown.trace) || {}).tick_ms;
+  const overrides = Object.entries(cand.overrides || {}).map(([k, x]) => `${k} = ${x}`).join(', ') || 'no parameter overrides';
+  // The reason comes from the failing gates; a note is added only when it names one of them.
+  const failing = Object.entries(cand.gates || {}).filter(([, ok]) => !ok).map(([g]) => g);
+  const note = (v.notes || []).find(n => failing.some(g => n.includes(g)));
+  const reason = failing.length ? `failed gate${failing.length > 1 ? 's' : ''}: ${failing.join(', ')}${note ? '; ' + note : ''}` : ((v.notes || [])[0] || 'see notes');
+  // Plain-language summary; every number is read from analysis.json or the trace.
+  const lede = el('p', {class: 'lede'},
+    `Simulated ground vehicle (2D integer kinematics${tickMs ? `, ${tickMs} ms ticks` : ''}). Tested change for ${cand.id}: ${overrides}. ` +
+    `On ${h.pairs} held-out and control pairs it fixed ${h.fixed}${h.fixed_vacuous ? ` (${h.fixed_vacuous} of them vacuous)` : ''} and broke ${h.broken}. Decision: ${decision} (${reason}).` +
+    (shown ? ` Below: the stored trace of one reduced counterexample, run on the ${String(shown.found_on).toUpperCase()} configuration.` : ''));
+  const safetyBadge = (cand.gates || {}).safety && v.safety === 'regressed' ? 'safety regressed (suite level)' : 'safety ' + (v.safety || '?');
   return el('section', {},
     el('h2', {}, 'Verdict (from analysis.json)'),
+    lede,
     el('div', {class: 'controls'}, el('label', {}, 'Candidate ', pick), el('span', {class: 'meta'}, `baseline: ${P.run.baseline}`)),
     el('div', {class: 'banner' + (v.decision === 'accept' ? ' acceptbox' : ''), role: 'status'},
       el('b', {class: 'big'}, `${cand.id}: ${decision}`), ' ',
-      badge('safety ' + (v.safety || '?'), v.safety || ''), ' ', badge('progress ' + (v.progress || '?'), v.progress || ''),
+      badge(safetyBadge, v.safety || ''), ' ', badge('progress ' + (v.progress || '?'), v.progress || ''),
       el('ul', {}, (v.notes || []).map(n => el('li', {}, n)))),
     el('div', {class: 'grid2'},
       el('div', {class: 'panel'}, el('b', {}, 'Fixed gates (registered in the experiment file)'),
-        table(['gate', 'result'], Object.entries(cand.gates || {}).map(([g, ok]) => [code(g), el('span', {class: ok ? 'ok' : 'bad'}, ok ? 'pass' : 'FAIL')])),
+        table(['gate', 'result'], Object.entries(cand.gates || {}).map(([g, ok]) => [code(g === 'safety' ? 'safety (pooled strict RD)' : g), el('span', {class: ok ? 'ok' : 'bad'}, ok ? 'pass' : 'FAIL')])),
         el('p', {class: 'meta'}, `alpha ${a.alpha_permille}‰; completion loss ≤ ${a.max_completion_loss_permille} per 1000 baseline completions; mean distance increase ≤ ${a.max_mean_distance_increase_mm} mm; ≥ ${a.min_heldout_pairs} held-out pairs per suite.`)),
       el('div', {class: 'panel'}, el('b', {}, 'Held-out and control pairs: safety and completion'),
         el('dl', {class: 'kv'},
@@ -621,10 +658,10 @@ function verdictPanel() {
           const r = b.risk_difference_strict, low = b.risk_difference && b.risk_difference.low;
           const failsGate = low != null && low > 0;
           return [code(s), b.fixed, b.broken,
-            el('span', {class: failsGate ? 'bad' : ''}, r ? `${pp(r.estimate)} pp [${pp(r.low)}; ${pp(r.high)}]` : 'n/a'),
+            el('span', {class: failsGate ? 'bad' : ''}, (r ? `${pp(r.estimate)} pp [${pp(r.low)}; ${pp(r.high)}]` : 'n/a') + (failsGate ? ' (fails gate)' : '')),
             b.mcnemar_p == null ? 'n/a' : (b.mcnemar_p < 1e-6 ? '<1e-6' : b.mcnemar_p.toPrecision(3))];
         })),
-        el('p', {class: 'meta'}, 'no_suite_regression fails when a suite\'s non-strict risk-difference lower bound is above 0 (shown in red). The aggregate can improve while one suite regresses.'))));
+        el('p', {class: 'meta'}, 'no_suite_regression fails when a suite\'s non-strict risk-difference lower bound is above 0 (marked "fails gate"). The aggregate can improve while one suite regresses.'))));
 }
 
 function brokenPanel() {
@@ -643,39 +680,77 @@ function brokenPanel() {
 function caseStatus(c) {
   const r = c.replay_check;
   if (c.integrity.problems.length) return el('span', {class: 'bad'}, 'INTEGRITY PROBLEMS: ' + c.integrity.problems.join('; '));
-  if (r.status === 'verified') return el('span', {class: 'ok'}, 'Verified: vv-lab replay-m4 recomputed this case with the build below and exited 0. Hashes match.');
+  if (r.status === 'verified') return el('span', {class: 'ok'}, 'Verified by recomputation: vv-lab replay-m4 re-ran this case with the build below and exited 0. Integrity: file hashes also match.');
   if (r.status === 'failed') return el('span', {class: 'bad'}, 'Replay FAILED: ' + (r.stderr || 'exit ' + r.rc));
   return el('span', {class: 'warn'}, 'Not verified by replay (' + (r.detail || 'not run') + '). File hashes match.');
 }
 
-function mapSvg(t, upto) {
+const HEADING = {east: [1, 0], west: [-1, 0], north: [0, 1], south: [0, -1]};
+
+// Bounding box of the recorded positions plus the waypoints and start, padded.
+function dataBox(t) {
   const g = t.geometry;
   const pts = t.ticks.flatMap(k => [k.truth_from, k.truth, k.observed && k.observed.position].filter(Boolean));
   if (g) { pts.push(...g.waypoints); if (g.start) pts.push(g.start); }
-  const xs = pts.map(p => p.x_mm), ys = pts.map(p => p.y_mm);
-  const pad = 600;
-  const x0 = Math.min(...xs) - pad, y0 = Math.min(...ys) - pad;
-  const spanX = Math.max(...xs) + pad - x0, spanY = Math.max(...ys) + pad - y0;
-  // Same scale on both axes; the box follows the data instead of a fixed square.
-  const s = Math.min(480 / spanX, 360 / spanY), W = spanX * s, H = spanY * s;
-  const X = p => ((p.x_mm - x0) * s).toFixed(1), Y = p => (H - (p.y_mm - y0) * s).toFixed(1);
-  const svg = sv('svg', {viewBox: `0 0 ${W.toFixed(0)} ${H.toFixed(0)}`, role: 'img', 'aria-label': `Recorded positions up to tick ${upto}`});
-  svg.append(sv('rect', {x: 0, y: 0, width: W, height: H, fill: 'none', stroke: 'var(--line)'}));
-  const span = spanX;
-  if (g && g.restricted_zone.length) svg.append(sv('polygon', {class: 'zone', points: g.restricted_zone.map(p => `${X(p)},${Y(p)}`).join(' ')}));
+  const xs = pts.map(p => p.x_mm), ys = pts.map(p => p.y_mm), pad = 600;
+  const box = {x0: Math.min(...xs) - pad, y0: Math.min(...ys) - pad, x1: Math.max(...xs) + pad, y1: Math.max(...ys) + pad};
+  // Keep the view at least 0.4 as tall as wide (and vice versa) so labels fit; this only adds empty margin.
+  const w = box.x1 - box.x0, h = box.y1 - box.y0;
+  if (h < 0.4 * w) { const e = (0.4 * w - h) / 2; box.y0 -= e; box.y1 += e; }
+  if (w < 0.4 * h) { const e = (0.4 * h - w) / 2; box.x0 -= e; box.x1 += e; }
+  return box;
+}
+
+// mode 'arena': the whole recorded world (bounds, zone, waypoints) with the zoom box; mode 'zoom': the data box.
+function mapSvg(t, upto, mode) {
+  const g = t.geometry, b = g && g.bounds, box = dataBox(t);
+  const v = mode === 'arena' && b ? {x0: b.min_x_mm, y0: b.min_y_mm, x1: b.max_x_mm, y1: b.max_y_mm} : box;
+  const spanX = v.x1 - v.x0, spanY = v.y1 - v.y0;
+  const s = mode === 'arena' ? Math.min(360 / spanX, 360 / spanY) : Math.min(400 / spanX, 200 / spanY);
+  const W = spanX * s, H = spanY * s;
+  const X = p => ((p.x_mm - v.x0) * s).toFixed(1), Y = p => (H - (p.y_mm - v.y0) * s).toFixed(1);
+  const cur = t.ticks.find(k => k.tick === upto);
+  const label = mode === 'arena'
+    ? `Arena ${spanX / 1000} by ${spanY / 1000} m: start, waypoint, restricted zone and recorded path up to tick ${upto}`
+    : `Zoomed view at tick ${upto}: true position ${cur ? pt(cur.truth) : 'none'}, observation ${cur && cur.observed ? pt(cur.observed.position) : 'none'}`;
+  const svg = sv('svg', {viewBox: `0 0 ${W.toFixed(0)} ${H.toFixed(0)}`, role: 'img', 'aria-label': label,
+    class: mode === 'arena' ? 'arena' : 'zoom', style: `max-width:${Math.ceil(W)}px`});
+  const fb = cur && cur.safety_state === 'fallback';
+  svg.append(sv('rect', {x: 0, y: 0, width: W, height: H, class: fb && mode !== 'arena' ? 'fbbg' : '', fill: fb && mode !== 'arena' ? '' : 'none', stroke: 'var(--line)'}));
+  if (g && g.restricted_zone.length) {
+    svg.append(sv('polygon', {class: 'zone', points: g.restricted_zone.map(p => `${X(p)},${Y(p)}`).join(' ')}));
+    const z = g.restricted_zone[0];
+    if (mode === 'arena') svg.append(sv('text', {x: +X(z) + 4, y: +Y(z) - 6, class: 'axis'}, 'restricted zone'));
+  }
   if (g) for (const w of g.waypoints) {
     svg.append(sv('circle', {class: 'wp', cx: X(w), cy: Y(w), r: Math.max(4, (g.arrival_radius_mm || 0) * s)}));
-    svg.append(sv('text', {x: +X(w) - 24, y: +Y(w) - 10}, 'waypoint'));
+    svg.append(sv('text', {x: +X(w) - 24, y: +Y(w) - 10, class: 'axis'}, 'waypoint'));
   }
-  if (g && g.start) svg.append(sv('text', {x: +X(g.start) - 12, y: +Y(g.start) + 20, class: 'axis'}, 'start'));
+  if (g && g.start) svg.append(sv('text', {x: +X(g.start) - 12, y: +Y(g.start) + 18, class: 'axis'}, 'start'));
+  if (mode === 'arena') {
+    svg.append(sv('rect', {class: 'zoombox', x: X({x_mm: box.x0}), y: Y({y_mm: box.y1}), width: ((box.x1 - box.x0) * s).toFixed(1), height: ((box.y1 - box.y0) * s).toFixed(1)}));
+    svg.append(sv('text', {x: 6, y: H - 6, class: 'axis'}, `${spanX / 1000} m wide; dashed box = zoomed view; y up`));
+  }
   for (const k of t.ticks.filter(k => k.tick <= upto))
     if (moved(k)) svg.append(sv('line', {class: 'seg' + (k.safety_state === 'fallback' ? ' fb' : ''), x1: X(k.truth_from), y1: Y(k.truth_from), x2: X(k.truth), y2: Y(k.truth)}));
-  const cur = t.ticks.find(k => k.tick === upto);
   if (cur) {
-    if (cur.observed && cur.observed.position) svg.append(sv('rect', {class: 'obs', x: +X(cur.observed.position) - 6, y: +Y(cur.observed.position) - 6, width: 12, height: 12}));
-    svg.append(sv('circle', {class: 'truth', cx: X(cur.truth), cy: Y(cur.truth), r: 6}));
+    const ob = cur.observed && cur.observed.position;
+    if (ob && mode !== 'arena') {
+      if (ob.x_mm !== cur.truth.x_mm || ob.y_mm !== cur.truth.y_mm)
+        svg.append(sv('line', {class: 'stale', x1: X(ob), y1: Y(ob), x2: X(cur.truth), y2: Y(cur.truth)}));
+      svg.append(sv('rect', {class: 'obs', x: +X(ob) - 6, y: +Y(ob) - 6, width: 12, height: 12}));
+      svg.append(sv('text', {x: +X(ob) - 20, y: +Y(ob) + 22, class: 'axis'}, `observed (sample tick ${cur.observed.sample_tick})`));
+    }
+    const d = HEADING[cur.heading];
+    if (d && mode !== 'arena') svg.append(sv('line', {class: 'heading', x1: X(cur.truth), y1: Y(cur.truth), x2: (+X(cur.truth) + d[0] * 22).toFixed(1), y2: (+Y(cur.truth) - d[1] * 22).toFixed(1)}));
+    svg.append(sv('circle', {class: 'truth', cx: X(cur.truth), cy: Y(cur.truth), r: mode === 'arena' ? 5 : 7}));
+    if (mode !== 'arena') {
+      svg.append(sv('text', {x: +X(cur.truth) - 10, y: +Y(cur.truth) - 14, class: 'lab'}, 'true'));
+      if (cur.gps_dropped) svg.append(sv('text', {x: +X(cur.truth) + 6, y: +Y(cur.truth) + 36, class: 'gpsx'}, '× GPS sample dropped'));
+      if (fb) svg.append(sv('text', {x: 8, y: 16, class: 'fbtext'}, 'FALLBACK'));
+      svg.append(sv('text', {x: 6, y: H - 6, class: 'axis'}, `view ${Math.round(spanX)} mm wide; y up`));
+    }
   }
-  svg.append(sv('text', {x: 6, y: H - 6, class: 'axis'}, `view ${Math.round(span)} mm wide; y up`));
   return svg;
 }
 
@@ -700,9 +775,12 @@ function timelineSvg(t, upto, onPick) {
     const x = L + i * cw;
     svg.append(sv('text', {x: x + cw / 2 - 4, y: 12, class: 'axis'}, k.tick));
     lanes.forEach(([label, on, cls], j) => {
-      const r = sv('rect', {x: x + 1, y: 18 + j * 22, width: cw - 2, height: 18, rx: 3, class: (on(k) ? cls : '') + ' tick-btn', fill: on(k) ? '' : 'var(--surface)'});
+      const text = `tick ${k.tick}: ${label} ${on(k) ? 'yes' : 'no'}`;
+      const r = sv('rect', {x: x + 1, y: 18 + j * 22, width: cw - 2, height: 18, rx: 3, class: (on(k) ? cls : '') + ' tick-btn',
+        fill: on(k) ? '' : 'var(--surface)', tabindex: j === 0 ? 0 : -1, role: 'button', 'aria-label': text, 'data-fid': `cell-${k.tick}-${j}`});
       r.addEventListener('click', () => onPick(k.tick));
-      r.append(sv('title', {}, `tick ${k.tick}: ${label} ${on(k) ? 'yes' : 'no'}`));
+      r.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPick(k.tick); } });
+      r.append(sv('title', {}, text));
       svg.append(r);
     });
   });
@@ -758,21 +836,36 @@ function story(t, verified) {
     el('p', {class: 'meta'}, 'Each line is computed only from transitions, tick_result and verification records of this case.'));
 }
 
+// Scenario picker: cases grouped by suite, labelled with the suite description recorded in evidence.json.
+function casePicker() {
+  const suites = [...new Set(P.cases.map(x => x.suite))];
+  return el('select', {'aria-label': 'Scenario and counterexample', onchange: e => { state.case = e.target.value; state.tick = null; draw(); }},
+    suites.map(s => el('optgroup', {label: `${s}: ${(P.run.suites || {})[s] || 'no description recorded'}`},
+      P.cases.filter(x => x.suite === s).map(x => {
+        const o = el('option', {value: x.id}, `${x.id.split('/').slice(-1)[0]} · ${x.class} (${x.steps} ticks)`);
+        if (x.id === state.case) o.selected = true;
+        return o;
+      }))));
+}
+
+function candidateChip(c) {
+  const r = c.replay[state.candidate];
+  if (!r || c.found_on === state.candidate) return null;
+  const others = (r.violations || []).filter(v => v !== c.class);
+  return el('p', {class: 'chip'}, el('b', {}, `Candidate ${state.candidate} on this case: `),
+    `${r.status} for the case's own class` + (others.length ? `; still violates ${others.join(', ')}` : '; no other violation listed') +
+    `; mission ${r.mission}. No candidate trace is stored; this summary row is all the evidence holds for it.`);
+}
+
 function casePanel() {
   const c = P.cases.find(x => x.id === state.case);
-  const pick = el('select', {'aria-label': 'Case', onchange: e => { state.case = e.target.value; state.tick = null; stop(); draw(); }},
-    P.cases.map(x => {
-      const s = (x.replay[state.candidate] || {}).status || '?';
-      const o = el('option', {value: x.id}, `${x.id} · ${x.class} · trace: ${x.found_on} · ${state.candidate}: ${s} (own class only)`);
-      if (x.id === state.case) o.selected = true;
-      return o;
-    }));
-  const head = el('div', {}, el('h2', {}, 'Stored counterexample trace'), el('div', {class: 'controls'}, el('label', {}, 'Case ', pick)));
+  const head = el('div', {}, el('h2', {}, 'Stored counterexample trace'), el('div', {class: 'controls'}, el('label', {}, 'Scenario ', casePicker())));
   if (!c) return el('section', {}, head, el('p', {}, 'No cases in evidence.json.'));
-  const candStatus = (c.replay[state.candidate] || {}).status;
-  head.append(el('p', {}, caseStatus(c)),
-    c.found_on !== state.candidate ? el('p', {}, el('b', {}, `This trace is ${c.found_on}'s run of the case. `),
-      `For ${state.candidate} the same reduced case has status "${candStatus || 'n/a'}" (table below, no trace). ` +
+  head.append(el('p', {class: 'meta'}, `Scenario ${c.suite}: ${(P.run.suites || {})[c.suite] || 'no description recorded'}`),
+    el('p', {}, caseStatus(c)),
+    el('p', {class: 'ribbon'}, `Trace shown: ${String(c.found_on).toUpperCase()} run (controller ${c.manifest ? c.manifest.controller_id : 'unknown'})`),
+    candidateChip(c),
+    c.found_on !== state.candidate ? el('p', {class: 'meta'},
       'The candidate verdict rests on the paired campaign rows, not on this trace; see the broken pairs section.') : null,
     el('p', {class: 'meta'}, `Class ${c.class}; suite ${c.suite}; simulation seed ${c.sim_seed}; ${c.steps} ticks; atoms beyond the suite base: ${c.atoms.length ? c.atoms.map(a => a.kind).join(', ') : 'none'}. The trace is the reduced case run under configuration `, code(c.found_on),
       ` (controller `, code(c.manifest ? c.manifest.controller_id : '?'), '). Other configurations have status rows only.'));
@@ -786,27 +879,16 @@ function casePanel() {
     .concat(t.invariant_failures.map(f => f.tick)).filter(x => x != null);
   if (!ticks.includes(state.tick)) state.tick = failTicks.length ? Math.min(...failTicks) : ticks[0];
   head.append(story(t, !c.integrity.problems.length && c.replay_check.status === 'verified'));
-  const setTick = tk => { state.tick = tk; draw(); };
-  const idx = ticks.indexOf(state.tick);
+  // Controls live outside the re-rendered view, so keyboard focus survives every tick change.
+  const ui = {t, ticks, view: el('div', {id: 'trace-view'}), label: el('b', {id: 'tick-label'}),
+    play: el('button', {'aria-pressed': 'false', onclick: () => (state.timer ? stop() : play())}, 'play')};
+  ui.slider = el('input', {type: 'range', min: 0, max: ticks.length - 1, 'aria-label': 'Tick', 'aria-describedby': 'tick-label',
+    oninput: e => setTick(ticks[+e.target.value])});
+  state.ui = ui;
   const controls = el('div', {class: 'controls'},
-    el('button', {onclick: () => setTick(ticks[Math.max(0, idx - 1)]), 'aria-label': 'Previous tick'}, '◀ step'),
-    el('button', {onclick: () => (state.timer ? (stop(), draw()) : play(ticks)), 'aria-label': 'Play or pause'}, state.timer ? 'pause' : 'play'),
-    el('button', {onclick: () => setTick(ticks[Math.min(ticks.length - 1, idx + 1)]), 'aria-label': 'Next tick'}, 'step ▶'),
-    el('input', {type: 'range', min: 0, max: ticks.length - 1, value: idx, 'aria-label': 'Tick', oninput: e => setTick(ticks[+e.target.value])}),
-    el('b', {}, `tick ${state.tick} of ${ticks[ticks.length - 1]}`));
-  const k = t.ticks[idx];
-  const firing = t.contracts.filter(x => x.outcome === 'FAIL' && x.violation_tick === k.tick).map(x => x.id)
-    .concat(t.invariant_failures.filter(f => f.tick === k.tick).map(f => 'invariant ' + f.name));
-  const ob = k.observed;
-  const detail = el('dl', {class: 'kv'},
-    el('dt', {}, 'safety / mission'), el('dd', {}, `${k.safety_state} / ${k.mission_state}`),
-    el('dt', {}, 'commanded action'), el('dd', {}, act(k.action)),
-    el('dt', {}, 'true position (truth_from → truth_position)'), el('dd', {}, `${pt(k.truth_from)} → ${pt(k.truth)} (${disp(k)} mm)`),
-    el('dt', {}, 'observation used'), el('dd', {}, ob ? `${pt(ob.position)}, sample tick ${ob.sample_tick}, age ${ob.age_ticks}, confidence ${ob.confidence_permille}‰, ${ob.fresh ? 'fresh' : 'stale'}` : 'none'),
-    el('dt', {}, 'GPS / packet'), el('dd', {}, `${k.gps_dropped ? 'sample dropped' : 'no drop recorded'} / ${k.packet_lost ? 'lost' : 'no loss recorded'}`),
-    el('dt', {}, 'violations at this tick'), el('dd', {class: firing.length ? 'bad' : ''}, firing.length ? firing.join(', ') : 'none'),
-    el('dt', {}, 'raw event'), el('dd', {}, code(`events.json sequence ${k.event_sequence}, hash ${short(k.event_hash)}`)));
-  const legend = el('p', {class: 'meta'}, 'Map: blue segments are recorded per-tick displacements (truth_from → truth_position in tick_result), orange while in fallback; filled dot = true position at this tick, hollow square = observation the controller used. Steps are discrete; nothing is interpolated between ticks. *The configured lane shows the fault window from verification.json actuator_config. The recorded lane shows actuator events stored in verification.json failures[].fault_events; the complete actuator trace is stored only as a hash (actuator_trace_sha256).');
+    el('button', {onclick: () => stepBy(-1)}, '◀ step'), ui.play, el('button', {onclick: () => stepBy(1)}, 'step ▶'), ui.slider, ui.label);
+  renderTrace();
+  const legend = el('p', {class: 'meta'}, 'Arena: the recorded world (bounds, restricted zone, start, waypoint) from the scenario embedded in events.json. Zoomed view: blue segments are recorded per-tick displacements (truth_from → truth_position in tick_result), dashed orange while in fallback; filled dot = true position at this tick with its recorded heading; hollow square = observation the controller used; the thin dashed line joins those two recorded points. Steps are discrete; nothing is interpolated between ticks. *The configured lane shows the fault window from verification.json actuator_config. The recorded lane and the realized action come from verification.json failures[]; the complete actuator trace is stored only as a hash (actuator_trace_sha256).');
   const viol = t.contracts.filter(x => x.outcome !== 'PASS');
   const sum = t.summary;
   const violations = el('div', {class: 'panel'},
@@ -819,9 +901,51 @@ function casePanel() {
         x.expected ? el('div', {}, el('pre', {}, 'expected: ' + x.expected), el('pre', {}, 'actual: ' + x.actual)) : ''])
       .concat(t.invariant_failures.map(f => [el('button', {onclick: () => setTick(f.tick)}, 'invariant ' + f.name), el('span', {class: 'bad'}, 'FAIL'), `tick ${f.tick}`, f.detail || '']))),
     el('p', {class: 'meta'}, `Transitions: ${t.transitions.map(x => `tick ${x.tick} ${x.subsystem} ${x.from} → ${x.to} (${x.reason})`).join('; ') || 'none'}. Mission: ${t.mission.outcome}${t.mission.reason ? ' (' + t.mission.reason + ')' : ''}, ${t.mission.distance_to_next_waypoint_mm} mm to the waypoint.`));
-  return el('section', {}, head, controls,
-    el('div', {class: 'grid2'}, el('div', {class: 'panel'}, mapSvg(t, state.tick)), el('div', {class: 'panel'}, detail)),
-    el('div', {class: 'panel scroll'}, timelineSvg(t, state.tick, setTick)), legend, violations, configTable(c), provenance(c));
+  return el('section', {}, head, controls, ui.view, legend, violations, configTable(c), provenance(c));
+}
+
+function tickCard(t, k) {
+  const firing = t.contracts.filter(x => x.outcome === 'FAIL' && x.violation_tick === k.tick).map(x => x.id)
+    .concat(t.invariant_failures.filter(f => f.tick === k.tick).map(f => 'invariant ' + f.name));
+  const ob = k.observed, a = k.actuation;
+  const none = 'not recorded for this tick (outside the failure windows)';
+  return el('dl', {class: 'kv'},
+    el('dt', {}, 'safety / mission'), el('dd', {}, `${k.safety_state} / ${k.mission_state}`),
+    el('dt', {}, 'commanded (controller)'), el('dd', {}, act(k.action)),
+    el('dt', {}, 'realized (actuator)'), el('dd', {}, a ? act(a.realized_action) + (a.conflict ? ' (conflicting records)' : '') : none),
+    el('dt', {}, 'actuator behaviour'), el('dd', {}, a ? String(a.actuator_behavior).replaceAll('_', ' ') : none),
+    el('dt', {}, 'true position (truth_from → truth_position)'), el('dd', {}, `${pt(k.truth_from)} → ${pt(k.truth)} (${disp(k)} mm)`),
+    el('dt', {}, 'observation used'), el('dd', {}, ob ? `${pt(ob.position)}, sample tick ${ob.sample_tick}, age ${ob.age_ticks}, confidence ${ob.confidence_permille}‰, ${ob.fresh ? 'fresh' : 'stale'}` : 'none'),
+    el('dt', {}, 'GPS / packet'), el('dd', {}, `${k.gps_dropped ? 'sample dropped' : 'no drop recorded'} / ${k.packet_lost ? 'lost' : 'no loss recorded'}`),
+    el('dt', {}, 'violations at this tick'), el('dd', {class: firing.length ? 'bad' : ''}, firing.length ? firing.join(', ') : 'none'),
+    el('dt', {}, 'raw event'), el('dd', {}, code(`events.json sequence ${k.event_sequence}, hash ${short(k.event_hash)}`)));
+}
+
+// Re-render only the trace view and refresh the persistent controls in place.
+function renderTrace() {
+  const ui = state.ui;
+  if (!ui) return;
+  const {t, ticks} = ui;
+  const idx = ticks.indexOf(state.tick), k = t.ticks[idx];
+  if (!k) return;
+  const fid = document.activeElement && document.activeElement.getAttribute && document.activeElement.getAttribute('data-fid');
+  ui.slider.value = idx;
+  ui.label.textContent = `tick ${state.tick} of ${ticks[ticks.length - 1]}`;
+  ui.slider.setAttribute('aria-valuetext', `tick ${state.tick} of ${ticks[ticks.length - 1]}: ${k.safety_state}, commanded ${act(k.action)}, moved ${disp(k)} mm`);
+  ui.play.textContent = state.timer ? 'pause' : 'play';
+  ui.play.setAttribute('aria-pressed', state.timer ? 'true' : 'false');
+  ui.view.replaceChildren(
+    el('div', {class: 'grid2'},
+      el('div', {class: 'panel'}, el('b', {}, 'Arena (recorded scenario)'), mapSvg(t, state.tick, 'arena')),
+      el('div', {class: 'panel'}, el('b', {}, 'Zoomed view'), mapSvg(t, state.tick, 'zoom'), tickCard(t, k))),
+    el('div', {class: 'panel scroll'}, timelineSvg(t, state.tick, setTick)));
+  if (fid) { const n = ui.view.querySelector(`[data-fid="${fid}"]`); if (n) n.focus(); }
+}
+
+function setTick(tk) { state.tick = tk; renderTrace(); }
+function stepBy(d) {
+  const ticks = state.ui.ticks, i = ticks.indexOf(state.tick);
+  setTick(ticks[Math.max(0, Math.min(ticks.length - 1, i + d))]);
 }
 
 function limits() {
@@ -832,21 +956,29 @@ function limits() {
     el('li', {}, 'The complete actuator event trace is stored only as a hash; only the actuator events inside each failure window are recorded, and the configured window is configuration, not observation. The story lines are computed from recorded fields (for example, displacement is the distance between truth_from and truth_position).')));
 }
 
-function stop() { if (state.timer) clearInterval(state.timer); state.timer = null; }
-function play(ticks) {
-  stop();
+// Play advances one recorded tick at a time; there is no tween, so reduced-motion users see the same discrete steps.
+function stop() { if (state.timer) clearInterval(state.timer); state.timer = null; renderTrace(); }
+function play() {
+  const ticks = state.ui.ticks;
+  if (state.timer) clearInterval(state.timer);
   if (ticks.indexOf(state.tick) >= ticks.length - 1) state.tick = ticks[0];
   state.timer = setInterval(() => {
     const i = ticks.indexOf(state.tick);
-    if (i >= ticks.length - 1) { stop(); draw(); return; }
-    state.tick = ticks[i + 1]; draw();
+    if (i >= ticks.length - 1) { stop(); return; }
+    setTick(ticks[i + 1]);
   }, 700);
-  draw();
+  renderTrace();
 }
 function draw() {
   const y = window.scrollY;
+  // Keep focus on a picker that triggered the redraw (arrow keys fire change on each step).
+  const fa = document.activeElement && document.activeElement.tagName === 'SELECT' ? document.activeElement.getAttribute('aria-label') : null;
+  if (state.timer) clearInterval(state.timer);
+  state.timer = null;
+  state.ui = null;
   app.replaceChildren(header(), verdictPanel(), casePanel(), brokenPanel(), limits());
   window.scrollTo(0, y);
+  if (fa) { const n = [...app.querySelectorAll('select')].find(s => s.getAttribute('aria-label') === fa); if (n) n.focus(); }
 }
 draw();
 """

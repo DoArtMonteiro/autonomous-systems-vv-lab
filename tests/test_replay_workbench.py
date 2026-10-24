@@ -261,6 +261,40 @@ class TraceTests(WorkbenchFixture):
         recorded = {(i["event"]["kind"], i["event"]["tick"]) for f in verification["failures"] for i in f["fault_events"]}
         self.assertEqual({(e["kind"], e["tick"]) for e in trace["actuator_events"]}, recorded)
 
+    def test_actuation_per_tick_comes_from_counterexample_ticks_only(self):
+        trace = self.case_view(self.payload())["trace"]
+        verification = json.loads((self.case / "verification.json").read_text(encoding="utf-8"))
+        recorded = {}
+        for f in verification["failures"]:
+            for row in f.get("counterexample_ticks", []):
+                recorded.setdefault(row["tick"], row)
+        self.assertTrue(recorded, "the fixture has counterexample ticks")
+        for tick in trace["ticks"]:
+            row = recorded.get(tick["tick"])
+            if row is None:
+                self.assertIsNone(tick["actuation"], tick["tick"])
+            else:
+                self.assertEqual(tick["actuation"]["realized_action"], row["realized_action"])
+                self.assertEqual(tick["actuation"]["actuator_behavior"], row["actuator_behavior"])
+                self.assertNotIn("conflict", tick["actuation"])
+
+    def test_payload_is_reproducible_apart_from_build_metadata(self):
+        first, second = self.payload(), self.payload()
+        first.pop("generated")
+        second.pop("generated")
+        self.assertEqual(json.dumps(first, sort_keys=True), json.dumps(second, sort_keys=True))
+
+    def test_conflicting_actuation_records_are_flagged(self):
+        doc = json.loads((self.case / "verification.json").read_text(encoding="utf-8"))
+        rows = [r for f in doc["failures"] for r in f.get("counterexample_ticks", [])]
+        first = rows[0]
+        clash = dict(first, realized_action={"heading": "north", "distance_mm": 999})
+        doc["failures"].append({"contract_id": "synthetic", "counterexample_ticks": [clash]})
+        (self.case / "verification.json").write_text(json.dumps(doc), encoding="utf-8")
+        trace = wb.trace(self.case)
+        flagged = next(t for t in trace["ticks"] if t["tick"] == first["tick"])
+        self.assertTrue(flagged["actuation"]["conflict"])
+
     def test_missing_events_gives_no_trace(self):
         (self.case / "events.json").unlink()
         self.assertIsNone(self.case_view(self.payload())["trace"])
@@ -288,6 +322,33 @@ class RenderTests(WorkbenchFixture):
         html = wb.render(self.payload(), focus_case=CASE_ID)
         self.assertNotIn("n</script><b>x", html)
         self.assertEqual(html.count("</script>"), html.count("<script"))
+
+    def test_scenario_and_candidate_context_come_from_the_stored_files(self):
+        self.evidence["suites"] = [{"id": "delayed_after_fallback", "description": "GPS dropout and a delayed command"}]
+        self.analysis["candidates"][0]["overrides"] = {"fallback_after_ticks": 2}
+        self.write()
+        payload = self.payload()
+        self.assertEqual(payload["run"]["suites"], {"delayed_after_fallback": "GPS dropout and a delayed command"})
+        self.assertEqual(payload["candidates"][0]["overrides"], {"fallback_after_ticks": 2})
+
+    def test_page_carries_the_honesty_labels_and_accessible_controls(self):
+        html = wb.render(self.payload(), focus_case=CASE_ID)
+        for label in (
+            "Trace shown: ",
+            "No candidate trace is stored",
+            "not recorded for this tick",
+            "safety (pooled strict RD)",
+            "optgroup",
+            "aria-valuetext",
+            "aria-pressed",
+            "data-fid",
+            "Arena (recorded scenario)",
+            "fails gate",
+            "failed gate",
+            "Verified by recomputation",
+            "configuration.`",
+        ):
+            self.assertIn(label, html, label)
 
     def test_output_inside_run_directory_is_refused(self):
         with self.assertRaises(wb.WorkbenchError):

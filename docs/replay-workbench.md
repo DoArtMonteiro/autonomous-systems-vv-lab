@@ -20,7 +20,11 @@ Abrir `http://127.0.0.1:8765/m6-cancel-confirm.html`. A página é um único fic
 ## O que a página mostra
 
 - **Veredicto**, tal como está em `analysis.json`: decisão, eixos de segurança e progresso, notas, cada critério fixo, os pares reservados e de controlo (corrigidos, quebrados, diferença estrita, missões perdidas por mil, distância) e, por suite, a diferença de risco estrita e o p exato, com a suite que falha a regra a vermelho.
-- **Aviso de origem do traço**: quando o traço foi gravado noutra configuração (normalmente a base), a página diz que o veredicto da candidata assenta nos pares da campanha e não nesse traço.
+- **Resumo em linguagem corrente** no topo do veredicto: alteração testada (`overrides` de `analysis.json`), pares corrigidos e quebrados e decisão.
+- **Seletor de cenário**: os casos agrupados por suite, com a descrição da suite gravada em `evidence.json`.
+- **Aviso de origem do traço**: a faixa "Trace shown: BASELINE run" e uma nota com o estado da candidata nesse caso e as violações que mantém. A página diz que não há traço da candidata e que o veredicto assenta nos pares da campanha.
+- **Arena e vista ampliada**: a arena mostra o mundo gravado (limites, zona restrita, partida, ponto de passagem) e a caixa da vista ampliada. A vista ampliada mostra os deslocamentos gravados (tracejados em *fallback*), a direção gravada, a observação usada, a ligação entre observação e posição verdadeira, a perda de amostra GPS e o estado de *fallback*. Nada é interpolado entre ticks.
+- **Ação realizada**: para os ticks dentro das janelas de falha, a ação pedida, a ação realizada e o comportamento do atuador gravados em `verification.json failures[].counterexample_ticks`; fora dessas janelas a página diz que não foram gravados.
 - **Traço do contraexemplo**, de um caso reduzido do corpus ou de uma classe nova: resumo do que o traço contém, mapa 2D com os deslocamentos gravados por tick (`truth_from` para `truth_position` em `tick_result`), a observação usada pelo controlador, linha temporal (estado de *fallback*, amostras GPS perdidas, pacotes perdidos, janela de falha do atuador configurada, eventos do atuador gravados, movimento comandado, movimento real e violações), avanço passo a passo e reprodução automática, e os resultados dos contratos com o gatilho, o prazo e a violação da instância que falhou (de `verification.json failures[]`) e as condições esperada e observada gravadas. A geometria vem do cenário embebido em `events.json` e a janela do atuador de `actuator_config` em `verification.json`, ambos cobertos pelos hashes.
 - **Mesmo caso nas outras configurações**: estado (`persisted`, `resolved`, ...), violações e missão, tal como estão em `evidence.json`.
 - **Pares quebrados** pela candidata, recontados a partir das linhas de `evidence.json`. Estes pares não têm traço por tick gravado; a página di-lo.
@@ -53,7 +57,13 @@ Máquina Windows 11, Python 3.14, compilação `release` de `efad24e`:
 - Os números do veredicto vêm de `analysis.json`; só os pares corrigidos e quebrados por suite são recontados a partir das linhas.
 - As frases do resumo são calculadas a partir dos campos gravados (por exemplo, o deslocamento é a distância entre `truth_from` e `truth_position`).
 - A página é gerada uma vez: a verificação vale para a compilação e o momento indicados na proveniência.
-- Em ecrãs estreitos o mapa fica pequeno quando o percurso é quase horizontal.
+- Em ecrãs estreitos o texto dentro da vista ampliada fica pequeno; os mesmos valores aparecem na ficha do tick. Em casos com percurso vertical, alguns rótulos da vista ampliada podem sobrepor-se.
+- Os controlos de passo, reprodução e deslizador e os dois seletores mantêm o foco do teclado; a reprodução avança tick a tick, sem animação, por isso não depende de `prefers-reduced-motion`.
+- A página não é totalmente acessível. Limitações conhecidas:
+  - na linha temporal só a primeira faixa de cada tick recebe foco do teclado; as outras sete não são alcançáveis por teclado;
+  - a 390 px a linha temporal exige deslocamento horizontal para ver os últimos ticks, sem indicação visível;
+  - o texto dentro da arena e da vista ampliada fica pequeno em ecrãs estreitos;
+  - não foi feito nenhum teste com leitor de ecrã; os rótulos ARIA foram verificados só no código e no navegador.
 
 ## Próximos passos
 
