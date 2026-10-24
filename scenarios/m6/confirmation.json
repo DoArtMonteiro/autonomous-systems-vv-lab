@@ -1,0 +1,63 @@
+{
+  "schema": "vv-repair.experiment.v1",
+  "name": "m6_confirmation",
+  "sim_seeds": [42, 1337],
+  "tuning_seeds": [1, 2, 3, 4, 5, 6, 7, 8],
+  "heldout_seeds": [201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212],
+  "workloads_per_seed": 12,
+  "minimize_budget": 96,
+  "max_corpus_per_suite": 16,
+  "suites": [
+    {
+      "id": "nominal_stop",
+      "scenario": "../m3/nominal-stop.json",
+      "contracts": "../m3/contracts-nominal.json",
+      "description": "1D mission of 1500 mm in 16 ticks at 250 mm per tick; the clean base has no violation."
+    },
+    {
+      "id": "x_first_overshoot",
+      "scenario": "../m4/x-first-overshoot.json",
+      "contracts": "../m3/contracts-nominal.json",
+      "description": "2D mission (250 mm east, 2000 mm north) in 12 ticks at 500 mm per tick; separates the two axis policies."
+    },
+    {
+      "id": "delayed_after_fallback",
+      "scenario": "../m3/delayed-after-fallback.json",
+      "contracts": "../m3/contracts-nominal.json",
+      "actuator": "../m3/actuator-delayed.json",
+      "description": "Known-faulty M3 base: GPS dropout at ticks 4 to 10 and a 3-tick delayed command, with fallback_after_ticks 2 already set. The 5000 mm mission cannot finish in 14 ticks, so it stresses fallback, not progress."
+    }
+  ],
+  "acceptance": {
+    "alpha_permille": 50,
+    "max_completion_loss_permille": 10,
+    "max_mean_distance_increase_mm": 100,
+    "min_heldout_pairs": 200
+  },
+  "baseline": {
+    "id": "baseline",
+    "policy": "dominant_axis",
+    "rationale": "Canonical M4 controller: dominant-axis heading, watchdog after 3 low-confidence ticks, recovery after 2, confidence gate 500 permille, scenario stride."
+  },
+  "candidates": [
+    {
+      "id": "watchdog_2",
+      "policy": "dominant_axis",
+      "overrides": { "fallback_after_ticks": 2 },
+      "rationale": "Unchanged from the main experiment, re-tested on held-out seeds that no earlier run used."
+    },
+    {
+      "id": "watchdog_2_brisk",
+      "policy": "dominant_axis",
+      "overrides": { "fallback_after_ticks": 2, "stride_permille": 1250 },
+      "rationale": "Designed after the main experiment: watchdog_2 lost completions because extra fallback ticks used up the fixed horizon. A 25% longer commanded step recovers that time. Risk: a delayed, continued or noise-misdirected command now covers 25% more distance, which can create overshoot or bounds failures."
+    },
+    {
+      "id": "x_first",
+      "policy": "x_first",
+      "role": "control",
+      "expect": { "safety": "regressed", "decision": "reject" },
+      "rationale": "Known-weaker policy from M4, kept as the negative control on the new seeds."
+    }
+  ]
+}

@@ -201,7 +201,10 @@ fn execute_inner(
             confidence_threshold_permille: scenario.safety.confidence_threshold_permille,
         };
         let action = choose_action_v1(controller_policy, &controller_input);
-        let actuation_outcome = actuator.as_mut().map(|model| model.apply(tick, action));
+        let in_fallback = state.controller.safety_state == crate::model::SafetyState::Fallback;
+        let actuation_outcome = actuator
+            .as_mut()
+            .map(|model| model.apply_in_state(tick, action, in_fallback));
         let realized_action = actuation_outcome
             .as_ref()
             .map_or(action, |outcome| outcome.realized_action);

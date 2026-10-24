@@ -1,0 +1,75 @@
+{
+  "schema": "vv-repair.experiment.v1",
+  "name": "m6_cancellation_dev",
+  "sim_seeds": [42, 1337],
+  "tuning_seeds": [1, 2, 3, 4, 5, 6, 7, 8],
+  "heldout_seeds": [101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112],
+  "workloads_per_seed": 12,
+  "minimize_budget": 96,
+  "max_corpus_per_suite": 16,
+  "suites": [
+    {
+      "id": "nominal_stop",
+      "scenario": "../m3/nominal-stop.json",
+      "contracts": "../m3/contracts-nominal.json",
+      "description": "1D mission of 1500 mm in 16 ticks at 250 mm per tick; the clean base has no violation."
+    },
+    {
+      "id": "x_first_overshoot",
+      "scenario": "../m4/x-first-overshoot.json",
+      "contracts": "../m3/contracts-nominal.json",
+      "description": "2D mission (250 mm east, 2000 mm north) in 12 ticks at 500 mm per tick; separates the two axis policies."
+    },
+    {
+      "id": "delayed_after_fallback",
+      "scenario": "../m3/delayed-after-fallback.json",
+      "contracts": "../m3/contracts-nominal.json",
+      "actuator": "../m3/actuator-delayed.json",
+      "description": "Known-faulty M3 base: GPS dropout at ticks 4 to 10 and a 3-tick delayed command, with fallback_after_ticks 2 already set. The 5000 mm mission cannot finish in 14 ticks, so it stresses fallback, not progress."
+    }
+  ],
+  "acceptance": {
+    "alpha_permille": 50,
+    "max_completion_loss_permille": 10,
+    "max_mean_distance_increase_mm": 100,
+    "min_heldout_pairs": 200
+  },
+  "baseline": {
+    "id": "baseline",
+    "policy": "dominant_axis",
+    "rationale": "Canonical M4 controller: dominant-axis heading, watchdog after 3 low-confidence ticks, recovery after 2, confidence gate 500 permille, scenario stride, pending commands kept in fallback."
+  },
+  "candidates": [
+    {
+      "id": "watchdog_2",
+      "policy": "dominant_axis",
+      "overrides": { "fallback_after_ticks": 2 },
+      "rationale": "Comparator from the main experiment: safety improves, but completions fall beyond the margin."
+    },
+    {
+      "id": "cancel_on_fallback",
+      "policy": "dominant_axis",
+      "overrides": { "cancel_pending_on_fallback": true },
+      "rationale": "When the controller enters fallback it owns the vehicle, so a command it issued before the fallback must not execute later. Cancelling pending delayed commands removes motion in fallback without changing the watchdog, so fallback timing and mission availability should stay as in the baseline. Cancelled commands still count as unapplied: command_applied and command_resolution are not affected."
+    },
+    {
+      "id": "watchdog_2_cancel",
+      "policy": "dominant_axis",
+      "overrides": { "fallback_after_ticks": 2, "cancel_pending_on_fallback": true },
+      "rationale": "Both fixes: the 2-tick watchdog for fallback_response and cancellation for motion in fallback. Expected to keep the availability cost of watchdog_2."
+    },
+    {
+      "id": "watchdog_2_fast_recovery_cancel",
+      "policy": "dominant_axis",
+      "overrides": { "fallback_after_ticks": 2, "recovery_after_ticks": 1, "cancel_pending_on_fallback": true },
+      "rationale": "Single bounded design iteration, added after the first development run. watchdog_2_fast_recovery kept completions but regressed because a command issued on the single good tick executed in the next fallback window. Cancellation removes exactly that path, so the combination should keep the timing fix and the availability of fast recovery."
+    },
+    {
+      "id": "x_first",
+      "policy": "x_first",
+      "role": "control",
+      "expect": { "safety": "regressed", "decision": "reject" },
+      "rationale": "Known-weaker policy from M4, kept as the negative control."
+    }
+  ]
+}
