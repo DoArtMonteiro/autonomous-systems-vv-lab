@@ -207,6 +207,23 @@ class ReportTest(unittest.TestCase):
         self.assertIn("&lt;script&gt;", html)
         self.assertIn("Can a controller change fix known failures", html)
 
+    def render_with_source(self, source: str) -> str:
+        doc = evidence([row([V])] * 4, [row()] * 4, ["heldout"] * 4)
+        doc["source_sha256"] = source
+        return mr.render(doc, ma.analyze(doc))
+
+    def test_report_states_the_library_change_against_m4_and_m5(self):
+        html = self.render_with_source("620f76031548075a66a2e4117956a29d1b63d846263b4aed224b74e2e2501f6b")
+        self.assertNotIn("unchanged from M4 and M5", html)
+        self.assertIn("differs from the M4/M5 library", html)
+        self.assertIn(mr.M4_M5_SOURCE_SHA256, html)
+        self.assertIn("d491b4a", html)
+
+    def test_report_says_unchanged_only_for_the_m4_m5_library(self):
+        html = self.render_with_source(mr.M4_M5_SOURCE_SHA256)
+        self.assertIn("same as the M4/M5 library", html)
+        self.assertNotIn("differs from the M4/M5 library", html)
+
     def test_causal_text_names_trigger_deadline_and_fault(self):
         text = mr.causal_text(corpus_item("resolved"))
         self.assertIn("triggered at tick 3", text)

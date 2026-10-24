@@ -9,6 +9,9 @@ from __future__ import annotations
 
 from html import escape
 
+# Library hash of the M4 and M5 manifests (docs/m4-results.md); they replay only on revision d491b4a.
+M4_M5_SOURCE_SHA256 = "38039c255f6f60c8b1a5d50332c2280665df469a1a00ad43b06f5df47bf643cb"
+
 FAULT_TEXT = {
     "gps_dropout": lambda a: f"GPS dropout ticks {a['start']}-{a['end']}",
     "packet_loss": lambda a: f"packet loss ticks {a['start']}-{a['end']}",
@@ -432,6 +435,16 @@ def candidate_section(cand: dict, config: dict) -> str:
     )
 
 
+def source_note(source: str) -> str:
+    """How the library hash relates to the one in the M4 and M5 manifests."""
+    if source == M4_M5_SOURCE_SHA256:
+        return "same as the M4/M5 library"
+    return (
+        f"differs from the M4/M5 library (<code>{M4_M5_SOURCE_SHA256}</code>); M4 and M5 manifests "
+        "replay only on revision <code>d491b4a</code>, and this build rejects them"
+    )
+
+
 def render(evidence: dict, analysis: dict, run: dict | None = None) -> str:
     run = run or {}
     experiment = evidence["experiment"]
@@ -530,7 +543,7 @@ Unidentified violations: {total['unidentified_violations']}.</p>
 
 <h2>Reproduction</h2>
 <div class="panel"><code>cargo build --release<br>python scripts/m6_repair_lab.py --experiment {escape(run.get('experiment', 'scenarios/m6/experiment.json'))} --output-root {escape(run.get('output_root', 'runs/m6'))}<br>target/release/vv-repair replay {escape(run_dir)}</code></div>
-<ul><li>Library source sha256 <code>{escape(evidence['source_sha256'])}</code>, unchanged from M4 and M5.</li>
+<ul><li>Library source sha256 <code>{escape(evidence['source_sha256'])}</code>, {source_note(evidence['source_sha256'])}.</li>
 <li>Evidence sha256 <code>{escape(evidence['evidence_sha256'])}</code>; experiment sha256 <code>{escape(evidence['experiment_sha256'])}</code>.</li>
 <li>Seeds: tuning {experiment['tuning_seeds']}, held-out {experiment['heldout_seeds']}, simulation {experiment['sim_seeds']}.</li>{checks}</ul>
 
