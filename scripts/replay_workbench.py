@@ -540,7 +540,10 @@ svg .gpsx{fill:var(--s2);font-weight:700}
 .chip{border-left:4px solid var(--warn);padding:4px 10px;background:var(--panel);overflow-wrap:anywhere}
 .lede{max-width:80ch}
 .truth{fill:var(--s1)}.obs{fill:none;stroke:var(--text2);stroke-width:2}
-.tick-btn{cursor:pointer}.tick-btn:focus-visible{outline:2px solid var(--s1);outline-offset:1px}
+.tick-btn{cursor:pointer}
+.tick-nav{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 8px}
+.tick-nav-btn{min-width:36px;min-height:36px;padding:4px 8px}
+.tick-nav-btn[aria-current]{border:2px solid var(--text);font-weight:700}
 svg.zoom{overflow:visible}
 dl.kv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 12px;margin:0}
 dl.kv dt{color:var(--muted)}dl.kv dd{margin:0;overflow-wrap:anywhere}
@@ -754,12 +757,12 @@ function mapSvg(t, upto, mode) {
   return svg;
 }
 
-function timelineSvg(t, upto, onPick) {
-  const n = t.ticks.length, L = 176, cw = Math.max(18, Math.min(44, 600 / Math.max(n, 1))), W = L + n * cw + 4;
+// Timeline lanes: [label, is-on(tick), css class]. Shared by the SVG and the accessible tick buttons.
+function laneDefs(t) {
   const violTicks = new Set([...t.contracts.filter(c => c.outcome === 'FAIL').map(c => c.violation_tick), ...t.invariant_failures.map(f => f.tick)]);
   const inFault = tk => t.actuator_faults.some(f => f.windows.some(w => tk >= w.start_tick && tk <= w.end_tick));
   const actTicks = new Set(t.actuator_events.filter(e => e.kind !== 'fault_window_active').map(e => e.tick));
-  const lanes = [
+  return [
     ['fallback state', k => k.safety_state === 'fallback', 'cell-fb'],
     ['GPS sample dropped', k => k.gps_dropped, 'cell-on'],
     ['packet lost', k => k.packet_lost, 'cell-on'],
@@ -769,18 +772,36 @@ function timelineSvg(t, upto, onPick) {
     ['vehicle moved', k => moved(k), 'cell-move'],
     ['violation', k => violTicks.has(k.tick), 'cell-viol'],
   ];
+}
+
+// Real HTML buttons, one per tick, so keyboard and screen-reader users get the same information as the SVG grid.
+function tickNav(t, upto, onPick) {
+  const lanes = laneDefs(t);
+  return el('div', {class: 'tick-nav', role: 'group', 'aria-labelledby': 'tick-nav-label'},
+    el('span', {class: 'meta', id: 'tick-nav-label'}, 'Jump to tick'),
+    t.ticks.map(k => {
+      const on = lanes.filter(([, f]) => f(k)).map(([label]) => label.replace('*', ''));
+      const attrs = {class: 'tick-nav-btn', 'data-fid': `nav-${k.tick}`, onclick: () => onPick(k.tick),
+        'aria-label': `Show tick ${k.tick}: ${on.length ? on.join(', ') : 'no lane active'}`};
+      if (k.tick === upto) attrs['aria-current'] = 'step';
+      return el('button', attrs, String(k.tick));
+    }));
+}
+
+// Visual grid only: hidden from assistive technology because tickNav carries the same information as buttons.
+function timelineSvg(t, upto, onPick) {
+  const n = t.ticks.length, L = 176, cw = Math.max(18, Math.min(44, 600 / Math.max(n, 1))), W = L + n * cw + 4;
+  const lanes = laneDefs(t);
   const H = 20 + lanes.length * 22;
-  const svg = sv('svg', {viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Per-tick timeline of recorded states, faults and violations', style: `min-width:${Math.min(W, 560)}px;max-width:${Math.max(W, 560)}px`});
+  const svg = sv('svg', {viewBox: `0 0 ${W} ${H}`, 'aria-hidden': 'true', focusable: 'false', style: `min-width:${Math.min(W, 560)}px;max-width:${Math.max(W, 560)}px`});
   t.ticks.forEach((k, i) => {
     const x = L + i * cw;
     svg.append(sv('text', {x: x + cw / 2 - 4, y: 12, class: 'axis'}, k.tick));
     lanes.forEach(([label, on, cls], j) => {
-      const text = `tick ${k.tick}: ${label} ${on(k) ? 'yes' : 'no'}`;
       const r = sv('rect', {x: x + 1, y: 18 + j * 22, width: cw - 2, height: 18, rx: 3, class: (on(k) ? cls : '') + ' tick-btn',
-        fill: on(k) ? '' : 'var(--surface)', tabindex: j === 0 ? 0 : -1, role: 'button', 'aria-label': text, 'data-fid': `cell-${k.tick}-${j}`});
+        fill: on(k) ? '' : 'var(--surface)'});
       r.addEventListener('click', () => onPick(k.tick));
-      r.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPick(k.tick); } });
-      r.append(sv('title', {}, text));
+      r.append(sv('title', {}, `tick ${k.tick}: ${label} ${on(k) ? 'yes' : 'no'}`));
       svg.append(r);
     });
   });
@@ -880,7 +901,7 @@ function casePanel() {
   if (!ticks.includes(state.tick)) state.tick = failTicks.length ? Math.min(...failTicks) : ticks[0];
   head.append(story(t, !c.integrity.problems.length && c.replay_check.status === 'verified'));
   // Controls live outside the re-rendered view, so keyboard focus survives every tick change.
-  const ui = {t, ticks, view: el('div', {id: 'trace-view'}), label: el('b', {id: 'tick-label'}),
+  const ui = {t, ticks, view: el('div', {id: 'trace-view'}), label: el('b', {id: 'tick-label', role: 'status', 'aria-live': 'polite'}),
     play: el('button', {'aria-pressed': 'false', onclick: () => (state.timer ? stop() : play())}, 'play')};
   ui.slider = el('input', {type: 'range', min: 0, max: ticks.length - 1, 'aria-label': 'Tick', 'aria-describedby': 'tick-label',
     oninput: e => setTick(ticks[+e.target.value])});
@@ -930,6 +951,8 @@ function renderTrace() {
   if (!k) return;
   const fid = document.activeElement && document.activeElement.getAttribute && document.activeElement.getAttribute('data-fid');
   ui.slider.value = idx;
+  // Mute the live region while playing so it does not announce every 700 ms.
+  ui.label.setAttribute('aria-live', state.timer ? 'off' : 'polite');
   ui.label.textContent = `tick ${state.tick} of ${ticks[ticks.length - 1]}`;
   ui.slider.setAttribute('aria-valuetext', `tick ${state.tick} of ${ticks[ticks.length - 1]}: ${k.safety_state}, commanded ${act(k.action)}, moved ${disp(k)} mm`);
   ui.play.textContent = state.timer ? 'pause' : 'play';
@@ -938,7 +961,7 @@ function renderTrace() {
     el('div', {class: 'grid2'},
       el('div', {class: 'panel'}, el('b', {}, 'Arena (recorded scenario)'), mapSvg(t, state.tick, 'arena')),
       el('div', {class: 'panel'}, el('b', {}, 'Zoomed view'), mapSvg(t, state.tick, 'zoom'), tickCard(t, k))),
-    el('div', {class: 'panel scroll'}, timelineSvg(t, state.tick, setTick)));
+    el('div', {class: 'panel'}, tickNav(t, state.tick, setTick), el('div', {class: 'scroll'}, timelineSvg(t, state.tick, setTick))));
   if (fid) { const n = ui.view.querySelector(`[data-fid="${fid}"]`); if (n) n.focus(); }
 }
 

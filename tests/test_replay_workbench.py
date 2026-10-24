@@ -350,6 +350,22 @@ class RenderTests(WorkbenchFixture):
         ):
             self.assertIn(label, html, label)
 
+    def test_timeline_controls_are_html_buttons_not_hidden_svg_children(self):
+        # An SVG with role="img" makes its children presentational, so no control may live inside it.
+        js = wb.APP_JS
+        timeline = js[js.index("function timelineSvg"):js.index("function configTable")]
+        self.assertNotIn("role: 'button'", timeline)
+        self.assertNotIn("tabindex", timeline)
+        self.assertIn("'aria-hidden': 'true'", timeline)
+        nav = js[js.index("function tickNav"):js.index("function timelineSvg")]
+        self.assertIn("el('button'", nav)
+        self.assertIn("'aria-current'", nav)
+        self.assertIn("'aria-label'", nav)
+
+    def test_current_tick_is_announced(self):
+        js = wb.APP_JS
+        self.assertIn("label: el('b', {id: 'tick-label', role: 'status', 'aria-live': 'polite'})", js)
+
     def test_output_inside_run_directory_is_refused(self):
         with self.assertRaises(wb.WorkbenchError):
             wb.check_output(self.root, self.root / "run" / "workbench.html")

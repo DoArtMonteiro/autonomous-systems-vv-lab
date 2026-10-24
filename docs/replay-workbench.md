@@ -47,7 +47,7 @@ Máquina Windows 11, Python 3.14, compilação `release` de `efad24e`:
 - `runs/m6-main-final2`: 40 casos, 40 verificados.
 - Cópia com um byte alterado em `corpus/delayed_after_fallback/07/events.json`: o caso aparece com `events.json sha256 mismatch` e falha a reprodução; `vv-repair replay` também a recusa.
 - Um manifesto M4 histórico (revisão `d491b4a`) dá `M4 source_sha256 does not match this build` com esta compilação.
-- `tests/test_replay_workbench.py`: 19 testes com um caso real gerado por `vv-lab run-m4` (ficheiro alterado, ficheiro em falta, hash de `m4.json` diferente da evidência, manifesto editado, `actuator.json` alterado, cadeia de eventos partida, `case_dir` fora de `run/`, sem binário, `summary.json` diferente, recontagem dos pares, traço igual aos `tick_result` gravados, gatilho e prazo da instância violada, eventos do atuador gravados, escape do HTML, saída dentro de `run/`) e 2 testes sobre uma execução real, ativados com `VV_WORKBENCH_RUN=<raiz da execução>`.
+- `tests/test_replay_workbench.py`: 26 testes com um caso real gerado por `vv-lab run-m4` (ficheiro alterado, ficheiro em falta, hash de `m4.json` diferente da evidência, manifesto editado, `actuator.json` alterado, cadeia de eventos partida, `case_dir` fora de `run/`, sem binário, `summary.json` diferente, recontagem dos pares, traço igual aos `tick_result` gravados, gatilho e prazo da instância violada, eventos do atuador gravados, escape do HTML, saída dentro de `run/`) e 2 testes sobre uma execução real, ativados com `VV_WORKBENCH_RUN=<raiz da execução>`.
 
 ## Limitações
 
@@ -58,12 +58,13 @@ Máquina Windows 11, Python 3.14, compilação `release` de `efad24e`:
 - As frases do resumo são calculadas a partir dos campos gravados (por exemplo, o deslocamento é a distância entre `truth_from` e `truth_position`).
 - A página é gerada uma vez: a verificação vale para a compilação e o momento indicados na proveniência.
 - Em ecrãs estreitos o texto dentro da vista ampliada fica pequeno; os mesmos valores aparecem na ficha do tick. Em casos com percurso vertical, alguns rótulos da vista ampliada podem sobrepor-se.
-- Os controlos de passo, reprodução e deslizador e os dois seletores mantêm o foco do teclado; a reprodução avança tick a tick, sem animação, por isso não depende de `prefers-reduced-motion`.
+- Os controlos de passo, reprodução e deslizador, os botões "Jump to tick" e os dois seletores mantêm o foco do teclado. O tick atual é exposto numa região `role="status"` com `aria-live="polite"` (desligada durante a reprodução automática); a reprodução avança tick a tick, sem animação, por isso não depende de `prefers-reduced-motion`.
 - A página não é totalmente acessível. Limitações conhecidas:
-  - na linha temporal só a primeira faixa de cada tick recebe foco do teclado; as outras sete não são alcançáveis por teclado;
-  - a 390 px a linha temporal exige deslocamento horizontal para ver os últimos ticks, sem indicação visível;
+  - a grelha da linha temporal é só visual (`aria-hidden`); o acesso por teclado e leitor de ecrã faz-se pelos botões "Jump to tick", cujo rótulo resume as faixas ativas de cada tick, e não célula a célula;
+  - a 390 px a grelha exige deslocamento horizontal dentro do seu painel e os rótulos das faixas saem do ecrã ao deslocar; os botões "Jump to tick" ficam todos visíveis;
   - o texto dentro da arena e da vista ampliada fica pequeno em ecrãs estreitos;
-  - não foi feito nenhum teste com leitor de ecrã; os rótulos ARIA foram verificados só no código e no navegador.
+  - a árvore de acessibilidade foi verificada no Chrome (botões e região de estado expostos, nenhum controlo dentro do SVG), mas não foi feito nenhum teste com leitor de ecrã real, por isso os anúncios não estão confirmados;
+  - os títulos dos painéis do mapa não indicam a configuração; essa informação está na faixa "Trace shown" acima dos controlos.
 
 ## Próximos passos
 
