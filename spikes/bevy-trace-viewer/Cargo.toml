@@ -1,0 +1,12 @@
+[package]
+name = "bevy_trace_viewer"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Spike: render a recorded vv-lab trace in Bevy. Evaluation only."
+
+[dependencies]
+bevy = "=0.16.1"
+serde_json = "1"
+
+[workspace]

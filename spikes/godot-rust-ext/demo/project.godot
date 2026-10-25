@@ -1,0 +1,7 @@
+; Spike: check that a Rust GDExtension loads in Godot 4.7 and reads the same trace values as GDScript.
+config_version=5
+
+[application]
+config/name="vv-lab gdext spike"
+run/main_scene="res://check.tscn"
+config/features=PackedStringArray("4.7")
