@@ -163,7 +163,7 @@ class TwoServersTests(unittest.TestCase):
 class ResultContractTests(unittest.TestCase):
     def good(self):
         return {"schema": sa.RESULT_SCHEMA, "adapter": sa.ADAPTER_SCHEMA, "run_id": "0123456789abcdef",
-                "request": {}, "reused": False, "model": {"id": sa.MODEL_ID}, "provenance": {}, "inputs": {},
+                "request": {"schema": sa.REQUEST_SCHEMA, "model": sa.MODEL_ID}, "reused": False, "model": {"id": sa.MODEL_ID}, "provenance": {}, "inputs": {},
                 "states": [], "replay": {"status": "verified"}, "integrity": {"problems": []},
                 "verdict": {"status": "verified", "reasons": []}}
 

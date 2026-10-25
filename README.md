@@ -2,7 +2,7 @@
 
 Laboratório em Rust para verificar missões de um veículo autónomo terrestre em duas dimensões. Combina falhas de sensores, comunicação e atuadores com invariantes de segurança, contratos temporais e reprodução determinística. Python coordena campanhas limitadas e a redução de contraexemplos.
 
-**Estado: M7 Mission Control integrado em `main` (PR #9, 25/10/2026); aceitação operacional ainda pendente.** Rust executa a simulação, aplica as políticas de controlo e avalia contratos; Python organiza campanhas, reduz contraexemplos e serve a interface local Mission Control através do adaptador versionado `vv-sim-adapter.v1`. O controlador recebe apenas observações e configuração da missão. O domínio executável continua a ser um veículo terrestre 2D. O modelo de foguetão 6-DOF é apenas uma especificação; o laboratório não controla equipamento real.
+**Estado: M7 Mission Control integrado em `main` (PR #9, 25/10/2026); aceitação operacional ainda pendente. M8 implementado e verificado localmente; aguarda CI remota e integração. M9 não iniciado.** Rust executa a simulação, aplica as políticas de controlo e avalia contratos; Python organiza campanhas, reduz contraexemplos e serve a interface local Mission Control através dos adaptadores versionados `vv-sim-adapter.v1` (veículo terrestre) e `vv-sim-adapter.v2` (foguetão). O controlador recebe apenas observações e configuração da missão. O domínio principal continua a ser um veículo terrestre 2D. O M8 acrescenta um modelo idealizado de foguetão como corpo rígido 6-DOF, verificado contra casos de referência e não validado com dados de voo; o laboratório não controla equipamento real.
 
 ## Executar uma missão
 
@@ -162,6 +162,8 @@ O binário `vv-repair` compara configurações do controlador nas mesmas cargas 
 `scripts/replay_workbench.py` gera uma página local, só de leitura, que mostra um contraexemplo gravado tick a tick, o veredicto da candidata, a integridade dos artefactos e o resultado de `replay-m4`. [Bancada de reprodução visual](docs/replay-workbench.md).
 
 `scripts/mission_control.py` abre um Mission Control local no navegador: escolher uma missão, alterar as falhas suportadas, correr o simulador através do contrato de adaptador `vv-sim-adapter.v1` e ver os estados gravados (modelo cinemático 2D). [M7: Mission Control, contrato de adaptador e roteiro](docs/m7-mission-control.md).
+
+`crates/vv-rocket` integra a dinâmica 6-DOF de um andar de foguete com massa variável (RK4 de passo fixo) e verifica-a contra casos de referência com tolerâncias fixadas antes da execução: `cargo run --release --manifest-path crates/vv-rocket/Cargo.toml -- verify`. Os doze casos cumprem os critérios ativos; os dois critérios da primeira execução que falharam ou se revelaram inválidos ficam no relatório como histórico e não contam como aprovados. No Mission Control, a página `/rocket` corre três experiências através do contrato `vv-sim-adapter.v2`. É um modelo idealizado, não validado contra dados de voo, e sem modelo de contacto com o solo. [M8: dinâmica de corpo rígido do andar de foguete](docs/m8-rocket-dynamics.md).
 
 `--suite m2 --seeds 42 --variants standard` seleciona dez casos. `--max-cases`, `--max-runs`, `--max-artifact-bytes` e `--time-budget-seconds` limitam a campanha antes e durante a execução. `--max-runs` conta invocações do simulador, incluindo repetições, reprodução e análise. Uma expectativa satisfeita não transforma uma missão insegura numa missão bem-sucedida.
 

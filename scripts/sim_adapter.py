@@ -157,16 +157,42 @@ def _verdict(replay: dict, problems: list[str]) -> dict[str, Any]:
 RESULT_FIELDS = {"schema": str, "adapter": str, "run_id": str, "request": dict, "reused": bool, "model": dict,
                  "provenance": dict, "inputs": dict, "states": list, "replay": dict, "integrity": dict, "verdict": dict}
 
+# Contract v2 adds models with continuous dynamics. v1 results stay valid and unchanged; a v2
+# result also separates the physics reference verification and the model's validity from the
+# integrity and replay verdict.
+ADAPTER_SCHEMA_V2 = "vv-sim-adapter.v2"
+REQUEST_SCHEMA_V2 = "vv-sim-run-request.v2"
+RESULT_SCHEMA_V2 = "vv-sim-run-result.v2"
+RESULT_FIELDS_V2 = {**RESULT_FIELDS, "events": list, "summary": dict, "physics_reference": dict, "model_validity": str}
+# Models served under contract v2; the ground vehicle stays on v1.
+V2_MODELS = frozenset({"rocket-rigid-body"})
+RESULT_CONTRACTS = {RESULT_SCHEMA: (ADAPTER_SCHEMA, RESULT_FIELDS), RESULT_SCHEMA_V2: (ADAPTER_SCHEMA_V2, RESULT_FIELDS_V2)}
+
 
 def check_result(result: Any) -> None:
     """Response contract of a successful run; raises AdapterError naming the first broken field."""
     if not isinstance(result, dict):
         raise AdapterError("result must be an object")
-    for name, kind in RESULT_FIELDS.items():
+    adapter, fields = RESULT_CONTRACTS.get(result.get("schema"), (None, RESULT_FIELDS))
+    for name, kind in fields.items():
         if not isinstance(result.get(name), kind):
             raise AdapterError(f"result.{name} missing or not {kind.__name__}")
-    if result["schema"] != RESULT_SCHEMA or result["adapter"] != ADAPTER_SCHEMA:
+    if adapter is None or result["adapter"] != adapter:
         raise AdapterError("result schema or adapter version is wrong")
+    # A result must name one model and one request contract: v1 is only the ground vehicle, v2 names
+    # its model in the request, and a result never answers a request for another model.
+    if fields is RESULT_FIELDS:
+        request = result["request"]
+        if (result["model"].get("id") != MODEL_ID or request.get("model") != MODEL_ID
+                or request.get("schema") != REQUEST_SCHEMA):
+            raise AdapterError(f"a {RESULT_SCHEMA} result must answer a {REQUEST_SCHEMA} request for {MODEL_ID}")
+    else:
+        if result["request"].get("schema") != REQUEST_SCHEMA_V2:
+            raise AdapterError(f"result.request.schema must be {REQUEST_SCHEMA_V2}")
+        if result["model"].get("id") not in V2_MODELS or result["model"]["id"] != result["request"].get("model"):
+            raise AdapterError(f"result.model.id must be one of {sorted(V2_MODELS)} and equal the requested model")
+        if not isinstance(result["physics_reference"].get("all_pass"), bool):
+            raise AdapterError("result.physics_reference.all_pass missing or not bool")
     if not RUN_ID.fullmatch(result["run_id"]):
         raise AdapterError("result.run_id is not 16 lowercase hex characters")
     problems = result["integrity"].get("problems")
