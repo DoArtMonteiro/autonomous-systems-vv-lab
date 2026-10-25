@@ -161,6 +161,8 @@ O binário `vv-repair` compara configurações do controlador nas mesmas cargas 
 
 `scripts/replay_workbench.py` gera uma página local, só de leitura, que mostra um contraexemplo gravado tick a tick, o veredicto da candidata, a integridade dos artefactos e o resultado de `replay-m4`. [Bancada de reprodução visual](docs/replay-workbench.md).
 
+`scripts/mission_control.py` abre um Mission Control local no navegador: escolher uma missão, alterar as falhas suportadas, correr o simulador através do contrato de adaptador `vv-sim-adapter.v1` e ver os estados gravados (modelo cinemático 2D). [M7: Mission Control, contrato de adaptador e roteiro](docs/m7-mission-control.md).
+
 `--suite m2 --seeds 42 --variants standard` seleciona dez casos. `--max-cases`, `--max-runs`, `--max-artifact-bytes` e `--time-budget-seconds` limitam a campanha antes e durante a execução. `--max-runs` conta invocações do simulador, incluindo repetições, reprodução e análise. Uma expectativa satisfeita não transforma uma missão insegura numa missão bem-sucedida.
 
 GitHub Actions executa formatação, Clippy, testes Rust e Python, cobertura mínima de 80%, as campanhas M1, M2, M3 e M4, minimização e reprodução em Linux e Windows. Compara os hashes canónicos entre os dois sistemas. [Resultados do M4](docs/m4-results.md), [resultados do M3](docs/m3-results.md), [resultados do M2](docs/m2-results.md), [resultados do M1](docs/m1-results.md) e [contrato de reprodução](docs/reproducibility.md).

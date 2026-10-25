@@ -74,6 +74,13 @@ jobs:
           VV_LAB_BINARY: target/release/vv-lab${{ matrix.exe_suffix }}
         run: python -m unittest discover -s tests -p "test_*.py"
 
+      - name: Exercise M7 cross-process locking and publication without skips
+        working-directory: tests
+        run: |
+          python -c "import sys; print('lock backend:', 'msvcrt.locking' if sys.platform == 'win32' else 'fcntl.flock')"
+          python -m unittest -v test_sim_adapter_concurrency test_sim_adapter test_mission_control 2>&1 | tee "$RUNNER_TEMP/m7-tests.log"
+          if grep -n "skipped" "$RUNNER_TEMP/m7-tests.log"; then echo "M7 tests were skipped"; exit 1; fi
+
       - name: Minimize the M3 actuator stop failure
         env:
           VV_LAB_BINARY: target/release/vv-lab${{ matrix.exe_suffix }}

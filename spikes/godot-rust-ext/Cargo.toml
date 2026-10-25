@@ -1,0 +1,15 @@
+[package]
+name = "trace_ext"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Spike: Godot 4.7 GDExtension in Rust that reads a recorded vv-lab trace"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+godot = { version = "=0.5.5", features = ["api-4-7"] }
+serde_json = "1"
+
+[workspace]
