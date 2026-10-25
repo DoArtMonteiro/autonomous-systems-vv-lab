@@ -69,10 +69,11 @@ Distribuição em núcleo aberto (proposta, não decidida): núcleo, contrato, C
 
 | Marco | Conteúdo | Estado |
 | --- | --- | --- |
-| M7 | Contrato `vv-sim-adapter.v1`, adaptador terrestre, Mission Control local, protótipos de motor, especificação de foguete | Este marco, por integrar |
-| M8 | Decisão de motor com mais medições; visualizador de ambiente de trabalho a ler resultados do contrato; modo Simple acessível com leitor de ecrã | Futuro |
-| M9 | Contrato v2 para dinâmica contínua; adaptador para um simulador 6-DOF externo verificado contra casos de referência | Futuro |
-| M10 | Missão de recuperação de foguete com requisitos e taxonomia de falhas da especificação | Futuro |
+| M7 | Contrato `vv-sim-adapter.v1`, adaptador terrestre, Mission Control local, protótipos de motor, especificação de foguete | Integrado |
+| M8 | Física: dinâmica 6-DOF de um andar de foguete verificada contra casos de referência, contrato v2 e integração no Mission Control | Em curso |
+| M9 | Recuperação: missão de recuperação de foguete com requisitos e taxonomia de falhas da especificação | Futuro |
+| M10 | Research Studio | Futuro |
+| M11 | Public Preview | Futuro |
 
 ## Limitações
 

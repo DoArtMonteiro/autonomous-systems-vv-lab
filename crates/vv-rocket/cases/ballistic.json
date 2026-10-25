@@ -1,0 +1,59 @@
+{
+  "schema": "vv-rocket-case.v1",
+  "name": "ballistic",
+  "dt_s": 0.01,
+  "duration_s": 40.0,
+  "record_every": 10,
+  "stop_at_ground": true,
+  "environment": {
+    "gravity_mps2": 9.80665,
+    "atmosphere": {
+      "density_kgpm3": 1.225,
+      "scale_height_m": 8500.0
+    }
+  },
+  "vehicle": {
+    "dry_mass_kg": 50.0,
+    "propellant_mass_kg": 0.0,
+    "dry_cm_station_m": 0.6,
+    "propellant_cm_station_m": 0.0,
+    "dry_inertia_kgm2": [
+      0.5,
+      6.0,
+      6.0
+    ],
+    "propellant_inertia_kgm2": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "max_thrust_n": 0.0,
+    "isp_s": 200.0,
+    "drag_coefficient": 0.3,
+    "reference_area_m2": 0.03
+  },
+  "initial": {
+    "position_m": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "velocity_mps": [
+      120.0,
+      0.0,
+      160.0
+    ],
+    "attitude": [
+      0.8944271909999159,
+      0.0,
+      -0.4472135954999579,
+      0.0
+    ],
+    "angular_velocity_radps": [
+      0.0,
+      0.0,
+      0.0
+    ]
+  },
+  "burns": []
+}

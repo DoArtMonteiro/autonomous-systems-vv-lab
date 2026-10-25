@@ -39,6 +39,10 @@ jobs:
         if: runner.os == 'Linux'
         run: cargo audit
 
+      - name: Audit locked vv-rocket dependencies
+        if: runner.os == 'Linux'
+        run: cargo audit --file crates/vv-rocket/Cargo.lock
+
       - name: Install LLVM coverage support
         if: runner.os == 'Linux'
         run: |
@@ -69,6 +73,19 @@ jobs:
       - name: Build release binary
         run: cargo build --locked --release
 
+      # vv-rocket is a separate workspace so the vv-lab source hash and M1-M7 outputs stay unchanged.
+      # Its pinned trace hashes make this step the cross-platform determinism check.
+      - name: Check, lint, test and build vv-rocket
+        run: |
+          cargo fmt --manifest-path crates/vv-rocket/Cargo.toml -- --check
+          cargo clippy --locked --manifest-path crates/vv-rocket/Cargo.toml --all-targets -- -D warnings
+          cargo test --locked --manifest-path crates/vv-rocket/Cargo.toml
+          cargo build --locked --release --manifest-path crates/vv-rocket/Cargo.toml
+
+      - name: Enforce vv-rocket coverage threshold
+        if: runner.os == 'Linux'
+        run: cargo llvm-cov --locked --manifest-path crates/vv-rocket/Cargo.toml --all-targets --fail-under-lines 80
+
       - name: Test Python campaign and minimizer
         env:
           VV_LAB_BINARY: target/release/vv-lab${{ matrix.exe_suffix }}
@@ -78,7 +95,7 @@ jobs:
         working-directory: tests
         run: |
           python -c "import sys; print('lock backend:', 'msvcrt.locking' if sys.platform == 'win32' else 'fcntl.flock')"
-          python -m unittest -v test_sim_adapter_concurrency test_sim_adapter test_mission_control 2>&1 | tee "$RUNNER_TEMP/m7-tests.log"
+          python -m unittest -v test_sim_adapter_concurrency test_sim_adapter test_mission_control test_rocket_adapter 2>&1 | tee "$RUNNER_TEMP/m7-tests.log"
           if grep -n "skipped" "$RUNNER_TEMP/m7-tests.log"; then echo "M7 tests were skipped"; exit 1; fi
 
       - name: Minimize the M3 actuator stop failure

@@ -31,7 +31,9 @@ from pathlib import Path
 from typing import Any
 
 from m6_report import CSS
-from sim_adapter import AdapterError, GroundVehicleAdapter, check_result
+from rocket_adapter import RocketAdapter
+from rocket_view import ROCKET_JS, rocket_page
+from sim_adapter import ADAPTER_SCHEMA_V2, MODEL_ID, AdapterError, GroundVehicleAdapter, check_result
 
 ROOT = Path(__file__).resolve().parents[1]
 MAX_BODY_BYTES = 16 * 1024
@@ -49,10 +51,17 @@ class ExclusiveServer(ThreadingHTTPServer):
         super().server_bind()
 
 
-def make_server(port: int, output_root: Path, adapter: GroundVehicleAdapter) -> ThreadingHTTPServer:
+def make_server(port: int, output_root: Path, adapter: Any) -> ThreadingHTTPServer:
+    """`adapter` is one ground-vehicle adapter or a map from model id to adapter; runs dispatch on `model`."""
     output_root = Path(output_root).resolve()
     output_root.mkdir(parents=True, exist_ok=True)
     lock = threading.Lock()
+    adapters = dict(adapter) if isinstance(adapter, dict) else {MODEL_ID: adapter}
+    ground = adapters.get(MODEL_ID)
+    # Longest paths first, so a run directory inside the repository becomes <runs>.
+    hidden = [(output_root, "<runs>")] + [(a.binary, f"<{m}-binary>") for m, a in adapters.items()]
+    hidden += [(a.root, "<repo>") for a in adapters.values()]
+    hidden.sort(key=lambda item: -len(str(Path(item[0]).resolve())) if item[0] is not None else 0)
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "MissionControl/1"
@@ -85,8 +94,7 @@ def make_server(port: int, output_root: Path, adapter: GroundVehicleAdapter) -> 
         def _json(self, status: int, value: Any) -> None:
             text = json.dumps(value, sort_keys=True)
             # Never leak where runs, the binary or the repository live on this machine.
-            # Longest paths first, so a run directory inside the repository becomes <runs>.
-            for place, label in ((output_root, "<runs>"), (adapter.binary, "<vv-lab>"), (adapter.root, "<repo>")):
+            for place, label in hidden:
                 if place is None:
                     continue
                 place = Path(place).resolve()
@@ -102,8 +110,15 @@ def make_server(port: int, output_root: Path, adapter: GroundVehicleAdapter) -> 
                 return self._send(HTTPStatus.OK, PAGE.encode("utf-8"), "text/html; charset=utf-8")
             if self.path == "/app.js":
                 return self._send(HTTPStatus.OK, APP_JS.encode("utf-8"), "text/javascript; charset=utf-8")
-            if self.path == "/api/describe":
-                return self._json(HTTPStatus.OK, adapter.describe())
+            if self.path == "/api/describe" and ground is not None:
+                return self._json(HTTPStatus.OK, ground.describe())
+            if self.path == "/api/models":
+                return self._json(HTTPStatus.OK, {"schema": ADAPTER_SCHEMA_V2,
+                                                  "models": {m: a.describe() for m, a in adapters.items()}})
+            if self.path == "/rocket":
+                return self._send(HTTPStatus.OK, rocket_page(CSS).encode("utf-8"), "text/html; charset=utf-8")
+            if self.path == "/rocket.js":
+                return self._send(HTTPStatus.OK, ROCKET_JS.encode("utf-8"), "text/javascript; charset=utf-8")
             return self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})
 
         def do_POST(self) -> None:  # noqa: N802
@@ -125,10 +140,13 @@ def make_server(port: int, output_root: Path, adapter: GroundVehicleAdapter) -> 
                 request = json.loads(self.rfile.read(length).decode("utf-8"))
             except (UnicodeDecodeError, json.JSONDecodeError):
                 return self._json(HTTPStatus.BAD_REQUEST, {"error": "body is not valid JSON"})
+            model = request.get("model") if isinstance(request, dict) else None
+            if not isinstance(model, str) or model not in adapters:
+                return self._json(HTTPStatus.BAD_REQUEST, {"error": f"model must be one of {sorted(adapters)}"})
             if not lock.acquire(timeout=BUSY_WAIT_SECONDS):
                 return self._json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "another simulation is running; try again shortly"})
             try:
-                result = adapter.run(request, output_root, reuse=True)
+                result = adapters[model].run(request, output_root, reuse=True)
             except AdapterError as error:
                 return self._json(HTTPStatus.BAD_REQUEST, {"error": str(error)})
             except Exception:  # noqa: BLE001 - report without internals
@@ -143,7 +161,8 @@ def make_server(port: int, output_root: Path, adapter: GroundVehicleAdapter) -> 
             return self._json(HTTPStatus.OK, result)
 
     server = ExclusiveServer(("127.0.0.1", port), Handler)
-    server.adapter = adapter
+    server.adapter = ground
+    server.adapters = adapters
     return server
 
 
@@ -191,7 +210,7 @@ pre{{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.4 ui-monospace,Cons
 [hidden]{{display:none!important}}
 </style></head>
 <body><main>
-<p class="meta">V&amp;V lab · Mission Control · local simulator runs on this computer</p>
+<p class="meta">V&amp;V lab · Mission Control · local simulator runs on this computer · Ground vehicle (2D) · <a href="/rocket">Rocket stage (6-DOF)</a></p>
 <h1>Mission Control</h1>
 <p class="physics" id="physics"><b>Ground vehicle, 2D kinematic model.</b> Positions are integer millimetres on a plane,
 time advances in fixed ticks, and there are no dynamics or environment model. This is not a 3D or 6-DOF simulation.</p>
@@ -583,7 +602,8 @@ def main(argv: list[str] | None = None) -> int:
     if not 1024 <= args.port <= 65535:
         print("error: --port must be in [1024, 65535]", file=sys.stderr)
         return 2
-    server = make_server(args.port, Path(args.output_root), GroundVehicleAdapter())
+    server = make_server(args.port, Path(args.output_root),
+                         {MODEL_ID: GroundVehicleAdapter(), "rocket-rigid-body": RocketAdapter()})
     print(f"Mission Control on http://127.0.0.1:{args.port}/  (Ctrl+C to stop)")
     try:
         server.serve_forever()
