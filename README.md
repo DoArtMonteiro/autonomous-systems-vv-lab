@@ -2,7 +2,7 @@
 
 Laboratório em Rust para verificar missões de um veículo autónomo terrestre em duas dimensões. Combina falhas de sensores, comunicação e atuadores com invariantes de segurança, contratos temporais e reprodução determinística. Python coordena campanhas limitadas e a redução de contraexemplos.
 
-**Estado: M4 em desenvolvimento.** Rust executa a simulação, aplica as políticas de controlo e avalia os contratos; Python seleciona cenários, organiza campanhas e reduz contraexemplos. O controlador recebe apenas observações e configuração da missão. O laboratório não controla equipamento real.
+**Estado: M7 Mission Control integrado em `main` (PR #9, 25/10/2026); aceitação operacional ainda pendente.** Rust executa a simulação, aplica as políticas de controlo e avalia contratos; Python organiza campanhas, reduz contraexemplos e serve a interface local Mission Control através do adaptador versionado `vv-sim-adapter.v1`. O controlador recebe apenas observações e configuração da missão. O domínio executável continua a ser um veículo terrestre 2D. O modelo de foguetão 6-DOF é apenas uma especificação; o laboratório não controla equipamento real.
 
 ## Executar uma missão
 
