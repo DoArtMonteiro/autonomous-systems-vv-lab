@@ -277,3 +277,115 @@ O Mission Control serve a página `/landing`, que corre o modelo `rocket-landing
 - O guiamento lateral é limitado pela inclinação comandada e pela ausência de RCS; desvios iniciais extremos não são recuperáveis.
 - O `baseline` mantém a última velocidade GNSS (até 0,1 s de idade) e não usa a IMU para a velocidade; é intencional, e é uma fonte de erro nos últimos segundos.
 - O modelo continua sem dinâmica de contacto: `landed` significa que o plano de saída da tubeira atingiu o solo com os seis requisitos cumpridos.
+
+### Resultados da campanha
+
+Campanha pré-registada completa (`preregistered: true` em `summary.json`), executada uma única vez depois da correção do verificador e do campo `acted`, sem alterar a matriz, as gamas, as janelas nem as hipóteses depois de ver resultados. Cada uma das 780 execuções foi reproduzida com `vv-rocket replay` e verificada; não houve erros de sorteio (`acted == false`) nem erros de reprodução.
+
+```sh
+cargo build --release --manifest-path crates/vv-rocket/Cargo.toml
+python scripts/m9_campaign.py
+```
+
+Os valores por omissão são a matriz pré-registada (`--seeds 1000..1029`, todas as falhas), `--max-runs 800`, `--max-artifact-bytes 536870912`, `--time-budget-seconds 1800` e `--jobs 4`; o comando expandido fica em `runs/m9-campaign/summary.json`.
+
+- Máquina: Windows-11-10.0.26300-SP0; AMD64 Family 25 Model 97 Stepping 2, AuthenticAMD; 16 logical CPUs; Python 3.14.6.
+- Duração medida pelo relógio, fora da simulação: 17,4 s para 780 execuções, 780 reproduções e 2 repetições (`--jobs 4`).
+- Artefactos: cerca de 290 MB em `runs/m9-campaign` (pasta ignorada pelo Git).
+- `source_sha256` do código: `85f9614d023a6b0c35317ccf5d1e18430773254e40c54b47185f7dcda0aad5b1`; SHA-256 do binário: `9b84be67dcfa1f8491667f0bb6e1d16822ca112c8b50365e496673839a0af14d`.
+- Repetição determinista: as execuções `runs/nominal/baseline/seed-1000` e `runs/imu_accel_bias/robust/seed-1029` foram repetidas para uma segunda pasta e `case.json`, `trace.json`, `verification.json` e `run.json` ficaram idênticos byte a byte.
+- `summary.json` pode ser regenerado com `python scripts/m9_campaign.py --summarize-only runs/m9-campaign`, que reproduz todas as execuções guardadas antes de recalcular as tabelas.
+
+#### Resultados por célula
+
+`Aterrou` conta `landed` com os quatro invariantes cumpridos. Cada célula tem 30 execuções. As colunas `R1` a `R6` contam execuções em que o requisito foi avaliado e falhou.
+
+| Falha | Política | Aterrou | `hard_landing` | `no_contact` | Invariantes falhados | R1 | R2 | R3 | R4 | R5 | R6 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `nominal` | `baseline` | 29 | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 |
+| `nominal` | `robust` | 28 | 2 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 |
+| `thrust_loss` | `baseline` | 27 | 3 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 |
+| `thrust_loss` | `robust` | 28 | 2 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 |
+| `ignition_delay` | `baseline` | 26 | 4 | 0 | 0 | 0 | 4 | 0 | 0 | 1 | 0 |
+| `ignition_delay` | `robust` | 26 | 4 | 0 | 0 | 0 | 4 | 0 | 0 | 1 | 0 |
+| `gimbal_stuck` | `baseline` | 28 | 2 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 |
+| `gimbal_stuck` | `robust` | 27 | 3 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 |
+| `altimeter_bias` | `baseline` | 0 | 30 | 0 | 0 | 30 | 5 | 0 | 0 | 1 | 0 |
+| `altimeter_bias` | `robust` | 27 | 3 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 |
+| `altimeter_dropout` | `baseline` | 7 | 23 | 0 | 0 | 22 | 8 | 0 | 0 | 1 | 0 |
+| `altimeter_dropout` | `robust` | 28 | 2 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 |
+| `gnss_dropout` | `baseline` | 7 | 3 | 20 | 2 | 1 | 3 | 0 | 0 | 2 | 0 |
+| `gnss_dropout` | `robust` | 28 | 2 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 |
+| `gnss_bias` | `baseline` | 8 | 22 | 0 | 0 | 0 | 0 | 0 | 0 | 22 | 0 |
+| `gnss_bias` | `robust` | 0 | 30 | 0 | 0 | 30 | 4 | 0 | 0 | 22 | 0 |
+| `imu_accel_bias` | `baseline` | 28 | 2 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 |
+| `imu_accel_bias` | `robust` | 28 | 2 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 |
+
+#### Pares emparelhados
+
+O mesmo caso (magnitude, janela e semente) foi dado às duas políticas. Cada linha tem 30 pares.
+
+| Falha | Ambas aterram | Só `baseline` | Só `robust` | Nenhuma |
+| --- | --- | --- | --- | --- |
+| `nominal` | 28 | 1 | 0 | 1 |
+| `thrust_loss` | 27 | 0 | 1 | 2 |
+| `ignition_delay` | 26 | 0 | 0 | 4 |
+| `gimbal_stuck` | 26 | 2 | 1 | 1 |
+| `altimeter_bias` | 0 | 0 | 27 | 3 |
+| `altimeter_dropout` | 7 | 0 | 21 | 2 |
+| `gnss_dropout` | 7 | 0 | 21 | 2 |
+| `gnss_bias` | 0 | 8 | 0 | 22 |
+| `imu_accel_bias` | 28 | 0 | 0 | 2 |
+
+#### Veredictos das hipóteses
+
+Aplicados os critérios pré-registados, tal como medidos:
+
+- **H1 apoiada.** `robust` aterra mais do que `baseline` nas três falhas: `altimeter_bias` 27 contra 0 de 30, `altimeter_dropout` 28 contra 7, `gnss_dropout` 28 contra 7.
+- **H2 apoiada, com um critério fraco.** Pares discordantes: `thrust_loss` 1, `ignition_delay` 0, `gimbal_stuck` 3 (limite pré-registado: 3 em 30; `gimbal_stuck` cumpre no limite exato). O critério só compara as políticas entre si: as duas políticas perdem 2 a 4 execuções de 30 em cada falha de atuador, perto do piso nominal (1 a 2, ver abaixo; `ignition_delay` está um pouco acima), e o critério não mostra que as falhas de atuador sejam recuperáveis.
+- **H3 observada, e pior do que o previsto.** Em 8 de 30 pares com `gnss_bias`, `baseline` aterra e `robust` não. Mas `robust` não aterrou em nenhuma das 30 execuções (30 falhas de `R1`, `|v_base,z|` entre 11,3 e 26,1 m/s, mediana 21,6 m/s) e `baseline` aterrou em 8 de 30 (22 falhas de `R5`, a posição fora do raio de 10 m). Nenhum dos dois controladores é robusto a `gnss_bias` nestas gamas.
+
+Os resultados do caso nominal fixam o piso da comparação: com as sementes de reserva, `baseline` aterra em 29 de 30 e `robust` em 28 de 30, sempre por falha de `R2` (velocidade horizontal no contacto). As sementes 1002 (`robust`) e 1018 (as duas políticas) falham `R2` sem qualquer falha injetada. É pior do que as 41 de 41 e 40 de 41 observadas nas sementes 0 a 40, que serviram para afinar os ganhos, como se esperava de sementes não vistas. Várias células de falha (`imu_accel_bias` com 28 de 30 nas duas políticas, `thrust_loss`, `gimbal_stuck`) não se distinguem desse piso com 30 sementes.
+
+Outros resultados que não estavam previstos:
+
+- `baseline` com `gnss_dropout`: 7 de 30 aterram, 3 `hard_landing` e 20 `no_contact`. Nas duas execuções `no_contact` que inspecionei (sementes 1000 e 1001) a simulação correu até aos 40 s sem corte nem esgotamento do propelente (cerca de 2000 kg restantes); a causa não foi investigada. Duas das `hard_landing` (sementes 1005 e 1027) violaram também `S2_keep_out`, os únicos invariantes de segurança falhados em toda a campanha.
+- `baseline` com `altimeter_bias`: 0 de 30; `R1` falhou em todas as execuções (`|v_base,z|` entre 10,1 e 32,9 m/s, mediana 23,0 m/s). Com `altimeter_dropout`, 7 de 30 e 22 falhas de `R1`.
+- `robust` com `altimeter_bias`: 27 de 30; com `altimeter_dropout` e com `gnss_dropout`: 28 de 30.
+- Em nenhuma execução da matriz falharam `R3`, `R4` ou `R6`, nem `S1`, `S3` ou `S4`.
+
+#### Varrimento de fronteira
+
+Seis magnitudes igualmente espaçadas por gama, sementes 1000 a 1009; execuções que aterraram em 10.
+
+`thrust_loss` (fração de impulso perdida):
+
+| Magnitude | `baseline` | `robust` |
+| --- | --- | --- |
+| 0,05 | 10 | 9 |
+| 0,1 | 9 | 9 |
+| 0,15 | 9 | 9 |
+| 0,2 | 9 | 9 |
+| 0,25 | 9 | 9 |
+| 0,3 | 6 | 8 |
+
+`ignition_delay` (atraso em s):
+
+| Magnitude | `baseline` | `robust` |
+| --- | --- | --- |
+| 0,1 | 9 | 9 |
+| 0,28 | 9 | 9 |
+| 0,46 | 9 | 8 |
+| 0,64 | 7 | 7 |
+| 0,82 | 7 | 7 |
+| 1,0 | 7 | 7 |
+
+Há falhas dentro das gamas, por isso não é um caso de "nenhuma fronteira dentro da gama". Mas as falhas nas magnitudes baixas são todas `R2` da semente 1002, que também falha sem falha injetada. Com `thrust_loss`, só em 0,30 há execuções adicionais perdidas (`baseline` 6 de 10, com as sementes 1000, 1001 e 1004; `robust` 8 de 10, com a semente 1000). Com `ignition_delay`, `baseline` perde as sementes 1005 e 1006 a partir de 0,64, e `robust` perde a 1006 a partir de 0,46 e a 1005 a partir de 0,64 (7 de 10 até 1,0 s). Todas as falhas do varrimento são de `R2`. Dez sementes por ponto não localizam uma fronteira com precisão; o que se observa é um início de degradação no topo das gamas, sem queda para zero.
+
+#### O que a campanha não estabelece
+
+- Não estima a fiabilidade de um veículo: as dispersões, as gamas das falhas e os requisitos são assumidos, e o modelo é idealizado (sem dinâmica de contacto, sem RCS).
+- Trinta sementes por célula (10 no varrimento) não sustentam valores-p nem intervalos de confiança; diferenças de uma ou duas execuções não são interpretáveis. Os veredictos de H1, H2 e H3 aplicam apenas os critérios pré-registados.
+- Cada execução injeta uma falha de cada vez, com magnitude e janela sorteadas uniformemente. Falhas combinadas, fora das gamas ou com outra distribuição temporal não foram avaliadas.
+- O controlador foi afinado no caso nominal com as sementes 0 a 40; as sementes 1000 a 1029 são disjuntas dessas, mas a afinação não considerou as falhas. O piso nominal acima mostra que a taxa de aterragem sem falhas não é 100% em sementes novas.
+- A causa das execuções `no_contact` do `baseline` com `gnss_dropout` e das 22 falhas de `R5` do `baseline` com `gnss_bias` não foi investigada.
