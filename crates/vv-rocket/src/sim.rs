@@ -42,8 +42,9 @@ pub struct Summary {
     pub propellant_used_kg: f64,
     /// Largest `| |q| - 1 |` after an RK4 step and before the projection.
     pub max_quaternion_drift: f64,
-    /// Largest ratio `ε` of the neglected translational jet term to the thrust, at the two ends
-    /// of every burning step; the model is adequate only while `ε ≪ 1`. Zero without thrust.
+    /// Largest ratio `ε` of the neglected translational jet term to the thrust, sampled at the
+    /// two ends of every burning step; not a guaranteed maximum of the continuous ratio.
+    /// Diagnostic only: the model is adequate only while `ε ≪ 1`. Zero without thrust.
     pub max_neglected_jet_ratio: f64,
     /// Time of that largest ratio; 0 when there is no thrust.
     pub max_neglected_jet_ratio_t_s: f64,
