@@ -330,7 +330,7 @@ function jetText(sum, verified, withheld) {
   const eps = sum.max_neglected_jet_ratio;
   if (!verified) return `Neglected jet term: ${withheld}.`;
   if (!Number.isFinite(eps)) return 'Neglected jet term: not reported by this trace.';
-  if (eps === 0) return 'No thrust in this run, so the translational jet term the model neglects is zero.';
+  if (eps === 0) return 'The translational jet term the model neglects is zero in this run.';
   return `The model neglects a translational jet term; in this run its largest size is ε = ${eps.toExponential(2)} of the thrust, at t = ${f(sum.max_neglected_jet_ratio_t_s, 2)} s. The translational acceleration error is of that order, and the model is adequate only while ε ≪ 1.`;
 }
 function eventText(e) {

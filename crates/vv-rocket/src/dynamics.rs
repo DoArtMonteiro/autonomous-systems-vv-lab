@@ -272,7 +272,7 @@ mod tests {
         let c_dot = 2000.0 / c_e * (s_cm - 1.5) / 150.0;
         // A pitch rate moves the nozzle sideways at 0.3 s_cm, perpendicular to ċ_B.
         let pitch = neglected_jet_ratio(&p, &state(Vec3::new(0.0, 0.3, 0.0)), Some(&burn(2000.0)));
-        let want = 2.0 * (0.3 * s_cm).hypot(c_dot) / c_e;
+        let want = 2.0 * ((0.3 * s_cm) * (0.3 * s_cm) + c_dot * c_dot).sqrt() / c_e;
         assert!((pitch - want).abs() <= 1e-15 * want, "{pitch} {want}");
         // A roll rate about x_B does not move the nozzle; only ċ_B remains.
         let roll = neglected_jet_ratio(&p, &state(Vec3::new(2.0, 0.0, 0.0)), Some(&burn(2000.0)));
