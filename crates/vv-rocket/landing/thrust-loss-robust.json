@@ -1,0 +1,142 @@
+{
+  "schema": "vv-rocket-landing.v1",
+  "name": "thrust loss 15% from 1 s after the nominal ignition, robust policy",
+  "dt_s": 0.01,
+  "duration_s": 40.0,
+  "record_every": 10,
+  "environment": {
+    "gravity_mps2": 9.80665,
+    "atmosphere": {
+      "density_kgpm3": 1.225,
+      "scale_height_m": 8500.0
+    }
+  },
+  "vehicle": {
+    "dry_mass_kg": 22000.0,
+    "propellant_mass_kg": 8000.0,
+    "dry_cm_station_m": 16.0,
+    "propellant_cm_station_m": 9.0,
+    "dry_inertia_kgm2": [
+      40000.0,
+      1800000.0,
+      1800000.0
+    ],
+    "propellant_inertia_kgm2": [
+      12000.0,
+      250000.0,
+      250000.0
+    ],
+    "max_thrust_n": 845000.0,
+    "isp_s": 282.0,
+    "drag_coefficient": 0.8,
+    "reference_area_m2": 10.5,
+    "throttle_min": 0.4,
+    "throttle_rate_per_s": 1.0,
+    "gimbal_max_tan": 0.1405408347,
+    "gimbal_rate_tan_per_s": 0.35
+  },
+  "initial": {
+    "position_m": [
+      80.0,
+      0.0,
+      3000.0
+    ],
+    "velocity_mps": [
+      -12.0,
+      0.0,
+      -200.0
+    ],
+    "attitude": [
+      0.7071067811865476,
+      0.0,
+      -0.7071067811865476,
+      0.0
+    ],
+    "angular_velocity_radps": [
+      0.0,
+      0.004,
+      0.0
+    ]
+  },
+  "dispersion": {
+    "position_m": [
+      30.0,
+      30.0,
+      50.0
+    ],
+    "velocity_mps": [
+      3.0,
+      3.0,
+      10.0
+    ],
+    "angular_velocity_radps": [
+      0.0,
+      0.004,
+      0.004
+    ],
+    "propellant_fraction": 0.02,
+    "thrust_fraction": 0.02,
+    "isp_fraction": 0.01
+  },
+  "sensors": {
+    "altimeter_sigma_m": 0.1,
+    "gnss_position_sigma_m": 0.5,
+    "gnss_velocity_sigma_mps": 0.05,
+    "imu_attitude_sigma_rad": 0.0001,
+    "imu_rate_sigma_radps": 0.0001,
+    "imu_accel_sigma_mps2": 0.02,
+    "control_period_steps": 2,
+    "gnss_period_cycles": 5
+  },
+  "controller": {
+    "policy": "robust",
+    "target_vertical_speed_mps": -1.5,
+    "gains": {
+      "ignition_fraction": 0.75,
+      "throttle_gain": 0.8,
+      "axial_load_margin_g": 0.1,
+      "altitude_floor_m": 0.5,
+      "attitude_kp": 0.3,
+      "attitude_kd": 0.5,
+      "attitude_reference_throttle": 0.6,
+      "tilt_max_tan": 0.2,
+      "tilt_floor_tan": 0.02,
+      "tilt_per_m": 0.004,
+      "lateral_velocity_gain": 0.5,
+      "lateral_position_gain": 0.12,
+      "lateral_braking_mps2": 1.0,
+      "lateral_fade_time_s": 3.0,
+      "cutoff_altitude_m": 15.0,
+      "gnss_position_gain": 0.15,
+      "gnss_velocity_gain": 0.25,
+      "altimeter_position_gain": 0.1,
+      "altimeter_velocity_gain": 0.004,
+      "altimeter_residual_threshold_m": 3.0,
+      "altimeter_rejection_cycles": 5
+    }
+  },
+  "requirements": {
+    "pad_position_m": [
+      0.0,
+      0.0
+    ],
+    "r1_vertical_speed_mps": 3.0,
+    "r2_horizontal_speed_mps": 1.0,
+    "r3_tilt_cos_min": 0.9961946981,
+    "r4_angular_rate_radps": 0.1,
+    "r5_position_m": 10.0,
+    "r6_propellant_margin_fraction": 0.01,
+    "s1_tilt_cos_min": 0.8660254038,
+    "s2_keep_out_m": 50.0,
+    "s3_axial_load_g0": 3.0,
+    "s4_max_ignitions": 1
+  },
+  "faults": [
+    {
+      "kind": "thrust_loss",
+      "start_s": 5.26,
+      "end_s": 40.0,
+      "magnitude": 0.15
+    }
+  ]
+}

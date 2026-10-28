@@ -43,7 +43,7 @@ pub fn trace_bytes(case_bytes: &[u8]) -> Result<(Case, Vec<u8>, serde_json::Valu
     Ok((case, bytes, summary))
 }
 
-fn read_bounded(path: &Path) -> Result<Vec<u8>, String> {
+pub(crate) fn read_bounded(path: &Path) -> Result<Vec<u8>, String> {
     let meta = fs::metadata(path).map_err(|e| format!("{}: {e}", path.display()))?;
     if meta.len() > MAX_CASE_BYTES {
         return Err(format!("{} exceeds {MAX_CASE_BYTES} bytes", path.display()));
@@ -112,7 +112,7 @@ pub struct ReplayReport {
     pub checks: Vec<Check>,
 }
 
-fn check(name: &'static str, pass: bool, detail: impl Into<String>) -> Check {
+pub(crate) fn check(name: &'static str, pass: bool, detail: impl Into<String>) -> Check {
     Check {
         name,
         pass,
@@ -120,19 +120,28 @@ fn check(name: &'static str, pass: bool, detail: impl Into<String>) -> Check {
     }
 }
 
+pub(crate) fn report_of(checks: Vec<Check>) -> ReplayReport {
+    let pass = !checks.is_empty() && checks.iter().all(|c: &Check| c.pass);
+    ReplayReport {
+        schema: REPLAY_SCHEMA,
+        status: if pass { "verified" } else { "failed" },
+        source_sha256: source_sha256(),
+        checks,
+    }
+}
+
 /// Recomputes the stored run from its case with this build and compares the trace byte for byte.
 /// Stored conclusions are never returned without recomputation.
 pub fn replay(dir: &Path) -> ReplayReport {
+    // Landing runs (M9) carry their own manifest schema and are replayed by their own module.
+    if let Ok(bytes) = fs::read(dir.join("run.json"))
+        && let Ok(value) = serde_json::from_slice::<serde_json::Value>(&bytes)
+        && value["schema"] == crate::landing_run::RUN_SCHEMA
+    {
+        return crate::landing_run::replay(dir);
+    }
     let mut checks = Vec::new();
-    let report = |checks: Vec<Check>| {
-        let pass = !checks.is_empty() && checks.iter().all(|c: &Check| c.pass);
-        ReplayReport {
-            schema: REPLAY_SCHEMA,
-            status: if pass { "verified" } else { "failed" },
-            source_sha256: source_sha256(),
-            checks,
-        }
-    };
+    let report = report_of;
     let manifest: Manifest = match fs::read(dir.join("run.json"))
         .map_err(|e| e.to_string())
         .and_then(|b| serde_json::from_slice(&b).map_err(|e| e.to_string()))

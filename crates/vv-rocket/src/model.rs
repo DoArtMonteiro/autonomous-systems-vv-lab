@@ -103,7 +103,7 @@ pub struct Prepared {
     pub segments: Vec<Segment>,
 }
 
-fn finite(value: f64, name: &str) -> Result<f64, String> {
+pub(crate) fn finite(value: f64, name: &str) -> Result<f64, String> {
     if value.is_finite() {
         Ok(value)
     } else {
@@ -111,7 +111,7 @@ fn finite(value: f64, name: &str) -> Result<f64, String> {
     }
 }
 
-fn within(value: f64, name: &str, low: f64, high: f64) -> Result<f64, String> {
+pub(crate) fn within(value: f64, name: &str, low: f64, high: f64) -> Result<f64, String> {
     finite(value, name)?;
     if value < low || value > high {
         return Err(format!("{name} must be in [{low}, {high}]"));
@@ -119,7 +119,7 @@ fn within(value: f64, name: &str, low: f64, high: f64) -> Result<f64, String> {
     Ok(value)
 }
 
-fn steps_of(seconds: f64, dt: f64, name: &str) -> Result<u64, String> {
+pub(crate) fn steps_of(seconds: f64, dt: f64, name: &str) -> Result<u64, String> {
     let ratio = seconds / dt;
     let steps = ratio.round();
     if (ratio - steps).abs() > ALIGN_TOLERANCE * steps.max(1.0) {
