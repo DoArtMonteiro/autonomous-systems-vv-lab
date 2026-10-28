@@ -6,7 +6,9 @@ use serde::Serialize;
 
 use crate::dynamics::{State, forces, mass_properties};
 use crate::landing_model::{FaultKind, FaultSpec, PreparedLanding, Requirements};
-use crate::landing_truth::{TruthExcerpt, TruthLog, TruthStep, base_kinematics, excerpt, tilt_cos};
+use crate::landing_truth::{
+    TruthExcerpt, TruthLog, TruthStep, base_kinematics, contact, excerpt, tilt_cos,
+};
 use crate::math::Vec3;
 use crate::model::{G0, Prepared, Segment, Vehicle};
 
@@ -72,8 +74,42 @@ pub struct Verification {
     pub touchdown: Option<TouchdownReport>,
     pub seed: u64,
     pub policy: &'static str,
-    pub faults: Vec<FaultSpec>,
+    pub faults: Vec<FaultReport>,
     pub disclaimer: &'static str,
+}
+
+/// A fault as configured plus whether it changed anything in this run. A window that closes
+/// before the effect can act (no thrusting step, no sensor cycle, an ignition not delayed) is
+/// `acted: false`: the run says nothing about that fault.
+#[derive(Clone, Debug, Serialize)]
+pub struct FaultReport {
+    #[serde(flatten)]
+    pub spec: FaultSpec,
+    pub acted: bool,
+}
+
+/// The contact, recomputed by the verifier from the states on both sides of the step.
+#[derive(Clone, Copy, Debug)]
+struct Contact {
+    step: u64,
+    fraction: f64,
+    t_s: f64,
+    state: State,
+}
+
+/// Interpolates the contact from the logged state at the start of the step and the integrated
+/// state at its end. The simulation's own interpolation (`log.touchdown.state` and the like) is
+/// never read: a log whose states do not cross the ground has no contact for the verifier.
+fn verified_contact(vehicle: &Vehicle, log: &TruthLog) -> Option<Contact> {
+    let td = log.touchdown.as_ref()?;
+    let before = log.steps.iter().find(|s| s.step + 1 == td.step)?;
+    let (fraction, state) = contact(vehicle, &before.state, &td.after)?;
+    Some(Contact {
+        step: td.step,
+        fraction,
+        t_s: ((td.step - 1) as f64 + fraction) * log.dt,
+        state,
+    })
 }
 
 fn kinds(faults: &[FaultKind]) -> Vec<&'static str> {
@@ -99,6 +135,7 @@ fn requirements(
     vehicle: &Vehicle,
     initial_propellant_kg: f64,
     log: &TruthLog,
+    touch: Option<&Contact>,
 ) -> Vec<RequirementResult> {
     let spec: [(&'static str, f64, &'static str, bool); 6] = [
         ("R1_vertical_speed", req.r1_vertical_speed_mps, "m/s", false),
@@ -118,7 +155,7 @@ fn requirements(
             true,
         ),
     ];
-    let contact = log.touchdown.as_ref().map(|t| {
+    let contact = touch.map(|t| {
         let (bp, bv) = base_kinematics(vehicle, &t.state);
         let values = [
             bv.z.abs(),
@@ -275,7 +312,12 @@ fn segment_of(s: &TruthStep) -> Option<Segment> {
 /// Invariants S1 to S4. S1 is checked at the state each thrusting step starts from and at the
 /// state it reaches; S3 at the start of every step with that step's thrust; S4 over the thrust
 /// history; S2 at the contact only.
-fn invariants(req: &Requirements, truth: &Prepared, log: &TruthLog) -> Vec<InvariantResult> {
+fn invariants(
+    req: &Requirements,
+    truth: &Prepared,
+    log: &TruthLog,
+    touch: Option<&Contact>,
+) -> Vec<InvariantResult> {
     let vehicle = &truth.vehicle;
     let mut s1 = Tally::new("S1_tilt_envelope", req.s1_tilt_cos_min, "cos", true);
     let mut s2 = Tally::new("S2_keep_out", req.s2_keep_out_m, "m", false);
@@ -304,15 +346,13 @@ fn invariants(req: &Requirements, truth: &Prepared, log: &TruthLog) -> Vec<Invar
             );
         }
         if thrusting {
-            let (end_step, end_state, end_t) = match log.steps.get(i + 1) {
-                Some(next) => (next.step, next.state, next.step as f64 * log.dt),
-                None => (
-                    log.end_step,
-                    log.end_state,
-                    log.touchdown
-                        .as_ref()
-                        .map_or(log.end_step as f64 * log.dt, |t| t.t_s),
-                ),
+            let (end_step, end_state, end_t) = match (log.steps.get(i + 1), touch, &log.touchdown) {
+                (Some(next), _, _) => (next.step, next.state, next.step as f64 * log.dt),
+                (None, Some(c), _) => (c.step, c.state, c.t_s),
+                // The log claims a contact the verifier cannot reproduce: use the state the
+                // last step integrated to, not the simulation's interpolation.
+                (None, None, Some(t)) => (t.step, t.after, t.step as f64 * log.dt),
+                (None, None, None) => (log.end_step, log.end_state, log.end_step as f64 * log.dt),
             };
             s1.check(
                 tilt_cos(end_state.q),
@@ -346,7 +386,7 @@ fn invariants(req: &Requirements, truth: &Prepared, log: &TruthLog) -> Vec<Invar
         s4.evaluated = true;
         s4.worst = Some(0.0);
     }
-    if let Some(t) = &log.touchdown {
+    if let Some(t) = touch {
         let (bp, _) = base_kinematics(vehicle, &t.state);
         let cause = log
             .steps
@@ -372,9 +412,16 @@ pub fn evaluate(
     truth: &Prepared,
     log: &TruthLog,
 ) -> (&'static str, Vec<RequirementResult>, Vec<InvariantResult>) {
-    let reqs = requirements(req, &truth.vehicle, truth.vehicle.propellant_mass_kg, log);
-    let invs = invariants(req, truth, log);
-    let outcome = if log.touchdown.is_none() {
+    let touch = verified_contact(&truth.vehicle, log);
+    let reqs = requirements(
+        req,
+        &truth.vehicle,
+        truth.vehicle.propellant_mass_kg,
+        log,
+        touch.as_ref(),
+    );
+    let invs = invariants(req, truth, log, touch.as_ref());
+    let outcome = if touch.is_none() {
         "no_contact"
     } else if reqs.iter().all(|r| r.pass) {
         "landed"
@@ -384,9 +431,52 @@ pub fn evaluate(
     (outcome, reqs, invs)
 }
 
+/// Whether each configured fault changed anything, from the per-step log alone: the faults
+/// active at each step, the thrust applied and the control schedule. Actuator faults need a
+/// thrusting step inside the window, `ignition_delay` an ignition later than commanded, a sensor
+/// fault a control cycle (for GNSS faults, a GNSS cycle) inside the window; a bias hidden by a
+/// dropout of the same sensor produced no biased sample.
+fn fault_reports(prep: &PreparedLanding, log: &TruthLog) -> Vec<FaultReport> {
+    let period = prep.controller.control_period_steps;
+    let gnss_period = prep.sensors.gnss_period_cycles;
+    let control_cycle = |s: &TruthStep| s.step.is_multiple_of(period);
+    let gnss_cycle =
+        |s: &TruthStep| control_cycle(s) && (s.step / period).is_multiple_of(gnss_period);
+    let any = |keep: &dyn Fn(&TruthStep) -> bool| log.steps.iter().any(keep);
+    prep.faults
+        .iter()
+        .map(|f| {
+            let kind = f.spec.kind;
+            let active = |s: &TruthStep| s.active_faults.contains(&kind);
+            let masked_by = |other: FaultKind, s: &TruthStep| s.active_faults.contains(&other);
+            let acted = match kind {
+                FaultKind::ThrustLoss | FaultKind::GimbalStuck => {
+                    any(&|s| active(s) && s.thrust_n > 0.0)
+                }
+                FaultKind::IgnitionDelay => log
+                    .ignition
+                    .is_some_and(|i| i.effective_step.is_none_or(|e| e > i.command_step)),
+                FaultKind::AltimeterDropout => any(&|s| active(s) && control_cycle(s)),
+                FaultKind::AltimeterBias => any(&|s| {
+                    active(s) && control_cycle(s) && !masked_by(FaultKind::AltimeterDropout, s)
+                }),
+                FaultKind::GnssDropout => any(&|s| active(s) && gnss_cycle(s)),
+                FaultKind::GnssBias => {
+                    any(&|s| active(s) && gnss_cycle(s) && !masked_by(FaultKind::GnssDropout, s))
+                }
+                FaultKind::ImuAccelBias => any(&|s| active(s) && control_cycle(s)),
+            };
+            FaultReport {
+                spec: f.spec,
+                acted,
+            }
+        })
+        .collect()
+}
+
 pub fn verify(prep: &PreparedLanding, log: &TruthLog) -> Verification {
     let (outcome, requirements, invariants) = evaluate(&prep.requirements, &prep.truth, log);
-    let touchdown = log.touchdown.as_ref().map(|t| TouchdownReport {
+    let touchdown = verified_contact(&prep.truth.vehicle, log).map(|t| TouchdownReport {
         step: t.step,
         fraction: t.fraction,
         t_s: t.t_s,
@@ -402,7 +492,7 @@ pub fn verify(prep: &PreparedLanding, log: &TruthLog) -> Verification {
         touchdown,
         seed: prep.seed,
         policy: prep.controller.policy.as_str(),
-        faults: prep.faults.iter().map(|f| f.spec).collect(),
+        faults: fault_reports(prep, log),
         disclaimer: DISCLAIMER,
     }
 }
@@ -457,6 +547,12 @@ mod tests {
         }
     }
 
+    /// The state moved vertically until its nozzle plane is on the ground.
+    fn grounded(mut s: State) -> State {
+        s.r.z -= base_kinematics(&vehicle(), &s).0.z;
+        s
+    }
+
     fn log_with(state: State) -> TruthLog {
         let step = TruthStep {
             step: 0,
@@ -475,12 +571,61 @@ mod tests {
                 fraction: 0.5,
                 t_s: 0.005,
                 state,
+                after: grounded(state),
             }),
+            ignition: None,
         }
     }
 
     fn run(state: State) -> (&'static str, Vec<RequirementResult>, Vec<InvariantResult>) {
         evaluate(&Requirements::registered(), &prepared(), &log_with(state))
+    }
+
+    #[test]
+    fn a_tampered_stored_interpolation_cannot_change_a_verdict() {
+        let soft = upright(0.0);
+        let mut hard = upright(0.0);
+        hard.v.z = -3.5;
+
+        // The states around the step say hard; the stored interpolation says soft.
+        let mut log = log_with(hard);
+        let td = log.touchdown.as_mut().unwrap();
+        (td.state, td.fraction, td.t_s) = (soft, 0.123, 99.0);
+        log.end_state = soft;
+        let (outcome, reqs, invs) = evaluate(&Requirements::registered(), &prepared(), &log);
+        assert_eq!(
+            (outcome, failed(&reqs)),
+            ("hard_landing", vec!["R1_vertical_speed"])
+        );
+        assert!((reqs[0].value.unwrap() - 3.5).abs() < 1e-9);
+        // The instant is the verifier's own: the nozzle plane reaches the ground at the end of
+        // step 0 (fraction 1), not at the stored 99 s.
+        assert!((reqs[0].t_s.unwrap() - 0.01).abs() < 1e-9);
+        assert!(invs.iter().all(|i| i.pass));
+
+        // The reverse: a stored hard interpolation does not make a soft contact hard.
+        let mut log = log_with(soft);
+        let td = log.touchdown.as_mut().unwrap();
+        (td.state, td.fraction, td.t_s) = (hard, 0.5, 0.005);
+        log.end_state = hard;
+        assert_eq!(
+            evaluate(&Requirements::registered(), &prepared(), &log).0,
+            "landed"
+        );
+
+        // A contact the states do not support (the step ends above the ground) is no contact.
+        let mut log = log_with(soft);
+        log.touchdown.as_mut().unwrap().after = upright(5.0);
+        let (outcome, reqs, invs) = evaluate(&Requirements::registered(), &prepared(), &log);
+        assert_eq!(outcome, "no_contact");
+        assert!(reqs.iter().all(|r| !r.evaluated));
+        assert!(
+            !invs
+                .iter()
+                .find(|i| i.id == "S2_keep_out")
+                .unwrap()
+                .evaluated
+        );
     }
 
     fn failed(reqs: &[RequirementResult]) -> Vec<&'static str> {
@@ -589,6 +734,7 @@ mod tests {
             end_state: upright(100.0),
             steps,
             touchdown: None,
+            ignition: None,
         }
     }
 

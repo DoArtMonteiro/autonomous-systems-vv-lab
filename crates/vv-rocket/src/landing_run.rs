@@ -14,6 +14,39 @@ use crate::{sha256_hex, source_sha256};
 
 pub const RUN_SCHEMA: &str = "vv-rocket-landing-run.v1";
 
+/// Why a landing could not be produced. The command line tells them apart: a rejected input is a
+/// usage error (exit status 3), a failed simulation (a non-finite or non-physical state) is not
+/// (exit status 4).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum LandError {
+    Input(String),
+    Simulation(String),
+}
+
+impl LandError {
+    /// Exit status of `vv-rocket land` for this error.
+    pub fn exit_code(&self) -> u8 {
+        match self {
+            LandError::Input(_) => 3,
+            LandError::Simulation(_) => 4,
+        }
+    }
+}
+
+impl std::fmt::Display for LandError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LandError::Input(m) | LandError::Simulation(m) => f.write_str(m),
+        }
+    }
+}
+
+impl From<LandError> for String {
+    fn from(e: LandError) -> String {
+        e.to_string()
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct LandingManifest {
@@ -57,16 +90,17 @@ fn json_line<T: Serialize>(value: &T) -> Result<Vec<u8>, String> {
 }
 
 /// Case bytes and seed to the canonical trace and verification bytes.
-pub fn artifacts(case_bytes: &[u8], seed: u64) -> Result<LandingArtifacts, String> {
-    let case: LandingCase =
-        serde_json::from_slice(case_bytes).map_err(|e| format!("invalid case: {e}"))?;
-    let prepared = prepare_landing(&case, seed)?;
-    let run = simulate_landing(&prepared)?;
+pub fn artifacts(case_bytes: &[u8], seed: u64) -> Result<LandingArtifacts, LandError> {
+    let case: LandingCase = serde_json::from_slice(case_bytes)
+        .map_err(|e| LandError::Input(format!("invalid case: {e}")))?;
+    let prepared = prepare_landing(&case, seed).map_err(LandError::Input)?;
+    let run = simulate_landing(&prepared).map_err(LandError::Simulation)?;
     let verification = verify(&prepared, &run.log);
     Ok(LandingArtifacts {
-        trace: json_line(&run.trace)?,
-        verification: json_line(&verification)?,
-        summary: serde_json::to_value(&run.trace.summary).map_err(|e| e.to_string())?,
+        trace: json_line(&run.trace).map_err(LandError::Simulation)?,
+        verification: json_line(&verification).map_err(LandError::Simulation)?,
+        summary: serde_json::to_value(&run.trace.summary)
+            .map_err(|e| LandError::Simulation(e.to_string()))?,
         outcome: verification.outcome,
         policy: verification.policy,
         requirements_pass: verification.requirements_pass,
@@ -111,18 +145,25 @@ fn manifest_for(
 const FILES: [&str; 4] = ["case.json", "trace.json", "verification.json", "run.json"];
 
 /// Runs a landing and writes the four artifacts into `out`, never overwriting.
-pub fn write_landing(case_path: &Path, seed: u64, out: &Path) -> Result<LandingManifest, String> {
-    let case_bytes = read_bounded(case_path)?;
+pub fn write_landing(
+    case_path: &Path,
+    seed: u64,
+    out: &Path,
+) -> Result<LandingManifest, LandError> {
+    let case_bytes = read_bounded(case_path).map_err(LandError::Input)?;
     let art = artifacts(&case_bytes, seed)?;
-    fs::create_dir_all(out).map_err(|e| format!("{}: {e}", out.display()))?;
+    fs::create_dir_all(out).map_err(|e| LandError::Input(format!("{}: {e}", out.display())))?;
     for name in FILES {
         if out.join(name).exists() {
-            return Err(format!("{name} already exists in the output directory"));
+            return Err(LandError::Input(format!(
+                "{name} already exists in the output directory"
+            )));
         }
     }
-    let (manifest, manifest_bytes) = manifest_for(&art, &case_bytes, seed)?;
+    let (manifest, manifest_bytes) =
+        manifest_for(&art, &case_bytes, seed).map_err(LandError::Input)?;
     let write = |name: &str, bytes: &[u8]| {
-        fs::write(out.join(name), bytes).map_err(|e| format!("{name}: {e}"))
+        fs::write(out.join(name), bytes).map_err(|e| LandError::Input(format!("{name}: {e}")))
     };
     write("case.json", &case_bytes)?;
     write("trace.json", &art.trace)?;
@@ -230,7 +271,25 @@ pub fn replay(dir: &Path) -> ReplayReport {
                 ),
             ));
         }
-        Err(e) => checks.push(check("case replays", false, e)),
+        Err(e) => checks.push(check("case replays", false, e.to_string())),
     }
     report_of(checks)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn input_and_simulation_errors_have_distinct_exit_codes() {
+        assert_eq!(LandError::Input("x".into()).exit_code(), 3);
+        assert_eq!(LandError::Simulation("x".into()).exit_code(), 4);
+        // A rejected case is an input error, whatever the field.
+        let bad = br#"{"schema": "other"}"#;
+        assert!(matches!(artifacts(bad, 0), Err(LandError::Input(_))));
+        assert_eq!(
+            String::from(LandError::Simulation("boom".into())),
+            "boom".to_string()
+        );
+    }
 }

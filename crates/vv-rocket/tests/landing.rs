@@ -7,8 +7,12 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use serde_json::{Value, json};
+use vv_rocket::dynamics::State;
 use vv_rocket::landing_model::{LandingCase, prepare_landing};
 use vv_rocket::landing_run::{artifacts, write_landing};
+use vv_rocket::landing_sim::simulate_landing;
+use vv_rocket::landing_verify::verify;
+use vv_rocket::math::Vec3;
 use vv_rocket::run::replay;
 use vv_rocket::sha256_hex;
 
@@ -136,6 +140,7 @@ fn dispersions_follow_the_registered_ranges_and_seed_zero_has_none() {
     assert_eq!(nominal.truth.r0.to_array(), [80.0, 0.0, 3000.0]);
     assert_eq!(nominal.truth.vehicle.max_thrust_n, 845_000.0);
     let mut moved = false;
+    let (mut thrust_moved, mut isp_moved, mut propellant_moved) = (false, false, false);
     for seed in 1..=40 {
         let p = prepare_landing(&case, seed).unwrap();
         assert!(p.dispersed);
@@ -152,12 +157,45 @@ fn dispersions_follow_the_registered_ranges_and_seed_zero_has_none() {
             (veh.propellant_inertia_kgm2[1] / veh.propellant_mass_kg - 250_000.0 / 8000.0).abs()
                 < 1e-9
         );
-        // The controller keeps the nominal values.
-        assert_eq!(p.controller.max_thrust_n, 845_000.0);
-        assert_eq!(p.controller.propellant_mass_kg, 8000.0);
+        // The controller keeps the nominal values of everything it is given, whatever the draw.
+        let c = &p.controller;
+        assert_eq!(c.max_thrust_n, 845_000.0);
+        assert_eq!(c.propellant_mass_kg, 8000.0);
+        assert_eq!(c.isp_s, 282.0);
+        assert_eq!(c.dry_mass_kg, 22_000.0);
+        assert_eq!(c.dry_cm_station_m, 16.0);
+        assert_eq!(c.propellant_cm_station_m, 9.0);
+        assert_eq!(c.gravity_mps2, 9.80665);
+        // The nominal vehicle kept for reference is untouched, inertias included; the controller
+        // has no inertia at all (checked against its type below).
+        let nominal = &p.nominal_vehicle;
+        assert_eq!(
+            nominal.dry_inertia_kgm2,
+            [40_000.0, 1_800_000.0, 1_800_000.0]
+        );
+        assert_eq!(
+            nominal.propellant_inertia_kgm2,
+            [12_000.0, 250_000.0, 250_000.0]
+        );
+        assert_eq!(nominal.max_thrust_n, 845_000.0);
+        assert_eq!(nominal.isp_s, 282.0);
+        assert_eq!(nominal.propellant_mass_kg, 8000.0);
+        // The truth vehicle keeps what is not dispersed: geometry, dry inertia, drag.
+        assert_eq!(veh.dry_cm_station_m, 16.0);
+        assert_eq!(veh.propellant_cm_station_m, 9.0);
+        assert_eq!(veh.dry_inertia_kgm2, nominal.dry_inertia_kgm2);
+        assert_eq!(veh.drag_coefficient, nominal.drag_coefficient);
+        // The guard only means something if the truth really differs from the controller's values.
+        thrust_moved |= veh.max_thrust_n != c.max_thrust_n;
+        isp_moved |= veh.isp_s != c.isp_s;
+        propellant_moved |= veh.propellant_mass_kg != c.propellant_mass_kg;
         moved |= r.x != 80.0;
     }
-    assert!(moved);
+    assert!(moved && thrust_moved && isp_moved && propellant_moved);
+    assert!(
+        !include_str!("../src/landing_types.rs").contains("inertia"),
+        "the controller configuration must not carry an inertia"
+    );
 }
 
 #[test]
@@ -507,6 +545,7 @@ fn trace_and_verification_have_the_documented_shape() {
     }
     assert!(v["touchdown"]["truth"]["base_velocity_mps"].is_array());
     assert_eq!(v["faults"][0]["kind"], "altimeter_bias");
+    assert_eq!(v["faults"][0]["acted"], true);
 }
 
 #[test]
@@ -630,43 +669,6 @@ fn a_short_run_without_contact_reports_no_contact() {
 }
 
 #[test]
-fn running_out_of_propellant_is_a_flameout_and_a_hard_landing() {
-    let mut case = value_of("nominal.json");
-    case["vehicle"]["propellant_mass_kg"] = json!(500.0);
-    let (trace, v) = run_value(&case, 0).unwrap();
-    let kinds = event_kinds(&trace);
-    assert!(kinds.contains(&"flameout"), "{kinds:?}");
-    assert_ne!(v["outcome"], "landed");
-    assert!(trace["summary"]["flameout_t_s"].as_f64().unwrap() > 0.0);
-    assert!(
-        trace["summary"]["propellant_remaining_kg"]
-            .as_f64()
-            .unwrap()
-            < 5.0
-    );
-    // The truth mass never goes negative and the last samples show the engine out.
-    let last = trace["samples"].as_array().unwrap().last().unwrap();
-    assert_eq!(last["applied"]["engine"], "flameout");
-}
-
-#[test]
-fn a_rising_vehicle_near_the_ground_is_cut_and_cannot_relight() {
-    let mut case = value_of("nominal.json");
-    case["initial"]["position_m"] = json!([0.0, 0.0, 100.0]);
-    case["initial"]["velocity_mps"] = json!([0.0, 0.0, -10.0]);
-    case["controller"]["gains"]["ignition_fraction"] = json!(0.1);
-    case["controller"]["gains"]["cutoff_altitude_m"] = json!(1000.0);
-    let (trace, v) = run_value(&case, 0).unwrap();
-    let kinds = event_kinds(&trace);
-    assert_eq!(kinds, ["ignition", "cutoff", "touchdown", "end"]);
-    assert_eq!(v["outcome"], "hard_landing");
-    assert_eq!(invariant(&v, "S4_no_relight")["pass"], true);
-    assert_eq!(invariant(&v, "S4_no_relight")["worst_value"], 1.0);
-    let last = trace["samples"].as_array().unwrap().last().unwrap();
-    assert_eq!(last["applied"]["engine"], "cut");
-}
-
-#[test]
 fn invalid_inputs_are_rejected_with_a_reason() {
     let reject = |edit: &dyn Fn(&mut Value)| -> String {
         let mut case = value_of("nominal.json");
@@ -708,10 +710,6 @@ fn invalid_inputs_are_rejected_with_a_reason() {
         reject(&|c| c["controller"]["gains"]["altimeter_rejection_cycles"] = json!(0))
             .contains("altimeter_rejection_cycles")
     );
-    assert!(
-        reject(&|c| c["initial"]["position_m"] = json!([0.0, 0.0, 5.0]))
-            .contains("above the ground")
-    );
 
     let fault = |kind: &str, start: f64, end: f64, magnitude: f64| json!({"kind": kind, "start_s": start, "end_s": end, "magnitude": magnitude});
     let with = |f: Vec<Value>| move |c: &mut Value| c["faults"] = Value::Array(f.clone());
@@ -737,6 +735,319 @@ fn invalid_inputs_are_rejected_with_a_reason() {
         reject(&|c| c["faults"] = Value::Array(vec![fault("gnss_bias", 1.0, 5.0, 10.0); 9]))
             .contains("more than")
     );
+}
+
+#[test]
+fn every_pre_registered_value_is_pinned_and_rejects_a_change() {
+    // (pointer into the case, a different value, the field the error must name)
+    let changes: Vec<(&str, Value, &str)> = vec![
+        ("/dt_s", json!(0.02), "dt_s"),
+        (
+            "/vehicle/dry_mass_kg",
+            json!(23_000.0),
+            "vehicle.dry_mass_kg",
+        ),
+        (
+            "/vehicle/propellant_mass_kg",
+            json!(9_000.0),
+            "vehicle.propellant_mass_kg",
+        ),
+        (
+            "/vehicle/dry_cm_station_m",
+            json!(15.0),
+            "vehicle.dry_cm_station_m",
+        ),
+        (
+            "/vehicle/propellant_cm_station_m",
+            json!(8.0),
+            "vehicle.propellant_cm_station_m",
+        ),
+        (
+            "/vehicle/dry_inertia_kgm2",
+            json!([40_000.0, 1_800_000.0, 1_800_001.0]),
+            "vehicle.dry_inertia_kgm2",
+        ),
+        (
+            "/vehicle/propellant_inertia_kgm2",
+            json!([12_000.0, 250_001.0, 250_000.0]),
+            "vehicle.propellant_inertia_kgm2",
+        ),
+        (
+            "/vehicle/max_thrust_n",
+            json!(900_000.0),
+            "vehicle.max_thrust_n",
+        ),
+        ("/vehicle/isp_s", json!(300.0), "vehicle.isp_s"),
+        (
+            "/vehicle/drag_coefficient",
+            json!(0.9),
+            "vehicle.drag_coefficient",
+        ),
+        (
+            "/vehicle/reference_area_m2",
+            json!(11.0),
+            "vehicle.reference_area_m2",
+        ),
+        ("/vehicle/throttle_min", json!(0.5), "vehicle.throttle_min"),
+        (
+            "/vehicle/throttle_rate_per_s",
+            json!(2.0),
+            "vehicle.throttle_rate_per_s",
+        ),
+        (
+            "/vehicle/gimbal_max_tan",
+            json!(0.15),
+            "vehicle.gimbal_max_tan",
+        ),
+        (
+            "/vehicle/gimbal_rate_tan_per_s",
+            json!(0.4),
+            "vehicle.gimbal_rate_tan_per_s",
+        ),
+        (
+            "/sensors/altimeter_sigma_m",
+            json!(0.2),
+            "sensors.altimeter_sigma_m",
+        ),
+        (
+            "/sensors/gnss_position_sigma_m",
+            json!(1.0),
+            "sensors.gnss_position_sigma_m",
+        ),
+        (
+            "/sensors/gnss_velocity_sigma_mps",
+            json!(0.1),
+            "sensors.gnss_velocity_sigma_mps",
+        ),
+        (
+            "/sensors/imu_attitude_sigma_rad",
+            json!(2e-4),
+            "sensors.imu_attitude_sigma_rad",
+        ),
+        (
+            "/sensors/imu_rate_sigma_radps",
+            json!(2e-4),
+            "sensors.imu_rate_sigma_radps",
+        ),
+        (
+            "/sensors/imu_accel_sigma_mps2",
+            json!(0.04),
+            "sensors.imu_accel_sigma_mps2",
+        ),
+        (
+            "/sensors/control_period_steps",
+            json!(4),
+            "sensors.control_period_steps",
+        ),
+        (
+            "/sensors/gnss_period_cycles",
+            json!(10),
+            "sensors.gnss_period_cycles",
+        ),
+        (
+            "/environment/gravity_mps2",
+            json!(3.7),
+            "environment.gravity_mps2",
+        ),
+        (
+            "/environment/atmosphere",
+            Value::Null,
+            "environment.atmosphere",
+        ),
+        (
+            "/environment/atmosphere/density_kgpm3",
+            json!(1.0),
+            "environment.atmosphere",
+        ),
+        (
+            "/environment/atmosphere/scale_height_m",
+            json!(7_000.0),
+            "environment.atmosphere",
+        ),
+        (
+            "/initial/position_m",
+            json!([80.0, 0.0, 2_999.0]),
+            "initial.position_m",
+        ),
+        (
+            "/initial/velocity_mps",
+            json!([-12.0, 0.0, -199.0]),
+            "initial.velocity_mps",
+        ),
+        (
+            "/initial/attitude",
+            json!([1.0, 0.0, 0.0, 0.0]),
+            "initial.attitude",
+        ),
+        (
+            "/initial/angular_velocity_radps",
+            json!([0.0, 0.005, 0.0]),
+            "initial.angular_velocity_radps",
+        ),
+        (
+            "/controller/target_vertical_speed_mps",
+            json!(-1.0),
+            "controller.target_vertical_speed_mps",
+        ),
+        ("/dispersion/thrust_fraction", json!(0.05), "dispersion"),
+        (
+            "/requirements/r1_vertical_speed_mps",
+            json!(4.0),
+            "requirements",
+        ),
+    ];
+    for name in ["nominal.json", "gimbal-stuck-robust.json"] {
+        for (pointer, value, field) in &changes {
+            let mut case = value_of(name);
+            *case.pointer_mut(pointer).unwrap() = value.clone();
+            let err = run_value(&case, 0).expect_err(pointer);
+            assert!(
+                err.contains(field) && err.contains("pre-registered"),
+                "{pointer}: {err}"
+            );
+        }
+    }
+    // What is not pinned stays free: the policy, the gains, the duration and the sampling.
+    let mut case = value_of("nominal.json");
+    case["duration_s"] = json!(5.0);
+    case["record_every"] = json!(20);
+    case["controller"]["policy"] = json!("robust");
+    case["controller"]["gains"]["throttle_gain"] = json!(0.7);
+    run_value(&case, 0).expect("controller choices and the duration are free");
+}
+
+fn fault(kind: &str, start: f64, end: f64, magnitude: f64) -> Value {
+    json!({"kind": kind, "start_s": start, "end_s": end, "magnitude": magnitude})
+}
+
+/// `(kind, acted)` for each fault of a nominal baseline run (seed 0) with these faults.
+fn acted_of(faults: Vec<Value>) -> Vec<(String, bool)> {
+    let mut case = value_of("nominal.json");
+    case["faults"] = Value::Array(faults);
+    let (_, v) = run_value(&case, 0).unwrap();
+    v["faults"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|f| {
+            (
+                f["kind"].as_str().unwrap().to_string(),
+                f["acted"].as_bool().unwrap(),
+            )
+        })
+        .collect()
+}
+
+fn acted_alone(f: Value) -> bool {
+    let kind = f["kind"].as_str().unwrap().to_string();
+    let got = acted_of(vec![f]);
+    assert_eq!(got[0].0, kind);
+    got[0].1
+}
+
+#[test]
+fn a_fault_window_that_changes_nothing_is_reported_as_not_acted() {
+    // Nominal baseline: the ignition is commanded at about 4.3 s and the contact is at 23.6 s.
+    for f in [
+        // No thrusting step inside the window.
+        fault("thrust_loss", 1.0, 2.0, 0.15),
+        fault("gimbal_stuck", 1.0, 2.5, 0.0),
+        // The ignition is commanded outside the window, so it is not delayed.
+        fault("ignition_delay", 10.0, 20.0, 0.5),
+        // The run ends at the contact before the window opens: nothing was biased or masked.
+        fault("altimeter_bias", 30.0, 40.0, 10.0),
+        fault("altimeter_dropout", 30.0, 38.0, 0.0),
+        fault("gnss_dropout", 30.0, 38.0, 0.0),
+        fault("gnss_bias", 30.0, 40.0, 10.0),
+        fault("imu_accel_bias", 30.0, 40.0, 0.2),
+        // One step, 101, which is not a control cycle (the control cycles are the even steps).
+        fault("altimeter_bias", 1.01, 1.02, 10.0),
+        fault("imu_accel_bias", 1.01, 1.02, 0.2),
+        // Step 102 is a control cycle but not a GNSS cycle (those are steps 0, 10, 20, ...).
+        fault("gnss_bias", 1.02, 1.03, 10.0),
+    ] {
+        assert!(!acted_alone(f.clone()), "{f}");
+    }
+
+    // The same faults, with a window that does reach an effect, act.
+    for f in [
+        fault("thrust_loss", 5.26, 40.0, 0.15),
+        fault("gimbal_stuck", 10.0, 12.0, 0.0),
+        fault("ignition_delay", 2.0, 8.0, 0.5),
+        fault("altimeter_bias", 0.0, 40.0, 10.0),
+        fault("altimeter_dropout", 18.0, 24.0, 0.0),
+        fault("gnss_dropout", 10.0, 16.0, 0.0),
+        fault("gnss_bias", 0.0, 40.0, 10.0),
+        fault("imu_accel_bias", 0.0, 40.0, 0.2),
+        // A single GNSS cycle (step 100) and a single control cycle.
+        fault("gnss_bias", 1.0, 1.01, 10.0),
+        fault("altimeter_bias", 1.0, 1.01, 10.0),
+        fault("imu_accel_bias", 1.0, 1.01, 0.2),
+    ] {
+        assert!(acted_alone(f.clone()), "{f}");
+    }
+}
+
+#[test]
+fn a_bias_hidden_by_a_dropout_of_the_same_sensor_did_not_act() {
+    // Biased samples exist only where the sensor still reports: here the bias window lies
+    // inside the dropout window.
+    assert_eq!(
+        acted_of(vec![
+            fault("altimeter_bias", 6.0, 7.0, 10.0),
+            fault("altimeter_dropout", 5.0, 8.0, 0.0)
+        ]),
+        [
+            ("altimeter_bias".to_string(), false),
+            ("altimeter_dropout".to_string(), true)
+        ]
+    );
+    assert_eq!(
+        acted_of(vec![
+            fault("gnss_bias", 6.0, 7.0, 10.0),
+            fault("gnss_dropout", 5.0, 8.0, 0.0)
+        ]),
+        [
+            ("gnss_bias".to_string(), false),
+            ("gnss_dropout".to_string(), true)
+        ]
+    );
+    // A bias window that sticks out of the dropout window does act.
+    assert_eq!(
+        acted_of(vec![
+            fault("altimeter_bias", 6.0, 9.0, 10.0),
+            fault("altimeter_dropout", 5.0, 8.0, 0.0)
+        ])[0],
+        ("altimeter_bias".to_string(), true)
+    );
+}
+
+#[test]
+fn the_verifier_recomputes_the_contact_and_ignores_the_stored_interpolation() {
+    let case: LandingCase = serde_json::from_slice(&bytes_of("altimeter-bias.json")).unwrap();
+    let prep = prepare_landing(&case, 0).unwrap();
+    let run = simulate_landing(&prep).unwrap();
+    let honest = serde_json::to_vec(&verify(&prep, &run.log)).unwrap();
+    assert_eq!(json_of(&honest)["outcome"], "hard_landing");
+
+    // Replace the simulation's interpolated contact by a perfect soft landing with another
+    // fraction and instant: the verdicts, the touchdown report and every number stay the same.
+    let mut log = run.log.clone();
+    let td = log.touchdown.as_mut().unwrap();
+    let soft = State {
+        v: Vec3::ZERO,
+        w: Vec3::ZERO,
+        ..td.state
+    };
+    (td.state, td.fraction, td.t_s) = (soft, 0.25, 1.0);
+    log.end_state = soft;
+    assert_eq!(serde_json::to_vec(&verify(&prep, &log)).unwrap(), honest);
+
+    // A contact that the states around the step do not support is no contact.
+    let mut log = run.log.clone();
+    log.touchdown.as_mut().unwrap().after = log.steps[0].state;
+    let v = json_of(&serde_json::to_vec(&verify(&prep, &log)).unwrap());
+    assert_eq!(v["outcome"], "no_contact");
 }
 
 fn vv_rocket(args: &[&str]) -> std::process::Output {
@@ -841,6 +1152,10 @@ fn every_demo_case_is_valid_and_runs_for_seeds_zero_and_one() {
         for seed in [0, 1] {
             let art = artifacts(&bytes_of(&name), seed).unwrap_or_else(|e| panic!("{name}: {e}"));
             assert!(["landed", "hard_landing", "no_contact"].contains(&art.outcome));
+            // A demonstration fault that changed nothing would be a case that proves nothing.
+            for f in json_of(&art.verification)["faults"].as_array().unwrap() {
+                assert_eq!(f["acted"], true, "{name} seed {seed}: {f}");
+            }
         }
     }
 }

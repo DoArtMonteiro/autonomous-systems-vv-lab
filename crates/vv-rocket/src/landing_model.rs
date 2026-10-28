@@ -1,8 +1,11 @@
 //! Landing case schema `vv-rocket-landing.v1`: strict validation and dispersion by seed.
 //!
-//! The pre-registered requirements, dispersions, sensor rates and fault ranges of
+//! The pre-registered vehicle and actuator limits, environment, nominal initial state, sensor
+//! noise and rates, dispersions, requirements, target touchdown speed and fault ranges of
 //! docs/m9-powered-landing.md are fixed: a file that states other values is rejected, so the
-//! evidence stays self-describing and a threshold cannot be moved to make a case pass.
+//! evidence stays self-describing and a threshold cannot be moved to make a case pass. Only the
+//! controller policy and gains, the faults (within their ranges), the duration, the sampling
+//! interval and the name are free.
 
 use serde::{Deserialize, Serialize};
 
@@ -17,6 +20,24 @@ pub const LANDING_SCHEMA: &str = "vv-rocket-landing.v1";
 pub const CONTROL_PERIOD_STEPS: u64 = 2;
 pub const GNSS_PERIOD_CYCLES: u64 = 5;
 pub const MAX_FAULTS: usize = 8;
+/// Tangent of the 8 degree TVC limit (docs/m9-powered-landing.md).
+pub const GIMBAL_MAX_TAN: f64 = 0.140_540_834_7;
+/// Pre-registered vertical speed target at the contact.
+pub const TARGET_VERTICAL_SPEED_MPS: f64 = -1.5;
+/// Pre-registered fixed step.
+pub const DT_S: f64 = 0.01;
+const GRAVITY_MPS2: f64 = 9.80665;
+const SEA_LEVEL_DENSITY_KGPM3: f64 = 1.225;
+const SCALE_HEIGHT_M: f64 = 8500.0;
+const NOMINAL_POSITION_M: [f64; 3] = [80.0, 0.0, 3000.0];
+const NOMINAL_VELOCITY_MPS: [f64; 3] = [-12.0, 0.0, -200.0];
+const NOMINAL_ATTITUDE: [f64; 4] = [
+    std::f64::consts::FRAC_1_SQRT_2,
+    0.0,
+    -std::f64::consts::FRAC_1_SQRT_2,
+    0.0,
+];
+const NOMINAL_ANGULAR_VELOCITY_RADPS: [f64; 3] = [0.0, 0.004, 0.0];
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -37,7 +58,7 @@ pub struct LandingCase {
     pub faults: Vec<FaultSpec>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct LandingVehicle {
     pub dry_mass_kg: f64,
@@ -54,6 +75,29 @@ pub struct LandingVehicle {
     pub throttle_rate_per_s: f64,
     pub gimbal_max_tan: f64,
     pub gimbal_rate_tan_per_s: f64,
+}
+
+impl LandingVehicle {
+    /// The pre-registered vehicle and actuator limits: the `propulsive_descent` vehicle of the M8
+    /// plus the throttle and TVC limits of the specification.
+    pub fn registered() -> Self {
+        LandingVehicle {
+            dry_mass_kg: 22_000.0,
+            propellant_mass_kg: 8_000.0,
+            dry_cm_station_m: 16.0,
+            propellant_cm_station_m: 9.0,
+            dry_inertia_kgm2: [40_000.0, 1_800_000.0, 1_800_000.0],
+            propellant_inertia_kgm2: [12_000.0, 250_000.0, 250_000.0],
+            max_thrust_n: 845_000.0,
+            isp_s: 282.0,
+            drag_coefficient: 0.8,
+            reference_area_m2: 10.5,
+            throttle_min: 0.4,
+            throttle_rate_per_s: 1.0,
+            gimbal_max_tan: GIMBAL_MAX_TAN,
+            gimbal_rate_tan_per_s: 0.35,
+        }
+    }
 }
 
 /// Half-widths of the uniform dispersions; fixed by the specification.
@@ -431,9 +475,100 @@ fn require_equal<T: PartialEq + std::fmt::Debug>(
     }
 }
 
+/// `require_equal` on each named field of `$got` against the same field of `$want`.
+macro_rules! pin_fields {
+    ($got:expr, $want:expr, $prefix:literal, [$($field:ident),* $(,)?]) => {{
+        let want = $want;
+        $( require_equal(&$got.$field, &want.$field, concat!($prefix, ".", stringify!($field)))?; )*
+    }};
+}
+
 /// Validates a landing case and applies the dispersions of `seed`. Seed 0 is the nominal case:
 /// no dispersion draws are made (sensor noise, in `landing_sensors`, stays on and is seeded by 0).
 pub fn prepare_landing(case: &LandingCase, seed: u64) -> Result<PreparedLanding, String> {
+    check_registered(case)?;
+    prepare_unpinned(case, seed)
+}
+
+/// Rejects every pre-registered value that differs, naming the field.
+fn check_registered(case: &LandingCase) -> Result<(), String> {
+    require_equal(&case.dispersion, &Dispersion::registered(), "dispersion")?;
+    require_equal(
+        &case.requirements,
+        &Requirements::registered(),
+        "requirements",
+    )?;
+    pin_fields!(
+        case.sensors,
+        Sensors::registered(),
+        "sensors",
+        [
+            altimeter_sigma_m,
+            gnss_position_sigma_m,
+            gnss_velocity_sigma_mps,
+            imu_attitude_sigma_rad,
+            imu_rate_sigma_radps,
+            imu_accel_sigma_mps2,
+            control_period_steps,
+            gnss_period_cycles,
+        ]
+    );
+    // The vehicle, its actuator limits and the environment are those of the specification.
+    pin_fields!(
+        case.vehicle,
+        LandingVehicle::registered(),
+        "vehicle",
+        [
+            dry_mass_kg,
+            propellant_mass_kg,
+            dry_cm_station_m,
+            propellant_cm_station_m,
+            dry_inertia_kgm2,
+            propellant_inertia_kgm2,
+            max_thrust_n,
+            isp_s,
+            drag_coefficient,
+            reference_area_m2,
+            throttle_min,
+            throttle_rate_per_s,
+            gimbal_max_tan,
+            gimbal_rate_tan_per_s,
+        ]
+    );
+    let env = &case.environment;
+    require_equal(&env.gravity_mps2, &GRAVITY_MPS2, "environment.gravity_mps2")?;
+    require_equal(
+        &env.atmosphere
+            .as_ref()
+            .map(|a| (a.density_kgpm3, a.scale_height_m)),
+        &Some((SEA_LEVEL_DENSITY_KGPM3, Some(SCALE_HEIGHT_M))),
+        "environment.atmosphere (density_kgpm3, scale_height_m)",
+    )?;
+    let i = &case.initial;
+    require_equal(&i.position_m, &NOMINAL_POSITION_M, "initial.position_m")?;
+    require_equal(
+        &i.velocity_mps,
+        &NOMINAL_VELOCITY_MPS,
+        "initial.velocity_mps",
+    )?;
+    require_equal(&i.attitude, &NOMINAL_ATTITUDE, "initial.attitude")?;
+    require_equal(
+        &i.angular_velocity_radps,
+        &NOMINAL_ANGULAR_VELOCITY_RADPS,
+        "initial.angular_velocity_radps",
+    )?;
+    require_equal(&case.dt_s, &DT_S, "dt_s")?;
+    require_equal(
+        &case.controller.target_vertical_speed_mps,
+        &TARGET_VERTICAL_SPEED_MPS,
+        "controller.target_vertical_speed_mps",
+    )
+}
+
+/// The validation that does not depend on the pre-registered values, and the preparation. Tests of
+/// the simulation use it to run scenarios the registered case cannot express (an empty tank, a
+/// start close to the ground); the public entry point is `prepare_landing`.
+pub(crate) fn prepare_unpinned(case: &LandingCase, seed: u64) -> Result<PreparedLanding, String> {
     if case.schema != LANDING_SCHEMA {
         return Err(format!("schema must be {LANDING_SCHEMA}"));
     }
@@ -442,56 +577,8 @@ pub fn prepare_landing(case: &LandingCase, seed: u64) -> Result<PreparedLanding,
             "record_every must be a positive multiple of the control period ({CONTROL_PERIOD_STEPS} steps)"
         ));
     }
-    require_equal(&case.dispersion, &Dispersion::registered(), "dispersion")?;
-    require_equal(
-        &case.requirements,
-        &Requirements::registered(),
-        "requirements",
-    )?;
-    let s = &case.sensors;
-    require_equal(
-        &s.control_period_steps,
-        &CONTROL_PERIOD_STEPS,
-        "sensors.control_period_steps",
-    )?;
-    require_equal(
-        &s.gnss_period_cycles,
-        &GNSS_PERIOD_CYCLES,
-        "sensors.gnss_period_cycles",
-    )?;
-    for (v, name) in [
-        (s.altimeter_sigma_m, "sensors.altimeter_sigma_m"),
-        (s.gnss_position_sigma_m, "sensors.gnss_position_sigma_m"),
-        (s.gnss_velocity_sigma_mps, "sensors.gnss_velocity_sigma_mps"),
-        (s.imu_attitude_sigma_rad, "sensors.imu_attitude_sigma_rad"),
-        (s.imu_rate_sigma_radps, "sensors.imu_rate_sigma_radps"),
-        (s.imu_accel_sigma_mps2, "sensors.imu_accel_sigma_mps2"),
-    ] {
-        within(v, name, 0.0, 100.0)?;
-    }
-
     let lv = &case.vehicle;
-    within(lv.throttle_min, "vehicle.throttle_min", 0.0, 1.0)?;
-    within(
-        lv.throttle_rate_per_s,
-        "vehicle.throttle_rate_per_s",
-        1e-3,
-        1e3,
-    )?;
-    within(lv.gimbal_max_tan, "vehicle.gimbal_max_tan", 0.0, 1.0)?;
-    within(
-        lv.gimbal_rate_tan_per_s,
-        "vehicle.gimbal_rate_tan_per_s",
-        1e-3,
-        1e3,
-    )?;
     let ctl = &case.controller;
-    within(
-        ctl.target_vertical_speed_mps,
-        "controller.target_vertical_speed_mps",
-        -3.0,
-        -0.1,
-    )?;
     validate_gains(&ctl.gains)?;
 
     // The truth model reuses the M8 validation for the environment, vehicle, state, step and

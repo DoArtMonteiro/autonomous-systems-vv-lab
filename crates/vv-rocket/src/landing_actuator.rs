@@ -96,6 +96,11 @@ impl Actuator {
         self.engine
     }
 
+    /// Step at which the ignition now waiting for its delay was commanded.
+    pub fn pending_command_step(&self) -> Option<u64> {
+        self.pending.map(|(_, commanded)| commanded)
+    }
+
     /// Applies `cmd` for step `step`, with `propellant_kg` left at its start.
     pub fn apply(
         &mut self,

@@ -63,6 +63,10 @@ pub struct TruthStep {
     pub active_faults: Vec<FaultKind>,
 }
 
+/// The contact as the simulation found it. Only `step` and `after` are inputs of the verifier:
+/// it interpolates the contact itself from the state at the start of step `step - 1` (in the log)
+/// and `after`, so `fraction`, `t_s` and `state` are the simulation's own result, used for the
+/// trace and to stop, and a wrong value there cannot change a verdict.
 #[derive(Clone, Debug)]
 pub struct Touchdown {
     /// Step boundary `k + 1` at which the nozzle plane was found at or below the ground; the contact
@@ -70,7 +74,18 @@ pub struct Touchdown {
     pub step: u64,
     pub fraction: f64,
     pub t_s: f64,
+    /// The interpolated contact state.
     pub state: State,
+    /// The integrated state at the end of step `k`, before any interpolation.
+    pub after: State,
+}
+
+/// The ignition as the actuator performed it: the step at which it was commanded and the step at
+/// which the engine lit (`None`: still waiting at the end of the run).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Ignition {
+    pub command_step: u64,
+    pub effective_step: Option<u64>,
 }
 
 /// All the truth the verifier needs; it holds no sensor or controller data.
@@ -82,6 +97,7 @@ pub struct TruthLog {
     pub end_step: u64,
     pub end_state: State,
     pub touchdown: Option<Touchdown>,
+    pub ignition: Option<Ignition>,
 }
 
 #[derive(Clone, Debug, Serialize, PartialEq)]

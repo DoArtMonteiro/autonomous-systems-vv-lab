@@ -12,7 +12,9 @@ use crate::landing_actuator::{Actuator, ActuatorEvent, ActuatorFaults, ActuatorP
 use crate::landing_controller::Controller;
 use crate::landing_model::{FaultKind, PreparedLanding};
 use crate::landing_sensors::{SensorFaults, SensorStreams};
-use crate::landing_truth::{Touchdown, TruthExcerpt, TruthLog, TruthStep, contact, excerpt};
+use crate::landing_truth::{
+    Ignition, Touchdown, TruthExcerpt, TruthLog, TruthStep, contact, excerpt,
+};
 use crate::landing_types::{Command, Estimate, Observation};
 use crate::model::Segment;
 
@@ -129,6 +131,7 @@ pub fn simulate_landing(prep: &PreparedLanding) -> Result<LandingRun, String> {
     let (mut ignition_t, mut cutoff_t, mut flameout_t) = (None, None, None);
     let (mut max_jet, mut max_jet_t) = (0.0_f64, 0.0);
     let mut touchdown: Option<Touchdown> = None;
+    let mut ignition: Option<Ignition> = None;
     let mut last_active: Vec<FaultKind> = Vec::new();
     let mut end_state = s;
     let mut step = 0;
@@ -222,10 +225,22 @@ pub fn simulate_landing(prep: &PreparedLanding) -> Result<LandingRun, String> {
         let (new_applied, actuator_events) =
             actuator.apply(step, &current.command, &actuator_faults, s.mp);
         applied = new_applied;
+        if ignition.is_none()
+            && let Some(command_step) = actuator.pending_command_step()
+        {
+            ignition = Some(Ignition {
+                command_step,
+                effective_step: None,
+            });
+        }
         for e in actuator_events {
             match e {
                 ActuatorEvent::Ignition { command_step } => {
                     ignition_t = Some(t_s);
+                    ignition = Some(Ignition {
+                        command_step,
+                        effective_step: Some(step),
+                    });
                     events.push(Event {
                         step,
                         t_s,
@@ -320,6 +335,7 @@ pub fn simulate_landing(prep: &PreparedLanding) -> Result<LandingRun, String> {
                 fraction: u,
                 t_s: t_touch,
                 state,
+                after: next,
             });
             end_state = state;
             break;
@@ -380,6 +396,97 @@ pub fn simulate_landing(prep: &PreparedLanding) -> Result<LandingRun, String> {
             end_step: step,
             end_state,
             touchdown,
+            ignition,
         },
     })
+}
+
+#[cfg(test)]
+mod tests {
+    //! Scenarios the pre-registered case cannot express (an empty tank, a start near the ground)
+    //! run through `prepare_unpinned`, which skips the pins but keeps every other check.
+
+    use serde_json::{Value, json};
+
+    use super::*;
+    use crate::landing_model::{LandingCase, prepare_unpinned};
+    use crate::landing_verify::verify;
+
+    fn run_unpinned(edit: impl Fn(&mut Value)) -> Result<(Value, Value), String> {
+        let mut case: Value =
+            serde_json::from_str(include_str!("../landing/nominal.json")).unwrap();
+        edit(&mut case);
+        let case: LandingCase = serde_json::from_value(case).unwrap();
+        let prep = prepare_unpinned(&case, 0)?;
+        let run = simulate_landing(&prep)?;
+        let v = verify(&prep, &run.log);
+        Ok((
+            serde_json::to_value(&run.trace).unwrap(),
+            serde_json::to_value(&v).unwrap(),
+        ))
+    }
+
+    fn event_kinds(trace: &Value) -> Vec<&str> {
+        trace["events"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| e["kind"].as_str().unwrap())
+            .collect()
+    }
+
+    fn invariant<'a>(v: &'a Value, id: &str) -> &'a Value {
+        v["invariants"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["id"] == id)
+            .unwrap()
+    }
+
+    #[test]
+    fn running_out_of_propellant_is_a_flameout_and_a_hard_landing() {
+        let (trace, v) =
+            run_unpinned(|c| c["vehicle"]["propellant_mass_kg"] = json!(500.0)).unwrap();
+        let kinds = event_kinds(&trace);
+        assert!(kinds.contains(&"flameout"), "{kinds:?}");
+        assert_ne!(v["outcome"], "landed");
+        assert!(trace["summary"]["flameout_t_s"].as_f64().unwrap() > 0.0);
+        assert!(
+            trace["summary"]["propellant_remaining_kg"]
+                .as_f64()
+                .unwrap()
+                < 5.0
+        );
+        // The truth mass never goes negative and the last samples show the engine out.
+        let last = trace["samples"].as_array().unwrap().last().unwrap();
+        assert_eq!(last["applied"]["engine"], "flameout");
+    }
+
+    #[test]
+    fn a_rising_vehicle_near_the_ground_is_cut_and_cannot_relight() {
+        let (trace, v) = run_unpinned(|c| {
+            c["initial"]["position_m"] = json!([0.0, 0.0, 100.0]);
+            c["initial"]["velocity_mps"] = json!([0.0, 0.0, -10.0]);
+            c["controller"]["gains"]["ignition_fraction"] = json!(0.1);
+            c["controller"]["gains"]["cutoff_altitude_m"] = json!(1000.0);
+        })
+        .unwrap();
+        assert_eq!(
+            event_kinds(&trace),
+            ["ignition", "cutoff", "touchdown", "end"]
+        );
+        assert_eq!(v["outcome"], "hard_landing");
+        assert_eq!(invariant(&v, "S4_no_relight")["pass"], true);
+        assert_eq!(invariant(&v, "S4_no_relight")["worst_value"], 1.0);
+        let last = trace["samples"].as_array().unwrap().last().unwrap();
+        assert_eq!(last["applied"]["engine"], "cut");
+    }
+
+    #[test]
+    fn the_nozzle_plane_must_start_above_the_ground() {
+        let err =
+            run_unpinned(|c| c["initial"]["position_m"] = json!([0.0, 0.0, 5.0])).unwrap_err();
+        assert!(err.contains("above the ground"), "{err}");
+    }
 }

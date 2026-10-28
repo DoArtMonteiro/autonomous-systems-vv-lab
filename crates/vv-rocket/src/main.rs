@@ -2,11 +2,13 @@
 //! `vv-rocket replay <dir>` | `vv-rocket verify [--output <file>]`
 //!
 //! Exit codes: 0 success or verified, 1 replay or verification failed, 2 (`land` only) the landing
-//! did not land or an invariant failed (artifacts are still written), 3 usage or input error.
+//! did not land or an invariant failed (artifacts are still written), 3 usage or input error,
+//! 4 (`land` only) simulation error: a valid input drove the state non-finite or non-physical.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+use vv_rocket::landing_run::LandError;
 use vv_rocket::{landing_run, run, verify};
 
 fn usage() -> ExitCode {
@@ -33,7 +35,11 @@ fn main() -> ExitCode {
             };
             let landed =
                 landing_run::write_landing(&PathBuf::from(case), seed, &PathBuf::from(out))
-                    .and_then(|m| print_json(&m).map(|text| (text, m.all_pass())));
+                    .and_then(|m| {
+                        print_json(&m)
+                            .map(|text| (text, m.all_pass()))
+                            .map_err(LandError::Simulation)
+                    });
             return match landed {
                 Ok((text, ok)) => {
                     println!("{text}");
@@ -41,7 +47,7 @@ fn main() -> ExitCode {
                 }
                 Err(e) => {
                     eprintln!("vv-rocket: {e}");
-                    ExitCode::from(3)
+                    ExitCode::from(e.exit_code())
                 }
             };
         }
