@@ -453,3 +453,32 @@ Hipóteses, com critérios numéricos:
 - **G5, custo da regra conservadora**: em `altimeter_bias_low` e `gnss_bias_low`, regista-se o resultado de `guarded` sem critério de sucesso; prevê-se que não recupere.
 
 Uma hipótese que falhe é reportada como falhada. Nenhum limiar de `S5`, nenhum requisito e nenhuma gama é ajustado depois de ver a campanha de aceitação.
+
+### Emenda depois da revisão independente (antes de qualquer código M9.1)
+
+Uma revisão independente desta secção, feita antes da implementação, encontrou dois bloqueios e várias definições em falta. As regras abaixo substituem as anteriores onde as contradizem; nada foi executado entre a secção acima e esta emenda.
+
+**`S5` passa a ser avaliado na altitude do centro de massa `r_z`**, não em `p_base,z`: com a inclinação permitida por `S1` (30°), `p_base,z` pode subir cerca de 2 m sem o centro de massa subir. "Ignição" é o primeiro passo com impulso positivo, como em `S4`. A cada passo com impulso, nos estados de início e de fim do passo (como `S1`), a subida é `r_z` menos o mínimo corrente de `r_z` desde a ignição até esse estado. Uma subida balística depois do corte não é avaliada (não é subida propulsiva). Orçamento do limite de 5 m: com a regra de corte por subida, a velocidade vertical chega a +1 m/s em 0,15 a 0,3 s e a regra espera 1 s, mais um ciclo e um passo do atuador; com cerca de 3 m/s² de aceleração líquida ao acelerador mínimo, a subida até ao corte é de 3 a 3,5 m. O limite de 5 m aceita essa contenção e rejeita qualquer subida mantida. A medição dos dados de projeto (0 m) foi feita nas amostras de 0,1 s, dez vezes mais espaçadas do que os passos onde `S5` é avaliado.
+
+**P1 redefinida.** Os campos novos da estimativa (`sensor_disagreement`, `ascent_abort`) só são escritos quando a política os produz, para que os traços de `baseline` e `robust` não mudem. Os ganhos de `guarded` são opcionais no esquema, com valores por omissão, para que os 780 `case.json` guardados continuem válidos. O M9.1 usa um modelo de caso próprio, `landing/m91-nominal.json`, congelado pelo seu hash; `landing/nominal.json` e o seu hash não mudam. Reavaliação retrospetiva: para cada uma das 780 execuções M9, correr `land` com o `case.json` guardado e a mesma semente, comparar `trace.json` byte a byte com o guardado e ler `S5` do `verification.json` novo. P1 mantém-se: traços idênticos e `S5` falha exatamente nas 20 execuções `no_contact` do `baseline` com `gnss_dropout`.
+
+**Regra 1 de `guarded`, especificada.** A escolha de altitude só afeta o guiamento: o estado do estimador não é alterado (de outro modo o resíduo anular-se-ia e a regra oscilaria). Durante a inconsistência, todos os usos da altitude da base no guiamento (ignição, acelerador, desvanecimento lateral, limite de inclinação, corte a 15 m) leem a altitude escolhida, `min(altímetro, altitude da base do estimador)`; a velocidade vertical é a do estimador. Sem amostra do altímetro nesse ciclo, usa a altitude do estimador. A saída da inconsistência segue a do `robust` (um resíduo abaixo de 3 m). `sensor_disagreement` regista o primeiro instante em que a inconsistência é declarada.
+
+**A regra 2 precisa de um caso onde possa atuar.** Em `guarded`, o corte a 15 m atua antes da regra 2 nas falhas que leem baixo, e com `gnss_dropout` o estimador do `robust` não perde a velocidade. Para testar a regra contra a falha observada, acrescenta-se a política `baseline_guarded`: o `baseline` sem alterações mais a regra 2. Corre só no caso nominal e em `gnss_dropout` (60 execuções). Previsão, escrita agora: durante a perda, a velocidade estimada do `baseline` fica congelada e negativa, pelo que a regra 2 só atua quando o GNSS regressa; o veículo já terá subido dezenas de metros. Prevê-se que `baseline_guarded` elimine o afastamento (`no_contact`), mas continue a violar `S5` e caia com velocidade elevada (`R1` falhado): contém, não recupera. Um teste unitário do controlador, com observações sintéticas a subir acima de 15 m, confirma que a regra 2 corta.
+
+**Contagem dos resultados.**
+
+- Deteção: a bandeira aparece em pelo menos um ciclo da execução. Para `robust`, `altimeter_rejected` é a mesma deteção e é apresentada ao lado.
+- Contenção: nenhum invariante avaliado falhou. Sem contacto, `S2` não é avaliado e não conta como falha.
+- Recuperação (`landed`): contacto com `R1` a `R6` e todos os invariantes `S1` a `S5`.
+- Falsos alarmes: nas células nominal, `thrust_loss`, `ignition_delay`, `gimbal_stuck`, `altimeter_dropout`, `gnss_dropout` e `imu_accel_bias`, cada bandeira em no máximo 1 de 30 execuções de `guarded`.
+
+**Hipóteses revistas.**
+
+- G1: `guarded` declara `sensor_disagreement` em **30 de 30** execuções em cada uma de `altimeter_bias`, `gnss_bias`, `altimeter_bias_low` e `gnss_bias_low` (com magnitude de pelo menos 5 m e limiar de 3 m, o resíduo excede o limiar desde o primeiro ciclo); falsos alarmes como definido acima.
+- G2: `guarded` não viola `S5` nas 30 execuções com `gnss_dropout` (herda o estimador do `robust`, que não subiu no M9; não testa a regra 2). G2b: `baseline_guarded` com `gnss_dropout` tem 0 execuções `no_contact`; a previsão de que `S5` e `R1` continuam a falhar é registada, sem critério de sucesso.
+- G3: `guarded` cumpre `R1` em pelo menos 27 de 30 execuções com `gnss_bias`. Teto aproximado de `landed`: com as sementes 2000 a 2029, os sorteios de `gnss_bias` têm 3 magnitudes abaixo de 10 m (5,74; 7,69; 10,00) e uma em 10,33 m; prevê-se cerca de 3 ± 1 `landed`.
+- G4: em cada um dos 9 cenários do M9, `guarded` aterra em pelo menos `robust − 2` execuções; a linha `gnss_bias` não é informativa (o `robust` teve 0). Verificação mais forte: em todas as execuções em que nenhuma bandeira de `guarded` aparece, a sequência de comandos de `guarded` é igual à do `robust` no mesmo caso.
+- G5: sem critério de sucesso. Previsões para as falhas novas: `guarded` trava cedo e corta a 15 m acima da altitude verdadeira menos o enviesamento, e não recupera; `baseline` com `altimeter_bias_low` corta a cerca de `h = enviesamento + 15 m` verdadeiros e falha `R1`; `robust` com `altimeter_bias_low` rejeita o altímetro e deverá aterrar como em `altimeter_bias`; com `gnss_bias_low`, `baseline` e `robust` deverão espelhar verticalmente o `gnss_bias`.
+
+**Restrições de implementação.** As falhas novas usam a regra de `acted` dos enviesamentos de sensores; continua a haver no máximo uma falha de cada tipo; as gamas novas entram na validação e na tabela de gamas do adaptador. A campanha de aceitação passa a ter 990 + 60 = 1050 execuções.
