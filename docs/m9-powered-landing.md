@@ -349,7 +349,7 @@ Os resultados do caso nominal fixam o piso da comparação: com as sementes de r
 
 Outros resultados que não estavam previstos:
 
-- `baseline` com `gnss_dropout`: 7 de 30 aterram, 3 `hard_landing` e 20 `no_contact`. Nas duas execuções `no_contact` que inspecionei (sementes 1000 e 1001) a simulação correu até aos 40 s sem corte nem esgotamento do propelente (cerca de 2000 kg restantes); a causa não foi investigada. Duas das `hard_landing` (sementes 1005 e 1027) violaram também `S2_keep_out`, os únicos invariantes de segurança falhados em toda a campanha.
+- `baseline` com `gnss_dropout`: 7 de 30 aterram, 3 `hard_landing` e 20 `no_contact`. O traço da semente 1000 mostra o mecanismo: durante a perda (14,9 a 21,99 s) o `baseline` mantém a última velocidade GNSS (cerca de -95,6 m/s) enquanto a velocidade real desce até cerca de -7 m/s; trava em excesso, para a cerca de 124 m e começa a subir. Quando o GNSS regressa, o veículo sobe a cerca de 36 m/s a 165 m. A regra de corte só atua abaixo de 15 m e o acelerador mínimo dá impulso superior ao peso, sem reacendimento possível: o andar afasta-se do solo até ao fim da duração (cerca de 1200 m aos 40 s). Nenhum invariante pré-registado deteta este afastamento; fica registado como `no_contact` e como lacuna dos invariantes. Duas das `hard_landing` (sementes 1005 e 1027) violaram também `S2_keep_out`, os únicos invariantes de segurança falhados em toda a campanha.
 - `baseline` com `altimeter_bias`: 0 de 30; `R1` falhou em todas as execuções (`|v_base,z|` entre 10,1 e 32,9 m/s, mediana 23,0 m/s). Com `altimeter_dropout`, 7 de 30 e 22 falhas de `R1`.
 - `robust` com `altimeter_bias`: 27 de 30; com `altimeter_dropout` e com `gnss_dropout`: 28 de 30.
 - Em nenhuma execução da matriz falharam `R3`, `R4` ou `R6`, nem `S1`, `S3` ou `S4`.
@@ -388,4 +388,4 @@ Há falhas dentro das gamas, por isso não é um caso de "nenhuma fronteira dent
 - Trinta sementes por célula (10 no varrimento) não sustentam valores-p nem intervalos de confiança; diferenças de uma ou duas execuções não são interpretáveis. Os veredictos de H1, H2 e H3 aplicam apenas os critérios pré-registados.
 - Cada execução injeta uma falha de cada vez, com magnitude e janela sorteadas uniformemente. Falhas combinadas, fora das gamas ou com outra distribuição temporal não foram avaliadas.
 - O controlador foi afinado no caso nominal com as sementes 0 a 40; as sementes 1000 a 1029 são disjuntas dessas, mas a afinação não considerou as falhas. O piso nominal acima mostra que a taxa de aterragem sem falhas não é 100% em sementes novas.
-- A causa das execuções `no_contact` do `baseline` com `gnss_dropout` e das 22 falhas de `R5` do `baseline` com `gnss_bias` não foi investigada.
+- A causa das 22 falhas de `R5` do `baseline` com `gnss_bias` não foi investigada. O mecanismo das execuções `no_contact` do `baseline` com `gnss_dropout` foi confirmado apenas no traço da semente 1000.
