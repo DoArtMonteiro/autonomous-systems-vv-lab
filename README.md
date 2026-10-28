@@ -177,6 +177,16 @@ python scripts/mission_control.py --port 8780
 
 O comando `land` termina com código 2 neste caso: com o altímetro enviesado em +20 m, a política `baseline` toca no solo a cerca de 20 m/s (requisito `R1`, limite 3 m/s). A política `robust` rejeita o altímetro e aterra. Em `http://127.0.0.1:8780/landing`, escolher "Altimeter bias" e "Compare policies on this case".
 
+O M9.1 acrescenta o invariante `S5` (subida com o motor aceso), as políticas `guarded` e `baseline_guarded` e duas falhas que leem baixo (`altimeter_bias_low`, `gnss_bias_low`). A campanha de aceitação, pré-registada, tem 1050 execuções (sementes 2000 a 2029), todas reproduzidas, e separa deteção, contenção e recuperação:
+
+```sh
+crates/vv-rocket/target/release/vv-rocket land crates/vv-rocket/landing/gnss-bias-guarded.json --seed 0 --output runs/m91-demo
+python scripts/m91_retrospective.py --binary crates/vv-rocket/target/release/vv-rocket
+python scripts/m91_campaign.py
+```
+
+Os resultados, incluindo a hipótese que falhou (G2b) e a regressão prevista em `altimeter_bias_low`, estão em [M9: aterragem propulsiva](docs/m9-powered-landing.md). O Mission Control mostra-os no separador "M9.1 campaign" de `/landing` (`--m91-summary` escolhe outro `summary.json`). `python scripts/m9_campaign.py` continua a dar as mesmas contagens do M9.
+
 No Mission Control, a página `/landing` corre a aterragem propulsiva em malha fechada do M9 através do contrato `vv-sim-adapter.v3`: escolher uma falha, uma política (`baseline` ou `robust`) e uma semente, ver o resultado da missão, os invariantes de segurança e a evidência de reprodução como três afirmações separadas, e comparar as duas políticas no mesmo caso. [M9: aterragem propulsiva](docs/m9-powered-landing.md).
 
 `--suite m2 --seeds 42 --variants standard` seleciona dez casos. `--max-cases`, `--max-runs`, `--max-artifact-bytes` e `--time-budget-seconds` limitam a campanha antes e durante a execução. `--max-runs` conta invocações do simulador, incluindo repetições, reprodução e análise. Uma expectativa satisfeita não transforma uma missão insegura numa missão bem-sucedida.

@@ -530,7 +530,7 @@ A janela de 6 s do demonstrador `gnss-dropout` não faz o `baseline` subir nesta
 
 #### Escolhas de implementação da campanha de aceitação (escritas antes da execução)
 
-Estas escolhas resolvem ambiguidades do pré-registo pela leitura mais literal. Foram escritas e confirmadas por testes antes da execução da campanha de aceitação; não alteram nenhuma hipótese, limiar, gama nem semente pré-registados. Dois ensaios de funcionamento do executor com as sementes 2000 e 2001 (os testes unitários e o passo reduzido do CI correm três cenários com essas sementes) são anteriores à campanha completa; o seu resultado não levou a nenhuma alteração de critério.
+Estas escolhas resolvem ambiguidades do pré-registo pela leitura mais literal. Foram escritas e confirmadas por testes antes da execução da campanha de aceitação; não alteram nenhuma hipótese, limiar, gama nem semente pré-registados. Antes da campanha completa, o executor foi exercitado com as sementes 2000 e 2001, e é preciso dizê-lo porque essas sementes pertencem à aceitação: (1) os testes unitários correm um plano reduzido (nominal, `gnss_bias` e `gnss_dropout`; `robust`, `guarded` e `baseline_guarded`) e repetem-no em cada execução dos testes; (2) uma execução à parte do cenário nominal com as quatro políticas; (3) uma execução local do passo reduzido do CI, que usa o mesmo plano que (1). Nenhum dos resultados parciais levou a alterar um critério, um limiar, uma gama ou uma escolha deste texto.
 
 - **Modelo de caso.** As quatro políticas correm o mesmo `landing/m91-nominal.json` (hash congelado `69ecad65e9ec4329ffc74a3b985dbb7dc60d5cdaa1e4a9a380f296a76f68114b`, verificado antes de qualquer execução). Só `name` e `controller.policy` mudam entre políticas. `baseline` e `robust` recebem assim os dois ganhos opcionais de corte por subida, que ignoram; o código das duas políticas é o do M9. O M9 continua a usar `landing/nominal.json`, e a preservação dos seus resultados é verificada abaixo.
 - **Sorteio.** As oito falhas do M9 usam `m9_campaign.sample_fault` sem alteração. As duas falhas novas usam `random.Random(semente · 100 + índice)` com índices 8 (`altimeter_bias_low`) e 9 (`gnss_bias_low`), magnitude `baixo + (alto − baixo) · rng.random()` e janela fixa de 0 a 40 s. Para as sementes 2000 a 2029, os sorteios de `gnss_bias` dão as magnitudes 5,74; 7,69; 10,00 e 10,33 m como as quatro menores, tal como o documento prevê (testado).
@@ -545,3 +545,103 @@ Estas escolhas resolvem ambiguidades do pré-registo pela leitura mais literal. 
 - **Regressões.** Todas as células dos 11 cenários em que `guarded` recupera menos execuções do que `robust`, com a indicação de estarem ou não dentro da tolerância de 2.
 - **Limites da campanha.** `--max-runs 1100` (o plano pede 1050 mais 2 repetições deterministas), tecto de 768 MiB de artefactos, 1800 s de orçamento de tempo, `--jobs 4` por omissão. O tecto de `--max-runs` do M9 (1000) passa a ser um parâmetro de `validate_limits`; o comportamento do M9 não muda.
 - **Composição do total do M9.** Passa a constar de `summary.json` (campo aditivo `composition`), de `summary.md` e do painel de campanha do Mission Control: 9 cenários × 2 políticas × 30 sementes = 540 execuções da matriz, mais 2 falhas × 6 magnitudes × 2 políticas × 10 sementes = 240 do varrimento de fronteira, 540 + 240 = 780.
+
+### Resultados da campanha M9.1
+
+Campanha pré-registada completa (`preregistered: true` em `summary.json`), executada uma única vez depois de os testes passarem, sem alterar a matriz, as gamas, as janelas, os limiares nem as hipóteses depois de ver resultados. Cada uma das 1050 execuções foi reproduzida com `vv-rocket replay` (todas `verified`); os códigos de saída de `land` foram todos 0 ou 2; não houve erros de sorteio (`acted == false`) nem erros do executor, e por isso não foi preciso repetir a campanha.
+
+**Contagem.** 11 cenários (nominal, as 8 falhas do M9 e as 2 novas) × 3 políticas (`baseline`, `robust`, `guarded`) × 30 sementes = 990 execuções; `baseline_guarded` em 2 cenários (nominal e `gnss_dropout`) × 30 sementes = 60 execuções; 990 + 60 = 1050. As 2 repetições deterministas não entram nesta contagem.
+
+**Comando e medições.** `python scripts/m91_campaign.py` (valores por omissão: sementes 2000 a 2029, `--jobs 4`, `--max-runs 1100`, 768 MiB de artefactos, 1800 s). Máquina: Windows-11-10.0.26300-SP0; AMD64 Family 25 Model 97 Stepping 2, AuthenticAMD; 16 logical CPUs; Python 3.14.6. Duração medida pelo relógio, fora da simulação: 33,9 s para 1050 execuções, 1050 reproduções e 2 repetições, com `--jobs 4`. SHA-256 do binário `2016a965df039f971cf6deab2a4299080aeb2e0f122bec12c9ad2c66d9add0aa`; `source_sha256` `27868d619ea82c7d86bb83f759db31761dc757322e81e55d97a401cac31e1476`; modelo de caso `69ecad65e9ec4329ffc74a3b985dbb7dc60d5cdaa1e4a9a380f296a76f68114b` (o hash congelado). Os artefactos ficam em `runs/m91-campaign/` (ignorada pelo Git; `summary.json` e `summary.md` descrevem a campanha completa).
+
+**Reprodutibilidade.** Uma segunda execução completa, com `--jobs 1` e outra pasta (`runs/m91-campaign-repro`), demorou 95,3 s e deu um `summary.json` e um `campaign.json` iguais byte a byte aos da primeira, exceto `duration_s` e `command` (que contém a pasta de saída e o número de tarefas). A ordem do plano e o número de tarefas não afetam, portanto, o resultado. As 2 repetições deterministas dentro de cada campanha (`nominal` com `baseline`, semente 2000, e `gnss_bias_low` com `guarded`, semente 2029) também ficaram idênticas em `case.json`, `trace.json`, `verification.json` e `run.json`.
+
+#### Resultados por célula
+
+Em cada linha, 30 execuções. Deteção, contenção e recuperação são três contagens separadas. `Recuperou`: resultado `landed` com `S1` a `S5` cumpridos. `Contenção`: execuções em que nenhum invariante avaliado falhou. As três colunas de deteção contam execuções em que o controlador declarou a bandeira em pelo menos um ciclo; é o que o controlador afirma e não entra em nenhum veredicto, e `0` quer dizer que a bandeira não apareceu ou que a política não a produz. `Invariantes falhados` e `Requisitos falhados` indicam o número de execuções em que cada identificador falhou.
+
+| Cenário | Política | Recuperou | `hard_landing` | `no_contact` | Contenção | `sensor_disagreement` | `altimeter_rejected` | `ascent_abort` | Invariantes falhados | Requisitos falhados |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `nominal` | `baseline` | 29 | 1 | 0 | 30 | 0 | 0 | 0 | nenhum | R2 1 |
+| `nominal` | `robust` | 29 | 1 | 0 | 30 | 0 | 0 | 0 | nenhum | R2 1 |
+| `nominal` | `guarded` | 29 | 1 | 0 | 30 | 0 | 0 | 0 | nenhum | R2 1 |
+| `nominal` | `baseline_guarded` | 29 | 1 | 0 | 30 | 0 | 0 | 0 | nenhum | R2 1 |
+| `thrust_loss` | `baseline` | 29 | 1 | 0 | 30 | 0 | 0 | 0 | nenhum | R2 1 |
+| `thrust_loss` | `robust` | 28 | 2 | 0 | 30 | 0 | 0 | 0 | nenhum | R2 2 |
+| `thrust_loss` | `guarded` | 28 | 2 | 0 | 30 | 0 | 0 | 0 | nenhum | R2 2 |
+| `ignition_delay` | `baseline` | 26 | 4 | 0 | 30 | 0 | 0 | 0 | nenhum | R2 4 |
+| `ignition_delay` | `robust` | 25 | 5 | 0 | 30 | 0 | 0 | 0 | nenhum | R2 5 |
+| `ignition_delay` | `guarded` | 25 | 5 | 0 | 30 | 0 | 0 | 0 | nenhum | R2 5 |
+| `gimbal_stuck` | `baseline` | 25 | 5 | 0 | 30 | 0 | 0 | 0 | nenhum | R2 5 |
+| `gimbal_stuck` | `robust` | 27 | 3 | 0 | 30 | 0 | 0 | 0 | nenhum | R2 3 |
+| `gimbal_stuck` | `guarded` | 27 | 3 | 0 | 30 | 0 | 0 | 0 | nenhum | R2 3 |
+| `altimeter_bias` | `baseline` | 0 | 30 | 0 | 30 | 0 | 0 | 0 | nenhum | R1 30, R2 7, R5 1 |
+| `altimeter_bias` | `robust` | 28 | 2 | 0 | 30 | 0 | 30 | 0 | nenhum | R1 1, R2 1 |
+| `altimeter_bias` | `guarded` | 28 | 2 | 0 | 30 | 30 | 30 | 0 | nenhum | R1 1, R2 1 |
+| `altimeter_dropout` | `baseline` | 6 | 24 | 0 | 30 | 0 | 0 | 0 | nenhum | R1 23, R2 6, R5 2 |
+| `altimeter_dropout` | `robust` | 29 | 1 | 0 | 30 | 0 | 0 | 0 | nenhum | R2 1 |
+| `altimeter_dropout` | `guarded` | 29 | 1 | 0 | 30 | 0 | 0 | 0 | nenhum | R2 1 |
+| `gnss_dropout` | `baseline` | 7 | 2 | 21 | 9 | 0 | 0 | 0 | S5 21 | R2 1, R5 2 |
+| `gnss_dropout` | `robust` | 29 | 1 | 0 | 30 | 0 | 0 | 0 | nenhum | R2 1 |
+| `gnss_dropout` | `guarded` | 29 | 1 | 0 | 30 | 0 | 0 | 0 | nenhum | R2 1 |
+| `gnss_dropout` | `baseline_guarded` | 7 | 21 | 2 | 13 | 0 | 0 | 21 | S2 6, S5 12 | R1 19, R2 18, R3 18, R4 2, R5 17 |
+| `gnss_bias` | `baseline` | 5 | 25 | 0 | 30 | 0 | 0 | 0 | nenhum | R5 25 |
+| `gnss_bias` | `robust` | 0 | 30 | 0 | 30 | 0 | 30 | 0 | nenhum | R1 30, R2 2, R5 24 |
+| `gnss_bias` | `guarded` | 6 | 24 | 0 | 30 | 30 | 30 | 0 | nenhum | R5 24 |
+| `imu_accel_bias` | `baseline` | 29 | 1 | 0 | 30 | 0 | 0 | 0 | nenhum | R2 1 |
+| `imu_accel_bias` | `robust` | 29 | 1 | 0 | 30 | 0 | 0 | 0 | nenhum | R2 1 |
+| `imu_accel_bias` | `guarded` | 29 | 1 | 0 | 30 | 0 | 0 | 0 | nenhum | R2 1 |
+| `altimeter_bias_low` | `baseline` | 0 | 30 | 0 | 30 | 0 | 0 | 0 | nenhum | R1 30 |
+| `altimeter_bias_low` | `robust` | 28 | 2 | 0 | 30 | 0 | 30 | 0 | nenhum | R1 1, R2 1 |
+| `altimeter_bias_low` | `guarded` | 0 | 30 | 0 | 30 | 30 | 30 | 0 | nenhum | R1 30 |
+| `gnss_bias_low` | `baseline` | 6 | 24 | 0 | 30 | 0 | 0 | 0 | nenhum | R2 2, R5 23 |
+| `gnss_bias_low` | `robust` | 0 | 30 | 0 | 30 | 0 | 30 | 0 | nenhum | R1 30, R2 1, R5 23 |
+| `gnss_bias_low` | `guarded` | 0 | 30 | 0 | 30 | 30 | 30 | 0 | nenhum | R1 30, R2 1, R5 23 |
+
+#### Falsos alarmes de `guarded`
+
+Nas sete células sem enviesamento de sensor (nominal, `thrust_loss`, `ignition_delay`, `gimbal_stuck`, `altimeter_dropout`, `gnss_dropout` e `imu_accel_bias`), 210 execuções de `guarded`, nenhuma das três bandeiras apareceu: 0 de 30 em cada bandeira de cada célula, contra o limite pré-registado de 1. `altimeter_rejected` partilha o contador de rejeição do estimador do `robust` com `sensor_disagreement` e dispara com ele; não pode alterar sozinha o veredicto dos falsos alarmes.
+
+#### Hipóteses pré-registadas
+
+| Hipótese | Critério pré-registado | Observado | Veredicto |
+| --- | --- | --- | --- |
+| G1, deteção | `sensor_disagreement` em 30 de 30 em cada uma de `altimeter_bias`, `gnss_bias`, `altimeter_bias_low` e `gnss_bias_low`; cada bandeira em no máximo 1 de 30 nas sete células sem enviesamento | 30 de 30 nas quatro células; 0 falsos alarmes nas sete | suportada |
+| G2, contenção da subida | 0 de 30 execuções de `guarded` com `gnss_dropout` falham `S5` | 0 de 30 (não testa a regra 2, como o documento diz) | suportada |
+| G2b, `baseline_guarded` com `gnss_dropout` | 0 execuções `no_contact` | 2 de 30 `no_contact` (sementes 2005 e 2013) | **não suportada** |
+| G3, contacto suave com `gnss_bias` | `R1` cumprido em pelo menos 27 de 30 execuções de `guarded` | 30 de 30 (velocidade vertical de 1,86 a 2,42 m/s; limite 3 m/s) | suportada |
+| G4, sem regressão | em cada um dos 9 cenários do M9, `guarded` recupera pelo menos `robust` menos 2 | `guarded` igual a `robust` em 8 cenários e 6 contra 0 em `gnss_bias` (linha não informativa, `robust` recuperou 0) | suportada |
+| G5, custo da regra conservadora | sem critério de sucesso | `guarded` recupera 0 de 30 em `altimeter_bias_low` e em `gnss_bias_low` | registada |
+
+**G2b.** `baseline_guarded` reduziu os `no_contact` do `baseline` com `gnss_dropout` de 21 para 2, mas não os eliminou, pelo que a hipótese falha. Nas duas execuções restantes a regra 2 atuou aos 23,98 s (`ascent_abort` e `cutoff`), depois de a subida já ser de 137,6 e 144,5 m (`S5` falhado), e o veículo ainda estava em queda no fim dos 40 s da execução, com velocidade vertical de -91,9 e -90,6 m/s e o centro de massa a 50,0 e 65,7 m do solo; contacto não houve dentro da duração. A previsão registada sem critério também se verifica: `S5` falha em 12 de 30 execuções e `R1` em 19 de 30 (contém, não recupera): 7 execuções recuperadas, 21 `hard_landing`, 2 `no_contact`, contenção em 13 de 30, e 6 execuções com falha de `S2` (raio de exclusão). O `baseline` com `gnss_dropout` teve 21 `no_contact` nas sementes 2000 a 2029 (20 nas sementes do M9), todas com `S5` falhado.
+
+**G3.** O critério verifica-se, mas a expectativa registada de cerca de 3 ± 1 execuções `landed` (teto previsto: o número de sorteios abaixo de 10 m, 3) não se verificou: `guarded` recuperou 6 de 30, as de magnitudes 5,7; 7,7; 10,0; 11,8; 11,9 e 12,6 m. Três delas têm magnitude acima de 10 m. A causa não foi investigada. As outras 24 execuções tocaram no solo com `R1` cumprido e `R5` falhado (distância ao centro da plataforma), como previsto. O `robust` com `gnss_bias` recuperou 0 de 30, com `R1` falhado em 30 (11,5 a 25,6 m/s); o `baseline` recuperou 5.
+
+**G4.** Linha a linha (`guarded` contra `robust`): nominal 29 e 29, `thrust_loss` 28 e 28, `ignition_delay` 25 e 25, `gimbal_stuck` 27 e 27, `altimeter_bias` 28 e 28, `altimeter_dropout` 29 e 29, `gnss_dropout` 29 e 29, `gnss_bias` 6 e 0, `imu_accel_bias` 29 e 29. Verificação mais forte, feita ao nível da campanha: nos 210 pares (cenário e semente) em que as três bandeiras de `guarded` ficaram `null`, os comandos das amostras gravadas de `guarded` e `robust` são idênticos (210 de 210). Compara as amostras gravadas a cada 0,1 s, não todos os ciclos de 0,02 s, e não altera o veredicto numérico.
+
+**G5.** Registo, sem critério. `altimeter_bias_low`: `guarded` recupera 0 de 30, com `R1` falhado em 30 (11,3 a 30,8 m/s), contenção em 30 de 30 e nenhum `ascent_abort` (o corte a 15 m atuou antes da regra 2); `baseline` 0 de 30 (11,6 a 30,9 m/s); `robust` 28 de 30 (rejeita o altímetro e comporta-se como em `altimeter_bias`). `gnss_bias_low`: `guarded` 0 de 30 com `R1` falhado em 30, os mesmos números do `robust` (0 de 30, `R1` de 11,2 a 23,8 m/s); `baseline` 6 de 30, a espelhar o `gnss_bias` (5 de 30). As previsões do documento para estas duas falhas verificam-se: o custo da regra conservadora aparece em `altimeter_bias_low`, onde `guarded` escolhe a fonte que lê baixo e deixa de recuperar o que o `robust` recupera; em `gnss_bias_low` os números de `guarded` e `robust` coincidem, o que é consistente com a fonte que lê baixo ser a do estimador, que o `robust` já seguia (não foi verificado ciclo a ciclo).
+
+#### Deteção, contenção e recuperação
+
+- `guarded` deteta (`sensor_disagreement`) os quatro enviesamentos em 30 de 30 execuções cada, mas a deteção não implica recuperação: 28 de 30 em `altimeter_bias`, 6 de 30 em `gnss_bias`, 0 de 30 em `altimeter_bias_low` e em `gnss_bias_low`.
+- A contenção de `guarded` é 30 de 30 em todas as células: nenhum invariante falhou em nenhuma das 330 execuções. Isto não quer dizer aterragem segura: em `altimeter_bias_low` as 30 execuções tocam no solo a 11 a 31 m/s (`R1` falhado) sem violar `S1` a `S5`, porque os invariantes não incluem a velocidade de contacto, que é um requisito.
+- A contenção só falha onde o motor sobe: `baseline` com `gnss_dropout` (9 de 30 contidas, `S5` falhado em 21) e `baseline_guarded` com `gnss_dropout` (13 de 30; `S5` falhado em 12 e `S2` em 6).
+- Os resultados do `baseline` e do `robust` nas oito falhas do M9 e no caso nominal, com sementes novas, mantêm o padrão do M9, sem as mesmas contagens (por exemplo `altimeter_bias`: `baseline` 0 e `robust` 28 de 30 aqui contra 0 e 27 no M9; `gnss_bias`: `robust` 0 de 30 nas duas e `baseline` 5 aqui contra 8).
+
+#### Regressões
+
+Uma célula em que `guarded` recupera menos do que `robust`: `altimeter_bias_low`, 0 contra 28 (diferença de -28, fora da tolerância de 2 de G4). Não faz parte dos nove cenários de G4 e é a regressão que o pré-registo previu (G5). Em nenhuma das restantes 10 células `guarded` recupera menos do que `robust`.
+
+#### Preservação dos resultados do M9
+
+Com o binário novo, `python scripts/m9_campaign.py --output-root runs/m9-campaign-v2` volta a dar 780 execuções, todas reproduzidas, e comparado com o `summary.json` guardado da campanha M9 original dá: as 18 células da matriz, os 9 quadros de pares emparelhados, as 24 linhas do varrimento de fronteira, as conclusões da fronteira e os veredictos H1 (suportada), H2 (suportada) e H3 (observada) são iguais, com as mesmas contagens `landed`, `hard_landing` e `no_contact` por política e falha. A única diferença de conteúdo é aditiva: as 20 execuções `no_contact` do `baseline` com `gnss_dropout` passam a listar `S5_no_powered_ascent` em `failed`, o que leva `invariant_failure_runs` dessa célula de 2 para 22. Mudam ainda, como esperado, `binary_sha256`, `source_sha256`, `command`, `duration_s` e o campo novo `composition` (540 + 240 = 780). `runs/m9-campaign` ficou intacta.
+
+#### O que a campanha não estabelece
+
+- Não estabelece que `guarded` seja seguro: só que, neste modelo, com as gamas e as 30 sementes de cada célula, os invariantes `S1` a `S5` não falharam e que as bandeiras apareceram onde estava o enviesamento. Em `gnss_bias`, 24 de 30 execuções tocam fora da plataforma (`R5`); em `altimeter_bias_low` nenhuma aterra.
+- Não estabelece o motivo de `guarded` recuperar 6 execuções de `gnss_bias` em vez das cerca de 3 previstas, nem se esse número generaliza.
+- Não mede falhas combinadas, enviesamentos fora das gamas pré-registadas, fontes de altitude ou de posição horizontal independentes, nem dinâmica de contacto.
+- Não generaliza as contagens para a fiabilidade de um veículo: são 30 sementes por célula com dispersões assumidas, sem valores-p nem intervalos.
+- Os limiares de `guarded` foram afinados com as sementes 0 a 40 e as 780 execuções do M9; as sementes 2000 a 2029 são novas, mas a escolha das falhas e das gamas é anterior a elas.
+- A verificação forte de G4 usa as amostras gravadas a cada 0,1 s; a igualdade em cada ciclo de 0,02 s só está coberta pelo teste do Rust.
+- Mostra que `baseline_guarded` não elimina o afastamento com a falha `gnss_dropout` em 2 de 30 execuções dentro de 40 s de simulação; não diz se ele chegaria ao solo com mais tempo.
