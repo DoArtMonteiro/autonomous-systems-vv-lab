@@ -282,6 +282,8 @@ O Mission Control serve a página `/landing`, que corre o modelo `rocket-landing
 
 Campanha pré-registada completa (`preregistered: true` em `summary.json`), executada uma única vez depois da correção do verificador e do campo `acted`, sem alterar a matriz, as gamas, as janelas nem as hipóteses depois de ver resultados. Cada uma das 780 execuções foi reproduzida com `vv-rocket replay` e verificada; não houve erros de sorteio (`acted == false`) nem erros de reprodução.
 
+Contagem das 780 execuções: a matriz tem 9 cenários (nominal e 8 falhas) × 2 políticas × 30 sementes = 540 execuções, que são as do quadro por célula; o varrimento de fronteira tem 2 falhas (`thrust_loss` e `ignition_delay`) × 6 magnitudes × 2 políticas × 10 sementes = 240 execuções, apresentadas à parte. 540 + 240 = 780. As 2 repetições deterministas não entram nesta contagem.
+
 ```sh
 cargo build --release --manifest-path crates/vv-rocket/Cargo.toml
 python scripts/m9_campaign.py
@@ -387,5 +389,5 @@ Há falhas dentro das gamas, por isso não é um caso de "nenhuma fronteira dent
 - Não estima a fiabilidade de um veículo: as dispersões, as gamas das falhas e os requisitos são assumidos, e o modelo é idealizado (sem dinâmica de contacto, sem RCS).
 - Trinta sementes por célula (10 no varrimento) não sustentam valores-p nem intervalos de confiança; diferenças de uma ou duas execuções não são interpretáveis. Os veredictos de H1, H2 e H3 aplicam apenas os critérios pré-registados.
 - Cada execução injeta uma falha de cada vez, com magnitude e janela sorteadas uniformemente. Falhas combinadas, fora das gamas ou com outra distribuição temporal não foram avaliadas.
-- O controlador foi afinado no caso nominal com as sementes 0 a 40; as sementes 1000 a 1029 são disjuntas dessas, mas a afinação não considerou as falhas. O piso nominal acima mostra que a taxa de aterragem sem falhas não é 100% em sementes novas.
+- O controlador foi afinado no caso nominal com as sementes 0 a 40; as sementes 1000 a 1029 são disjuntas dessas. A afinação usou apenas o caso nominal, mas os casos de demonstração com falhas tinham sido executados com um conjunto anterior de ganhos (ver Implementação). O piso nominal acima mostra que a taxa de aterragem sem falhas não é 100% em sementes novas.
 - A causa das 22 falhas de `R5` do `baseline` com `gnss_bias` não foi investigada. O mecanismo das execuções `no_contact` do `baseline` com `gnss_dropout` foi confirmado apenas no traço da semente 1000.
