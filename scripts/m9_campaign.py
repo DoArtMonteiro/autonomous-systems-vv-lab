@@ -65,7 +65,7 @@ MAGNITUDE_RANGES: dict[str, tuple[float, float] | None] = {
 # Janelas fixas pré-registadas (início, fim) em segundos.
 FIXED_WINDOWS: dict[str, tuple[float, float]] = {
     "thrust_loss": (5.26, 40.0),
-    "ignition_delay": (2.0, 8.0),
+    "ignition_delay": (0.0, 10.0),
     "altimeter_bias": (0.0, 40.0),
     "gnss_bias": (0.0, 40.0),
     "imu_accel_bias": (0.0, 40.0),
@@ -77,7 +77,10 @@ DURATION_RANGES_CS = {
     "gnss_dropout": (200, 1000),
 }
 GIMBAL_START_RANGE_CS = (500, 2000)
+DROPOUT_EARLIEST_START_CS = 500
 DROPOUT_LATEST_END_CS = 2300
+# SHA-256 do caso base congelado (ganhos do controlador incluídos), pré-registado no documento.
+TEMPLATE_SHA256 = "58b19ff7a85455d4feb0d9c47e9098b21dcb4660416bbfaf822bf433576f1830"
 
 HYPOTHESIS_FAMILIES = {
     "H1": ("altimeter_bias", "altimeter_dropout", "gnss_dropout"),
@@ -101,6 +104,10 @@ REPEAT_RUNS = 2
 
 class M9CampaignError(ValueError):
     """Erro da campanha: um resultado que não pode ser aceite como evidência."""
+
+
+class DrawError(M9CampaignError):
+    """Uma falha sorteada que nunca atuou: um erro de sorteio, não um resultado."""
 
 
 @dataclass(frozen=True)
@@ -149,7 +156,7 @@ def _window_for(fault: str, rng: random.Random | None) -> tuple[float, float]:
     if fault == "gimbal_stuck":
         first, last = GIMBAL_START_RANGE_CS
     else:
-        first, last = 0, DROPOUT_LATEST_END_CS - duration_cs
+        first, last = DROPOUT_EARLIEST_START_CS, DROPOUT_LATEST_END_CS - duration_cs
     start_cs = round(first + (last - first) * rng.random())
     return start_cs / 100, (start_cs + duration_cs) / 100
 
@@ -207,9 +214,15 @@ def case_bytes(case: dict[str, Any]) -> bytes:
 
 def load_template() -> dict[str, Any]:
     try:
-        template = json.loads(TEMPLATE.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
+        raw = TEMPLATE.read_bytes()
+        template = json.loads(raw.decode("utf-8"))
+    except (OSError, ValueError) as error:
         raise M9CampaignError(f"cannot read the case template: {error}") from error
+    if hashlib.sha256(raw).hexdigest() != TEMPLATE_SHA256:
+        raise M9CampaignError(
+            f"{TEMPLATE.name} differs from the frozen pre-registered template "
+            f"(expected SHA-256 {TEMPLATE_SHA256}); the controller must not change during the campaign"
+        )
     if template.get("faults") != [] or template.get("controller", {}).get("policy") != "baseline":
         raise M9CampaignError("the case template must be the nominal baseline case")
     return template
@@ -343,6 +356,7 @@ class Runner:
         self.simulator_runs = 0
         self.stop = threading.Event()
         self.first_error: BaseException | None = None
+        self.draw_errors: list[str] = []
         self.template = load_template()
 
     def fail(self, error: BaseException) -> None:
@@ -417,21 +431,25 @@ class Runner:
         self.replay(run, directory)
         return inspect_run(run, directory, self.template, exit_code)
 
-    def execute(self, run: RunSpec) -> dict[str, Any]:
+    def guarded(self, run: RunSpec, exit_code_from_land: bool) -> dict[str, Any] | None:
+        """Devolve o registo, ou `None` num erro de sorteio (contado, sem parar a campanha)."""
         directory = self.root / run.rel
         try:
-            exit_code = self.land(run, directory)
+            exit_code = self.land(run, directory) if exit_code_from_land else None
             return self.record(run, directory, exit_code)
+        except DrawError as error:
+            with self.lock:
+                self.draw_errors.append(str(error))
+            return None
         except BaseException as error:
             self.fail(error)
             raise
 
-    def check_stored(self, run: RunSpec) -> dict[str, Any]:
-        try:
-            return self.record(run, self.root / run.rel, None)
-        except BaseException as error:
-            self.fail(error)
-            raise
+    def execute(self, run: RunSpec) -> dict[str, Any] | None:
+        return self.guarded(run, True)
+
+    def check_stored(self, run: RunSpec) -> dict[str, Any] | None:
+        return self.guarded(run, False)
 
 
 def inspect_run(
@@ -463,6 +481,15 @@ def inspect_run(
         raise M9CampaignError(
             f"{run.rel}: exit code {exit_code} does not match the verification (expected {derived_exit})"
         )
+    acted = verification.get("faults")
+    if not isinstance(acted, list) or any(
+        not isinstance(f, dict) or not isinstance(f.get("acted"), bool) for f in acted
+    ):
+        raise M9CampaignError(f"{run.rel}: verification.json faults[] has no boolean 'acted' field")
+    if len(acted) != (0 if run.fault == NOMINAL else 1):
+        raise M9CampaignError(f"{run.rel}: verification.json lists {len(acted)} faults")
+    if not all(f["acted"] for f in acted):
+        raise DrawError(f"{run.rel}: the {run.fault} window never acted (acted == false)")
     fault = None
     cases = read_json(directory / "case.json").get("faults", [])
     if cases:
@@ -738,6 +765,7 @@ def build_summary(records: list[dict[str, Any]], meta: dict[str, Any]) -> dict[s
         "duration_s": meta.get("duration_s"),
         "resummarized": bool(meta.get("resummarized", False)),
         "total_runs": len(records),
+        "draw_errors": 0,
         "determinism_check": meta.get("determinism_check"),
         "cells": cells,
         "pairs": pairs,
@@ -889,17 +917,33 @@ def command_text(arguments: argparse.Namespace) -> str:
 
 
 def run_parallel(runner: Runner, action, runs: list[RunSpec], jobs: int) -> list[dict[str, Any]]:
-    """Executa em paralelo, mas devolve os registos pela ordem do plano."""
+    """Executa em paralelo, mas devolve os registos pela ordem do plano.
+
+    Erros de sorteio (falha que nunca atuou) são contados e fazem a campanha falhar no fim.
+    """
     with ThreadPoolExecutor(max_workers=jobs) as pool:
         futures = [pool.submit(action, run) for run in runs]
         results: list[dict[str, Any]] = []
         for future in futures:
             try:
-                results.append(future.result())
+                result = future.result()
             except BaseException:  # noqa: BLE001 - the first real error is raised below
-                pass
+                continue
+            if result is not None:
+                results.append(result)
     if runner.first_error is not None:
         raise runner.first_error
+    if runner.draw_errors:
+        errors = sorted(runner.draw_errors)
+        (runner.root / "draw_errors.json").write_text(
+            json.dumps({"count": len(errors), "errors": errors}, indent=2) + "\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+        raise M9CampaignError(
+            f"{len(errors)} runs had a fault that never acted (draw errors, listed in draw_errors.json); "
+            f"first: {errors[0]}"
+        )
     return results
 
 

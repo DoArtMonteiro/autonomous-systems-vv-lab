@@ -106,7 +106,7 @@ class SamplingTests(unittest.TestCase):
                     self.assertLessEqual(end, 23.0)
                 elif fault in ("altimeter_dropout", "gnss_dropout"):
                     self.assertTrue(2.0 <= length <= 10.0, (seed, length))
-                    self.assertGreaterEqual(start, 0.0)
+                    self.assertGreaterEqual(start, 5.0)
                     self.assertLessEqual(end, 23.0)
                 else:
                     self.assertEqual((start, end), m9.FIXED_WINDOWS[fault])
@@ -133,6 +133,82 @@ class SamplingTests(unittest.TestCase):
     def test_nominal_has_no_fault(self):
         case = m9.build_case(m9.load_template(), m9.RunSpec("matrix", "nominal", "robust", 1000))
         self.assertEqual(case["faults"], [])
+
+
+class FrozenTemplateTests(unittest.TestCase):
+    def test_the_template_hash_is_checked_before_use(self):
+        m9.load_template()
+        with patch.object(m9, "TEMPLATE_SHA256", "0" * 64):
+            with self.assertRaisesRegex(m9.M9CampaignError, "frozen pre-registered template"):
+                m9.load_template()
+
+    def test_ignition_delay_window_covers_every_plausible_ignition(self):
+        spec = m9.sample_fault("ignition_delay", 1000)
+        self.assertEqual((spec["start_s"], spec["end_s"]), (0.0, 10.0))
+
+
+def synthetic_run(directory, run, faults_acted, template=None):
+    """Escreve uma execução mínima que `inspect_run` aceita (sem binário)."""
+    template = template or m9.load_template()
+    directory.mkdir(parents=True)
+    (directory / "case.json").write_bytes(m9.case_bytes(m9.build_case(template, run)))
+    (directory / "run.json").write_text(json.dumps(
+        {"seed": run.seed, "policy": run.policy, "outcome": "landed", "source_sha256": "abc"}), encoding="utf-8")
+    verification = {
+        "outcome": "landed",
+        "requirements": [{"id": "R1_vertical_speed", "evaluated": True, "pass": True}],
+        "invariants": [{"id": "S1_tilt_envelope", "pass": True}],
+    }
+    if faults_acted is not None:
+        verification["faults"] = faults_acted
+    (directory / "verification.json").write_text(json.dumps(verification), encoding="utf-8")
+
+
+class ActedTests(unittest.TestCase):
+    spec = m9.RunSpec("matrix", "thrust_loss", "baseline", 1000)
+
+    def inspect(self, faults):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary) / "run"
+            synthetic_run(directory, self.spec, faults)
+            return m9.inspect_run(self.spec, directory, m9.load_template(), 0)
+
+    def test_a_fault_that_acted_gives_a_record(self):
+        result = self.inspect([{"kind": "thrust_loss", "acted": True}])
+        self.assertEqual(result["outcome"], "landed")
+        self.assertEqual(result["exit_code"], 0)
+
+    def test_a_fault_that_never_acted_is_a_draw_error(self):
+        with self.assertRaises(m9.DrawError):
+            self.inspect([{"kind": "thrust_loss", "acted": False}])
+
+    def test_a_missing_acted_field_is_a_hard_error_not_a_draw_error(self):
+        for faults in (None, [{"kind": "thrust_loss"}], [{"kind": "thrust_loss", "acted": "yes"}]):
+            with self.subTest(faults=faults):
+                with self.assertRaises(m9.M9CampaignError) as caught:
+                    self.inspect(faults)
+                self.assertNotIsInstance(caught.exception, m9.DrawError)
+
+    def test_draw_errors_are_counted_reported_and_fail_the_campaign(self):
+        runs = [m9.RunSpec("matrix", "thrust_loss", "baseline", s) for s in (1, 2, 3)]
+        with tempfile.TemporaryDirectory() as temporary:
+            runner = m9.Runner(Path("vv-rocket"), Path(temporary), max_runs=10,
+                               max_artifact_bytes=2**20, time_budget_seconds=30)
+
+            def fake_land(run, directory):
+                return 0
+
+            def fake_record(run, directory, exit_code):
+                if run.seed != 2:
+                    return record("thrust_loss", "baseline", run.seed)
+                raise m9.DrawError(f"{run.rel}: the thrust_loss window never acted (acted == false)")
+
+            with patch.object(runner, "land", fake_land), patch.object(runner, "record", fake_record):
+                with self.assertRaisesRegex(m9.M9CampaignError, "1 runs had a fault that never acted"):
+                    m9.run_parallel(runner, runner.execute, runs, 2)
+            listed = json.loads((Path(temporary) / "draw_errors.json").read_text(encoding="utf-8"))
+            self.assertEqual(listed["count"], 1)
+            self.assertIn("seed-2", listed["errors"][0])
 
 
 class PlanTests(unittest.TestCase):
@@ -308,7 +384,7 @@ class SummaryTests(unittest.TestCase):
     def test_markdown_has_no_em_dash_and_states_the_verdicts(self):
         records = family_records("gnss_bias", 1, 0)
         text = m9.render_markdown(m9.build_summary(records, {"command": "c", "machine": "m", "duration_s": 1.5}))
-        self.assertNotIn("—", text)
+        self.assertNotIn(chr(0x2014), text)
         self.assertIn("(observed)", text)
         self.assertIn("não (subconjunto", text)
 
@@ -377,7 +453,31 @@ def campaign_arguments(output_root, **overrides):
     return SimpleNamespace(**values)
 
 
+def binary_reports_acted() -> bool:
+    """O binário atual escreve `acted` em `verification.json`?"""
+    if not BINARY.is_file():
+        return False
+    import subprocess
+
+    with tempfile.TemporaryDirectory() as temporary:
+        case = Path(temporary) / "case.json"
+        case.write_bytes(m9.case_bytes(m9.build_case(m9.load_template(),
+                                                     m9.RunSpec("matrix", "thrust_loss", "baseline", 77))))
+        out = Path(temporary) / "out"
+        subprocess.run([str(BINARY), "land", str(case), "--seed", "77", "--output", str(out)],
+                       capture_output=True, check=False)
+        try:
+            faults = json.loads((out / "verification.json").read_text(encoding="utf-8"))["faults"]
+        except (OSError, KeyError, ValueError):
+            return False
+        return bool(faults) and all("acted" in f for f in faults)
+
+
+NO_ACTED = "the vv-rocket binary predates the `acted` field in verification.json; rebuild after the Rust fix"
+
+
 @unittest.skipUnless(BINARY.is_file(), MISSING_BINARY)
+@unittest.skipUnless(binary_reports_acted(), NO_ACTED)
 class EndToEndTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
