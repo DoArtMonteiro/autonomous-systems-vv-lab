@@ -107,6 +107,16 @@ Hipóteses, registadas antes da campanha:
 - **H2**: em falhas de atuador (`thrust_loss`, `ignition_delay`, `gimbal_stuck`), as duas políticas têm resultados semelhantes, porque partilham o guiamento.
 - **H3**: com `gnss_bias`, `robust` pode rejeitar um altímetro correto e falhar onde `baseline` aterra. É o modo de falha conhecido da política `robust`.
 
+## Campanha (pré-registada depois da implementação e antes de qualquer execução da campanha)
+
+As sementes 0 a 40 do caso nominal serviram para escolher os ganhos. A campanha usa apenas sementes de reserva, nunca usadas antes: **1000 a 1029** (30 sementes).
+
+- Matriz: o caso nominal e as oito falhas, cada um com as duas políticas e as 30 sementes (540 execuções).
+- Para cada par (falha, semente), a magnitude e a janela são sorteadas uniformemente dentro das gamas acima, com `random.Random` do Python (Mersenne Twister) e semente `semente · 100 + índice da falha`. As duas políticas recebem exatamente o mesmo caso: a comparação é emparelhada.
+- Cada execução é reproduzida (`vv-rocket replay`); uma execução não verificada é um erro da campanha, não um resultado.
+- Varrimento de fronteira: `thrust_loss` e `ignition_delay` em seis magnitudes igualmente espaçadas de cada gama, com as duas políticas e as sementes 1000 a 1009. Se não houver falhas dentro da gama, o resultado é "nenhuma fronteira dentro da gama pré-registada", não uma extrapolação.
+- Critério de cada hipótese, por família de falhas: contagem de `landed` com todos os invariantes por política e contagem dos pares discordantes (uma política aterra, a outra não). H1 é **apoiada** se `robust ≥ baseline` em cada uma das três falhas da família; H2 é **apoiada** se, em cada falha de atuador, os pares discordantes forem no máximo 3 de 30; H3 é **observada** se houver pelo menos um par em que `baseline` aterra e `robust` não. Não se calculam valores-p: 30 sementes com dispersões assumidas não sustentam uma inferência estatística sobre um veículo real.
+
 ## Requisitos de contacto (assumidos para este demonstrador)
 
 Avaliados no estado real interpolado do contacto, no ponto `p_base`. Valores assumidos para o demonstrador, não especificações de um veículo real.
