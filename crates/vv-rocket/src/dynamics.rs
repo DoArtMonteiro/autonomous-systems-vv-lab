@@ -118,6 +118,26 @@ pub fn forces(p: &Prepared, s: &State, burn: Option<&Segment>) -> Forces {
     }
 }
 
+/// Ratio to the thrust of the translational term the model neglects, `2·ṁ_e·R(q)·(ω_B × r_e − ċ_B)`:
+/// `ε = 2·|ω_B × r_e − ċ_B| / c_e` (docs/m8-rocket-dynamics.md). Zero when no thrust is produced.
+/// Measured only; it does not enter the derivative.
+pub fn neglected_jet_ratio(p: &Prepared, s: &State, burn: Option<&Segment>) -> f64 {
+    let Some(b) = burn.filter(|b| b.thrust_n > 0.0) else {
+        return 0.0;
+    };
+    let v = &p.vehicle;
+    let c_e = v.isp_s * G0;
+    let mp = mass_properties(v, s.mp);
+    let r_e = Vec3::new(-mp.cm_station, 0.0, 0.0);
+    // ċ_B: the centre of mass moves along x_B as propellant at s_p leaves.
+    let c_dot = Vec3::new(
+        -(b.thrust_n / c_e) * (v.propellant_cm_station_m - mp.cm_station) / mp.mass,
+        0.0,
+        0.0,
+    );
+    2.0 * (s.w.cross(r_e) - c_dot).norm() / c_e
+}
+
 pub fn derivative(p: &Prepared, s: &State, burn: Option<&Segment>) -> Derivative {
     let mp = mass_properties(&p.vehicle, s.mp);
     let f = forces(p, s, burn);
@@ -215,5 +235,50 @@ mod tests {
         let iyy = about_station_0 - 150.0 * cm * cm;
         assert!((m.inertia.y - iyy).abs() < 1e-12);
         assert_eq!(m.inertia.x, 15.0);
+    }
+
+    #[test]
+    fn neglected_jet_ratio_matches_a_hand_calculation() {
+        let p = Prepared {
+            dt: 0.01,
+            steps: 1,
+            record_every: 1,
+            stop_at_ground: false,
+            gravity: 0.0,
+            atmosphere: None,
+            vehicle: vehicle(),
+            r0: Vec3::ZERO,
+            v0: Vec3::ZERO,
+            q0: Quat::new(1.0, 0.0, 0.0, 0.0),
+            w0: Vec3::ZERO,
+            segments: Vec::new(),
+        };
+        let burn = |thrust_n| Segment {
+            start_step: 0,
+            end_step: 1,
+            thrust_n,
+            direction: Vec3::new(1.0, 0.0, 0.0),
+        };
+        let state = |w| State {
+            r: Vec3::ZERO,
+            v: Vec3::ZERO,
+            q: Quat::new(1.0, 0.0, 0.0, 0.0),
+            w,
+            mp: 50.0,
+        };
+        // Scalars: s_cm = 275/150 m, c_e = 200 g0, ṁ_e = 2000 / c_e, |ċ_B| = ṁ_e (s_cm − 1.5) / 150.
+        let s_cm: f64 = 275.0 / 150.0;
+        let c_e = 200.0 * 9.80665;
+        let c_dot = 2000.0 / c_e * (s_cm - 1.5) / 150.0;
+        // A pitch rate moves the nozzle sideways at 0.3 s_cm, perpendicular to ċ_B.
+        let pitch = neglected_jet_ratio(&p, &state(Vec3::new(0.0, 0.3, 0.0)), Some(&burn(2000.0)));
+        let want = 2.0 * ((0.3 * s_cm) * (0.3 * s_cm) + c_dot * c_dot).sqrt() / c_e;
+        assert!((pitch - want).abs() <= 1e-15 * want, "{pitch} {want}");
+        // A roll rate about x_B does not move the nozzle; only ċ_B remains.
+        let roll = neglected_jet_ratio(&p, &state(Vec3::new(2.0, 0.0, 0.0)), Some(&burn(2000.0)));
+        assert!((roll - 2.0 * c_dot / c_e).abs() <= 1e-15 * roll);
+        let spinning = state(Vec3::new(0.0, 0.3, 0.0));
+        assert_eq!(neglected_jet_ratio(&p, &spinning, None), 0.0);
+        assert_eq!(neglected_jet_ratio(&p, &spinning, Some(&burn(0.0))), 0.0);
     }
 }
