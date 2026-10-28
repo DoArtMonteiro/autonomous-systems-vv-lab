@@ -111,7 +111,8 @@ class PageTests(Base):
             "!data.verification",
             "Mission outcome", "Safety invariants", "Evidence (integrity and replay)",  # three separate statements
             "withheld: this run is not verified evidence", "UNVERIFIED stored data, shown for diagnosis only",
-            "Compare policies on this case", "Requirements at contact (R1 to R6)", "Safety invariants (S1 to S4)",
+            "Compare policies on this case", "Requirements at contact (R1 to R6)", "Safety invariants (${invRange(r)})", "Controller-reported flags (what the controller says; not a verdict)",
+            "The verifier never reads these flags", "ascent_abort", "e.ascent_abort !== undefined",
             "Assumed demonstrator requirements", "R1 limit at contact", "keep-out", "Read from disk, not recomputed here",
             "No verified run to plot", "Not claimed", "Verified", "Assumed", "pad_radius_m", "/api/campaign",
             "estimate minus truth", "Gaps are sensor dropouts", "The fault never acted",

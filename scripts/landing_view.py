@@ -1,7 +1,7 @@
 """Mission Control page for the `rocket-landing` model (M9), served at /landing, and the campaign reader.
 
 The page keeps three statements apart and never merges them: the mission outcome (requirements R1 to
-R6 at contact), the flight-safety invariants S1 to S4, and the evidence verdict (integrity and replay).
+R6 at contact), the flight-safety invariants S1 to S5 (S1 to S4 in M9 records), and the evidence verdict (integrity and replay).
 Verdicts are shown only from a run whose replay verified; anything else is marked unverified. Charts plot
 recorded samples only, as inline SVG without libraries. The campaign panel reads
 `runs/m9-campaign/summary.json` from disk, labels it as such, and sends a clicked run back through the
@@ -141,7 +141,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.4 ui-monospace,Conso
 <h1>Mission Control: powered landing</h1>
 <p class="physics" id="physics"><b>Closed-loop landing of a rocket stage.</b> A controller sees only noisy sensor readings
 (radar altimeter, GNSS, IMU), commands throttle and thrust vector, and tries to land on a pad. A separate verifier judges the
-true state at touchdown against six requirements and the whole flight against four safety invariants. Idealized demonstrator:
+true state at touchdown against six requirements and the whole flight against the safety invariants (five since M9.1). Idealized demonstrator:
 not flight software, not validated against flight data, no contact model (touchdown is the nozzle exit plane reaching the
 ground). Requirements, noise and fault ranges are assumed values.</p>
 <div class="tabs" role="tablist" aria-label="Sections">
@@ -369,13 +369,14 @@ function faultSpans(r) {
   return (r.verification.faults || []).filter(x => x.start_s < end).map(x => ({from: x.start_s, to: Math.min(x.end_s, end), name: words(x.kind)}));
 }
 function eventMarks(r) {
-  return r.events.filter(e => ['ignition', 'cutoff', 'flameout', 'touchdown'].includes(e.kind)).map(e => ({t: e.t_s, name: e.kind}));
+  return r.events.filter(e => ['ignition', 'ascent_abort', 'cutoff', 'flameout', 'touchdown'].includes(e.kind)).map(e => ({t: e.t_s, name: e.kind}));
 }
 function eventText(e) {
   const t = `t = ${f(e.t_s, 2)} s: `, d = e.detail || {};
   if (e.kind === 'ignition') return t + `engine ignites${d.command_t_s !== undefined && Math.abs(d.command_t_s - e.t_s) > 1e-9 ? ` (commanded at ${f(d.command_t_s, 2)} s, ${f(e.t_s - d.command_t_s, 2)} s late)` : ' as commanded'}.`;
   if (e.kind === 'fault_start') return t + `fault starts: ${words(d.fault)}${d.magnitude ? ' (magnitude ' + g3(d.magnitude) + ')' : ''}.`;
   if (e.kind === 'fault_end') return t + `fault ends: ${words(d.fault)}.`;
+  if (e.kind === 'ascent_abort') return t + 'the controller declares an ascent abort (it is climbing under power) and cuts the engine; this is a report by the controller, not a verdict.';
   if (e.kind === 'cutoff') return t + 'the controller cuts the engine off; it cannot relight.';
   if (e.kind === 'flameout') return t + 'propellant exhausted, the engine goes out.';
   if (e.kind === 'touchdown') return t + 'the nozzle exit plane reaches the ground. No contact dynamics: this instant is interpolated within the step.';
@@ -385,6 +386,8 @@ function eventText(e) {
 
 // ---------------------------------------------------------------- statements and tables
 function failedReqs(r) { return (r.verification.requirements || []).filter(x => x.evaluated && !x.pass); }
+// M9 records carry S1 to S4; M9.1 records (verification v2) add S5.
+function invRange(r) { const n = (r.verification.invariants || []).length; return n > 1 ? `S1 to S${n}` : 'S1'; }
 function failedInvs(r) { return (r.verification.invariants || []).filter(x => x.evaluated && !x.pass); }
 const short = id => id.split('_')[0];
 const WITHHELD = 'withheld: this run is not verified evidence';
@@ -399,7 +402,7 @@ function statements(r) {
   let inv;
   if (!ok) inv = el('p', {class: 'statement bad'}, el('b', {}, 'Safety invariants. '), WITHHELD + '.');
   else if (failedInvs(r).length) inv = el('p', {class: 'statement bad'}, el('b', {}, 'Safety invariants: violated. '), `${failedInvs(r).map(x => short(x.id)).join(', ')} failed during the flight, whatever the mission outcome.`);
-  else inv = el('p', {class: 'statement ok'}, el('b', {}, 'Safety invariants: all hold. '), 'S1 to S4 held at every step of the flight (S2 is checked at contact). This is separate from the mission outcome.');
+  else inv = el('p', {class: 'statement ok'}, el('b', {}, 'Safety invariants: all hold. '), `${invRange(r)} held at every step of the flight (S2 is checked at contact). This is separate from the mission outcome.`);
   const ev = el('p', {class: 'statement ' + (ok ? 'ok' : 'bad')}, el('b', {}, 'Evidence (integrity and replay). '), ok
     ? `Verified: vv-rocket replay recomputed the trace, the requirement and invariant verdicts and the manifest from the stored case and seed, and each matched byte for byte${r.reused ? '; every stored file also matches a fresh regeneration' : ''}. This confirms the record, not the physics.`
     : `Not verified: ${r.verdict.reasons.join('; ')}.`);
@@ -432,6 +435,18 @@ function invTable(r) {
     el('td', {class: !ok ? '' : x.pass ? 'ok' : 'bad'}, !ok ? 'withheld' : x.pass ? 'holds' : `VIOLATED (${x.failure_count} step${x.failure_count === 1 ? '' : 's'})`),
     el('td', {}, !ok ? 'withheld' : x.first_failure ? `t = ${f(x.first_failure.t_s, 2)} s: expected ${x.first_failure.expected}, observed ${x.first_failure.observed}${x.first_failure.cause && x.first_failure.cause.length ? '; active fault: ' + x.first_failure.cause.map(words).join(', ') : ''}` : 'none')));
   return el('div', {class: 'scroll'}, el('table', {}, el('thead', {}, el('tr', {}, ['Invariant', 'Limit', 'Worst value', 'Result', 'First failure'].map(h => el('th', {}, h)))), el('tbody', {}, rows)));
+}
+// The controller's own report. It is copied from the controller log after the verdicts are computed and
+// never feeds a verdict, so it is shown apart from the verification tables and labelled as such.
+function flagsBox(r) {
+  const fl = r.verification.controller_flags;
+  if (!verified(r) || !fl || typeof fl !== 'object') return null;
+  const names = [['sensor_disagreement_first', 'sensor disagreement declared'], ['altimeter_rejected_first', 'altimeter rejected (robust policy)'], ['ascent_abort_first', 'ascent abort (engine cut on a climb under power)']];
+  const rows = names.map(([key, label]) => el('tr', {}, el('td', {}, label),
+    el('td', {}, fl[key] ? `first at t = ${f(fl[key].t_s, 2)} s (step ${fl[key].step})` : 'did not appear, or this policy does not produce it')));
+  return el('div', {}, el('h3', {}, 'Controller-reported flags (what the controller says; not a verdict)'),
+    el('div', {class: 'scroll'}, el('table', {class: 'narrow'}, el('thead', {}, el('tr', {}, ['Flag', 'Reported'].map(h => el('th', {}, h)))), el('tbody', {}, rows))),
+    el('p', {class: 'meta'}, 'Copied from the controller log. The verifier never reads these flags: a flag that appears does not mean the vehicle was safe, and no flag does not mean it was unsafe. Detection, containment (S1 to S5) and recovery (R1 to R6 at contact) are three separate statements.'));
 }
 function touchdownCard(r) {
   const td = r.verification.touchdown;
@@ -563,6 +578,13 @@ function charts(runs) {
   out.push(trackChart(runs.map(x => ({r: x.r, name: one ? 'truth' : x.name, n: x.n, style: x.style}))));
   return out;
 }
+// Optional estimate fields written only by the guarded policies; absent in older traces and other policies.
+function flagRows(s) {
+  const e = s.estimate || {}, set = [];
+  if (e.sensor_disagreement !== undefined) set.push('sensor disagreement: ' + (e.sensor_disagreement ? 'declared' : 'no'));
+  if (e.ascent_abort !== undefined) set.push('ascent abort: ' + (e.ascent_abort ? 'declared' : 'no'));
+  return set.length ? [el('dt', {}, 'controller flags (reported)'), el('dd', {}, set.join('; '))] : [];
+}
 function readout(r) {
   const s = r.states[nearest(r, state.t)], eng = s.applied.engine;
   return el('dl', {class: 'kv'},
@@ -572,6 +594,7 @@ function readout(r) {
     el('dt', {}, 'controller estimate'), el('dd', {}, `${f(cols.estimate(s), 2)} m (error ${f(cols.estErr(s), 2)} m)`),
     el('dt', {}, 'vertical speed, truth'), el('dd', {}, `${f(cols.vz(s), 2)} m/s`),
     el('dt', {}, 'engine'), el('dd', {}, `${eng}, throttle ${f(cols.applied(s), 2)} (commanded ${f(cols.cmd(s), 2)})`),
+    ...flagRows(s),
     el('dt', {}, 'active faults'), el('dd', {}, s.active_faults.length ? s.active_faults.map(words).join(', ') : 'none'));
 }
 
@@ -619,7 +642,7 @@ function drawSingle() {
   if (!r.states.length) { fill($('result'), el('p', {class: 'bad'}, 'The run produced no recorded samples.')); return; }
   const details = [
     el('h3', {}, 'Requirements at contact (R1 to R6)'), reqTable(r),
-    el('h3', {}, 'Safety invariants (S1 to S4)'), invTable(r),
+    el('h3', {}, `Safety invariants (${invRange(r)})`), invTable(r), flagsBox(r),
     el('h3', {}, 'Touchdown state (true state, interpolated to the contact instant)'), touchdownCard(r),
     ...liveSection(),
     el('h3', {}, 'Events'), eventList(r)];
@@ -777,12 +800,12 @@ function drawClaims() {
     el('div', {class: 'cols3'},
       el('div', {class: 'panel'}, el('h3', {class: 'ok'}, 'Verified'), list([
         'Determinism: a run is a function of the case and the seed. Replay recomputes the trace, the verdicts and the manifest and compares them byte for byte; a run that fails replay is shown as unverified and its verdicts are withheld.',
-        'The requirements R1 to R6 and the invariants S1 to S4 are evaluated by a verifier on the true simulated state, separately from what the controller believed, and recomputed on every replay.',
+        'The requirements R1 to R6 and the invariants S1 to S5 (S1 to S4 in M9 records) are evaluated by a verifier on the true simulated state, separately from what the controller believed, and recomputed on every replay.',
         'The controller code receives only sensor readings and the mission configuration; a test checks that it does not reference the true state.',
         'The stored run is bound to its request, its seed, its case and the build that produced it; edited or relocated files are rejected.',
         'The plotted altitude error is estimate minus truth: the page never uses the truth to hide an estimator error.'])),
       el('div', {class: 'panel'}, el('h3', {class: 'warn'}, 'Assumed'), list([
-        'The requirement limits (3 m/s vertical, 1 m/s horizontal, 5° tilt, 0.1 rad/s, 10 m pad radius, 1% propellant) and the invariant limits (30° tilt, 50 m keep-out, 3 g0 axial load).',
+        'The requirement limits (3 m/s vertical, 1 m/s horizontal, 5° tilt, 0.1 rad/s, 10 m pad radius, 1% propellant) and the invariant limits (30° tilt, 50 m keep-out, 3 g0 axial load, 5 m climb under power).',
         'The dispersions of the initial state, propellant, thrust and Isp, and the sensor noise levels.',
         'The fault models and their ranges; one fault of each kind at most.',
         'The vehicle, the actuator rate limits and the 50 Hz control cycle. The controller gains were tuned on the nominal case with seeds 0 to 40.'])),

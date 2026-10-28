@@ -8,7 +8,7 @@ Contract v3 exists because the request has categorical inputs (policy, fault kin
 numeric overrides of v2 cannot express. v1 and v2, their models and their results are unchanged.
 
 Three statements stay apart and are never merged: the mission outcome (requirements R1 to R6 at
-contact), the flight-safety invariants S1 to S4, and the evidence verdict (integrity and replay).
+contact), the flight-safety invariants S1 to S5, and the evidence verdict (integrity and replay).
 `vv-rocket land` exits 2 when a requirement or invariant fails; that is a result, not an error.
 Publication, locking, run-id binding and tamper checks are those of the rocket adapter, which
 this class reuses; the verification of a run is per run, so `replay` recomputes it byte for byte.
@@ -46,6 +46,10 @@ from sim_adapter import (
 ROOT = Path(__file__).resolve().parents[1]
 MODEL_ID = "rocket-landing"
 TEMPLATE = CRATE / "landing" / "nominal.json"
+# The case model of the M9.1 policies (adds the two optional ascent-abort gains at their defaults); the
+# baseline and robust cases keep the frozen M9 template byte for byte.
+TEMPLATE_M91 = CRATE / "landing" / "m91-nominal.json"
+M91_POLICIES = frozenset({"guarded", "baseline_guarded"})
 PHYSICS = ("closed-loop powered landing of a 22 t rocket stage: the 6-DOF rigid body of the rocket-rigid-body model, "
            "a throttle and thrust-vector actuator, noisy radar altimeter, GNSS and IMU, and a deterministic controller "
            "that sees only the observations; fixed step 0.01 s, control at 50 Hz")
@@ -59,6 +63,9 @@ MAX_SEED = 2**32 - 1  # one run per seed; the campaign uses 1000 to 1029
 POLICIES = {
     "baseline": "Uses the latest reading of each sensor and trusts the radar altimeter for height.",
     "robust": "Runs its own navigation filter and rejects an altimeter that disagrees with the GNSS and inertial estimate.",
+    "guarded": "The robust estimator plus two rules: when altimeter and estimate disagree it guides on the lower altitude "
+               "and reports sensor_disagreement, and it cuts the engine when it climbs under power (ascent_abort).",
+    "baseline_guarded": "The baseline policy unchanged plus the ascent-abort rule only (M9.1 test of that rule).",
 }
 
 # Pre-registered magnitude and window-length ranges (docs/m9-powered-landing.md, Falhas e gamas pré-registadas)
@@ -86,6 +93,12 @@ FAULTS: dict[str, tuple[str, str, tuple[float, float, str] | None, tuple[float, 
     "imu_accel_bias": (
         "IMU acceleration bias", "The IMU adds the magnitude to the specific force along the body axis x_B.",
         (0.05, 0.5, "m/s²"), None, 0.25, 5.0, 40.0),
+    "altimeter_bias_low": (
+        "Altimeter bias, low reading", "The radar altimeter reads too low by the magnitude (M9.1).",
+        (5.0, 50.0, "m"), None, 27.5, 10.0, 40.0),
+    "gnss_bias_low": (
+        "GNSS bias, low reading", "The GNSS position is shifted down by the magnitude along x and z (M9.1).",
+        (5.0, 30.0, "m"), None, 17.5, 8.0, 40.0),
 }
 
 LABELS = {
@@ -93,6 +106,7 @@ LABELS = {
     "R3_tilt": "Tilt at contact", "R4_angular_rate": "Angular rate at contact", "R5_position": "Distance from pad centre",
     "R6_propellant_margin": "Propellant margin", "S1_tilt_envelope": "Tilt envelope while thrusting",
     "S2_keep_out": "Keep-out radius at contact", "S3_axial_load": "Axial load", "S4_no_relight": "No relight",
+    "S5_no_powered_ascent": "Climb under power",
 }
 
 
@@ -113,6 +127,7 @@ class LandingAdapter(RocketAdapter):
         self.root = Path(root)
         self.lock_timeout = LOCK_TIMEOUT_SECONDS
         self.template = json.loads(TEMPLATE.read_text(encoding="utf-8"))
+        self.template_m91 = json.loads(TEMPLATE_M91.read_text(encoding="utf-8"))
 
     # ------------------------------------------------------------ contract
 
@@ -183,13 +198,16 @@ class LandingAdapter(RocketAdapter):
         return {"kind": kind, "magnitude": size, "start_s": start / 100, "end_s": end / 100}
 
     def case_for(self, req: dict) -> dict:
-        case = json.loads(json.dumps(self.template))
+        case = json.loads(json.dumps(self.template_m91 if req["policy"] in M91_POLICIES else self.template))
         fault = req["fault"]
         case["controller"]["policy"] = req["policy"]
         case["faults"] = [] if fault is None else [dict(fault)]
         text = "nominal" if fault is None else (f"{fault['kind']} {fault['magnitude']:g} from {fault['start_s']:g} s "
                                                  f"to {fault['end_s']:g} s")
-        case["name"] = f"Mission Control landing: {text}, {req['policy']} policy"
+        name = f"Mission Control landing: {text}, {req['policy']} policy"
+        if len(name) > 80:  # the simulator limits names to 80 characters; the longer M9.1 names need the short form
+            name = f"Landing: {text}, {req['policy']}"
+        case["name"] = name[:80]
         return case
 
     # ------------------------------------------------------------ execution

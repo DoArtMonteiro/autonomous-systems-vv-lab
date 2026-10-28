@@ -59,6 +59,11 @@ class ValidationTests(unittest.TestCase):
             (request(flt={**fault(), "extra": 1}), "unknown field in fault: extra"),
             (request(flt=fault("teleport")), "fault.kind must be one of"),
             (request(flt=fault(magnitude=4.99)), "fault.magnitude must be in"),
+            (request("guarded", flt=fault("altimeter_bias_low", 4.99)), "fault.magnitude must be in"),
+            (request("guarded", flt=fault("altimeter_bias_low", 50.01)), "fault.magnitude must be in"),
+            (request("guarded", flt=fault("gnss_bias_low", 4.99)), "fault.magnitude must be in"),
+            (request("guarded", flt=fault("gnss_bias_low", 30.01)), "fault.magnitude must be in"),
+            (request("baseline_guarded", flt=fault("gnss_bias_low", -10)), "fault.magnitude must be in"),
             (request(flt=fault(magnitude=50.01)), "fault.magnitude must be in"),
             (request(flt=fault(magnitude="20")), "fault.magnitude must be a number"),
             (request(flt=fault(magnitude=float("nan"))), "fault.magnitude must be a number"),
@@ -88,7 +93,9 @@ class ValidationTests(unittest.TestCase):
                  ("altimeter_dropout", 0, 18.0, 20.0), ("altimeter_dropout", 0, 14.0, 24.0),
                  ("gnss_dropout", 0, 8.0, 10.0), ("gnss_dropout", 0, 8.0, 18.0),
                  ("gnss_bias", 5.0, 8.0, 40.0), ("gnss_bias", 30.0, 8.0, 40.0),
-                 ("imu_accel_bias", 0.05, 5.0, 40.0), ("imu_accel_bias", 0.5, 5.0, 40.0)]
+                 ("imu_accel_bias", 0.05, 5.0, 40.0), ("imu_accel_bias", 0.5, 5.0, 40.0),
+                 ("altimeter_bias_low", 5.0, 10.0, 40.0), ("altimeter_bias_low", 50.0, 10.0, 40.0),
+                 ("gnss_bias_low", 5.0, 8.0, 40.0), ("gnss_bias_low", 30.0, 8.0, 40.0)]
         for kind, magnitude, start, end in edges:
             with self.subTest(kind=kind, magnitude=magnitude, start=start, end=end):
                 self.adapter.validate(request(flt=fault(kind, magnitude, start, end)))
@@ -110,6 +117,9 @@ class ValidationTests(unittest.TestCase):
         for entry in self.adapter.describe()["capabilities"]["faults"]:
             for policy, suffix in (("baseline", ""), ("robust", "-robust")):
                 name = entry["kind"].replace("_", "-") + suffix
+                if not (TEMPLATES / f"{name}.json").exists():
+                    self.assertIn(entry["kind"], ("altimeter_bias_low", "gnss_bias_low"))  # M9.1 faults: guarded demos only
+                    continue
                 with self.subTest(case=name):
                     stored = json.loads((TEMPLATES / f"{name}.json").read_text(encoding="utf-8"))
                     magnitude = (entry["magnitude"] or {"default": 0.0})["default"]
@@ -119,13 +129,62 @@ class ValidationTests(unittest.TestCase):
                     self.assertEqual({k: v for k, v in case.items() if k != "name"},
                                      {k: v for k, v in stored.items() if k != "name"})
 
+    def test_m91_declared_defaults_are_the_guarded_demonstration_cases(self):
+        entries = {e["kind"]: e for e in self.adapter.describe()["capabilities"]["faults"]}
+        for name, policy, kind in (("gnss-bias-guarded", "guarded", "gnss_bias"),
+                                   ("altimeter-bias-low-guarded", "guarded", "altimeter_bias_low"),
+                                   ("gnss-dropout-baseline-guarded", "baseline_guarded", "gnss_dropout")):
+            with self.subTest(case=name):
+                stored = json.loads((TEMPLATES / f"{name}.json").read_text(encoding="utf-8"))
+                entry = entries[kind]
+                magnitude = (entry["magnitude"] or {"default": 0.0})["default"]
+                flt = fault(kind, magnitude, entry["default_start_s"], entry["default_end_s"])
+                case = self.adapter.case_for(self.adapter.validate(request(policy, 0, flt)))
+                self.assertEqual({k: v for k, v in case.items() if k != "name"},
+                                 {k: v for k, v in stored.items() if k != "name"})
+        nominal = json.loads((TEMPLATES / "m91-nominal.json").read_text(encoding="utf-8"))
+        case = self.adapter.case_for(self.adapter.validate(request("guarded", 0, None)))
+        self.assertEqual({k: v for k, v in case.items() if k != "name"}, {k: v for k, v in nominal.items() if k != "name"})
+        # baseline and robust keep the frozen M9 template (no M9.1 gains in their cases).
+        for policy in ("baseline", "robust"):
+            gains = self.adapter.case_for(self.adapter.validate(request(policy, 0, None)))["controller"]["gains"]
+            self.assertNotIn("ascent_abort_vz_mps", gains)
+
+    def test_m91_policies_and_faults_are_declared_with_their_ranges(self):
+        caps = self.adapter.describe()["capabilities"]
+        self.assertEqual([p["id"] for p in caps["policies"]], ["baseline", "robust", "guarded", "baseline_guarded"])
+        faults = {f["kind"]: f for f in caps["faults"]}
+        self.assertEqual(list(faults)[-2:], ["altimeter_bias_low", "gnss_bias_low"])
+        low = faults["altimeter_bias_low"]["magnitude"]
+        self.assertEqual((low["min"], low["max"]), (5.0, 50.0))
+        low = faults["gnss_bias_low"]["magnitude"]
+        self.assertEqual((low["min"], low["max"]), (5.0, 30.0))
+        self.assertEqual(caps["labels"]["S5_no_powered_ascent"], "Climb under power")
+        for policy in ("guarded", "baseline_guarded"):
+            self.adapter.validate(request(policy, 3, fault("gnss_bias_low", 12.5, 8.0, 40.0)))
+
+    def test_v2_verification_contract(self):
+        flag = {"step": 818, "t_s": 8.18}
+        flags = {"source": "x", "sensor_disagreement_first": flag, "ascent_abort_first": None, "altimeter_rejected_first": flag}
+        ok = {"schema": sa.LANDING_VERIFICATION_V2, "outcome": "landed", "requirements": [],
+              "invariants": [{"id": f"S{i}_x"} for i in range(1, 6)], "controller_flags": flags}
+        self.assertIsNone(sa._check_landing_verification_schema(ok))
+        v1 = {**ok, "schema": sa.LANDING_VERIFICATION_V1, "invariants": ok["invariants"][:4]}
+        self.assertIsNone(sa._check_landing_verification_schema(v1))
+        for change in ({"invariants": ok["invariants"][:4]}, {"controller_flags": None},
+                       {"controller_flags": {k: v for k, v in flags.items() if k != "ascent_abort_first"}},
+                       {"controller_flags": {**flags, "ascent_abort_first": {"step": "x"}}},
+                       {"schema": "vv-rocket-landing-verification.v3"}):
+            with self.subTest(change=change), self.assertRaises(sa.AdapterError):
+                sa._check_landing_verification_schema({**ok, **change})
+
     def test_describe_declares_policies_faults_and_limits(self):
         d = self.adapter.describe()
         self.assertEqual(d["schema"], sa.ADAPTER_SCHEMA_V3)
         self.assertEqual(d["model"]["id"], la.MODEL_ID)
         caps = d["capabilities"]
-        self.assertEqual([p["id"] for p in caps["policies"]], ["baseline", "robust"])
-        self.assertEqual(len(caps["faults"]), 8)
+        self.assertEqual([p["id"] for p in caps["policies"]], ["baseline", "robust", "guarded", "baseline_guarded"])
+        self.assertEqual(len(caps["faults"]), 10)
         bias = next(f for f in caps["faults"] if f["kind"] == "altimeter_bias")
         self.assertEqual((bias["magnitude"]["min"], bias["magnitude"]["max"]), (5.0, 50.0))
         gimbal = next(f for f in caps["faults"] if f["kind"] == "gimbal_stuck")
@@ -194,11 +253,23 @@ class RunTests(unittest.TestCase):
         v = result["verification"]
         self.assertEqual((v["outcome"], v["requirements_pass"], v["invariants_pass"]), ("landed", True, True))
         self.assertEqual([r["id"][:2] for r in v["requirements"]], ["R1", "R2", "R3", "R4", "R5", "R6"])
-        self.assertEqual([i["id"][:2] for i in v["invariants"]], ["S1", "S2", "S3", "S4"])
+        self.assertEqual([i["id"][:2] for i in v["invariants"]], ["S1", "S2", "S3", "S4", "S5"])
+        self.assertEqual(v["schema"], sa.LANDING_VERIFICATION_V2)
+        self.assertEqual(set(v["controller_flags"]) - {"source"}, set(sa.LANDING_FLAGS))
+        self.assertTrue(all(v["controller_flags"][n] is None for n in sa.LANDING_FLAGS))
         self.assertEqual(result["provenance"]["binary_sha256"], sa.sha256_file(ROCKET))
         self.assertEqual(result["summary"]["end_reason"], "touchdown")
         self.assertEqual(result["states"][-1]["kind"], "touchdown")
         self.assertIn("not validated against flight data", result["model_validity"])
+
+    def test_guarded_run_reports_controller_flags_apart_from_the_verdict(self):
+        result = self.run_view(request("guarded", 0, fault("gnss_bias", 15.0, 8.0, 40.0)))
+        v = result["verification"]
+        self.assertEqual(result["verdict"]["status"], "verified")
+        self.assertEqual(v["controller_flags"]["sensor_disagreement_first"]["t_s"], 8.18)
+        self.assertIn("controller-reported", v["controller_flags"]["source"])
+        self.assertEqual(v["outcome"], "hard_landing")
+        self.assertTrue(v["invariants_pass"])
 
     def test_exit_code_2_is_a_result_not_an_error(self):
         # The pre-registered flagship: a +20 m altimeter bias makes the baseline policy hit the ground at about 20 m/s.
@@ -225,7 +296,9 @@ class RunTests(unittest.TestCase):
                  ("altimeter_dropout", 0, 18.0, 20.0), ("altimeter_dropout", 0, 14.0, 24.0),
                  ("gnss_dropout", 0, 8.0, 10.0), ("gnss_dropout", 0, 8.0, 18.0),
                  ("gnss_bias", 5.0, 8.0, 40.0), ("gnss_bias", 30.0, 8.0, 40.0),
-                 ("imu_accel_bias", 0.05, 5.0, 40.0), ("imu_accel_bias", 0.5, 5.0, 40.0)]
+                 ("imu_accel_bias", 0.05, 5.0, 40.0), ("imu_accel_bias", 0.5, 5.0, 40.0),
+                 ("altimeter_bias_low", 5.0, 10.0, 40.0), ("altimeter_bias_low", 50.0, 10.0, 40.0),
+                 ("gnss_bias_low", 5.0, 8.0, 40.0), ("gnss_bias_low", 30.0, 8.0, 40.0)]
         for kind, magnitude, start, end in edges:
             with self.subTest(kind=kind, magnitude=magnitude, start=start, end=end):
                 result = self.run_view(request(flt=fault(kind, magnitude, start, end)))
