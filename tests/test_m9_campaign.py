@@ -346,6 +346,25 @@ class SummaryTests(unittest.TestCase):
             (4, 1, 1, 1, 1),
         )
 
+    def test_composition_states_the_arithmetic_of_the_780_runs(self):
+        records = [record(r.fault, r.policy, r.seed, group=r.group, grid_index=r.grid_index)
+                   for r in m9.plan_runs(m9.DEFAULT_SEEDS)]
+        composition = m9.build_composition(records)
+        self.assertEqual(composition["matrix"], {"scenarios": 9, "policies": 2, "seeds": 30, "runs": 540})
+        self.assertEqual(composition["boundary"], {"faults": 2, "magnitudes": 6, "policies": 2, "seeds": 10, "runs": 240})
+        self.assertEqual(composition["total"], 780)
+        text = m9.composition_text(composition)
+        self.assertIn("9 cenários × 2 políticas × 30 sementes = 540", text)
+        self.assertIn("2 falhas × 6 magnitudes × 2 políticas × 10 sementes = 240", text)
+        self.assertIn("540 + 240 = 780", text)
+        self.assertEqual(m9.build_summary(records, {})["composition"], composition)
+
+    def test_runs_ceiling_can_be_raised_by_a_campaign_that_reuses_the_validation(self):
+        good = dict(max_runs=1100, max_artifact_bytes=2**20, time_budget_seconds=60, jobs=2)
+        with self.assertRaises(m9.M9CampaignError):
+            m9.validate_limits(1050, **good)
+        m9.validate_limits(1050, **good, runs_ceiling=1200)
+
     def test_boundary_findings_report_no_boundary_or_first_failing_magnitude(self):
         records = []
         for index, magnitude in enumerate(m9.boundary_magnitudes("thrust_loss")):
