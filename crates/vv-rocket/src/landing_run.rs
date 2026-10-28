@@ -95,7 +95,8 @@ pub fn artifacts(case_bytes: &[u8], seed: u64) -> Result<LandingArtifacts, LandE
         .map_err(|e| LandError::Input(format!("invalid case: {e}")))?;
     let prepared = prepare_landing(&case, seed).map_err(LandError::Input)?;
     let run = simulate_landing(&prepared).map_err(LandError::Simulation)?;
-    let verification = verify(&prepared, &run.log);
+    let mut verification = verify(&prepared, &run.log);
+    verification.controller_flags.flags = run.controller_flags;
     Ok(LandingArtifacts {
         trace: json_line(&run.trace).map_err(LandError::Simulation)?,
         verification: json_line(&verification).map_err(LandError::Simulation)?,

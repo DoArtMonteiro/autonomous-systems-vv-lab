@@ -520,7 +520,7 @@ fn trace_and_verification_have_the_documented_shape() {
     ] {
         assert!(v.get(k).is_some(), "verification.{k}");
     }
-    assert_eq!(v["schema"], "vv-rocket-landing-verification.v1");
+    assert_eq!(v["schema"], "vv-rocket-landing-verification.v2");
     assert!(
         v["disclaimer"]
             .as_str()
@@ -732,7 +732,7 @@ fn invalid_inputs_are_rejected_with_a_reason() {
     );
     assert!(reject(&with(vec![fault("meteor", 1.0, 5.0, 10.0)])).contains("invalid case"));
     assert!(
-        reject(&|c| c["faults"] = Value::Array(vec![fault("gnss_bias", 1.0, 5.0, 10.0); 9]))
+        reject(&|c| c["faults"] = Value::Array(vec![fault("gnss_bias", 1.0, 5.0, 10.0); 11]))
             .contains("more than")
     );
 }
@@ -1157,5 +1157,541 @@ fn every_demo_case_is_valid_and_runs_for_seeds_zero_and_one() {
                 assert_eq!(f["acted"], true, "{name} seed {seed}: {f}");
             }
         }
+    }
+}
+
+#[test]
+fn m9_demo_traces_are_byte_identical_after_m91() {
+    // SHA-256 of `trace.json` of every case that existed before the M9.1 changes (18 cases, seeds 0
+    // and 1), recorded with the build that preceded them. The new policies, flags, fault kinds and
+    // the invariant `S5` must not change any byte of a trace of `baseline` or `robust`.
+    for (name, seed, want) in [
+        (
+            "altimeter-bias.json",
+            0,
+            "f6e1fa7ae1f26b78b8146a9a242fbbaa1656e8153b15ad071a401f0aec965d7e",
+        ),
+        (
+            "altimeter-bias.json",
+            1,
+            "3b30677cc5be826da8a56d871c6bd46bcf90e54c1e5905485112d7a60a108213",
+        ),
+        (
+            "altimeter-bias-robust.json",
+            0,
+            "2321c82f522e727984cd10b04f4f15840eb4c90f1ca84c74b5a0b6b6db254159",
+        ),
+        (
+            "altimeter-bias-robust.json",
+            1,
+            "bdfe179c3d0ffca12d304b4b0de59c9f411eed8b59a25bc15304d5a0e54279ae",
+        ),
+        (
+            "altimeter-dropout.json",
+            0,
+            "eefd91c7fde6278454823fad75d8ad36c742920cf537447a8a435fe5b7f0032e",
+        ),
+        (
+            "altimeter-dropout.json",
+            1,
+            "8d9280d08baa30c668bb9b6c987ca31277608134b12de47cd2bcef61e717876d",
+        ),
+        (
+            "altimeter-dropout-robust.json",
+            0,
+            "fd8e5da562cc6cae8dcb844f226a81de36f7e9b6405b72bbe1231f5045fbb8a2",
+        ),
+        (
+            "altimeter-dropout-robust.json",
+            1,
+            "1359b803b5c76777f82eab1ff59ea1ace2ad640e987266439ccab5143c96129b",
+        ),
+        (
+            "gimbal-stuck.json",
+            0,
+            "f73abfe499faeeafb1cd752e7a40f2e59cda15430e9f848cb4102aa79f534b43",
+        ),
+        (
+            "gimbal-stuck.json",
+            1,
+            "3d56c63b334b4e759890ff1b1cb880bdfa4ee5682ab232a1cb3f0f1109d8dd90",
+        ),
+        (
+            "gimbal-stuck-robust.json",
+            0,
+            "6b10f2cfbd446e9c9907f7b54a30ed4804a3bb1eb7fa5b677012ce634dde411a",
+        ),
+        (
+            "gimbal-stuck-robust.json",
+            1,
+            "1390ae2c0f717e2e8f9444d23d0236e8340df68423210c8cfd922eae71457a20",
+        ),
+        (
+            "gnss-bias.json",
+            0,
+            "18f20b90d7961669e5f0d404d28a754b52724d6135117668ef0178734013c956",
+        ),
+        (
+            "gnss-bias.json",
+            1,
+            "0eb5db9eae7460290968994eb678a2ac1c7e2a699302866ee96b2de2990181d5",
+        ),
+        (
+            "gnss-bias-robust.json",
+            0,
+            "2b31bb418ee9ec1e671017a4663f4c95c2df97d498eb41a041bb632c7d4f8103",
+        ),
+        (
+            "gnss-bias-robust.json",
+            1,
+            "396a14bdf9b31a206865ea3015e7063f4babb9794c29a79064e4f2673a2f64c4",
+        ),
+        (
+            "gnss-dropout.json",
+            0,
+            "c603b317f4ed165c6d84988495c39fbc6ae9abfb236c2e3d2b9dab294ea2b2b7",
+        ),
+        (
+            "gnss-dropout.json",
+            1,
+            "90e5ba8bd79fa8c7913101a979d67b34f7ed1a4c9415ff89485dd63bb1849ed0",
+        ),
+        (
+            "gnss-dropout-robust.json",
+            0,
+            "9ea039cf05bda6ee6e66fa54c68a7233f201d0fca6caf773815ea1a60b1430e6",
+        ),
+        (
+            "gnss-dropout-robust.json",
+            1,
+            "1ee22eb06ccce913c5f2742f253b80f2bf41a896c04ff6f346fe58f9dad76587",
+        ),
+        (
+            "ignition-delay.json",
+            0,
+            "0d8ffa6a52efe39f8b1bb8f3adbed2499fb3e4904867790876646ef72b415437",
+        ),
+        (
+            "ignition-delay.json",
+            1,
+            "856dd6f0ea11166d5871ac85d22549df1622488b34f2e953f56e384126716b72",
+        ),
+        (
+            "ignition-delay-robust.json",
+            0,
+            "aa9413c18f51cab5e9143d963f6bff577f4e781468cafd55cc72eeb03eac83c1",
+        ),
+        (
+            "ignition-delay-robust.json",
+            1,
+            "a452ff7ae5417016d315417bdb72c14a697348ed1be50ee0679a51b79dd5c318",
+        ),
+        (
+            "imu-accel-bias.json",
+            0,
+            "c5f4df1eb004b20cf8573321b133a26ac4ced9311257a0424fe2a11287118c86",
+        ),
+        (
+            "imu-accel-bias.json",
+            1,
+            "0c497f851c5376034b164695bcb0b33899cc97a8859c0ea2608d66d052f71359",
+        ),
+        (
+            "imu-accel-bias-robust.json",
+            0,
+            "b1e1aa8c4c3deadc90d1cd7723c3fd7a6ae821e7ca6c1420868916b10d3dd0e9",
+        ),
+        (
+            "imu-accel-bias-robust.json",
+            1,
+            "4d5f1faba3f046c3fe14738861616efe9756f31afa591711ce27343e310e3733",
+        ),
+        (
+            "nominal.json",
+            0,
+            "58035467c03016594951a311142f594e19559565619f54d1671b8497524cf780",
+        ),
+        (
+            "nominal.json",
+            1,
+            "64263c6c86bde9d1fbb24aea9265475ca653226a6065e4c8547f2b949a2f5a59",
+        ),
+        (
+            "nominal-robust.json",
+            0,
+            "ffa6b96916380de6ab7bdec36c2551e5f9a12282e99e062f8e182533487dddfd",
+        ),
+        (
+            "nominal-robust.json",
+            1,
+            "2c3fbf481662da09e0c19dc0b5a6f003db64c97935e8b4703cd3f1b3bb3c37bf",
+        ),
+        (
+            "thrust-loss.json",
+            0,
+            "87fec24a6c97af84ba50567eaa4d9a2035573b013b8b719cef8f2190de5c9687",
+        ),
+        (
+            "thrust-loss.json",
+            1,
+            "6d8ed9a544acd527501f175857d517152308a47c3f819e0d62d2331308025eb5",
+        ),
+        (
+            "thrust-loss-robust.json",
+            0,
+            "cd71ede285dee7e3801bb0bbc04cb51f489bf66127b476dfa40cec30535e716b",
+        ),
+        (
+            "thrust-loss-robust.json",
+            1,
+            "ad659ea943243aa4ea848c95838ef13c9115a4cd74a96f044ceee130de643e2a",
+        ),
+    ] {
+        let art = artifacts(&bytes_of(name), seed).unwrap();
+        assert_eq!(sha256_hex(&art.trace), want, "{name} seed {seed}");
+    }
+}
+
+fn first_flag(v: &Value, key: &str) -> Option<u64> {
+    v["controller_flags"][key]["step"].as_u64()
+}
+
+fn samples_with(trace: &Value, flag: &str, value: bool) -> usize {
+    trace["samples"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|s| s["estimate"][flag] == value)
+        .count()
+}
+
+#[test]
+fn verification_v2_has_s5_and_a_labelled_controller_flags_block() {
+    let (_, v) = run_value(&value_of("nominal.json"), 0).unwrap();
+    let ids: Vec<&str> = v["invariants"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| i["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        ids,
+        [
+            "S1_tilt_envelope",
+            "S2_keep_out",
+            "S3_axial_load",
+            "S4_no_relight",
+            "S5_no_powered_ascent"
+        ]
+    );
+    let s5 = invariant(&v, "S5_no_powered_ascent");
+    assert_eq!(
+        (s5["limit"].as_f64(), s5["unit"].as_str()),
+        (Some(5.0), Some("m"))
+    );
+    assert_eq!(s5["evaluated"], true);
+    assert_eq!(s5["pass"], true);
+    let flags = &v["controller_flags"];
+    assert_eq!(
+        flags["source"],
+        "controller-reported; not used for any verdict"
+    );
+    for k in [
+        "sensor_disagreement_first",
+        "ascent_abort_first",
+        "altimeter_rejected_first",
+    ] {
+        assert!(flags.get(k).is_some_and(Value::is_null), "{k}: {flags}");
+    }
+}
+
+#[test]
+fn the_m91_demo_cases_report_what_the_controller_said_apart_from_the_verdicts() {
+    // Guarded, nominal: no flag, lands, and its trace carries the new estimate fields.
+    for seed in [0, 1] {
+        let (trace, v) = run_value(&value_of("m91-nominal.json"), seed).unwrap();
+        assert_eq!(v["policy"], "guarded");
+        assert_eq!(v["outcome"], "landed");
+        assert_eq!(v["invariants_pass"], true);
+        assert_eq!(first_flag(&v, "sensor_disagreement_first"), None);
+        assert_eq!(first_flag(&v, "ascent_abort_first"), None);
+        assert!(
+            trace["samples"][0]["estimate"]
+                .get("ascent_abort")
+                .is_some()
+        );
+        assert_eq!(samples_with(&trace, "sensor_disagreement", true), 0);
+    }
+
+    // Guarded with a GNSS bias from 8 s: the disagreement is declared after the 5 cycles that
+    // follow the start of the bias, and the vehicle touches down softly (`R1` met), which `robust`
+    // does not (docs/m9-powered-landing.md).
+    let (trace, v) = run_value(&value_of("gnss-bias-guarded.json"), 0).unwrap();
+    let first = first_flag(&v, "sensor_disagreement_first").unwrap();
+    assert!((800..900).contains(&first), "{first}");
+    assert_eq!(first_flag(&v, "altimeter_rejected_first"), Some(first));
+    assert!(samples_with(&trace, "sensor_disagreement", true) > 100);
+    assert_eq!(requirement(&v, "R1_vertical_speed")["pass"], true);
+    assert_eq!(v["invariants_pass"], true);
+
+    // The same case with `robust` reports its rejection, which is the same detection, and has no
+    // M9.1 field in its estimates.
+    let (trace, v) = run_value(&value_of("gnss-bias-robust.json"), 0).unwrap();
+    assert!(first_flag(&v, "altimeter_rejected_first").is_some());
+    assert_eq!(first_flag(&v, "sensor_disagreement_first"), None);
+    let est = &trace["samples"][0]["estimate"];
+    assert!(est.get("sensor_disagreement").is_none() && est.get("ascent_abort").is_none());
+
+    // `baseline` raises nothing.
+    let (_, v) = run_value(&value_of("gnss-bias.json"), 0).unwrap();
+    for k in [
+        "sensor_disagreement_first",
+        "ascent_abort_first",
+        "altimeter_rejected_first",
+    ] {
+        assert_eq!(first_flag(&v, k), None, "{k}");
+    }
+
+    // Guarded with a low-reading altimeter: detected; the verdicts stay the verifier's.
+    let (_, v) = run_value(&value_of("altimeter-bias-low-guarded.json"), 0).unwrap();
+    assert!(first_flag(&v, "sensor_disagreement_first").is_some());
+    assert_eq!(v["faults"][0]["kind"], "altimeter_bias_low");
+    assert_eq!(v["faults"][0]["acted"], true);
+}
+
+#[test]
+fn the_rise_cutoff_contains_the_m9_gnss_dropout_failure_but_s5_still_sees_it() {
+    // The 20 `no_contact` executions of the M9 campaign: `baseline` keeps the last, large and
+    // negative, GNSS velocity during the loss, brakes too hard and climbs with the engine lit.
+    // This is the window of seed 1000 of the campaign.
+    let mut case = value_of("nominal.json");
+    case["faults"] = json!([fault("gnss_dropout", 14.9, 21.99, 0.0)]);
+    let m9 = |policy: &str| {
+        let mut c = case.clone();
+        c["controller"]["policy"] = json!(policy);
+        run_value(&c, 1000).unwrap()
+    };
+
+    let (trace, v) = m9("baseline");
+    assert_eq!(v["outcome"], "no_contact");
+    let s5 = invariant(&v, "S5_no_powered_ascent");
+    assert_eq!(s5["pass"], false);
+    assert!(s5["worst_value"].as_f64().unwrap() > 100.0);
+    assert_eq!(s5["first_failure"]["cause"], json!(["gnss_dropout"]));
+    assert!(!event_kinds(&trace).contains(&"ascent_abort"));
+
+    // `baseline_guarded`: rule 2 cuts after the GNSS returns; no longer `no_contact`, but not a
+    // recovery either: the climb is still over the S5 limit and the contact is hard.
+    let (trace, v) = m9("baseline_guarded");
+    assert_eq!(v["outcome"], "hard_landing");
+    assert_eq!(invariant(&v, "S5_no_powered_ascent")["pass"], false);
+    assert_eq!(requirement(&v, "R1_vertical_speed")["pass"], false);
+    let kinds = event_kinds(&trace);
+    let abort = kinds.iter().position(|k| *k == "ascent_abort").unwrap();
+    assert_eq!(kinds[abort + 1], "cutoff", "{kinds:?}");
+    let step = first_flag(&v, "ascent_abort_first").unwrap();
+    assert_eq!(trace["events"][abort]["step"].as_u64(), Some(step));
+    assert!(trace["events"][abort]["detail"]["estimated_vertical_velocity_mps"].is_number());
+    // The flag is false before the cut and true after it.
+    assert!(samples_with(&trace, "ascent_abort", false) > 100);
+    assert!(samples_with(&trace, "ascent_abort", true) >= 1);
+    assert_eq!(first_flag(&v, "sensor_disagreement_first"), None);
+
+    // `guarded` inherits the estimator of `robust`, which did not climb: S5 holds, no flag.
+    let (_, v) = m9("guarded");
+    assert_eq!(v["outcome"], "landed");
+    assert_eq!(invariant(&v, "S5_no_powered_ascent")["pass"], true);
+    assert_eq!(first_flag(&v, "ascent_abort_first"), None);
+}
+
+fn trace_fault_names(trace: &Value) -> Vec<String> {
+    trace["events"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| e["kind"] == "fault_start")
+        .map(|e| e["detail"]["fault"].as_str().unwrap().to_string())
+        .collect()
+}
+
+#[test]
+fn the_low_bias_faults_subtract_their_magnitude_and_are_validated_like_the_other_biases() {
+    // Observations of the same seed with and without the fault differ by exactly the magnitude,
+    // before the controller can have changed the flight (the noise streams are always drawn).
+    let clean = run_value(&value_of("nominal.json"), 0).unwrap().0;
+    let mut case = value_of("nominal.json");
+    case["faults"] = json!([
+        fault("altimeter_bias_low", 0.0, 40.0, 27.5),
+        fault("gnss_bias_low", 0.0, 40.0, 15.0)
+    ]);
+    let (faulty, v) = run_value(&case, 0).unwrap();
+    for k in 0..10 {
+        let (a, b) = (
+            &clean["samples"][k]["observation"],
+            &faulty["samples"][k]["observation"],
+        );
+        let d = |x: &Value, y: &Value| x.as_f64().unwrap() - y.as_f64().unwrap();
+        assert!(
+            (d(&b["altimeter_m"], &a["altimeter_m"]) + 27.5).abs() < 1e-9,
+            "{k}"
+        );
+        for axis in [0, 2] {
+            let diff = d(&b["gnss_position_m"][axis], &a["gnss_position_m"][axis]);
+            assert!((diff + 15.0).abs() < 1e-9, "{k} axis {axis}: {diff}");
+        }
+        assert_eq!(a["gnss_position_m"][1], b["gnss_position_m"][1]);
+    }
+    assert_eq!(v["faults"][0]["kind"], "altimeter_bias_low");
+    assert_eq!(v["faults"][1]["kind"], "gnss_bias_low");
+    assert!(
+        v["faults"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|f| f["acted"] == true)
+    );
+    assert_eq!(
+        trace_fault_names(&faulty),
+        ["altimeter_bias_low", "gnss_bias_low"]
+    );
+
+    // A positive and a negative bias of the same sensor are different kinds and may coexist; the
+    // same kind twice may not.
+    let reject = |faults: Vec<Value>| {
+        let mut c = value_of("nominal.json");
+        c["faults"] = Value::Array(faults);
+        run_value(&c, 0)
+    };
+    assert!(
+        reject(vec![
+            fault("altimeter_bias", 0.0, 40.0, 10.0),
+            fault("altimeter_bias_low", 0.0, 40.0, 10.0)
+        ])
+        .is_ok()
+    );
+    for kind in ["altimeter_bias_low", "gnss_bias_low"] {
+        let err = reject(vec![
+            fault(kind, 0.0, 10.0, 6.0),
+            fault(kind, 12.0, 20.0, 6.0),
+        ])
+        .unwrap_err();
+        assert!(err.contains("appears twice"), "{err}");
+    }
+    // Ranges: 5 to 50 m for the altimeter, 5 to 30 m for the GNSS, ends included.
+    for (kind, low, high) in [
+        ("altimeter_bias_low", 5.0, 50.0),
+        ("gnss_bias_low", 5.0, 30.0),
+    ] {
+        assert!(
+            reject(vec![fault(kind, 0.0, 40.0, low)]).is_ok(),
+            "{kind} {low}"
+        );
+        assert!(
+            reject(vec![fault(kind, 0.0, 40.0, high)]).is_ok(),
+            "{kind} {high}"
+        );
+        for bad in [low - 0.1, high + 0.1, 0.0, -low] {
+            let err = reject(vec![fault(kind, 0.0, 40.0, bad)]).unwrap_err();
+            assert!(err.contains("registered range"), "{kind} {bad}: {err}");
+        }
+    }
+    // `acted` follows the rule of the other sensor biases.
+    assert!(!acted_alone(fault("altimeter_bias_low", 30.0, 40.0, 10.0)));
+    assert!(!acted_alone(fault("gnss_bias_low", 30.0, 40.0, 10.0)));
+    assert!(!acted_alone(fault("gnss_bias_low", 1.02, 1.03, 10.0)));
+    assert!(acted_alone(fault("gnss_bias_low", 1.0, 1.01, 10.0)));
+    assert!(acted_alone(fault("altimeter_bias_low", 1.0, 1.01, 10.0)));
+    assert_eq!(
+        acted_of(vec![
+            fault("altimeter_bias_low", 6.0, 7.0, 10.0),
+            fault("altimeter_dropout", 5.0, 8.0, 0.0)
+        ])[0],
+        ("altimeter_bias_low".to_string(), false)
+    );
+    assert_eq!(
+        acted_of(vec![
+            fault("gnss_bias_low", 6.0, 7.0, 10.0),
+            fault("gnss_dropout", 5.0, 8.0, 0.0)
+        ])[0],
+        ("gnss_bias_low".to_string(), false)
+    );
+}
+
+#[test]
+fn the_new_policies_and_gains_are_optional_in_the_schema_and_validated() {
+    // Existing case files carry no `ascent_abort_*` gains and still validate (defaults 1 m/s, 1 s).
+    let case = value_of("nominal.json");
+    assert!(
+        case["controller"]["gains"]
+            .get("ascent_abort_vz_mps")
+            .is_none()
+    );
+    run_value(&case, 0).unwrap();
+    for policy in ["guarded", "baseline_guarded"] {
+        let mut c = case.clone();
+        c["controller"]["policy"] = json!(policy);
+        let (_, v) = run_value(&c, 0).unwrap();
+        assert_eq!(v["policy"], policy);
+    }
+    // Explicit defaults give the same bytes as the omitted ones.
+    let mut explicit = case.clone();
+    explicit["controller"]["policy"] = json!("guarded");
+    let mut omitted = explicit.clone();
+    explicit["controller"]["gains"]["ascent_abort_vz_mps"] = json!(1.0);
+    explicit["controller"]["gains"]["ascent_abort_time_s"] = json!(1.0);
+    let a = artifacts(&serde_json::to_vec(&explicit).unwrap(), 5).unwrap();
+    let b = artifacts(&serde_json::to_vec(&omitted).unwrap(), 5).unwrap();
+    assert_eq!(a.trace, b.trace);
+    // Out-of-range values are rejected with the field name.
+    for (key, bad) in [
+        ("ascent_abort_vz_mps", -1.0),
+        ("ascent_abort_vz_mps", 1000.0),
+        ("ascent_abort_time_s", 0.0),
+        ("ascent_abort_time_s", 61.0),
+    ] {
+        omitted["controller"]["gains"][key] = json!(bad);
+        let err = run_value(&omitted, 0).unwrap_err();
+        assert!(err.contains(key), "{key} {bad}: {err}");
+        omitted["controller"]["gains"]
+            .as_object_mut()
+            .unwrap()
+            .remove(key);
+    }
+}
+
+#[test]
+fn m91_runs_replay_and_a_forged_controller_flag_is_rejected() {
+    for (case, seed) in [
+        ("gnss-bias-guarded.json", 0),
+        ("gnss-dropout-baseline-guarded.json", 0),
+        ("altimeter-bias-low-guarded.json", 1),
+    ] {
+        let dir = tamper_dir(&format!("m91-{seed}-{case}"), case, seed);
+        let report = replay(&dir);
+        assert_eq!(report.status, "verified", "{case}: {:?}", report.checks);
+        // The flags block is part of the recomputed verification: forging it, with the manifest
+        // hash forged to match, still differs from the recomputation.
+        let v = fs::read_to_string(dir.join("verification.json")).unwrap();
+        let forged = v.replacen(
+            "\"sensor_disagreement_first\":",
+            "\"sensor_disagreement_first_forged\":",
+            1,
+        );
+        assert_ne!(forged, v);
+        fs::write(dir.join("verification.json"), &forged).unwrap();
+        let run = fs::read_to_string(dir.join("run.json")).unwrap();
+        fs::write(
+            dir.join("run.json"),
+            run.replace(&sha256_hex(v.as_bytes()), &sha256_hex(forged.as_bytes())),
+        )
+        .unwrap();
+        assert_eq!(
+            replay_failures(&dir),
+            [
+                "recomputed verification equals the stored verification byte for byte",
+                "run.json equals the regenerated manifest byte for byte"
+            ]
+        );
+        let _ = fs::remove_dir_all(dir);
     }
 }

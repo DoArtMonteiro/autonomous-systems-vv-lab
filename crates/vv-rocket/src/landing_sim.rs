@@ -15,7 +15,7 @@ use crate::landing_sensors::{SensorFaults, SensorStreams};
 use crate::landing_truth::{
     Ignition, Touchdown, TruthExcerpt, TruthLog, TruthStep, contact, excerpt,
 };
-use crate::landing_types::{Command, Estimate, Observation};
+use crate::landing_types::{Command, ControllerFlags, Estimate, FlagInstant, Observation};
 use crate::model::Segment;
 
 pub const TRACE_SCHEMA: &str = "vv-rocket-landing-trace.v1";
@@ -80,6 +80,8 @@ pub struct Trace {
 pub struct LandingRun {
     pub trace: Trace,
     pub log: TruthLog,
+    /// What the controller reported, for the verification record; no verdict reads it.
+    pub controller_flags: ControllerFlags,
 }
 
 fn kinds_of(active: &[FaultKind]) -> Vec<&'static str> {
@@ -133,6 +135,7 @@ pub fn simulate_landing(prep: &PreparedLanding) -> Result<LandingRun, String> {
     let mut touchdown: Option<Touchdown> = None;
     let mut ignition: Option<Ignition> = None;
     let mut last_active: Vec<FaultKind> = Vec::new();
+    let mut flags = ControllerFlags::default();
     let mut end_state = s;
     let mut step = 0;
 
@@ -192,10 +195,12 @@ pub fn simulate_landing(prep: &PreparedLanding) -> Result<LandingRun, String> {
                         actuator_faults.ignition_delay_steps = Some((m / dt).round() as u64)
                     }
                     FaultKind::GimbalStuck => actuator_faults.gimbal_stuck = true,
-                    FaultKind::AltimeterBias => sensor_faults.altimeter_bias_m = m,
+                    FaultKind::AltimeterBias => sensor_faults.altimeter_bias_m += m,
+                    FaultKind::AltimeterBiasLow => sensor_faults.altimeter_bias_m -= m,
                     FaultKind::AltimeterDropout => sensor_faults.altimeter_dropout = true,
                     FaultKind::GnssDropout => sensor_faults.gnss_dropout = true,
-                    FaultKind::GnssBias => sensor_faults.gnss_bias_m = m,
+                    FaultKind::GnssBias => sensor_faults.gnss_bias_m += m,
+                    FaultKind::GnssBiasLow => sensor_faults.gnss_bias_m -= m,
                     FaultKind::ImuAccelBias => sensor_faults.imu_accel_bias_mps2 = m,
                 }
             }
@@ -213,6 +218,23 @@ pub fn simulate_landing(prep: &PreparedLanding) -> Result<LandingRun, String> {
                 gnss_cycle,
             );
             let (command, estimate) = controller.step(&observation);
+            let at = FlagInstant { step, t_s };
+            if estimate.altimeter_rejected {
+                flags.altimeter_rejected_first.get_or_insert(at);
+            }
+            if estimate.sensor_disagreement == Some(true) {
+                flags.sensor_disagreement_first.get_or_insert(at);
+            }
+            if estimate.ascent_abort == Some(true) && flags.ascent_abort_first.is_none() {
+                flags.ascent_abort_first = Some(at);
+                events.push(Event {
+                    step,
+                    t_s,
+                    kind: "ascent_abort",
+                    detail: serde_json::json!({"estimated_vertical_velocity_mps":
+                        estimate.velocity_mps[2]}),
+                });
+            }
             cycle = Some(Cycle {
                 observation,
                 estimate,
@@ -398,6 +420,7 @@ pub fn simulate_landing(prep: &PreparedLanding) -> Result<LandingRun, String> {
             touchdown,
             ignition,
         },
+        controller_flags: flags,
     })
 }
 

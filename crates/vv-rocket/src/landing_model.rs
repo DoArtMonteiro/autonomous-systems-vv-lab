@@ -19,7 +19,7 @@ use crate::prng::{SplitMix64, source};
 pub const LANDING_SCHEMA: &str = "vv-rocket-landing.v1";
 pub const CONTROL_PERIOD_STEPS: u64 = 2;
 pub const GNSS_PERIOD_CYCLES: u64 = 5;
-pub const MAX_FAULTS: usize = 8;
+pub const MAX_FAULTS: usize = 10;
 /// Tangent of the 8 degree TVC limit (docs/m9-powered-landing.md).
 pub const GIMBAL_MAX_TAN: f64 = 0.140_540_834_7;
 /// Pre-registered vertical speed target at the contact.
@@ -208,6 +208,10 @@ pub enum FaultKind {
     GnssDropout,
     GnssBias,
     ImuAccelBias,
+    /// M9.1: subtracts the magnitude from the altimeter.
+    AltimeterBiasLow,
+    /// M9.1: subtracts the magnitude from the GNSS position in x and z.
+    GnssBiasLow,
 }
 
 impl FaultKind {
@@ -221,6 +225,8 @@ impl FaultKind {
             FaultKind::GnssDropout => "gnss_dropout",
             FaultKind::GnssBias => "gnss_bias",
             FaultKind::ImuAccelBias => "imu_accel_bias",
+            FaultKind::AltimeterBiasLow => "altimeter_bias_low",
+            FaultKind::GnssBiasLow => "gnss_bias_low",
         }
     }
 
@@ -232,6 +238,8 @@ impl FaultKind {
             FaultKind::AltimeterBias => Some((5.0, 50.0)),
             FaultKind::GnssBias => Some((5.0, 30.0)),
             FaultKind::ImuAccelBias => Some((0.05, 0.5)),
+            FaultKind::AltimeterBiasLow => Some((5.0, 50.0)),
+            FaultKind::GnssBiasLow => Some((5.0, 30.0)),
             FaultKind::GimbalStuck | FaultKind::AltimeterDropout | FaultKind::GnssDropout => None,
         }
     }
@@ -403,6 +411,18 @@ fn validate_gains(g: &Gains) -> Result<(), String> {
     if g.altimeter_rejection_cycles == 0 || g.altimeter_rejection_cycles > 1000 {
         return Err("controller.gains.altimeter_rejection_cycles must be in [1, 1000]".into());
     }
+    within(
+        g.ascent_abort_vz_mps,
+        "controller.gains.ascent_abort_vz_mps",
+        0.0,
+        100.0,
+    )?;
+    within(
+        g.ascent_abort_time_s,
+        "controller.gains.ascent_abort_time_s",
+        0.02,
+        60.0,
+    )?;
     Ok(())
 }
 

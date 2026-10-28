@@ -10,6 +10,10 @@ use serde::{Deserialize, Serialize};
 pub enum Policy {
     Baseline,
     Robust,
+    /// `robust` plus the M9.1 rules: altitude disagreement handling and the rise cutoff.
+    Guarded,
+    /// `baseline` unchanged plus the M9.1 rise cutoff.
+    BaselineGuarded,
 }
 
 impl Policy {
@@ -17,7 +21,24 @@ impl Policy {
         match self {
             Policy::Baseline => "baseline",
             Policy::Robust => "robust",
+            Policy::Guarded => "guarded",
+            Policy::BaselineGuarded => "baseline_guarded",
         }
+    }
+
+    /// The policy navigates with the fused (IMU, GNSS, gated altimeter) estimator.
+    pub fn uses_fused_estimator(self) -> bool {
+        matches!(self, Policy::Robust | Policy::Guarded)
+    }
+
+    /// M9.1 rule 1: guidance reads the lower of the two disagreeing altitudes.
+    pub fn handles_disagreement(self) -> bool {
+        self == Policy::Guarded
+    }
+
+    /// M9.1 rule 2: cut the engine after a sustained estimated rise.
+    pub fn cuts_on_ascent(self) -> bool {
+        matches!(self, Policy::Guarded | Policy::BaselineGuarded)
     }
 }
 
@@ -57,6 +78,29 @@ pub struct Estimate {
     pub position_m: [f64; 3],
     pub velocity_mps: [f64; 3],
     pub altimeter_rejected: bool,
+    /// M9.1 rule 1 is active (the altimeter and the estimator disagree). `None` for the policies
+    /// that do not produce the flag, so their traces keep their bytes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sensor_disagreement: Option<bool>,
+    /// M9.1 rule 2 cut the engine (stays true afterwards). `None` for the policies without it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ascent_abort: Option<bool>,
+}
+
+/// The step and logical time of a control cycle.
+#[derive(Clone, Copy, Debug, Serialize, PartialEq)]
+pub struct FlagInstant {
+    pub step: u64,
+    pub t_s: f64,
+}
+
+/// First control cycle at which each controller flag was raised. What the controller said, kept
+/// next to the verdicts; no verdict reads it.
+#[derive(Clone, Copy, Debug, Default, Serialize, PartialEq)]
+pub struct ControllerFlags {
+    pub sensor_disagreement_first: Option<FlagInstant>,
+    pub ascent_abort_first: Option<FlagInstant>,
+    pub altimeter_rejected_first: Option<FlagInstant>,
 }
 
 /// Design parameters of the controller and of the `robust` estimator. These are decisions of the
@@ -95,6 +139,23 @@ pub struct Gains {
     pub altimeter_velocity_gain: f64,
     pub altimeter_residual_threshold_m: f64,
     pub altimeter_rejection_cycles: u32,
+    /// M9.1 rule 2 (`guarded`, `baseline_guarded`): the estimated vertical velocity above this
+    /// value, held for `ascent_abort_time_s`, cuts the engine. Optional in the case file.
+    #[serde(default = "default_ascent_abort_vz_mps")]
+    pub ascent_abort_vz_mps: f64,
+    #[serde(default = "default_ascent_abort_time_s")]
+    pub ascent_abort_time_s: f64,
+}
+
+pub const DEFAULT_ASCENT_ABORT_VZ_MPS: f64 = 1.0;
+pub const DEFAULT_ASCENT_ABORT_TIME_S: f64 = 1.0;
+
+fn default_ascent_abort_vz_mps() -> f64 {
+    DEFAULT_ASCENT_ABORT_VZ_MPS
+}
+
+fn default_ascent_abort_time_s() -> f64 {
+    DEFAULT_ASCENT_ABORT_TIME_S
 }
 
 /// The only information the controller has besides observations (docs/m9-powered-landing.md).

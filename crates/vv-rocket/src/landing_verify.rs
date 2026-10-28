@@ -1,5 +1,5 @@
 //! Independent verifier of the landing: requirements R1 to R6 at the interpolated contact state
-//! and invariants S1 to S4 per step, from the true state only. Formulas and limits are those of
+//! and invariants S1 to S5 per step, from the true state only. Formulas and limits are those of
 //! docs/m9-powered-landing.md; the mission outcome is kept apart from the safety invariants.
 
 use serde::Serialize;
@@ -9,10 +9,16 @@ use crate::landing_model::{FaultKind, FaultSpec, PreparedLanding, Requirements};
 use crate::landing_truth::{
     TruthExcerpt, TruthLog, TruthStep, base_kinematics, contact, excerpt, tilt_cos,
 };
+use crate::landing_types::ControllerFlags;
 use crate::math::Vec3;
 use crate::model::{G0, Prepared, Segment, Vehicle};
 
-pub const VERIFICATION_SCHEMA: &str = "vv-rocket-landing-verification.v1";
+pub const VERIFICATION_SCHEMA: &str = "vv-rocket-landing-verification.v2";
+/// Pre-registered M9.1 limit of `S5_no_powered_ascent`, in metres of rise of the centre of mass
+/// above its running minimum since ignition. A constant of the verifier, not a case field.
+pub const S5_MAX_ASCENT_M: f64 = 5.0;
+/// Label of the `controller_flags` block: what the controller said, not a verdict.
+pub const CONTROLLER_FLAGS_NOTE: &str = "controller-reported; not used for any verdict";
 pub const DISCLAIMER: &str = "idealized model; contact = nozzle plane reaching z=0; no contact dynamics; not validated against flight data";
 
 #[derive(Clone, Debug, Serialize)]
@@ -75,7 +81,17 @@ pub struct Verification {
     pub seed: u64,
     pub policy: &'static str,
     pub faults: Vec<FaultReport>,
+    pub controller_flags: ControllerReport,
     pub disclaimer: &'static str,
+}
+
+/// First instants at which the controller raised its flags, copied from the run. They are the
+/// controller's own claims, shown for comparison with the verdicts; the verifier never reads them.
+#[derive(Clone, Debug, Serialize)]
+pub struct ControllerReport {
+    pub source: &'static str,
+    #[serde(flatten)]
+    pub flags: ControllerFlags,
 }
 
 /// A fault as configured plus whether it changed anything in this run. A window that closes
@@ -309,9 +325,11 @@ fn segment_of(s: &TruthStep) -> Option<Segment> {
     })
 }
 
-/// Invariants S1 to S4. S1 is checked at the state each thrusting step starts from and at the
+/// Invariants S1 to S5. S1 is checked at the state each thrusting step starts from and at the
 /// state it reaches; S3 at the start of every step with that step's thrust; S4 over the thrust
-/// history; S2 at the contact only.
+/// history; S5 at the same two states as S1, as the rise of the centre of mass above its running
+/// minimum since the first thrusting step (every state since ignition feeds the minimum, only the
+/// states of thrusting steps are evaluated); S2 at the contact only.
 fn invariants(
     req: &Requirements,
     truth: &Prepared,
@@ -328,6 +346,8 @@ fn invariants(
         "ignitions",
         false,
     );
+    let mut s5 = Tally::new("S5_no_powered_ascent", S5_MAX_ASCENT_M, "m", false);
+    let mut min_z: Option<f64> = None;
     let mut ignitions = 0_u32;
     let mut last_s1: Option<u64> = None;
     let mut prev_thrusting = false;
@@ -335,6 +355,19 @@ fn invariants(
     for (i, st) in log.steps.iter().enumerate() {
         let thrusting = st.thrust_n > 0.0;
         let t_s = st.step as f64 * log.dt;
+        if thrusting || min_z.is_some() {
+            min_z = Some(min_z.map_or(st.state.r.z, |m| m.min(st.state.r.z)));
+        }
+        if thrusting && let Some(m) = min_z {
+            s5.check(
+                st.state.r.z - m,
+                st.step,
+                t_s,
+                &st.active_faults,
+                vehicle,
+                &st.state,
+            );
+        }
         if thrusting && last_s1 != Some(st.step) {
             s1.check(
                 tilt_cos(st.state.q),
@@ -363,6 +396,16 @@ fn invariants(
                 &end_state,
             );
             last_s1 = Some(st.step + 1);
+            let m = min_z.map_or(end_state.r.z, |m| m.min(end_state.r.z));
+            min_z = Some(m);
+            s5.check(
+                end_state.r.z - m,
+                end_step,
+                end_t,
+                &st.active_faults,
+                vehicle,
+                &end_state,
+            );
         }
         let seg = segment_of(st);
         let f = forces(truth, &st.state, seg.as_ref());
@@ -403,7 +446,13 @@ fn invariants(
             &t.state,
         );
     }
-    vec![s1.finish(), s2.finish(), s3.finish(), s4.finish()]
+    vec![
+        s1.finish(),
+        s2.finish(),
+        s3.finish(),
+        s4.finish(),
+        s5.finish(),
+    ]
 }
 
 /// Verdicts from the true state only.
@@ -421,9 +470,14 @@ pub fn evaluate(
         touch.as_ref(),
     );
     let invs = invariants(req, truth, log, touch.as_ref());
+    // `landed` also needs `S5`: a soft contact reached by climbing under power is not a landing.
+    let s5_pass = invs
+        .iter()
+        .find(|i| i.id == "S5_no_powered_ascent")
+        .is_none_or(|i| i.pass);
     let outcome = if touch.is_none() {
         "no_contact"
-    } else if reqs.iter().all(|r| r.pass) {
+    } else if reqs.iter().all(|r| r.pass) && s5_pass {
         "landed"
     } else {
         "hard_landing"
@@ -457,11 +511,11 @@ fn fault_reports(prep: &PreparedLanding, log: &TruthLog) -> Vec<FaultReport> {
                     .ignition
                     .is_some_and(|i| i.effective_step.is_none_or(|e| e > i.command_step)),
                 FaultKind::AltimeterDropout => any(&|s| active(s) && control_cycle(s)),
-                FaultKind::AltimeterBias => any(&|s| {
+                FaultKind::AltimeterBias | FaultKind::AltimeterBiasLow => any(&|s| {
                     active(s) && control_cycle(s) && !masked_by(FaultKind::AltimeterDropout, s)
                 }),
                 FaultKind::GnssDropout => any(&|s| active(s) && gnss_cycle(s)),
-                FaultKind::GnssBias => {
+                FaultKind::GnssBias | FaultKind::GnssBiasLow => {
                     any(&|s| active(s) && gnss_cycle(s) && !masked_by(FaultKind::GnssDropout, s))
                 }
                 FaultKind::ImuAccelBias => any(&|s| active(s) && control_cycle(s)),
@@ -493,6 +547,10 @@ pub fn verify(prep: &PreparedLanding, log: &TruthLog) -> Verification {
         seed: prep.seed,
         policy: prep.controller.policy.as_str(),
         faults: fault_reports(prep, log),
+        controller_flags: ControllerReport {
+            source: CONTROLLER_FLAGS_NOTE,
+            flags: ControllerFlags::default(),
+        },
         disclaimer: DISCLAIMER,
     }
 }
@@ -783,5 +841,177 @@ mod tests {
         assert!(!s4.pass);
         assert_eq!((s4.worst_value, s4.failure_count), (Some(2.0), 1));
         assert_eq!(s4.first_failure.as_ref().unwrap().step, 4);
+    }
+
+    /// A log of `thrust.len()` steps whose states have the centre of mass at `z[k]` (upright);
+    /// `z` has one more entry than `thrust`: the last is the state at the end of the run.
+    fn climb_log(z: &[f64], thrust: &[bool]) -> TruthLog {
+        assert_eq!(z.len(), thrust.len() + 1);
+        let at = |h: f64| State {
+            r: Vec3::new(0.0, 0.0, h),
+            ..upright(0.0)
+        };
+        let steps: Vec<TruthStep> = thrust
+            .iter()
+            .enumerate()
+            .map(|(k, &on)| TruthStep {
+                step: k as u64,
+                state: at(z[k]),
+                thrust_n: if on { 25_000.0 } else { 0.0 },
+                direction: Vec3::new(1.0, 0.0, 0.0),
+                active_faults: Vec::new(),
+            })
+            .collect();
+        TruthLog {
+            dt: 0.01,
+            end_step: thrust.len() as u64,
+            end_state: at(z[thrust.len()]),
+            steps,
+            touchdown: None,
+            ignition: None,
+        }
+    }
+
+    fn s5_of(log: &TruthLog) -> InvariantResult {
+        let (_, _, invs) = evaluate(&Requirements::registered(), &prepared(), log);
+        invs.into_iter()
+            .find(|i| i.id == "S5_no_powered_ascent")
+            .unwrap()
+    }
+
+    #[test]
+    fn s5_passes_without_a_rise_and_at_the_limit_and_fails_above_it() {
+        // Descent under power: the rise is zero.
+        let s5 = s5_of(&climb_log(&[100.0, 99.0, 98.0, 97.0], &[true, true, true]));
+        assert!(s5.pass && s5.evaluated);
+        assert_eq!(
+            (s5.worst_value, s5.limit, s5.failure_count),
+            (Some(0.0), 5.0, 0)
+        );
+
+        // 4.9 m above the running minimum (100 m) passes, 5.1 m fails.
+        let s5 = s5_of(&climb_log(
+            &[100.0, 102.0, 104.9, 104.9],
+            &[true, true, true],
+        ));
+        assert!(s5.pass, "{s5:?}");
+        assert!((s5.worst_value.unwrap() - 4.9).abs() < 1e-9);
+
+        let s5 = s5_of(&climb_log(
+            &[100.0, 102.0, 105.1, 105.1],
+            &[true, true, true],
+        ));
+        assert!(!s5.pass, "{s5:?}");
+        assert!((s5.worst_value.unwrap() - 5.1).abs() < 1e-9);
+        let first = s5.first_failure.unwrap();
+        // The rise is first seen at the start of step 2 and at the end of step 1; the end of
+        // step 1 is the state at step 2, so the first record is step 2.
+        assert_eq!(first.step, 2);
+        assert!(first.observed.starts_with("5.1"), "{}", first.observed);
+        assert_eq!(first.expected, "<= 5 m");
+        assert!((first.t_s - 0.02).abs() < 1e-12);
+    }
+
+    #[test]
+    fn s5_uses_the_minimum_since_ignition_and_not_the_start() {
+        // Falls to 90 m, then rises to 96 m: 6 m above the minimum, 4 m below the start.
+        let s5 = s5_of(&climb_log(
+            &[100.0, 95.0, 90.0, 96.0, 96.0],
+            &[true, true, true, true],
+        ));
+        assert!(!s5.pass);
+        assert!((s5.worst_value.unwrap() - 6.0).abs() < 1e-9);
+        // The unpowered approach before the ignition does not count: the minimum starts at the
+        // state of the first thrusting step (100 m), not at the 50 m of step 0.
+        let s5 = s5_of(&climb_log(
+            &[50.0, 100.0, 102.0, 103.0, 103.0],
+            &[false, true, true, true],
+        ));
+        assert!(s5.pass, "{s5:?}");
+        assert!((s5.worst_value.unwrap() - 3.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn s5_does_not_evaluate_an_unpowered_rise() {
+        // Powered descent, cutoff, then a ballistic rise of 150 m.
+        let s5 = s5_of(&climb_log(
+            &[100.0, 99.0, 99.0, 150.0, 200.0, 250.0],
+            &[true, true, false, false, false],
+        ));
+        assert!(s5.pass, "{s5:?}");
+        assert!(s5.worst_value.unwrap() <= 1e-9);
+        // No ignition at all: not evaluated, and the invariant holds.
+        let s5 = s5_of(&climb_log(&[100.0, 150.0, 200.0], &[false, false]));
+        assert!(s5.pass && !s5.evaluated && s5.worst_value.is_none());
+    }
+
+    #[test]
+    fn s5_ignores_attitude_only_motion_of_the_nozzle_plane() {
+        // The centre of mass stays at 100 m while the vehicle turns past 120 degrees: the
+        // nozzle plane rises by 7.5 m, more than the limit, but the centre of mass did not.
+        let (c, sn) = (0.5_f64, 0.866_025_403_784_438_6_f64);
+        let upright_state = State {
+            r: Vec3::new(0.0, 0.0, 100.0),
+            ..upright(0.0)
+        };
+        let mut turned = upright_state;
+        turned.q = Quat::new(c, 0.0, sn, 0.0).hamilton(turned.q).normalized();
+        let v = vehicle();
+        let rise = base_kinematics(&v, &turned).0.z - base_kinematics(&v, &upright_state).0.z;
+        assert!(rise > 7.0, "{rise}");
+        let mut log = climb_log(&[100.0, 100.0, 100.0], &[true, true]);
+        log.steps[1].state = turned;
+        log.end_state = turned;
+        let s5 = s5_of(&log);
+        assert!(s5.pass && s5.worst_value == Some(0.0), "{s5:?}");
+    }
+
+    #[test]
+    fn a_landing_that_climbed_too_far_under_power_is_not_landed_but_keeps_its_requirements() {
+        // Thrusting steps at 10, 8 and `top` m (centre of mass), then a soft, upright contact.
+        let landing = |top: f64| {
+            let after = grounded(upright(0.0));
+            let mk = |k: u64, z: f64| TruthStep {
+                step: k,
+                state: State {
+                    r: Vec3::new(0.0, 0.0, z),
+                    ..upright(0.0)
+                },
+                thrust_n: 25_000.0,
+                direction: Vec3::new(1.0, 0.0, 0.0),
+                active_faults: Vec::new(),
+            };
+            let log = TruthLog {
+                dt: 0.01,
+                steps: vec![mk(0, 10.0), mk(1, 8.0), mk(2, top)],
+                end_step: 3,
+                end_state: after,
+                touchdown: Some(Touchdown {
+                    step: 3,
+                    fraction: 1.0,
+                    t_s: 0.03,
+                    state: after,
+                    after,
+                }),
+                ignition: None,
+            };
+            evaluate(&Requirements::registered(), &prepared(), &log)
+        };
+        let s5_of = |invs: &[InvariantResult]| {
+            invs.iter()
+                .find(|i| i.id == "S5_no_powered_ascent")
+                .unwrap()
+                .clone()
+        };
+        let (outcome, reqs, invs) = landing(9.0);
+        assert!(failed(&reqs).is_empty(), "{reqs:?}");
+        assert!(s5_of(&invs).pass);
+        assert_eq!(outcome, "landed");
+        // 6 m above the 8 m minimum: S5 fails, no requirement does, and the outcome is no longer
+        // `landed`.
+        let (outcome, reqs, invs) = landing(14.0);
+        assert!(failed(&reqs).is_empty(), "{reqs:?}");
+        assert!(!s5_of(&invs).pass);
+        assert_eq!(outcome, "hard_landing");
     }
 }
