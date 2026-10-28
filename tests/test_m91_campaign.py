@@ -380,13 +380,13 @@ class SummaryTests(unittest.TestCase):
                 "command_identity": GOOD_IDENTITY}
         summary = m91.build_summary(records, meta)
         text = m91.render_markdown(summary)
-        self.assertNotIn("—", text)
+        self.assertNotIn("\u2014", text)
         self.assertFalse(summary["preregistered"])
         self.assertEqual(summary["schema"], "vv-m91-campaign.v1")
         for token in ("G1", "G5", "Recuperou", "Contenção", "Falsos alarmes", "Regressões", "não (subconjunto"):
             self.assertIn(token, text)
         self.assertEqual(summary["composition"]["total"], 6)
-        self.assertNotIn("—", json.dumps(summary, ensure_ascii=False))
+        self.assertNotIn("\u2014", json.dumps(summary, ensure_ascii=False))
 
     def test_composition_states_the_arithmetic_of_1050(self):
         records = [run_record(r.fault, r.policy, r.seed, magnitude=1.0) for r in m91.plan_runs(m91.DEFAULT_SEEDS)]
