@@ -1352,6 +1352,58 @@ fn m9_demo_traces_are_byte_identical_after_m91() {
     }
 }
 
+#[test]
+fn m91_demo_traces_are_pinned() {
+    // SHA-256 of `trace.json` of the four M9.1 cases (seeds 0 and 1), recorded on Windows. CI runs
+    // this test on Linux too, which is the cross-platform evidence for `guarded`, `baseline_guarded`
+    // and the low-reading faults.
+    for (name, seed, want) in [
+        (
+            "m91-nominal.json",
+            0,
+            "bd906bfa1ce893d4b0a156c99232d18a4808a566793e59b39523f1c4f4d7d381",
+        ),
+        (
+            "m91-nominal.json",
+            1,
+            "7255fb9152daf34bff4aa2ba4da1ed15bf9d7655b5b90df0fd0a0fcfd532a241",
+        ),
+        (
+            "gnss-bias-guarded.json",
+            0,
+            "91a21b24d4f2169a338729901f160e3cd37de5b65edacfc4d00d4671fa81dc04",
+        ),
+        (
+            "gnss-bias-guarded.json",
+            1,
+            "fe55f8ffea89e05b6e5946496a644e7716baa977bd9650520a5b3a028bdcf9e4",
+        ),
+        (
+            "gnss-dropout-baseline-guarded.json",
+            0,
+            "aa92dbc1d6c52a04eec5eabad6d76ba17d2ed0ffd11ccc89e8fa98cec5ae0e1a",
+        ),
+        (
+            "gnss-dropout-baseline-guarded.json",
+            1,
+            "2052494de738c84bee9e34d892270265e5fa1f2be165d0a85ed8da6ba1f61db1",
+        ),
+        (
+            "altimeter-bias-low-guarded.json",
+            0,
+            "8a8b5109024b2b4f00e380d89f7cd8c94fa73915a98c66bb9789c4c1fdfc93e6",
+        ),
+        (
+            "altimeter-bias-low-guarded.json",
+            1,
+            "696b6657f1ae76aaf08d185b103cff6d16de805c470f6a3a5fead948662573b8",
+        ),
+    ] {
+        let art = artifacts(&bytes_of(name), seed).unwrap();
+        assert_eq!(sha256_hex(&art.trace), want, "{name} seed {seed}");
+    }
+}
+
 fn first_flag(v: &Value, key: &str) -> Option<u64> {
     v["controller_flags"][key]["step"].as_u64()
 }
