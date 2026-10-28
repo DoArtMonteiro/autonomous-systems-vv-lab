@@ -482,3 +482,48 @@ Uma revisão independente desta secção, feita antes da implementação, encont
 - G5: sem critério de sucesso. Previsões para as falhas novas: `guarded` escolhe a fonte que lê baixo, trava cedo, para a cerca de `h ≈ enviesamento` acima do solo verdadeiro, corta e não recupera; `baseline` com `altimeter_bias_low` corta a cerca de `h = enviesamento + 15 m` verdadeiros e falha `R1`; `robust` com `altimeter_bias_low` rejeita o altímetro e deverá aterrar como em `altimeter_bias`; com `gnss_bias_low`, `baseline` e `robust` deverão espelhar verticalmente o `gnss_bias`.
 
 **Restrições de implementação.** As falhas novas usam a regra de `acted` dos enviesamentos de sensores; continua a haver no máximo uma falha de cada tipo; as gamas novas entram na validação e na tabela de gamas do adaptador. A campanha de aceitação passa a ter 990 + 60 = 1050 execuções.
+
+### Implementação M9.1
+
+Esta subsecção descreve o que foi implementado em `crates/vv-rocket` para o M9.1. Não altera nenhum texto, limite, gama ou hipótese pré-registados acima. Os resultados são os medidos.
+
+**Módulos alterados.** Não há ficheiros de código novos (a lista de `source_sha256` mantém-se).
+
+| Ficheiro | Alteração |
+| --- | --- |
+| `landing_types.rs` | Políticas `guarded` e `baseline_guarded`; campos `sensor_disagreement` e `ascent_abort` da estimativa (`Option<bool>`, só serializados quando a política os produz); ganhos opcionais `ascent_abort_vz_mps` e `ascent_abort_time_s` (por omissão 1 m/s e 1 s); `ControllerFlags` e `FlagInstant`. |
+| `landing_controller.rs` | Regra 1 e regra 2 (ver abaixo). `baseline` e `robust` não mudam. |
+| `landing_model.rs` | Falhas `altimeter_bias_low` (5 a 50 m) e `gnss_bias_low` (5 a 30 m) na validação; validação dos dois ganhos novos; `MAX_FAULTS` passa de 8 a 10 (há dez tipos, no máximo um de cada). |
+| `landing_sim.rs` | Aplicação das falhas novas; primeiro instante de cada bandeira; evento `ascent_abort`. |
+| `landing_verify.rs` | Invariante `S5_no_powered_ascent`; esquema `vv-rocket-landing-verification.v2`; bloco `controller_flags`; `acted` das falhas novas. |
+| `landing_run.rs` | Copia as bandeiras da execução para o bloco `controller_flags`. |
+| `landing/` | `m91-nominal.json` (modelo de caso de `guarded`, SHA-256 `69ecad65e9ec4329ffc74a3b985dbb7dc60d5cdaa1e4a9a380f296a76f68114b`), `gnss-bias-guarded.json`, `gnss-dropout-baseline-guarded.json` e `altimeter-bias-low-guarded.json`. `nominal.json` e o seu SHA-256 não mudam. |
+| `scripts/m91_retrospective.py` | Reavaliação retrospetiva P1. |
+
+**Esquema v2.** `verification.json` passa a ter `S5_no_powered_ascent` (limite 5 m, unidade m) depois de `S4_no_relight` e um bloco `controller_flags` com o rótulo `controller-reported; not used for any verdict` e os campos `sensor_disagreement_first`, `ascent_abort_first` e `altimeter_rejected_first`, cada um `null` ou `{step, t_s}` do primeiro ciclo de controlo em que a bandeira apareceu. O bloco existe em todas as políticas; `null` quer dizer que a bandeira não apareceu ou que a política não a produz (`altimeter_rejected_first` é a deteção do `robust`, para comparar com `sensor_disagreement_first` do `guarded`). O verificador não lê o bloco: é copiado do registo do controlador por `landing_run.rs`, depois de `verify`. O esquema do caso (`vv-rocket-landing.v1`) e o de `trace.json` (`v1`) não mudam.
+
+**Resultado da missão e código de saída.** `landed` exige agora `R1` a `R6` e `S5`; uma violação de `S1` a `S4` continua a não alterar o resultado da missão. Um contacto suave depois de subir mais de 5 m com o motor aceso é `hard_landing` com `requirements_pass: true` e `invariants_pass: false`. O código de saída 0 de `vv-rocket land` mantém a definição (resultado `landed` e todos os invariantes cumpridos, agora incluindo `S5`); a lógica não precisou de mudar.
+
+**Escolhas de implementação.**
+
+- O limite de `S5` (5,0 m) é uma constante do verificador (`S5_MAX_ASCENT_M`) e não um campo do caso: os 780 `case.json` guardados não o têm, e assim não pode ser movido por um ficheiro de caso. A subida é `r_z` menos o mínimo corrente de `r_z` desde o primeiro passo com impulso; todos os estados desde a ignição entram no mínimo (incluindo os de passos sem impulso), e só se avalia no estado inicial e final de cada passo com impulso. Sem ignição, `S5` não é avaliado (`evaluated: false`, cumprido).
+- Regra 1: usa o contador de rejeição do estimador do `robust` (resíduo acima de `altimeter_residual_threshold_m` = 3 m durante `altimeter_rejection_cycles` = 5 ciclos seguidos), pelo que não há ganhos novos para a deteção. `sensor_disagreement` é o estado corrente (verdadeiro enquanto a inconsistência durar); o primeiro instante fica em `controller_flags`. A altitude de guiamento é `min(amostra do altímetro do ciclo, altitude da base do estimador)` quando a inconsistência está declarada; sem amostra, é a do estimador. O estado do estimador nunca é alterado pela escolha, e `guarded` e `robust` têm estimativas de posição e velocidade idênticas com as mesmas observações.
+- Regra 2: conta ciclos de controlo seguidos com a velocidade vertical estimada do centro de massa (`nav.v.z`) acima de `ascent_abort_vz_mps`, só com o motor aceso; corta ao ciclo número `round(ascent_abort_time_s / período do ciclo)` = 50 (cada ciclo vale um período de 0,02 s). O corte a 15 m continua em todas as políticas e é avaliado antes. `ascent_abort` na estimativa fica verdadeiro depois do corte. O evento `ascent_abort` precede o evento `cutoff` do mesmo passo.
+- As falhas `*_bias_low` somam-se às respetivas falhas `*_bias` quando coexistem (`+=` e `-=` sobre o desvio do passo); `acted` segue a regra dos desvios (um ciclo de controlo, ou de GNSS, dentro da janela e sem corte do mesmo sensor).
+
+**Retrospetiva P1.** `python scripts/m91_retrospective.py --binary crates/vv-rocket/target/release/vv-rocket` volta a correr `vv-rocket land` com o `case.json` e a semente de `run.json` de cada execução guardada de `runs/m9-campaign` (as 540 da matriz em `runs/` e as 240 do varrimento em `boundary/`; as 2 repetições deterministas não entram), para uma pasta temporária, e compara `trace.json` byte a byte. Resultado, tal como medido: 780 execuções, 780 traços idênticos, `S5` falha em exatamente 20, todas `baseline` com `gnss_dropout` e resultado `no_contact` (subida máxima entre 136,4 e 1358,8 m), e em nenhuma outra. A previsão P1 verifica-se. O resultado está em `runs/m91-retrospective/retrospective.json` (pasta ignorada pelo Git). `runs/m9-campaign` não foi alterada; as suas execuções deixam de passar `vv-rocket replay` (código e `verification.json` v1 mudaram, como já acontecia com qualquer alteração do código).
+
+**Identidade dos traços.** Os SHA-256 de `trace.json` dos 18 casos que já existiam, com as sementes 0 e 1 (36 traços), registados antes das alterações, ficaram iguais e estão fixados em `m9_demo_traces_are_byte_identical_after_m91`, tal como os dos casos nominais e os do M8.
+
+**Casos de demonstração M9.1.** Magnitudes fixadas antes de qualquer execução (pontos médios das gamas: `gnss_bias` 15 m, `altimeter_bias_low` 27,5 m) e janelas copiadas dos casos M9 correspondentes. Sementes 0 e 1, sem ajuste de limiares; nenhum invariante falhou:
+
+| Caso | Semente 0 | Semente 1 | Bandeiras |
+| --- | --- | --- | --- |
+| `m91-nominal` (`guarded`) | `landed` | `landed` | nenhuma |
+| `gnss-bias-guarded` (8 s a 40 s) | `hard_landing` (`R5` 12,3 m; `R1` cumprido) | `landed` | `sensor_disagreement` e `altimeter_rejected` aos 8,18 s |
+| `gnss-dropout-baseline-guarded` (8 s a 14 s) | `hard_landing` (`R2` 1,86 m/s, `R5` 12,8 m) | `landed` | nenhuma |
+| `altimeter-bias-low-guarded` (10 s a 40 s) | `hard_landing` (`R1` 23,0 m/s) | `hard_landing` (`R1` 22,9 m/s) | `sensor_disagreement` aos 10,08 s; sem `ascent_abort` (o corte a 15 m atuou) |
+
+A janela de 6 s do demonstrador `gnss-dropout` não faz o `baseline` subir nestas sementes, pelo que a regra 2 não atua nesses dois casos. Para a testar contra a falha observada, os testes usam a janela e a semente 1000 da campanha M9 (14,9 s a 21,99 s) sobre `nominal.json`: `baseline` dá `no_contact` com `S5` a falhar (subida de 1073 m); `baseline_guarded` corta aos 22,98 s (`ascent_abort`, depois `cutoff`), deixa de ser `no_contact` e dá `hard_landing` com `R1` 68,2 m/s e `S5` (59,2 m) e `S2` (51,1 m) falhados, como previsto na emenda (contém, não recupera); `guarded` aterra sem bandeiras. É uma execução, não uma campanha.
+
+**Verificação.** `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` e `cargo build --release` em `crates/vv-rocket` passam; `vv-rocket verify` termina com 0; cobertura de linhas 97,4% (`cargo llvm-cov`). Os testes novos cobrem `S5` com registos construídos à mão (cumpre a 0 m e a 4,9 m, falha a 5,1 m, subida sem impulso não avaliada, movimento da base só por atitude não conta), as regras 1 e 2 com observações sintéticas, as falhas novas (efeito, gamas, `acted`), os campos opcionais do esquema, a repetição das execuções M9.1 e a identidade byte a byte dos traços anteriores.
