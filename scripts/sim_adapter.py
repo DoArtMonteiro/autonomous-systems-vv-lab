@@ -166,7 +166,19 @@ RESULT_SCHEMA_V2 = "vv-sim-run-result.v2"
 RESULT_FIELDS_V2 = {**RESULT_FIELDS, "events": list, "summary": dict, "physics_reference": dict, "model_validity": str}
 # Models served under contract v2; the ground vehicle stays on v1.
 V2_MODELS = frozenset({"rocket-rigid-body"})
-RESULT_CONTRACTS = {RESULT_SCHEMA: (ADAPTER_SCHEMA, RESULT_FIELDS), RESULT_SCHEMA_V2: (ADAPTER_SCHEMA_V2, RESULT_FIELDS_V2)}
+
+# Contract v3 is for the closed-loop landing model only. Its request carries categorical inputs
+# (policy, fault kind) that the numeric overrides of v2 cannot express; v1 and v2 are unchanged.
+# A v3 result separates the mission outcome and the requirement and invariant verdicts
+# (`verification`) from the integrity and replay verdict, and has no physics reference.
+ADAPTER_SCHEMA_V3 = "vv-sim-adapter.v3"
+REQUEST_SCHEMA_V3 = "vv-sim-run-request.v3"
+RESULT_SCHEMA_V3 = "vv-sim-run-result.v3"
+RESULT_FIELDS_V3 = {**RESULT_FIELDS, "events": list, "summary": dict, "verification": dict, "model_validity": str}
+V3_MODELS = frozenset({"rocket-landing"})
+LANDING_OUTCOMES = ("landed", "hard_landing", "no_contact")
+RESULT_CONTRACTS = {RESULT_SCHEMA: (ADAPTER_SCHEMA, RESULT_FIELDS), RESULT_SCHEMA_V2: (ADAPTER_SCHEMA_V2, RESULT_FIELDS_V2),
+                    RESULT_SCHEMA_V3: (ADAPTER_SCHEMA_V3, RESULT_FIELDS_V3)}
 
 
 def check_result(result: Any) -> None:
@@ -186,13 +198,25 @@ def check_result(result: Any) -> None:
         if (result["model"].get("id") != MODEL_ID or request.get("model") != MODEL_ID
                 or request.get("schema") != REQUEST_SCHEMA):
             raise AdapterError(f"a {RESULT_SCHEMA} result must answer a {REQUEST_SCHEMA} request for {MODEL_ID}")
-    else:
+    elif fields is RESULT_FIELDS_V2:
         if result["request"].get("schema") != REQUEST_SCHEMA_V2:
             raise AdapterError(f"result.request.schema must be {REQUEST_SCHEMA_V2}")
         if result["model"].get("id") not in V2_MODELS or result["model"]["id"] != result["request"].get("model"):
             raise AdapterError(f"result.model.id must be one of {sorted(V2_MODELS)} and equal the requested model")
         if not isinstance(result["physics_reference"].get("all_pass"), bool):
             raise AdapterError("result.physics_reference.all_pass missing or not bool")
+    else:
+        if result["request"].get("schema") != REQUEST_SCHEMA_V3:
+            raise AdapterError(f"result.request.schema must be {REQUEST_SCHEMA_V3}")
+        if result["model"].get("id") not in V3_MODELS or result["model"]["id"] != result["request"].get("model"):
+            raise AdapterError(f"result.model.id must be one of {sorted(V3_MODELS)} and equal the requested model")
+        # Verdicts of a run that was not verified are never read, but a verified one must carry them.
+        verification = result["verification"]
+        if result["verdict"].get("status") == "verified" and (
+                verification.get("outcome") not in LANDING_OUTCOMES
+                or not isinstance(verification.get("requirements"), list)
+                or not isinstance(verification.get("invariants"), list)):
+            raise AdapterError("result.verification must carry an outcome, requirements and invariants")
     if not RUN_ID.fullmatch(result["run_id"]):
         raise AdapterError("result.run_id is not 16 lowercase hex characters")
     problems = result["integrity"].get("problems")
