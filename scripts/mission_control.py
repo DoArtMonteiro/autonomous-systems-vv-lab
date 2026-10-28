@@ -32,7 +32,7 @@ from typing import Any
 
 from landing_adapter import MODEL_ID as LANDING_MODEL_ID
 from landing_adapter import LandingAdapter
-from landing_view import LANDING_JS, landing_page, load_campaign
+from landing_view import LANDING_JS, landing_page, load_campaign, load_m91_campaign
 from m6_report import CSS
 from rocket_adapter import RocketAdapter
 from rocket_view import ROCKET_JS, rocket_page
@@ -40,6 +40,7 @@ from sim_adapter import ADAPTER_SCHEMA_V2, MODEL_ID, AdapterError, GroundVehicle
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CAMPAIGN_SUMMARY = ROOT / "runs" / "m9-campaign" / "summary.json"
+DEFAULT_M91_SUMMARY = ROOT / "runs" / "m91-campaign" / "summary.json"
 MAX_BODY_BYTES = 16 * 1024
 BUSY_WAIT_SECONDS = 5
 
@@ -55,12 +56,15 @@ class ExclusiveServer(ThreadingHTTPServer):
         super().server_bind()
 
 
-def make_server(port: int, output_root: Path, adapter: Any, campaign_summary: Path | None = None) -> ThreadingHTTPServer:
+def make_server(port: int, output_root: Path, adapter: Any, campaign_summary: Path | None = None,
+                m91_summary: Path | None = None) -> ThreadingHTTPServer:
     """`adapter` is one ground-vehicle adapter or a map from model id to adapter; runs dispatch on `model`.
 
-    `campaign_summary` is the M9 campaign summary the landing page may read (GET /api/campaign).
+    `campaign_summary` is the M9 campaign summary the landing page may read (GET /api/campaign);
+    `m91_summary` is the M9.1 acceptance campaign summary (GET /api/campaign-m91).
     """
     campaign_summary = DEFAULT_CAMPAIGN_SUMMARY if campaign_summary is None else Path(campaign_summary)
+    m91_summary = DEFAULT_M91_SUMMARY if m91_summary is None else Path(m91_summary)
     output_root = Path(output_root).resolve()
     output_root.mkdir(parents=True, exist_ok=True)
     lock = threading.Lock()
@@ -133,6 +137,8 @@ def make_server(port: int, output_root: Path, adapter: Any, campaign_summary: Pa
                 return self._send(HTTPStatus.OK, LANDING_JS.encode("utf-8"), "text/javascript; charset=utf-8")
             if self.path == "/api/campaign":
                 return self._json(HTTPStatus.OK, load_campaign(campaign_summary))
+            if self.path == "/api/campaign-m91":
+                return self._json(HTTPStatus.OK, load_m91_campaign(m91_summary))
             return self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})
 
         def do_POST(self) -> None:  # noqa: N802
@@ -614,13 +620,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output-root", default=str(ROOT / "runs" / "mission-control"))
     parser.add_argument("--campaign-summary", default=str(DEFAULT_CAMPAIGN_SUMMARY),
                         help="M9 campaign summary.json shown on /landing (read only; may be absent)")
+    parser.add_argument("--m91-summary", default=str(DEFAULT_M91_SUMMARY),
+                        help="M9.1 campaign summary.json shown on /landing (read only; may be absent)")
     args = parser.parse_args(argv)
     if not 1024 <= args.port <= 65535:
         print("error: --port must be in [1024, 65535]", file=sys.stderr)
         return 2
     server = make_server(args.port, Path(args.output_root),
                          {MODEL_ID: GroundVehicleAdapter(), "rocket-rigid-body": RocketAdapter(),
-                          LANDING_MODEL_ID: LandingAdapter()}, Path(args.campaign_summary))
+                          LANDING_MODEL_ID: LandingAdapter()}, Path(args.campaign_summary),
+                         Path(args.m91_summary))
     print(f"Mission Control on http://127.0.0.1:{args.port}/  (Ctrl+C to stop)")
     try:
         server.serve_forever()

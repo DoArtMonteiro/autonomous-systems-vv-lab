@@ -62,7 +62,8 @@ class Base(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
         self.server = mc.make_server(0, self.tmp / "runs", {sa.MODEL_ID: sa.GroundVehicleAdapter(), ra.MODEL_ID: ra.RocketAdapter(),
-                                                             la.MODEL_ID: la.LandingAdapter()}, self.summary_path())
+                                                             la.MODEL_ID: la.LandingAdapter()}, self.summary_path(),
+                                     self.tmp / "m91-campaign" / "summary.json")
         self.port = self.server.server_address[1]
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
 
@@ -116,6 +117,8 @@ class PageTests(Base):
             "Assumed demonstrator requirements", "R1 limit at contact", "keep-out", "Read from disk, not recomputed here",
             "No verified run to plot", "Not claimed", "Verified", "Assumed", "pad_radius_m", "/api/campaign",
             "estimate minus truth", "Gaps are sensor dropouts", "The fault never acted",
+            "/api/campaign-m91", "M9.1 acceptance campaign", "Contained (S1 to S5 hold)", "Recovered (landed, R1 to R6, S1 to S5)",
+            "Three separate statements", "compositionText9",
         ):
             self.assertIn(marker, text)
 
@@ -129,12 +132,13 @@ class PageTests(Base):
         self.assertEqual(json.loads(self.call("GET", "/api/describe")[1])["schema"], sa.ADAPTER_SCHEMA)
 
     def test_routes_refuse_foreign_hosts_and_origins(self):
-        for path in ("/landing", "/landing.js", "/api/campaign"):
+        for path in ("/landing", "/landing.js", "/api/campaign", "/api/campaign-m91"):
             with self.subTest(path=path):
                 self.assertEqual(self.call("GET", path, headers={"Host": "evil.example:80"})[0].status, 403)
                 self.assertEqual(self.call("GET", path, headers={"Origin": "http://evil.example"})[0].status, 403)
                 self.assertEqual(self.call("GET", path, headers={"Origin": f"http://127.0.0.1:{self.port}"})[0].status, 200)
         self.assertEqual(self.call("POST", "/api/campaign", run_body())[0].status, 404)
+        self.assertEqual(self.call("POST", "/api/campaign-m91", run_body())[0].status, 404)
         self.assertEqual(self.call("POST", "/api/run", run_body(), {"Origin": "http://evil.example"})[0].status, 403)
 
     @unittest.skipUnless(shutil.which("node"), "node is not installed")
@@ -217,6 +221,15 @@ class CampaignTests(Base):
             self.skipTest("symlinks are not available")
         self.assertFalse(self.campaign()["found"])
 
+    def test_the_m9_summary_forwards_the_composition_when_present(self):
+        composition = {"matrix": {"scenarios": 9, "policies": 2, "seeds": 30, "runs": 540},
+                       "boundary": {"faults": 2, "magnitudes": 6, "policies": 2, "seeds": 10, "runs": 240},
+                       "total": 780, "repeat_runs_not_counted": 2}
+        self.write({**FIXTURE_CAMPAIGN(), "composition": composition})
+        self.assertEqual(self.campaign()["summary"]["composition"], composition)
+        self.write(FIXTURE_CAMPAIGN())
+        self.assertIsNone(self.campaign()["summary"]["composition"], "a summary from before the field is still readable")
+
     def test_the_default_summary_location_is_the_campaign_output_directory(self):
         self.assertEqual(mc.DEFAULT_CAMPAIGN_SUMMARY, ROOT / "runs" / "m9-campaign" / "summary.json")
 
@@ -288,3 +301,70 @@ class RunTests(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def FIXTURE_M91():
+    """A synthetic summary in the vv-m91-campaign.v1 shape. NOT produced by scripts/m91_campaign.py."""
+    flags = {"sensor_disagreement": 0, "altimeter_rejected": 0, "ascent_abort": 0}
+    cell = {"scenario": "gnss_bias", "policy": "guarded", "runs": 30, "outcome_landed": 3, "recovered": 3, "hard_landing": 27,
+            "no_contact": 0, "detection": {**flags, "sensor_disagreement": 30}, "containment": 30, "r1_met": 30,
+            "invariant_failures": {"S1": 0, "S2": 0, "S3": 0, "S4": 0, "S5": 0},
+            "requirement_failures": {"R1": 0, "R2": 0, "R3": 0, "R4": 0, "R5": 27, "R6": 0}}
+    return {"schema": "vv-m91-campaign.v1", "preregistered": False, "seeds": [2000], "total_runs": 1, "command": "python scripts/m91_campaign.py",
+            "machine": "fixture", "duration_s": 1.0, "binary_sha256": "b" * 64, "source_sha256": "s" * 64, "template_sha256": "t" * 64,
+            "determinism_check": None, "composition": None, "command_identity": None, "cells": [cell],
+            "false_alarms": [{"scenario": "nominal", "runs": 30, "flags": flags, "within_limit": True}],
+            "regressions": [{"scenario": "gnss_bias_low", "robust_recovered": 20, "guarded_recovered": 10, "difference": -10,
+                             "within_g4_tolerance": False}],
+            "hypotheses": [{"id": "G1", "statement": "<img src=x onerror=alert(1)>", "criterion": "c", "observed": {},
+                            "verdict": "not_evaluated", "evidence": "fixture", "complete": False}],
+            "runs": [{"scenario": "gnss_bias", "dir": "runs/x"}] * 5, "limitations": ["fixture limitation"],
+            "path_on_disk": "C:\\Users\\someone\\secret"}
+
+
+class M91CampaignReaderTests(Base):
+    def m91(self):
+        resp, body = self.call("GET", "/api/campaign-m91")
+        self.assertEqual(resp.status, 200)
+        return json.loads(body)
+
+    def write91(self, value=None, raw=None):
+        path = self.tmp / "m91-campaign" / "summary.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(raw if raw is not None else json.dumps(value).encode())
+
+    def test_missing_summary_says_how_to_make_it(self):
+        out = self.m91()
+        self.assertFalse(out["found"])
+        self.assertIn("run `python scripts/m91_campaign.py`", out["message"])
+
+    def test_fixture_is_forwarded_without_the_per_run_rows_or_unknown_fields(self):
+        self.write91(FIXTURE_M91())
+        out = self.m91()
+        self.assertTrue(out["found"])
+        summary = out["summary"]
+        self.assertEqual(out["schema"], "vv-m91-campaign.v1")
+        self.assertEqual(summary["cells"][0]["detection"]["sensor_disagreement"], 30)
+        self.assertEqual(summary["regressions"][0]["scenario"], "gnss_bias_low")
+        self.assertNotIn("runs", summary)
+        self.assertNotIn("path_on_disk", summary)
+        self.assertNotIn("secret", json.dumps(out))
+
+    def test_the_m9_summary_is_not_accepted_as_an_m91_one_and_the_reverse(self):
+        self.write91(FIXTURE_CAMPAIGN())
+        self.assertFalse(self.m91()["found"])
+        path = self.summary_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(FIXTURE_M91()), encoding="utf-8")
+        self.assertFalse(self.campaign_m9()["found"])
+
+    def campaign_m9(self):
+        return json.loads(self.call("GET", "/api/campaign")[1])
+
+    def test_unusable_m91_summaries_are_reported_as_not_found(self):
+        for name, kwargs in {"not json": dict(raw=b"{no"), "a list": dict(value=[]),
+                             "cells not a list": dict(value={**FIXTURE_M91(), "cells": {}}),
+                             "limitations not strings": dict(value={**FIXTURE_M91(), "limitations": [1]})}.items():
+            with self.subTest(name=name):
+                self.write91(**kwargs)
+                self.assertFalse(self.m91()["found"])

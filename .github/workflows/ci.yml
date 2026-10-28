@@ -120,6 +120,9 @@ jobs:
       - name: Run reduced bounded M9 landing campaign
         run: python scripts/m9_campaign.py --binary crates/vv-rocket/target/release/vv-rocket${{ matrix.exe_suffix }} --seeds 1000,1001 --faults nominal,altimeter_bias,thrust_loss --max-runs 100 --max-artifact-bytes 67108864 --time-budget-seconds 120 --output-root runs/ci-m9-${{ runner.os }}
 
+      - name: Run reduced bounded M9.1 acceptance campaign
+        run: python scripts/m91_campaign.py --binary crates/vv-rocket/target/release/vv-rocket${{ matrix.exe_suffix }} --seeds 2000,2001 --scenarios nominal,gnss_bias,gnss_dropout --policies robust,guarded,baseline_guarded --max-runs 100 --max-artifact-bytes 67108864 --time-budget-seconds 120 --output-root runs/ci-m91-${{ runner.os }}
+
       - name: Minimize the seeded natural sensor fault
         env:
           VV_LAB_BINARY: target/release/vv-lab${{ matrix.exe_suffix }}

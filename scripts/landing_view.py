@@ -20,7 +20,7 @@ MAX_CAMPAIGN_BYTES = 8 * 1024 * 1024
 MISSING = "no campaign evidence found; run `python scripts/m9_campaign.py`"
 
 _TOP = ("preregistered", "seeds", "boundary_seeds", "total_runs", "command", "machine", "duration_s", "binary_sha256",
-        "source_sha256", "determinism_check", "resummarized")
+        "source_sha256", "determinism_check", "resummarized", "composition")
 _ROWS = {
     "cells": ("fault", "policy", "runs", "landed", "landed_with_invariant_failure", "hard_landing", "no_contact",
               "invariant_failure_runs", "requirement_failures"),
@@ -33,11 +33,33 @@ _ROWS = {
 }
 
 
-def load_campaign(path: Path | None) -> dict[str, Any]:
-    """Read the campaign summary defensively. Never raises; anything unusable is `found: false`."""
+M91_SCHEMA = "vv-m91-campaign.v1"
+M91_MISSING = "no M9.1 campaign evidence found; run `python scripts/m91_campaign.py`"
+_TOP_M91 = ("preregistered", "seeds", "total_runs", "command", "machine", "duration_s", "binary_sha256", "source_sha256",
+            "template_sha256", "determinism_check", "composition", "command_identity")
+_ROWS_M91 = {
+    "cells": ("scenario", "policy", "runs", "outcome_landed", "recovered", "hard_landing", "no_contact", "detection",
+              "containment", "r1_met", "invariant_failures", "requirement_failures"),
+    "false_alarms": ("scenario", "runs", "flags", "within_limit"),
+    "regressions": ("scenario", "robust_recovered", "guarded_recovered", "difference", "within_g4_tolerance"),
+    "hypotheses": ("id", "statement", "criterion", "observed", "verdict", "evidence", "complete"),
+}
 
+
+def load_campaign(path: Path | None) -> dict[str, Any]:
+    """Read the M9 campaign summary defensively. Never raises; anything unusable is `found: false`."""
+    return _read_summary(path, CAMPAIGN_SCHEMA, _TOP, _ROWS, MISSING)
+
+
+def load_m91_campaign(path: Path | None) -> dict[str, Any]:
+    """Same for the M9.1 acceptance campaign (the 1050 per-run rows stay on disk)."""
+    return _read_summary(path, M91_SCHEMA, _TOP_M91, _ROWS_M91, M91_MISSING)
+
+
+def _read_summary(path: Path | None, schema: str, top: tuple[str, ...], row_keys: dict[str, tuple[str, ...]],
+                  message: str) -> dict[str, Any]:
     def missing(reason: str) -> dict[str, Any]:
-        return {"found": False, "message": MISSING, "reason": reason}
+        return {"found": False, "message": message, "reason": reason}
 
     try:
         if path is None or path.is_symlink() or not path.is_file():
@@ -48,10 +70,10 @@ def load_campaign(path: Path | None) -> dict[str, Any]:
         data = json.loads(raw.decode("utf-8"))
     except (OSError, ValueError):
         return missing("summary.json cannot be read as JSON")
-    if not isinstance(data, dict) or data.get("schema") != CAMPAIGN_SCHEMA:
-        return missing(f"summary.json is not a {CAMPAIGN_SCHEMA} document")
-    out: dict[str, Any] = {k: data.get(k) for k in _TOP}
-    for name, keys in _ROWS.items():
+    if not isinstance(data, dict) or data.get("schema") != schema:
+        return missing(f"summary.json is not a {schema} document")
+    out: dict[str, Any] = {k: data.get(k) for k in top}
+    for name, keys in row_keys.items():
         rows = data.get(name, [])
         if not isinstance(rows, list) or not all(isinstance(r, dict) for r in rows):
             return missing(f"summary.json field {name} is not a list of objects")
@@ -60,7 +82,7 @@ def load_campaign(path: Path | None) -> dict[str, Any]:
     if not isinstance(limitations, list) or not all(isinstance(x, str) for x in limitations):
         return missing("summary.json field limitations is not a list of strings")
     out["limitations"] = limitations
-    return {"found": True, "schema": CAMPAIGN_SCHEMA, "sha256": hashlib.sha256(raw).hexdigest(), "bytes": len(raw),
+    return {"found": True, "schema": schema, "sha256": hashlib.sha256(raw).hexdigest(), "bytes": len(raw),
             "summary": out}
 
 
@@ -147,11 +169,13 @@ ground). Requirements, noise and fault ranges are assumed values.</p>
 <div class="tabs" role="tablist" aria-label="Sections">
 <button role="tab" id="tab-run" aria-controls="panel-run" aria-selected="true">Run</button>
 <button role="tab" id="tab-campaign" aria-controls="panel-campaign" aria-selected="false" tabindex="-1">Campaign evidence</button>
+<button role="tab" id="tab-campaign91" aria-controls="panel-campaign91" aria-selected="false" tabindex="-1">M9.1 campaign</button>
 <button role="tab" id="tab-claims" aria-controls="panel-claims" aria-selected="false" tabindex="-1">What is claimed</button>
 <button role="tab" id="tab-research" aria-controls="panel-research" aria-selected="false" tabindex="-1">Research</button>
 </div>
 <section id="panel-run" role="tabpanel" aria-labelledby="tab-run"></section>
 <section id="panel-campaign" role="tabpanel" aria-labelledby="tab-campaign" hidden></section>
+<section id="panel-campaign91" role="tabpanel" aria-labelledby="tab-campaign91" hidden></section>
 <section id="panel-claims" role="tabpanel" aria-labelledby="tab-claims" hidden></section>
 <section id="panel-research" role="tabpanel" aria-labelledby="tab-research" hidden></section>
 <p id="status" role="status" aria-live="polite" class="meta"></p>
@@ -192,7 +216,7 @@ const words = s => String(s).replaceAll('_', ' ');
 const POLICY_NAMES = ['baseline', 'robust'];
 
 const state = {models: null, caps: null, kind: 'nominal', policy: 'baseline', mode: null, single: null, pair: null,
-  note: null, zoom: 'full', t: 0, busy: false, campaign: null, campaignFilter: null, tab: 'run'};
+  note: null, zoom: 'full', t: 0, busy: false, campaign: null, campaign91: null, campaignFilter: null, tab: 'run'};
 
 function setStatus(t) { $('status').textContent = t; }
 function setError(t) { fill($('error'), t ? el('p', {class: 'alert', id: 'error-text'}, el('b', {}, 'Could not run: '), t) : ''); }
@@ -265,7 +289,7 @@ const runOne = () => runBodies([formRequest(state.policy)]);
 const runCompare = () => runBodies(POLICY_NAMES.map(formRequest));
 
 // ---------------------------------------------------------------- tabs
-const TABS = ['run', 'campaign', 'claims', 'research'];
+const TABS = ['run', 'campaign', 'campaign91', 'claims', 'research'];
 function selectTab(name) {
   state.tab = name;
   for (const t of TABS) {
@@ -276,6 +300,7 @@ function selectTab(name) {
   }
   $('result').hidden = name !== 'run';
   if (name === 'campaign' && !state.campaign) loadCampaign();
+  if (name === 'campaign91' && !state.campaign91) loadCampaign91();
 }
 function wireTabs() {
   TABS.forEach((name, i) => {
@@ -745,6 +770,12 @@ async function rerun(run, compare) {
     drawResult();
   }
 }
+// The 780 runs of the M9 campaign are 540 of the matrix plus 240 of the boundary sweep; older summaries lack the field.
+function compositionText9(c) {
+  if (!c || !c.matrix) return 'not recorded in this summary';
+  const m = c.matrix, b = c.boundary;
+  return `${m.scenarios} scenarios × ${m.policies} policies × ${m.seeds} seeds = ${m.runs} matrix runs` + (b && b.runs ? `, plus the boundary sweep ${b.faults} faults × ${b.magnitudes} magnitudes × ${b.policies} policies × ${b.seeds} seeds = ${b.runs}; ${m.runs} + ${b.runs} = ${c.total}` : '') + ` runs. The ${c.repeat_runs_not_counted} deterministic repeats are not counted.`;
+}
 function drawCampaign() {
   const c = state.campaign, box = $('panel-campaign');
   if (!c || !c.found) { fill(box, el('h2', {}, 'Campaign evidence'), el('p', {class: 'note'}, c ? c.message : 'No campaign information.'),
@@ -780,13 +811,54 @@ function drawCampaign() {
     el('p', {class: 'note'}, el('b', {}, 'Read from disk, not recomputed here. '), 'The counts, hypothesis verdicts and run list below come from the campaign summary file written by scripts/m9_campaign.py and are shown as stored. A click on a run sends it back through the adapter: that run is executed again now, replayed, and shown with fresh verdicts.',
       el('br'), el('code', {}, `summary.json sha256 ${c.sha256}`)),
     s.preregistered ? null : el('p', {class: 'alert'}, 'This campaign is a subset of the pre-registered matrix. Its hypothesis verdicts have no test value.'),
-    kv2({runs: s.total_runs, seeds: Array.isArray(s.seeds) && s.seeds.length ? `${s.seeds[0]} to ${s.seeds[s.seeds.length - 1]}` : 'none', machine: s.machine, command: s.command,
+    kv2({runs: s.total_runs, composition: compositionText9(s.composition), seeds: Array.isArray(s.seeds) && s.seeds.length ? `${s.seeds[0]} to ${s.seeds[s.seeds.length - 1]}` : 'none', machine: s.machine, command: s.command,
       'wall-clock duration (s)': s.duration_s, binary_sha256: s.binary_sha256, source_sha256: s.source_sha256, 'determinism check': s.determinism_check === null || s.determinism_check === undefined ? 'not recorded' : JSON.stringify(s.determinism_check)}),
     el('h3', {}, 'Success matrix: scenario by policy'), el('p', {class: 'meta'}, 'Landed means outcome landed with all four invariants holding. Select a cell to list its runs.'), matrix,
     el('h3', {}, 'Pre-registered hypotheses'), el('p', {class: 'meta'}, 'Statements, criteria and evidence are stored text from the summary file (Portuguese). No p-values: 30 seeds with assumed dispersions do not support a statistical inference about a real vehicle.'), ...hyps,
     ...boundary,
     el('h3', {}, flt ? `Runs: ${words(flt.fault)}, ${flt.policy}` : 'Runs (all cells)'),
     el('p', {class: 'meta'}, `${runs.length} runs${runs.length > SHOW ? `, showing the first ${SHOW}; select a matrix cell to narrow the list` : ''}. Stored outcomes are from the file.`), list,
+    el('h3', {}, 'Limitations stated by the campaign'), el('ul', {}, s.limitations.map(x => el('li', {}, x))));
+}
+// ---------------------------------------------------------------- M9.1 campaign
+async function loadCampaign91() {
+  fill($('panel-campaign91'), el('p', {class: 'meta'}, 'Reading the M9.1 campaign summary from disk…'));
+  try { state.campaign91 = await (await fetch('/api/campaign-m91')).json(); }
+  catch (e) { state.campaign91 = {found: false, message: 'the local server did not answer the M9.1 campaign request', reason: 'request failed'}; }
+  drawCampaign91();
+}
+function compositionText(c) {
+  if (!c || !c.main) return 'not recorded in this summary';
+  const m = c.main, e = c.baseline_guarded;
+  return `${m.scenarios} scenarios × ${m.policies} policies × ${m.seeds} seeds = ${m.runs}` + (e && e.runs ? `, plus baseline_guarded in ${e.scenarios} scenarios × ${e.seeds} seeds = ${e.runs}; ${m.runs} + ${e.runs} = ${c.total}` : '') + ` runs. The ${c.repeat_runs_not_counted} deterministic repeats are not counted.`;
+}
+function drawCampaign91() {
+  const c = state.campaign91, box = $('panel-campaign91');
+  if (!c || !c.found) { fill(box, el('h2', {}, 'M9.1 campaign evidence'), el('p', {class: 'note'}, c ? c.message : 'No campaign information.'),
+    c && c.reason ? el('p', {class: 'meta'}, `Reason: ${c.reason}.`) : null, el('button', {onclick: () => { state.campaign91 = null; loadCampaign91(); }}, 'Look again')); return; }
+  const s = c.summary, num = x => el('td', {class: 'num'}, x);
+  const cellRows = s.cells.map(x => el('tr', {}, el('td', {}, words(x.scenario)), el('td', {}, x.policy), num(x.runs),
+    num(x.detection ? x.detection.sensor_disagreement : 'n/a'), num(x.detection ? x.detection.altimeter_rejected : 'n/a'), num(x.detection ? x.detection.ascent_abort : 'n/a'),
+    num(x.containment), num(`${x.recovered}`), num(x.hard_landing), num(x.no_contact), num(x.invariant_failures ? x.invariant_failures.S5 : 'n/a')));
+  const head = ['Scenario', 'Policy', 'Runs', 'sensor disagreement', 'altimeter rejected', 'ascent abort', 'Contained (S1 to S5 hold)', 'Recovered (landed, R1 to R6, S1 to S5)', 'Hard landing', 'No contact', 'S5 failed'];
+  const verdictClass = v => v === 'supported' ? 'ok' : v === 'recorded' || v === 'not_evaluated' ? 'warn' : 'bad';
+  const hyps = s.hypotheses.map(h => el('div', {class: 'panel'}, el('h4', {}, `${h.id}: `, el('span', {class: verdictClass(h.verdict)}, words(h.verdict))), el('p', {}, h.statement), el('p', {class: 'meta'}, 'Criterion: ' + h.criterion), el('p', {class: 'meta'}, 'Observed: ' + h.evidence)));
+  const alarms = (s.false_alarms || []).map(a => el('tr', {}, el('td', {}, words(a.scenario)), num(a.runs), num(a.flags.sensor_disagreement), num(a.flags.altimeter_rejected), num(a.flags.ascent_abort), el('td', {class: a.within_limit ? 'ok' : 'bad'}, a.within_limit ? 'within the limit of 1' : 'above the limit of 1')));
+  const regs = (s.regressions || []).map(g => el('li', {}, `${words(g.scenario)}: robust recovered ${g.robust_recovered}, guarded ${g.guarded_recovered} (${g.difference}); ${g.within_g4_tolerance ? 'within' : 'outside'} the G4 tolerance of 2.`));
+  fill(box,
+    el('h2', {}, 'M9.1 acceptance campaign'),
+    el('p', {class: 'note'}, el('b', {}, 'Read from disk, not recomputed here. '), 'Counts and verdicts come from the summary written by scripts/m91_campaign.py. Every run in it was replayed by the Rust build when the campaign ran.',
+      el('br'), el('code', {}, `summary.json sha256 ${c.sha256}`)),
+    s.preregistered ? null : el('p', {class: 'alert'}, 'This campaign is a subset of the pre-registered matrix. Its hypothesis verdicts have no test value.'),
+    kv2({runs: s.total_runs, composition: compositionText(s.composition), seeds: Array.isArray(s.seeds) && s.seeds.length ? `${s.seeds[0]} to ${s.seeds[s.seeds.length - 1]}` : 'none',
+      machine: s.machine, command: s.command, 'wall-clock duration (s)': s.duration_s, binary_sha256: s.binary_sha256, source_sha256: s.source_sha256, template_sha256: s.template_sha256}),
+    el('h3', {}, 'Detection, containment and recovery, per scenario and policy'),
+    el('p', {class: 'meta'}, 'Three separate statements. Detection is what the controller reports (runs in which the flag appeared at least once; 0 also means the policy does not produce that flag); it is not a verdict. Containment and recovery are verified on the true state.'),
+    el('div', {class: 'scroll'}, el('table', {}, el('thead', {}, el('tr', {}, head.map(h => el('th', {}, h)))), el('tbody', {}, cellRows))),
+    el('h3', {}, 'Pre-registered hypotheses G1 to G5'), ...hyps,
+    el('h3', {}, 'Guarded false alarms (cells without a sensor bias)'),
+    el('div', {class: 'scroll'}, el('table', {}, el('thead', {}, el('tr', {}, ['Scenario', 'Runs', 'sensor disagreement', 'altimeter rejected', 'ascent abort', 'Limit'].map(h => el('th', {}, h)))), el('tbody', {}, alarms))),
+    el('h3', {}, 'Regressions: cells where guarded recovered fewer runs than robust'), regs.length ? el('ul', {}, regs) : el('p', {}, 'None.'),
     el('h3', {}, 'Limitations stated by the campaign'), el('ul', {}, s.limitations.map(x => el('li', {}, x))));
 }
 function kv2(obj) { return el('dl', {class: 'kv'}, Object.entries(obj).flatMap(([k, v]) => [el('dt', {}, k), el('dd', {}, el('code', {}, v === null || v === undefined ? 'n/a' : String(v)))])); }
