@@ -2,10 +2,10 @@
 
 use serde::Serialize;
 
-use crate::dynamics::{State, forces, mass_properties, rk4};
+use crate::dynamics::{State, forces, mass_properties, neglected_jet_ratio, rk4};
 use crate::model::Prepared;
 
-pub const TRACE_SCHEMA: &str = "vv-rocket-trace.v1";
+pub const TRACE_SCHEMA: &str = "vv-rocket-trace.v2";
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Sample {
@@ -42,6 +42,11 @@ pub struct Summary {
     pub propellant_used_kg: f64,
     /// Largest `| |q| - 1 |` after an RK4 step and before the projection.
     pub max_quaternion_drift: f64,
+    /// Largest ratio `ε` of the neglected translational jet term to the thrust, at the two ends
+    /// of every burning step; the model is adequate only while `ε ≪ 1`. Zero without thrust.
+    pub max_neglected_jet_ratio: f64,
+    /// Time of that largest ratio; 0 when there is no thrust.
+    pub max_neglected_jet_ratio_t_s: f64,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -117,6 +122,7 @@ pub fn simulate(p: &Prepared, keep_states: bool) -> Result<Run, String> {
     let mut max_altitude = s.r.z;
     let mut max_speed = s.v.norm();
     let mut max_drift: f64 = 0.0;
+    let (mut max_jet, mut max_jet_t) = (0.0_f64, 0.0);
     let mut end_reason = "duration";
     let mut step = 0;
     while step < p.steps {
@@ -132,7 +138,8 @@ pub fn simulate(p: &Prepared, keep_states: bool) -> Result<Run, String> {
             }
         }
         let before = s;
-        let mut next = rk4(p, &s, active(p, step), p.dt);
+        let burn = active(p, step);
+        let mut next = rk4(p, &s, burn, p.dt);
         max_drift = max_drift.max((next.q.norm() - 1.0).abs());
         next.q = next.q.normalized();
         // Exact consumption can round a few ulp below zero at exhaustion.
@@ -141,6 +148,12 @@ pub fn simulate(p: &Prepared, keep_states: bool) -> Result<Run, String> {
         }
         if !next.is_finite() || next.mp < 0.0 {
             return Err(format!("non-physical state after step {step}"));
+        }
+        for (k, x) in [(step, &before), (step + 1, &next)] {
+            let ratio = neglected_jet_ratio(p, x, burn);
+            if ratio > max_jet {
+                (max_jet, max_jet_t) = (ratio, k as f64 * p.dt);
+            }
         }
         s = next;
         step += 1;
@@ -204,6 +217,8 @@ pub fn simulate(p: &Prepared, keep_states: bool) -> Result<Run, String> {
                 max_speed_mps: max_speed,
                 propellant_used_kg: p.vehicle.propellant_mass_kg - s.mp,
                 max_quaternion_drift: max_drift,
+                max_neglected_jet_ratio: max_jet,
+                max_neglected_jet_ratio_t_s: max_jet_t,
             },
         },
         states,

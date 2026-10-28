@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use vv_rocket::model::{Case, prepare};
 use vv_rocket::run::{replay, trace_bytes, write_run};
 use vv_rocket::sha256_hex;
+use vv_rocket::sim::simulate;
 use vv_rocket::verify::{base_case, run_all};
 
 fn case_path(name: &str) -> PathBuf {
@@ -104,23 +105,55 @@ fn reference_cases_meet_their_active_criteria_and_keep_the_replaced_ones() {
 
 #[test]
 fn demo_traces_are_bit_identical_on_every_platform() {
-    // Hashes of the trace bytes, pinned on Windows and checked on Linux by CI.
+    // Hashes of the trace bytes, pinned on Windows and checked on Linux by CI. They changed
+    // with trace schema v2, which adds the measured validity ratio to the summary; the next test
+    // shows that the samples and events are those of v1.
     for (name, want) in [
         (
             "ballistic.json",
-            "7fbdb4f36656dd6d65c12b3f78fc06dd1e04dac060feb9ba892d55aa9713c63d",
+            "4ab07bff1531a8231db467db00d58b5137554d78186e35ba6c65ae64eb48e0ba",
         ),
         (
             "propulsive_descent.json",
-            "b446e2494bfb718e3f9f81d11f99deea5fb560097ad22e505cec3c57fb6552f5",
+            "ab02afd3dedea329ddea7e176ef306f4891cbb73e035adfd3b560543eb45e665",
         ),
         (
             "attitude_dynamics.json",
-            "09dd6573a4a8b68ac032c084244e362cc634f90699e62a62883396d2cbdebaa9",
+            "8ff992f291627a398936418c6a708c2a723abc42880f480d1e5a46a181904f4b",
         ),
     ] {
         let (_, trace, _) = trace_bytes(&fs::read(case_path(name)).unwrap()).unwrap();
         assert_eq!(sha256_hex(&trace), want, "{name}");
+    }
+}
+
+#[test]
+fn measuring_the_validity_ratio_leaves_samples_and_events_unchanged() {
+    // Hashes of the serialized (samples, events) pair, computed with the v1 simulator at 8b04960
+    // before the measurement was added. A change here means the dynamics changed.
+    for (name, want, ratio) in [
+        (
+            "ballistic.json",
+            "fc13277b613dcf400e80da1fe8b3cb82f6f0705f0d9ded5939b767a1c0b6f585",
+            (0.0, 0.0),
+        ),
+        (
+            "propulsive_descent.json",
+            "cf5e4e7ec63ba09b086514e5ecfde40ba0c390e7d2a115ee180977aa1a298767",
+            (5.0e-5, 5.2e-5),
+        ),
+        (
+            "attitude_dynamics.json",
+            "247c2f4397dec1d2d0f7bbfa0242e444af92bcde1621526f9bc85088d0597ae7",
+            (2.6e-3, 2.8e-3),
+        ),
+    ] {
+        let case: Case = serde_json::from_slice(&fs::read(case_path(name)).unwrap()).unwrap();
+        let run = simulate(&prepare(&case).unwrap(), false).unwrap();
+        let bytes = serde_json::to_vec(&(&run.trace.samples, &run.trace.events)).unwrap();
+        assert_eq!(sha256_hex(&bytes), want, "{name}");
+        let eps = run.trace.summary.max_neglected_jet_ratio;
+        assert!(ratio.0 <= eps && eps <= ratio.1, "{name}: {eps}");
     }
 }
 

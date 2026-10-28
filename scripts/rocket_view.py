@@ -312,7 +312,7 @@ function drawResult() {
       ? `Verified: vv-rocket replay recomputed this run with the build named in Research and every byte of the trace matched${r.reused ? '; every stored file also matches a fresh regeneration' : ''}. This confirms the record, not the physics.`
       : `Not verified: ${r.verdict.reasons.join('; ')}.`),
     el('p', {class: 'statement ' + (pr.all_pass ? 'ok' : 'warn')}, el('b', {}, 'Physics reference verification of this build. '), pr.summary + '. Details in Research.'),
-    el('p', {class: 'statement'}, el('b', {}, 'Model validity. '), r.model_validity),
+    el('p', {class: 'statement'}, el('b', {}, 'Model validity. '), r.model_validity, ' ', jetText(sum, verified, withheld)),
     el('div', {class: 'cards'},
       card('Simulated time', verified ? `${f(sum.final_time_s, 2)} s, ended by ${sum.end_reason === 'ground' ? '0 m crossing' : 'duration'}` : withheld),
       card('Highest altitude', verified ? `${f(sum.max_altitude_m)} m` : withheld),
@@ -324,6 +324,14 @@ function drawResult() {
     ...(verified ? details : [el('section', {class: 'unverified', 'aria-label': 'Unverified stored data'},
       el('b', {class: 'bad'}, 'UNVERIFIED stored data, shown for diagnosis only'), details)]));
   renderSample();
+}
+// Measured by vv-rocket at both ends of every burning step; see docs/m8-rocket-dynamics.md.
+function jetText(sum, verified, withheld) {
+  const eps = sum.max_neglected_jet_ratio;
+  if (!verified) return `Neglected jet term: ${withheld}.`;
+  if (!Number.isFinite(eps)) return 'Neglected jet term: not reported by this trace.';
+  if (eps === 0) return 'No thrust in this run, so the translational jet term the model neglects is zero.';
+  return `The model neglects a translational jet term; in this run its largest size is ε = ${eps.toExponential(2)} of the thrust, at t = ${f(sum.max_neglected_jet_ratio_t_s, 2)} s. The translational acceleration error is of that order, and the model is adequate only while ε ≪ 1.`;
 }
 function eventText(e) {
   const t = `t = ${f(e.t_s, 2)} s: `, d = e.detail;

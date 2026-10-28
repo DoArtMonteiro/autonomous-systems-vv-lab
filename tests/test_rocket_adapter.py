@@ -231,6 +231,18 @@ class RunTests(unittest.TestCase):
         # Vacuum apex is v_z² / 2g for v_z = 160 m/s.
         self.assertAlmostEqual(vacuum["summary"]["max_altitude_m"], 160.0 ** 2 / (2 * 9.80665), delta=0.2)
 
+    def test_each_run_measures_the_neglected_jet_term(self):
+        ratio = lambda r: (r["summary"]["max_neglected_jet_ratio"], r["summary"]["max_neglected_jet_ratio_t_s"])
+        self.assertEqual(ratio(self.adapter.run(request("ballistic"), self.tmp)), (0.0, 0.0))
+        self.assertLess(ratio(self.adapter.run(request(), self.tmp))[0], 1e-4)
+        # Without roll the transverse rate reaches 2.45 rad/s; at 4 rad/s gyroscopic stiffness keeps it
+        # near 0.30 rad/s, so the nozzle moves sideways more slowly and the neglected term is smaller.
+        no_roll = ratio(self.adapter.run(request("attitude_dynamics", roll_rate_radps=0.0), self.tmp))
+        fast_roll = ratio(self.adapter.run(request("attitude_dynamics", roll_rate_radps=4.0), self.tmp))
+        self.assertGreater(no_roll[0], fast_roll[0])
+        # The burn runs from 2 s to 6 s; the ratio is zero outside it.
+        self.assertTrue(2.0 <= no_roll[1] <= 6.0 and 2.0 <= fast_roll[1] <= 6.0, (no_roll, fast_roll))
+
     def test_a_case_the_rust_library_refuses_is_an_adapter_error(self):
         with self.assertRaisesRegex(sa.AdapterError, "propellant"):
             self.adapter.run(request(ignition_time_s=0.0, throttle=1.0), self.tmp)
