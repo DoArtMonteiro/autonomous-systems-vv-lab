@@ -117,6 +117,23 @@ As sementes 0 a 40 do caso nominal serviram para escolher os ganhos. A campanha 
 - Varrimento de fronteira: `thrust_loss` e `ignition_delay` em seis magnitudes igualmente espaçadas de cada gama, com as duas políticas e as sementes 1000 a 1009. Se não houver falhas dentro da gama, o resultado é "nenhuma fronteira dentro da gama pré-registada", não uma extrapolação.
 - Critério de cada hipótese, por família de falhas: contagem de `landed` com todos os invariantes por política e contagem dos pares discordantes (uma política aterra, a outra não). H1 é **apoiada** se `robust ≥ baseline` em cada uma das três falhas da família; H2 é **apoiada** se, em cada falha de atuador, os pares discordantes forem no máximo 3 de 30; H3 é **observada** se houver pelo menos um par em que `baseline` aterra e `robust` não. Não se calculam valores-p: 30 sementes com dispersões assumidas não sustentam uma inferência estatística sobre um veículo real.
 
+### Janelas das falhas na campanha (pré-registadas antes de executar a matriz)
+
+A gama de magnitudes está na tabela de falhas. As janelas seguem a cronologia do voo nominal (ignição por volta de 4,3 s, contacto por volta de 23,5 s) e não dependem de nenhum resultado da campanha. Todos os tempos são múltiplos de 0,01 s. A ordem dos sorteios com `random.Random(semente · 100 + índice da falha)` é: magnitude (se a falha tem magnitude), duração (se a falha é definida pela duração) e início (se o início é sorteado). Cada sorteio é `a + (b - a) · random()`, arredondado a 0,01 s para tempos e à precisão completa para magnitudes. O índice segue a ordem da tabela de falhas (`thrust_loss` 0 a `imu_accel_bias` 7).
+
+| Falha | Magnitude | Início | Fim |
+| --- | --- | --- | --- |
+| `thrust_loss` | sorteada em 0,05 a 0,30 | 5,26 s (ignição nominal mais 1 s) | 40,0 s (resto do voo) |
+| `ignition_delay` | sorteada em 0,1 a 1,0 s | 2,0 s | 8,0 s (a janela só tem de conter o instante do comando de ignição) |
+| `gimbal_stuck` | 0 | sorteado em 5,0 a 20,0 s (durante a queima) | início mais a duração, sorteada em 0,5 a 3,0 s (termina antes de 23,0 s) |
+| `altimeter_bias` | sorteada em 5 a 50 m | 0 s | 40,0 s (voo inteiro) |
+| `altimeter_dropout` | 0 | sorteado em 0 a (23,0 s menos a duração) | início mais a duração, sorteada em 2 a 10 s |
+| `gnss_dropout` | 0 | sorteado em 0 a (23,0 s menos a duração) | início mais a duração, sorteada em 2 a 10 s |
+| `gnss_bias` | sorteada em 5 a 30 m | 0 s | 40,0 s (voo inteiro) |
+| `imu_accel_bias` | sorteada em 0,05 a 0,5 m/s² | 0 s | 40,0 s (voo inteiro) |
+
+No varrimento de fronteira a magnitude é a da grelha (seis valores de `low + i · (high - low) / 5`, `i = 0 … 5`, extremos incluídos) e a janela é a da tabela, que nestas duas falhas não é sorteada. A duração do voo nos casos é 40 s; a simulação termina no contacto.
+
 ## Requisitos de contacto (assumidos para este demonstrador)
 
 Avaliados no estado real interpolado do contacto, no ponto `p_base`. Valores assumidos para o demonstrador, não especificações de um veículo real.
