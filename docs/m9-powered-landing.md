@@ -148,3 +148,82 @@ Uma violação de segurança não é apagada por um resultado `landed`, nem o co
 - Que o modelo representa um veículo real ou que os requisitos são os de um veículo real.
 - Que uma taxa de sucesso numa campanha é uma estimativa de fiabilidade: as dispersões são assumidas e limitadas.
 - Que os controladores são ótimos ou adequados para voo.
+
+## Implementação
+
+Esta secção descreve o que foi implementado em `crates/vv-rocket`. Não altera nenhuma convenção, limite, dispersão ou gama de falhas das secções anteriores.
+
+### Módulos
+
+| Ficheiro | Conteúdo |
+| --- | --- |
+| `prng.rs` | SplitMix64 e ruído de Irwin-Hall; identificadores das fontes: posição inicial 1, velocidade inicial 2, velocidade angular inicial 3, propelente 4, impulso 5, `Isp` 6, altímetro 7, posição GNSS 8, velocidade GNSS 9, atitude da IMU 10, velocidade angular da IMU 11, aceleração da IMU 12. Teste com o vetor de referência da semente 0 (primeira saída `0xe220a8397b1dcdaf`). |
+| `landing_types.rs` | Observação, comando, estimativa, ganhos e configuração conhecida pelo controlador. Não importa nada do lado real. |
+| `landing_controller.rs` | Navegação (`baseline` e `robust`), guiamento, acelerador e TVC. Só importa `landing_types`, `math` e `G0`; um teste confirma as importações e que o código não menciona `dynamics`, `State` nem `Vehicle`. A entrada é `Controller::step(&Observation) -> (Command, Estimate)`. |
+| `landing_model.rs` | Esquema `vv-rocket-landing.v1`, validação estrita e dispersões por semente. |
+| `landing_actuator.rs` | Ignição, taxas e limites, TVC preso, perda de impulso, corte irreversível e `flameout`. |
+| `landing_sensors.rs` | Observações com ruído e falhas. |
+| `landing_truth.rs` | Ponto de contacto, inclinação, interpolação do contacto e registo por passo para o verificador. |
+| `landing_verify.rs` | Verificador independente: `R1` a `R6`, `S1` a `S4` e resultado da missão, só a partir do estado real. |
+| `landing_sim.rs` | Simulação em malha fechada; reutiliza `dynamics::rk4` do M8 sem alterações, com um `Segment` por passo. |
+| `landing_run.rs` | Escrita dos artefactos e repetição (`replay`). |
+
+### Comandos e artefactos
+
+```sh
+vv-rocket land <landing.json> --seed <u64> --output <pasta>
+vv-rocket replay <pasta>
+```
+
+`land` escreve, sem nunca sobrescrever, `case.json` (bytes do pedido), `trace.json` (`vv-rocket-landing-trace.v1`), `verification.json` (`vv-rocket-landing-verification.v1`) e `run.json` (`vv-rocket-landing-run.v1`, com `source_sha256`, nome, semente, política, referências com SHA-256, resumo e resultado). Código de saída: 0 se o resultado for `landed` e todos os invariantes passarem; 2 se algum requisito ou invariante falhar ou o resultado não for `landed` (os artefactos são escritos); 3 em erro de entrada ou de uso. `replay` deteta uma aterragem pelo esquema de `run.json`, recalcula o traço, a verificação e o manifesto a partir de `case.json` e da semente guardada e compara-os byte a byte; termina com 0 se verificado e 1 se falhar. A repetição de execuções M8 não mudou.
+
+`trace.json` e `verification.json` não contêm hash do código nem dados da plataforma: dependem só do caso e da semente. O `source_sha256` fica em `run.json`.
+
+### Escolhas que a especificação deixava em aberto
+
+- **Esquema.** O ficheiro de entrada repete os limites dos requisitos, as dispersões, as taxas dos sensores e o período de controlo, para a evidência ser autodescritiva, e a validação rejeita qualquer valor diferente do pré-registado. As gamas das falhas também são impostas na validação: magnitude dentro da gama, duração da janela de `gimbal_stuck` e dos cortes de sensores dentro de 0,5 a 3 s e 2 a 10 s, no máximo uma falha de cada tipo, no máximo 8 falhas. Os ganhos do controlador e do estimador estão no ficheiro (`controller.gains`) e são limitados, mas livres. A validação do veículo, do estado inicial e dos limites de passos e amostras reutiliza a do M8. `record_every` é múltiplo do período de controlo (2 passos); os casos usam 10 passos (0,1 s).
+- **Semente 0.** Não faz sorteios de dispersão (caso nominal), mas o ruído dos sensores continua ligado, com os fluxos da semente 0. Uma execução com a semente 0 não é, por isso, uma execução sem ruído.
+- **Fluxos.** Os sensores sorteiam sempre, haja ou não falha, para que uma falha não desloque o ruído das outras amostras. O GNSS só sorteia nos ciclos em que há amostra.
+- **Propelente disperso.** Altera `propellant_mass_kg` do veículo real e escala a inércia do propelente na mesma proporção (inércia por quilograma constante). O controlador mantém os valores nominais.
+- **Ordem do passo.** Seguida como no documento. A amostra do passo `k` guarda o estado real em `k` com a observação, o estimador, o comando e a saída do atuador aplicada de `k` a `k + 1`. Contacto: evento `touchdown` com `step = k + 1` (o passo em que foi detetado) e `t_s` igual ao instante interpolado; a amostra `touchdown` guarda o estado interpolado. Uma amostra `final` fecha as execuções sem contacto.
+- **Aceleração específica da IMU.** No passo `k` é o impulso aplicado no passo anterior (o atuador ainda não foi atualizado) mais o arrasto no estado `k`, a dividir pela massa em `k`, em B.
+- **Taxas dos atuadores.** Aplicadas em cada passo (0,01 s) enquanto o comando fica constante durante o ciclo. A ignição leva o acelerador a 0,40 no passo da ignição; o TVC só se move com o motor aceso.
+- **`ignition_delay`.** Só atrasa uma ignição comandada com a janela ativa; o atraso é arredondado ao passo mais próximo e fixado quando a ignição é comandada.
+- **`flameout`.** Avaliado ao aplicar o atuador: se o propelente real não chega para o passo completo com o impulso desse passo, o motor apaga nesse passo, com `Isp` e `T_max` reais. O evento regista esse passo.
+- **Contacto.** Fração linear de `p_base,z` entre os dois extremos do passo; os restantes componentes interpolam-se linearmente e o quaternião é normalizado depois. O primeiro passo com `p_base,z <= 0` no fim termina a simulação.
+- **Verificador.** `S1` avalia o cosseno da inclinação nos estados de início e de fim de cada passo com impulso (no contacto, o estado interpolado). `S3` avalia `|impulso + arrasto| / m` no início de cada passo, com o impulso desse passo, usando `dynamics::forces`. `S4` conta as subidas de impulso de zero a positivo; como o atuador torna o corte irreversível, só um registo construído à mão o pode violar, e é isso que o teste faz. `S2` só é avaliado no contacto. Sem contacto, os seis requisitos aparecem com `evaluated: false` e `pass: false`. A causa de uma falha são as falhas ativas no passo (para o contacto, o passo em que ocorre).
+- **Estimador `baseline`.** Último valor de cada sensor. A posição horizontal e a velocidade são as do último GNSS; a altitude do centro de massa vem do último altímetro (`z = altímetro + s_cm · (x_B)_z`).
+- **Estimador `robust`.** Propaga posição e velocidade com a aceleração específica da IMU rodada pela atitude medida e a gravidade, a 50 Hz. Cada medida GNSS corrige a posição com ganho 0,15 e a velocidade com ganho 0,25. O altímetro é comparado com a altitude da base do próprio estimador (GNSS corrigido, propagado pela IMU, `s_cm` nominal): se o resíduo excede 3 m, o altímetro não é usado nesse ciclo e, após 5 ciclos consecutivos, `altimeter_rejected` fica verdadeiro até haver um resíduo abaixo do limiar. Um resíduo aceite corrige a altitude (ganho 0,1) e a velocidade vertical (ganho 0,004 por ciclo, a dividir pelo período). A comparação é, portanto, com a altitude GNSS filtrada e não com a amostra GNSS bruta; com `gnss_bias` o altímetro correto é rejeitado, como previsto em H3.
+- **Guiamento.** Partilhado. Desaceleração necessária `a = (v_z² - v_t²) / (2 h)` na base, com `h` limitado inferiormente a 0,5 m. Ignição quando `g + a >= 0,75 · T_max / m` (massa nominal estimada). Depois, a aceleração específica vertical pretendida é `g + a`, limitada a `3 g0 - 0,1 g0`; o acelerador é o do modelo do controlador no ciclo anterior mais a correção do erro de aceleração específica vertical medida (ganho 0,8 por ciclo), o que absorve o arrasto, que o controlador não conhece, e os erros de impulso e de massa. Lateral: velocidade lateral pretendida proporcional ao desvio da base ao centro da plataforma (ganho 0,12 por segundo), limitada pela curva de travagem (1 m/s²) e a desvanecer nos últimos 3 s de descida; aceleração lateral proporcional ao erro de velocidade (0,5 por segundo); a inclinação comandada (tangente) tem o limite 0,2 longe do solo e `0,02 + 0,004 · h` perto dele. Atitude: erro `x_B × x_desejado` em B, controlo PD (0,3 por rad, 0,5 por rad/s) sobre a deflexão, escalado pelo acelerador de referência 0,6. Corte se a velocidade vertical estimada for positiva abaixo de 15 m.
+- **`neglected_jet_ratio`.** O resumo do traço regista o máximo de `ε` (M8) amostrado nos dois extremos de cada passo com impulso; só é reportado.
+
+### Resultados medidos
+
+Compilação `--release`, Windows 11, Rust 1.99.0, `vv-rocket land landing/<caso>.json --seed <s>`.
+
+Semente 0, caso nominal. `baseline`: `landed`; ignição aos 4,26 s; contacto aos 23,63 s; `v_base,z` = -1,346 m/s; `|v_base,xy|` = 0,278 m/s; cosseno da inclinação superior a 0,9999; `|ω|` = 0,0064 rad/s; `|p_base,xy|` = 0,516 m; propelente restante 4328,5 kg; pior `S3` 2,195 g0. `robust`: `landed`; contacto aos 23,27 s; `v_base,z` = -1,691 m/s; `|v_base,xy|` = 0,178 m/s; `|ω|` = 0,0041 rad/s; `|p_base,xy|` = 0,483 m; propelente restante 4367,0 kg; pior `S3` 2,367 g0. Os quatro invariantes passam nas duas. `ε` máximo 7,4e-4 (reportado).
+
+Os casos de demonstração em `crates/vv-rocket/landing/` usam magnitudes e janelas fixadas antes de qualquer execução com falhas: ponto médio das gamas pré-registadas (`altimeter_bias` +20 m, `gnss_bias` 15 m, `imu_accel_bias` 0,25 m/s², `thrust_loss` 0,15 a partir de 1 s depois da ignição nominal, `ignition_delay` 0,5 s, `gimbal_stuck` 2 s, `gnss_dropout` 6 s) e o corte do altímetro de 6 s sobre a descida final (18 a 24 s). Cada caso existe com `baseline` e com `robust` (`<nome>-robust.json`). Resultado com as sementes 0 e 1, tal como medido (resultado da missão; requisitos falhados):
+
+| Caso | `baseline` | `robust` |
+| --- | --- | --- |
+| nominal | `landed`, `landed` | `landed`, `landed` |
+| `altimeter_bias` | `hard_landing` (R1 20,4 m/s), `hard_landing` (R1) | `landed`, `landed` |
+| `altimeter_dropout` | `hard_landing` (R1 37 m/s), `hard_landing` (R1) | `landed`, `landed` |
+| `gnss_dropout` | `hard_landing` (R2, R5), `landed` | `landed`, `landed` |
+| `gnss_bias` | `hard_landing` (R5 12,7 m), `hard_landing` (R5) | `hard_landing` (R1 18,4 m/s, R5), `hard_landing` (R1, R2) |
+| `imu_accel_bias` | `landed`, `landed` | `landed`, `landed` |
+| `thrust_loss` | `landed`, `landed` | `landed`, `landed` |
+| `ignition_delay` | `landed`, `landed` | `landed`, `landed` |
+| `gimbal_stuck` | `landed`, `landed` | `landed`, `landed` |
+
+Nenhum invariante falhou nestas 36 execuções. Duas sementes não são uma campanha: o quadro mostra apenas que a implementação reproduz o sentido de H1 (as falhas do altímetro e a perda do GNSS prejudicam o `baseline`, não o `robust`) e de H3 (o `gnss_bias` faz o `robust` rejeitar um altímetro correto e falhar com uma velocidade vertical de cerca de 18 m/s), e que as falhas de atuador testadas (H2) tiveram o mesmo resultado nas duas políticas nestas sementes. A taxa de sucesso e as fronteiras de recuperação ficam para a campanha em Python.
+
+Os ganhos do controlador foram escolhidos por simulação com o caso nominal e a semente 0, e o limite de inclinação e os ganhos laterais foram afinados com as sementes 1 a 40 do mesmo caso; não há sementes de reserva. Com a configuração final, o caso nominal com sementes de 0 a 40 aterra (`landed` com todos os invariantes) em 41 de 41 execuções com `baseline` e em 40 de 41 com `robust` (semente 28, que falha `R2`). É uma indicação do funcionamento do controlador, não uma estimativa de fiabilidade.
+
+### Limitações materiais
+
+- O controlador não conhece o arrasto nem a inércia; compensa o arrasto através da aceleração específica medida e usa ganhos fixos de atitude escalados pelo acelerador. Com o motor desligado não há controlo de atitude, como pré-registado.
+- O guiamento lateral é limitado pela inclinação comandada e pela ausência de RCS; desvios iniciais extremos não são recuperáveis.
+- O `baseline` mantém a última velocidade GNSS (até 0,1 s de idade) e não usa a IMU para a velocidade; é intencional, e é uma fonte de erro nos últimos segundos.
+- O modelo continua sem dinâmica de contacto: `landed` significa que o plano de saída da tubeira atingiu o solo com os seis requisitos cumpridos.
