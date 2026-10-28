@@ -405,6 +405,12 @@ function statements(r) {
     : `Not verified: ${r.verdict.reasons.join('; ')}.`);
   return [outcome, inv, ev];
 }
+// The verifier marks a fault window that never acted; such a run is effectively fault-free.
+function actedNote(r) {
+  const idle = verified(r) ? (r.verification.faults || []).filter(x => x.acted === false) : [];
+  return idle.length ? el('p', {class: 'statement warn'}, el('b', {}, 'The fault never acted. '),
+    `${idle.map(x => words(x.kind)).join(', ')}: the verifier reports that the window never acted on the vehicle or the sensors (for example it closed before the event it affects), so this run behaves like a run without the fault.`) : null;
+}
 function limitText(x) { return x.expected || `${x.limit} ${x.unit}`; }
 function reqTable(r) {
   const ok = verified(r), labels = state.caps.labels;
@@ -619,7 +625,7 @@ function drawSingle() {
     el('h3', {}, 'Events'), eventList(r)];
   fill($('result'), 
     el('h2', {id: 'result-heading', tabindex: '-1'}, ok ? 'Result' : 'Result: REJECTED evidence'),
-    el('p', {class: 'meta'}, describeRun(r)), noteBox(), ...statements(r),
+    el('p', {class: 'meta'}, describeRun(r)), noteBox(), ...statements(r), actedNote(r),
     ...(ok ? details : [el('section', {class: 'unverified', 'aria-label': 'Unverified stored data'},
       el('b', {class: 'bad'}, 'UNVERIFIED stored data, shown for diagnosis only'), details)]));
   renderLive();
@@ -659,7 +665,7 @@ function drawCompare() {
   fill($('result'), 
     el('h2', {id: 'result-heading', tabindex: '-1'}, 'Comparison of the two policies'),
     el('p', {class: 'meta'}, `Same case for both: ${describeFault(req.fault)} · seed ${req.seed}. baseline run ${b.run_id}, robust run ${r.run_id}.`), noteBox(),
-    summary,
+    summary, actedNote(b),
     el('div', {class: 'grid2'}, POLICY_NAMES.map(p => el('div', {class: 'panel'}, el('h3', {}, p), ...statements(state.pair[p]), detail(p)))),
     el('h3', {}, 'Requirement and invariant verdicts side by side'), table,
     el('p', {class: 'meta'}, 'Requirements are evaluated on the true state at touchdown. Differences are computed from the verdicts of the two runs, each replayed by the Rust build.'),

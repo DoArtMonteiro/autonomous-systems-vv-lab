@@ -114,7 +114,7 @@ class PageTests(Base):
             "Compare policies on this case", "Requirements at contact (R1 to R6)", "Safety invariants (S1 to S4)",
             "Assumed demonstrator requirements", "R1 limit at contact", "keep-out", "Read from disk, not recomputed here",
             "No verified run to plot", "Not claimed", "Verified", "Assumed", "pad_radius_m", "/api/campaign",
-            "estimate minus truth", "Gaps are sensor dropouts",
+            "estimate minus truth", "Gaps are sensor dropouts", "The fault never acted",
         ):
             self.assertIn(marker, text)
 
