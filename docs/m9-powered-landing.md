@@ -391,3 +391,65 @@ Há falhas dentro das gamas, por isso não é um caso de "nenhuma fronteira dent
 - Cada execução injeta uma falha de cada vez, com magnitude e janela sorteadas uniformemente. Falhas combinadas, fora das gamas ou com outra distribuição temporal não foram avaliadas.
 - O controlador foi afinado no caso nominal com as sementes 0 a 40; as sementes 1000 a 1029 são disjuntas dessas. A afinação usou apenas o caso nominal, mas os casos de demonstração com falhas tinham sido executados com um conjunto anterior de ganhos (ver Implementação). O piso nominal acima mostra que a taxa de aterragem sem falhas não é 100% em sementes novas.
 - A causa das 22 falhas de `R5` do `baseline` com `gnss_bias` não foi investigada. O mecanismo das execuções `no_contact` do `baseline` com `gnss_dropout` foi confirmado apenas no traço da semente 1000.
+
+## M9.1: endurecimento de segurança (pré-registado antes da implementação)
+
+A campanha M9 mostrou duas lacunas. Primeira: com `gnss_dropout`, o `baseline` para acima do solo e sobe com o motor aceso até mais de 1 km (20 de 30 execuções), e nenhum invariante o deteta. Segunda: com `gnss_bias`, o `robust` rejeita o altímetro correto no primeiro ciclo (0,1 s), porque o enviesamento está presente desde o início e o seu filtro só confia no GNSS; aterra 0 de 30 vezes, com 11 a 26 m/s. O M9.1 acrescenta um invariante, uma política nova e uma campanha nova. Não altera o M9: as políticas `baseline` e `robust`, os requisitos `R1` a `R6`, os invariantes `S1` a `S4`, as gamas, as sementes e os resultados da campanha M9 ficam como estão.
+
+### Dados usados no projeto
+
+Os dados de projeto do M9.1 são as sementes 0 a 40 do caso nominal e as 780 execuções da campanha M9 (sementes 1000 a 1029). Nessas execuções, nenhuma das 580 aterragens sobe acima do mínimo da altitude da base desde a ignição (subida máxima 0 m, nas amostras de 0,1 s); as únicas 20 subidas acima de 0,5 m são as 20 execuções `no_contact` do `baseline` com `gnss_dropout`, entre 136 e 1358 m. A aceitação usa sementes novas, **2000 a 2029**, nunca executadas antes.
+
+### Invariante novo
+
+| Id | Invariante | Limite | Quando |
+| --- | --- | --- | --- |
+| `S5_no_powered_ascent` | subida de `p_base,z` acima do seu mínimo desde a ignição | ≤ 5,0 m | cada passo com impulso, depois da ignição |
+
+Justificação: uma queima de aterragem sem capacidade de pairar (acelerador mínimo com impulso superior ao peso) só é segura em descida; subir com o motor aceso significa que o veículo parou acima do solo e já não pode tocar suavemente sem cortar o motor. 5 m fica muito acima da subida observada nas aterragens (0 m) e da interpolação do contacto (cerca de 1e-4 m), e muito abaixo das subidas observadas (pelo menos 136 m). Avalia-se no estado real, em todos os passos, com o mesmo verificador independente; não depende do controlador. Com `S5`, os artefactos passam a `vv-rocket-landing-verification.v2`.
+
+Previsão P1: ao reavaliar os 780 casos da campanha M9 com o verificador novo, os traços ficam idênticos byte a byte e `S5` falha exatamente nas 20 execuções `no_contact` do `baseline` com `gnss_dropout`, e em nenhuma outra.
+
+### Deteção e recuperação são coisas diferentes
+
+- **Deteção**: o controlador declara, na sua estimativa, uma inconsistência entre sensores (`sensor_disagreement`) ou uma subida que leva ao corte (`ascent_abort`), com o instante. É o que o controlador afirma, registado no traço; o verificador não o usa para nenhum veredicto.
+- **Contenção**: os invariantes de segurança `S1` a `S5` cumprem-se no estado real.
+- **Recuperação**: `R1` a `R6` cumprem-se no contacto (resultado `landed`).
+
+A campanha apresenta, por célula, as três contagens separadas e, no caso nominal e nas falhas que não enviesam sensores, a taxa de falsos alarmes de `sensor_disagreement`.
+
+### Política nova `guarded`
+
+`baseline` e `robust` não mudam. `guarded` usa o estimador do `robust` (IMU, GNSS, comparação com o altímetro) e acrescenta duas regras:
+
+1. **Inconsistência de altitude.** Se o resíduo entre o altímetro e a altitude da base do estimador exceder 3 m durante 5 ciclos consecutivos, declara `sensor_disagreement`. Sem terceira fonte de altitude, não sabe qual das duas está errada. Escolhe a mais conservadora para a travagem: a que indica **menor** altitude. Enquanto a inconsistência durar, o guiamento usa essa altitude.
+2. **Corte por subida.** Depois da ignição, se a velocidade vertical estimada for superior a +1 m/s durante 1 s seguido, corta o motor e declara `ascent_abort`. É uma terminação do voo que contém o veículo perto da plataforma; a queda livre a partir de `h` dá cerca de `√(2·g·h)` no contacto, pelo que não é uma recuperação.
+
+Limiares de `guarded` afinados apenas com os dados de projeto acima; depois congelados pelo hash do modelo de caso.
+
+### O que a política não pode fazer (previsto agora)
+
+- **Posição horizontal.** `gnss_bias` desloca também `x`. Não há segunda fonte horizontal, por isso nenhum controlador deste modelo pode cumprir `R5` quando o deslocamento horizontal excede 10 m. Com magnitudes uniformes entre 5 e 30 m, cerca de 1 em 5 sorteios fica abaixo de 10 m. A célula `gnss_bias` não pode ficar "verde"; o resultado honesto esperado é contacto suave fora da plataforma (`R1` cumprido, `R5` falhado, resultado `hard_landing`).
+- **Dependência do sinal.** A regra "menor altitude" acerta quando a fonte errada lê **alto**, como nas duas falhas pré-registadas do M9 (`altimeter_bias` e `gnss_bias`, ambas positivas). Quando a fonte errada lê **baixo**, a regra escolhe a errada, trava cedo, para acima do solo e só lhe resta o corte. Para medir esse custo, o M9.1 acrescenta duas falhas novas, com gamas próprias, sem alterar as do M9:
+
+| Falha | Efeito | Gama | Janela |
+| --- | --- | --- | --- |
+| `altimeter_bias_low` | subtrai `magnitude` m à medida do altímetro | 5 a 50 m | 0 a 40 s |
+| `gnss_bias_low` | subtrai `magnitude` m à posição GNSS em x e z | 5 a 30 m | 0 a 40 s |
+
+### Campanha de aceitação M9.1
+
+- Sementes 2000 a 2029; 11 cenários (nominal, as 8 falhas do M9 e as 2 novas) × 3 políticas (`baseline`, `robust`, `guarded`) × 30 sementes = 990 execuções. Sem varrimento de fronteira.
+- Sorteio de magnitude e janela como no M9 (`random.Random(semente · 100 + índice)`, índices 0 a 7 como no M9, 8 e 9 para as falhas novas); as três políticas recebem o mesmo caso.
+- Cada execução é reproduzida; o modelo de caso é congelado por hash antes da execução única.
+- Reavaliação retrospetiva (P1) dos 780 casos M9 com o binário novo, separada da aceitação.
+
+Hipóteses, com critérios numéricos:
+
+- **G1, deteção**: `guarded` declara `sensor_disagreement` em pelo menos 27 de 30 execuções em cada uma de `altimeter_bias`, `gnss_bias`, `altimeter_bias_low` e `gnss_bias_low`; e em no máximo 1 de 30 no caso nominal.
+- **G2, contenção da subida**: `guarded` não viola `S5` em nenhuma das 30 execuções com `gnss_dropout`.
+- **G3, contacto suave com `gnss_bias`**: `guarded` cumpre `R1` em pelo menos 27 de 30 execuções. O número de `landed` não deverá exceder o número de sorteios com magnitude inferior a 10 m; é um teto previsto, não um objetivo.
+- **G4, sem regressão**: em cada um dos 9 cenários do M9, `guarded` aterra em pelo menos `robust − 2` execuções.
+- **G5, custo da regra conservadora**: em `altimeter_bias_low` e `gnss_bias_low`, regista-se o resultado de `guarded` sem critério de sucesso; prevê-se que não recupere.
+
+Uma hipótese que falhe é reportada como falhada. Nenhum limiar de `S5`, nenhum requisito e nenhuma gama é ajustado depois de ver a campanha de aceitação.
