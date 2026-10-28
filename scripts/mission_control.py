@@ -30,12 +30,16 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+from landing_adapter import MODEL_ID as LANDING_MODEL_ID
+from landing_adapter import LandingAdapter
+from landing_view import LANDING_JS, landing_page, load_campaign
 from m6_report import CSS
 from rocket_adapter import RocketAdapter
 from rocket_view import ROCKET_JS, rocket_page
 from sim_adapter import ADAPTER_SCHEMA_V2, MODEL_ID, AdapterError, GroundVehicleAdapter, check_result
 
 ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_CAMPAIGN_SUMMARY = ROOT / "runs" / "m9-campaign" / "summary.json"
 MAX_BODY_BYTES = 16 * 1024
 BUSY_WAIT_SECONDS = 5
 
@@ -51,8 +55,12 @@ class ExclusiveServer(ThreadingHTTPServer):
         super().server_bind()
 
 
-def make_server(port: int, output_root: Path, adapter: Any) -> ThreadingHTTPServer:
-    """`adapter` is one ground-vehicle adapter or a map from model id to adapter; runs dispatch on `model`."""
+def make_server(port: int, output_root: Path, adapter: Any, campaign_summary: Path | None = None) -> ThreadingHTTPServer:
+    """`adapter` is one ground-vehicle adapter or a map from model id to adapter; runs dispatch on `model`.
+
+    `campaign_summary` is the M9 campaign summary the landing page may read (GET /api/campaign).
+    """
+    campaign_summary = DEFAULT_CAMPAIGN_SUMMARY if campaign_summary is None else Path(campaign_summary)
     output_root = Path(output_root).resolve()
     output_root.mkdir(parents=True, exist_ok=True)
     lock = threading.Lock()
@@ -119,6 +127,12 @@ def make_server(port: int, output_root: Path, adapter: Any) -> ThreadingHTTPServ
                 return self._send(HTTPStatus.OK, rocket_page(CSS).encode("utf-8"), "text/html; charset=utf-8")
             if self.path == "/rocket.js":
                 return self._send(HTTPStatus.OK, ROCKET_JS.encode("utf-8"), "text/javascript; charset=utf-8")
+            if self.path == "/landing":
+                return self._send(HTTPStatus.OK, landing_page(CSS).encode("utf-8"), "text/html; charset=utf-8")
+            if self.path == "/landing.js":
+                return self._send(HTTPStatus.OK, LANDING_JS.encode("utf-8"), "text/javascript; charset=utf-8")
+            if self.path == "/api/campaign":
+                return self._json(HTTPStatus.OK, load_campaign(campaign_summary))
             return self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})
 
         def do_POST(self) -> None:  # noqa: N802
@@ -210,7 +224,7 @@ pre{{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.4 ui-monospace,Cons
 [hidden]{{display:none!important}}
 </style></head>
 <body><main>
-<p class="meta">V&amp;V lab · Mission Control · local simulator runs on this computer · Ground vehicle (2D) · <a href="/rocket">Rocket stage (6-DOF)</a></p>
+<p class="meta">V&amp;V lab · Mission Control · local simulator runs on this computer · Ground vehicle (2D) · <a href="/rocket">Rocket stage (6-DOF)</a> · <a href="/landing">Powered landing</a></p>
 <h1>Mission Control</h1>
 <p class="physics" id="physics"><b>Ground vehicle, 2D kinematic model.</b> Positions are integer millimetres on a plane,
 time advances in fixed ticks, and there are no dynamics or environment model. This is not a 3D or 6-DOF simulation.</p>
@@ -598,12 +612,15 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--port", type=int, default=8780)
     parser.add_argument("--output-root", default=str(ROOT / "runs" / "mission-control"))
+    parser.add_argument("--campaign-summary", default=str(DEFAULT_CAMPAIGN_SUMMARY),
+                        help="M9 campaign summary.json shown on /landing (read only; may be absent)")
     args = parser.parse_args(argv)
     if not 1024 <= args.port <= 65535:
         print("error: --port must be in [1024, 65535]", file=sys.stderr)
         return 2
     server = make_server(args.port, Path(args.output_root),
-                         {MODEL_ID: GroundVehicleAdapter(), "rocket-rigid-body": RocketAdapter()})
+                         {MODEL_ID: GroundVehicleAdapter(), "rocket-rigid-body": RocketAdapter(),
+                          LANDING_MODEL_ID: LandingAdapter()}, Path(args.campaign_summary))
     print(f"Mission Control on http://127.0.0.1:{args.port}/  (Ctrl+C to stop)")
     try:
         server.serve_forever()
