@@ -124,13 +124,21 @@ A gama de magnitudes está na tabela de falhas. As janelas seguem a cronologia d
 | Falha | Magnitude | Início | Fim |
 | --- | --- | --- | --- |
 | `thrust_loss` | sorteada em 0,05 a 0,30 | 5,26 s (ignição nominal mais 1 s) | 40,0 s (resto do voo) |
-| `ignition_delay` | sorteada em 0,1 a 1,0 s | 2,0 s | 8,0 s (a janela só tem de conter o instante do comando de ignição) |
+| `ignition_delay` | sorteada em 0,1 a 1,0 s | 0 s | 10,0 s (contém o comando de ignição, que ocorre por volta de 4 s, para qualquer semente) |
 | `gimbal_stuck` | 0 | sorteado em 5,0 a 20,0 s (durante a queima) | início mais a duração, sorteada em 0,5 a 3,0 s (termina antes de 23,0 s) |
 | `altimeter_bias` | sorteada em 5 a 50 m | 0 s | 40,0 s (voo inteiro) |
-| `altimeter_dropout` | 0 | sorteado em 0 a (23,0 s menos a duração) | início mais a duração, sorteada em 2 a 10 s |
-| `gnss_dropout` | 0 | sorteado em 0 a (23,0 s menos a duração) | início mais a duração, sorteada em 2 a 10 s |
+| `altimeter_dropout` | 0 | sorteado em 5,0 s a (23,0 s menos a duração), durante a queima | início mais a duração, sorteada em 2 a 10 s |
+| `gnss_dropout` | 0 | sorteado em 5,0 s a (23,0 s menos a duração), durante a queima | início mais a duração, sorteada em 2 a 10 s |
 | `gnss_bias` | sorteada em 5 a 30 m | 0 s | 40,0 s (voo inteiro) |
 | `imu_accel_bias` | sorteada em 0,05 a 0,5 m/s² | 0 s | 40,0 s (voo inteiro) |
+
+Cada janela é construída para atuar: a ignição fica dentro de `ignition_delay`, a perda de impulso começa depois da ignição, os desvios cobrem o voo todo e os cortes e o `gimbal_stuck` ficam dentro da queima. Uma execução cuja falha tenha `acted: false` em `verification.json` é um erro de sorteio da campanha (registado, contado e a campanha falha), não um resultado; a ausência do campo `acted` também é um erro. Esta alteração das janelas de `ignition_delay` e dos cortes foi feita antes de qualquer execução da matriz.
+
+O caso base da campanha é `crates/vv-rocket/landing/nominal.json` (os ganhos do controlador estão nesse ficheiro; a política e o nome são os únicos campos que o script altera por execução, e as falhas são as sorteadas). O script recusa-se a correr se o SHA-256 deste ficheiro não for o seguinte, para o controlador ficar congelado durante a campanha:
+
+| Ficheiro | SHA-256 |
+| --- | --- |
+| `crates/vv-rocket/landing/nominal.json` | `58b19ff7a85455d4feb0d9c47e9098b21dcb4660416bbfaf822bf433576f1830` |
 
 No varrimento de fronteira a magnitude é a da grelha (seis valores de `low + i · (high - low) / 5`, `i = 0 … 5`, extremos incluídos) e a janela é a da tabela, que nestas duas falhas não é sorteada. A duração do voo nos casos é 40 s; a simulação termina no contacto.
 
