@@ -9,7 +9,9 @@ use serde::{Deserialize, Serialize};
 use crate::landing_model::{LandingCase, prepare_landing};
 use crate::landing_sim::simulate_landing;
 use crate::landing_verify::verify;
-use crate::run::{Check, FileRef, ReplayReport, check, read_bounded, report_of};
+use crate::run::{
+    Check, FileRef, MAX_ARTIFACT_BYTES, ReplayReport, check, read_bounded, read_capped, report_of,
+};
 use crate::{sha256_hex, source_sha256};
 
 pub const RUN_SCHEMA: &str = "vv-rocket-landing-run.v1";
@@ -177,7 +179,8 @@ pub fn write_landing(
 /// the verification and the manifest byte for byte. Stored verdicts are never returned unchecked.
 pub fn replay(dir: &Path) -> ReplayReport {
     let mut checks: Vec<Check> = Vec::new();
-    let stored_manifest = fs::read(dir.join("run.json")).unwrap_or_default();
+    let stored_manifest =
+        read_capped(&dir.join("run.json"), MAX_ARTIFACT_BYTES).unwrap_or_default();
     let manifest: LandingManifest = match serde_json::from_slice(&stored_manifest) {
         Ok(m) => m,
         Err(e) => {
@@ -219,17 +222,12 @@ pub fn replay(dir: &Path) -> ReplayReport {
     ));
     let (case_bytes, stored_trace, stored_verification) = match (
         read_bounded(&dir.join("case.json")),
-        fs::read(dir.join("trace.json")),
-        fs::read(dir.join("verification.json")),
+        read_capped(&dir.join("trace.json"), MAX_ARTIFACT_BYTES),
+        read_capped(&dir.join("verification.json"), MAX_ARTIFACT_BYTES),
     ) {
         (Ok(c), Ok(t), Ok(v)) => (c, t, v),
         (c, t, v) => {
-            let detail = format!(
-                "{:?} {:?} {:?}",
-                c.err(),
-                t.err().map(|e| e.to_string()),
-                v.err().map(|e| e.to_string())
-            );
+            let detail = format!("{:?} {:?} {:?}", c.err(), t.err(), v.err());
             checks.push(check(
                 "case.json, trace.json and verification.json readable",
                 false,

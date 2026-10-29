@@ -118,13 +118,32 @@ struct Contact {
 /// never read: a log whose states do not cross the ground has no contact for the verifier.
 fn verified_contact(vehicle: &Vehicle, log: &TruthLog) -> Option<Contact> {
     let td = log.touchdown.as_ref()?;
-    let before = log.steps.iter().find(|s| s.step + 1 == td.step)?;
+    // The logged `touchdown.step` is a claim: the first step whose end has the nozzle plane at or
+    // below the ground must be that step. A late claim (an earlier step already crossed) or an
+    // early one (no step crosses there) is no contact, like any contact the states do not support.
+    // The contact ends the log, so its step is the last logged one and `td.after` is the same end
+    // state `first_crossing` tested.
+    if first_crossing(vehicle, log) != Some(td.step) {
+        return None;
+    }
+    let before = log.steps.last().filter(|s| s.step + 1 == td.step)?;
     let (fraction, state) = contact(vehicle, &before.state, &td.after)?;
     Some(Contact {
         step: td.step,
         fraction,
         t_s: ((td.step - 1) as f64 + fraction) * log.dt,
         state,
+    })
+}
+
+/// The step that first ends with the nozzle plane at or below the ground, from the logged states
+/// alone. The end state of a step is the start of the next; the last step ends at the claimed
+/// `after` state, or at the final state of a log that claims no contact.
+fn first_crossing(vehicle: &Vehicle, log: &TruthLog) -> Option<u64> {
+    let last_end = log.touchdown.as_ref().map_or(log.end_state, |td| td.after);
+    log.steps.iter().enumerate().find_map(|(i, s)| {
+        let end = log.steps.get(i + 1).map_or(&last_end, |n| &n.state);
+        (base_kinematics(vehicle, end).0.z <= 0.0).then_some(s.step + 1)
     })
 }
 
@@ -358,7 +377,11 @@ fn invariants(
         if thrusting || min_z.is_some() {
             min_z = Some(min_z.map_or(st.state.r.z, |m| m.min(st.state.r.z)));
         }
-        if thrusting && let Some(m) = min_z {
+        // The end state of the previous thrusting step is this start state: already evaluated.
+        if thrusting
+            && last_s1 != Some(st.step)
+            && let Some(m) = min_z
+        {
             s5.check(
                 st.state.r.z - m,
                 st.step,
@@ -684,6 +707,92 @@ mod tests {
                 .unwrap()
                 .evaluated
         );
+    }
+
+    fn step_at(step: u64, state: State, thrust_n: f64) -> TruthStep {
+        TruthStep {
+            step,
+            state,
+            thrust_n,
+            direction: Vec3::new(1.0, 0.0, 0.0),
+            active_faults: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn s5_counts_each_failing_state_once() {
+        // Four thrusting steps climbing 10 m each from z = 10 m; the log ends at z = 50 m without
+        // contact. S5 is evaluated at the 5 states 10, 20, 30, 40 and 50 m (rises 0, 10, 20, 30
+        // and 40 m over the running minimum): four distinct states exceed 5 m. The end state of
+        // each step is the start of the next and counts once.
+        let at = |z: f64| {
+            let mut s = upright(0.0);
+            s.r.z = z;
+            s
+        };
+        let steps: Vec<TruthStep> = (0..4)
+            .map(|i| step_at(i, at(10.0 + 10.0 * i as f64), 1000.0))
+            .collect();
+        let log = TruthLog {
+            dt: 0.01,
+            steps,
+            end_step: 4,
+            end_state: at(50.0),
+            touchdown: None,
+            ignition: None,
+        };
+        let (outcome, _, invs) = evaluate(&Requirements::registered(), &prepared(), &log);
+        assert_eq!(outcome, "no_contact");
+        let s5 = invs
+            .iter()
+            .find(|i| i.id == "S5_no_powered_ascent")
+            .unwrap();
+        assert!(!s5.pass);
+        assert_eq!(s5.failure_count, 4);
+        assert_eq!(s5.worst_value, Some(40.0));
+        assert_eq!(s5.first_failure.as_ref().unwrap().step, 1);
+    }
+
+    /// Step 0 starts above the ground and step 1 starts on it: the first crossing is step 0.
+    fn two_step_log() -> TruthLog {
+        let ground = grounded(upright(0.0));
+        let mut log = log_with(ground);
+        log.steps.push(step_at(1, ground, 0.0));
+        log.end_step = 2;
+        log
+    }
+
+    #[test]
+    fn a_forged_touchdown_step_is_no_contact() {
+        let req = Requirements::registered();
+        // Honest claim: step 0 ends on the ground and the log ends there, contact step 1.
+        assert_eq!(
+            evaluate(&req, &prepared(), &log_with(grounded(upright(0.0)))).0,
+            "landed"
+        );
+
+        // Mid-log claim: step 0 crossed, but the log goes on with step 1.
+        let mut log = two_step_log();
+        log.touchdown.as_mut().unwrap().step = 1;
+        assert_eq!(evaluate(&req, &prepared(), &log).0, "no_contact");
+
+        // Late claim: step 1 also "ends" on the ground, but step 0 crossed first.
+        log.touchdown.as_mut().unwrap().step = 2;
+        let (outcome, reqs, invs) = evaluate(&req, &prepared(), &log);
+        assert_eq!(outcome, "no_contact");
+        assert!(reqs.iter().all(|r| !r.evaluated));
+        assert!(
+            !invs
+                .iter()
+                .find(|i| i.id == "S2_keep_out")
+                .unwrap()
+                .evaluated
+        );
+
+        // Early claim: step 0 ends above the ground, so step 0 cannot be the contact.
+        let mut log = log_with(grounded(upright(0.0)));
+        log.touchdown.as_mut().unwrap().after = upright(1.0);
+        assert_eq!(evaluate(&req, &prepared(), &log).0, "no_contact");
     }
 
     fn failed(reqs: &[RequirementResult]) -> Vec<&'static str> {

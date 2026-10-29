@@ -1747,3 +1747,66 @@ fn m91_runs_replay_and_a_forged_controller_flag_is_rejected() {
         let _ = fs::remove_dir_all(dir);
     }
 }
+
+#[test]
+fn the_gnss_dropout_of_the_campaign_fails_end_to_end_under_baseline_guarded() {
+    // Seed 1000, GNSS lost from 14.9 s to 21.99 s, run through the real simulator and verifier:
+    // rule 2 contains the climb but does not recover the landing.
+    let mut case = value_of("nominal.json");
+    case["faults"] = json!([fault("gnss_dropout", 14.9, 21.99, 0.0)]);
+    case["controller"]["policy"] = json!("baseline_guarded");
+    let (_, v) = run_value(&case, 1000).unwrap();
+    assert_eq!(v["outcome"], "hard_landing");
+    assert_eq!(v["requirements_pass"], false);
+    assert_eq!(v["invariants_pass"], false);
+    let failed = |items: &str| -> Vec<&str> {
+        v[items]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|r| r["pass"] == false)
+            .map(|r| r["id"].as_str().unwrap())
+            .collect()
+    };
+    assert_eq!(
+        failed("requirements"),
+        [
+            "R1_vertical_speed",
+            "R2_horizontal_speed",
+            "R3_tilt",
+            "R5_position"
+        ]
+    );
+    assert_eq!(
+        failed("invariants"),
+        ["S2_keep_out", "S5_no_powered_ascent"]
+    );
+    let value = |r: &Value| r.as_f64().unwrap();
+    assert!((value(&requirement(&v, "R1_vertical_speed")["value"]) - 68.24).abs() < 0.01);
+    assert!((value(&requirement(&v, "R5_position")["value"]) - 51.08).abs() < 0.01);
+    assert!((value(&invariant(&v, "S2_keep_out")["worst_value"]) - 51.08).abs() < 0.01);
+    let s5 = invariant(&v, "S5_no_powered_ascent");
+    assert!((value(&s5["worst_value"]) - 59.16).abs() < 0.01);
+    // Each failing state counted once.
+    assert_eq!(s5["failure_count"], 189);
+}
+
+#[test]
+fn replay_refuses_stored_artifacts_over_the_size_cap() {
+    for name in ["trace.json", "verification.json", "run.json"] {
+        let dir = tamper_dir(&format!("oversize-{name}"), "nominal.json", 3);
+        assert_eq!(replay(&dir).status, "verified");
+        // A sparse file one byte over the cap: the check fails without reading it.
+        let file = fs::OpenOptions::new()
+            .write(true)
+            .open(dir.join(name))
+            .unwrap();
+        file.set_len(vv_rocket::run::MAX_ARTIFACT_BYTES + 1)
+            .unwrap();
+        drop(file);
+        let report = replay(&dir);
+        assert_ne!(report.status, "verified", "{name}");
+        let detail = format!("{:?}", report.checks);
+        assert!(detail.contains("exceeds"), "{name}: {detail}");
+    }
+}
