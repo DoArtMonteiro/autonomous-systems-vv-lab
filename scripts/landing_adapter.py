@@ -230,6 +230,9 @@ class LandingAdapter(RocketAdapter):
             report = json.loads(done.stdout) if done.returncode in (0, 1) else None
         except json.JSONDecodeError:
             report = None
+        if not (isinstance(report, dict) and isinstance(report.get("status"), str)
+                and isinstance(report.get("checks"), list)):
+            report = None
         replay = ({"status": "error", "detail": done.stderr.strip()[-400:]} if report is None
                   else {"status": report["status"], "checks": report["checks"]})
 

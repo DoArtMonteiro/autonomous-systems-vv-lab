@@ -298,6 +298,7 @@ class HypothesisTests(unittest.TestCase):
 
     def test_h2_counts_discordant_pairs_in_both_directions(self):
         records = family_records("thrust_loss", 15, 15, overlap="disjoint")  # 30 discordantes
+        records += family_records("ignition_delay", 30, 30) + family_records("gimbal_stuck", 30, 30)
         h2 = verdicts(records)["H2"]
         self.assertEqual(h2["observed"]["thrust_loss"]["only_baseline"], 15)
         self.assertEqual(h2["observed"]["thrust_loss"]["only_robust"], 15)
@@ -313,6 +314,22 @@ class HypothesisTests(unittest.TestCase):
 
     def test_h3_not_evaluated_without_gnss_bias(self):
         self.assertEqual(verdicts(family_records("nominal", 5, 5))["H3"]["verdict"], "not_evaluated")
+
+
+    def test_a_subset_of_the_preregistered_runs_gives_no_verdict(self):
+        records = []
+        for fault, (b, r) in {"altimeter_bias": (5, 30), "altimeter_dropout": (20, 20), "gnss_dropout": (10, 25)}.items():
+            records += family_records(fault, b, r, runs=2)
+        records += family_records("gnss_bias", 1, 0, runs=2)
+        for fault in m9.HYPOTHESIS_FAMILIES["H2"]:
+            records += family_records(fault, 2, 2, runs=2)
+        h = verdicts(records)
+        for hid in ("H1", "H2", "H3"):
+            self.assertEqual(h[hid]["verdict"], "not_evaluated", hid)
+            self.assertFalse(h[hid]["complete"], hid)
+
+    def test_a_cell_with_29_runs_gives_no_verdict(self):
+        self.assertEqual(verdicts(family_records("gnss_bias", 1, 0, runs=29))["H3"]["verdict"], "not_evaluated")
 
 
 class SummaryTests(unittest.TestCase):

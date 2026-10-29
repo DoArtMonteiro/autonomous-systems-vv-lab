@@ -372,6 +372,20 @@ class RunTests(unittest.TestCase):
             (run_dir / "verification.json").write_bytes(stored)
         self.assertEqual(self.adapter.verify(run_dir)["verdict"]["status"], "verified")
 
+    def test_a_malformed_replay_report_is_an_error_verdict_not_an_exception(self):
+        run_dir = self.tmp / self.run_view(request())["run_id"]
+        real = self.adapter._call
+        for stdout in ("[]", "42", '{"status": "verified"}', '{"checks": []}', '{"status": 1, "checks": []}',
+                       '{"status": "verified", "checks": {}}'):
+            fake = subprocess.CompletedProcess([], 0, stdout=stdout, stderr="")
+            self.adapter._call = lambda *a, _f=fake: _f
+            try:
+                view = self.adapter.verify(run_dir)
+            finally:
+                self.adapter._call = real
+            self.assertEqual(view["replay"]["status"], "error", stdout)
+            self.assertEqual(view["verdict"]["status"], "rejected", stdout)
+
     def test_self_consistent_forgeries_that_replay_alone_cannot_see(self):
         run_dir = self.tmp / self.run_view(request("baseline", 0))["run_id"]
         saved = {n: (run_dir / n).read_bytes() for n in OUTPUTS}

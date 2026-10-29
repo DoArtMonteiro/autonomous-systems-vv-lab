@@ -78,7 +78,19 @@ def verdicts(cells, extras=None):
     return {h["id"]: h for h in m91.evaluate_hypotheses(cells, extras)}
 
 
+def shrink(cells, runs=2):
+    return [{**c, "runs": runs, "r1_met": min(c["r1_met"], runs)} for c in cells]
+
+
 GOOD_IDENTITY = {"pairs_compared": 100, "identical": 100, "different": []}
+
+
+class SubsetTests(unittest.TestCase):
+    def test_hypotheses_need_the_full_preregistered_run_count(self):
+        v = verdicts(shrink(passing_cells()), {"command_identity": GOOD_IDENTITY, "small_gnss_bias_draws": 0})
+        for hid in ("G1", "G2", "G2b", "G3", "G4", "G5"):
+            self.assertEqual(v[hid]["verdict"], "not_evaluated", hid)
+            self.assertFalse(v[hid]["complete"], hid)
 
 
 class PlanTests(unittest.TestCase):

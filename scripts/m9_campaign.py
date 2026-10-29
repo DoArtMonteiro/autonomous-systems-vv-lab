@@ -88,6 +88,8 @@ HYPOTHESIS_FAMILIES = {
     "H3": ("gnss_bias",),
 }
 H2_MAX_DISCORDANT = 3
+# Execuções por célula pré-registadas; só células completas dão veredicto.
+PREREGISTERED_RUNS = len(DEFAULT_SEEDS)
 
 MAX_RUNS = 1000
 DEFAULT_MAX_RUNS = 800
@@ -493,7 +495,9 @@ def inspect_run(
     requirements_failed = [
         r["id"].split("_", 1)[0] for r in requirements if r.get("evaluated") and not r.get("pass")
     ]
-    invariants_failed = [i["id"] for i in invariants if not i.get("pass")]
+    invariants_failed = [
+        i["id"] for i in invariants if i.get("evaluated") and not i.get("pass")
+    ]
     derived_exit = 0 if outcome == "landed" and not invariants_failed else 2
     if exit_code is not None and exit_code != derived_exit:
         raise M9CampaignError(
@@ -598,10 +602,15 @@ def _cell_index(cells: list[dict[str, Any]]) -> dict[tuple[str, str], dict[str, 
     return {(c["fault"], c["policy"]): c for c in cells}
 
 
+def full_cells(cells: list[dict[str, Any]]) -> bool:
+    """Verdadeiro quando todas as células têm o número pré-registado de execuções."""
+    return bool(cells) and all(c["runs"] == PREREGISTERED_RUNS for c in cells)
+
+
 def evaluate_hypotheses(
     cells: list[dict[str, Any]], pairs: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
-    """Critérios pré-registados. Sem falhas da família, o veredicto é `not_evaluated`."""
+    """Critérios pré-registados. Sem as células completas da família, o veredicto é `not_evaluated`."""
     index = _cell_index(cells)
     pair_index = {p["fault"]: p for p in pairs}
 
@@ -621,14 +630,17 @@ def evaluate_hypotheses(
         for f in present
     }
     held = {f: e["robust_landed"] >= e["baseline_landed"] for f, e in evidence.items()}
+    h1_complete = len(present) == len(family) and full_cells(
+        [index[(f, p)] for f in present for p in POLICIES]
+    )
     results.append(
         {
             "id": "H1",
             "statement": "Em falhas do altímetro e perda do GNSS, robust cumpre os requisitos em pelo menos tantos casos como baseline.",
             "criterion": "robust aterra (landed com todos os invariantes) em pelo menos tantas execuções como baseline em cada uma das três falhas.",
             "observed": evidence,
-            "complete": len(present) == len(family),
-            "verdict": "not_evaluated" if not present else ("supported" if all(held.values()) else "not_supported"),
+            "complete": h1_complete,
+            "verdict": "not_evaluated" if not h1_complete else ("supported" if all(held.values()) else "not_supported"),
             "evidence": "; ".join(
                 f"{f}: baseline {e['baseline_landed']}/{e['runs']}, robust {e['robust_landed']}/{e['runs']}"
                 f" ({'cumpre' if held[f] else 'não cumpre'})"
@@ -651,14 +663,19 @@ def evaluate_hypotheses(
             "robust_landed": index[(f, "robust")]["landed"],
         }
     held = {f: e["discordant"] <= H2_MAX_DISCORDANT for f, e in evidence.items()}
+    h2_complete = (
+        len(present) == len(family)
+        and full_cells([index[(f, p)] for f in present for p in POLICIES])
+        and all(e["pairs"] == PREREGISTERED_RUNS for e in evidence.values())
+    )
     results.append(
         {
             "id": "H2",
             "statement": "Em falhas de atuador, as duas políticas têm resultados semelhantes, porque partilham o guiamento.",
             "criterion": f"pares discordantes (uma política aterra, a outra não) no máximo {H2_MAX_DISCORDANT} em cada uma das três falhas de atuador (em 30 sementes).",
             "observed": evidence,
-            "complete": len(present) == len(family),
-            "verdict": "not_evaluated" if not present else ("supported" if all(held.values()) else "not_supported"),
+            "complete": h2_complete,
+            "verdict": "not_evaluated" if not h2_complete else ("supported" if all(held.values()) else "not_supported"),
             "evidence": "; ".join(
                 f"{f}: {e['discordant']} discordantes em {e['pairs']} pares"
                 f" (só baseline {e['only_baseline']}, só robust {e['only_robust']};"
@@ -671,14 +688,17 @@ def evaluate_hypotheses(
     present = [f for f in HYPOTHESIS_FAMILIES["H3"] if f in pair_index]
     only_baseline = sum(pair_index[f]["only_baseline"] for f in present)
     pairs_total = sum(pair_index[f]["pairs"] for f in present)
+    h3_complete = bool(present) and full_cells(
+        [index[(f, p)] for f in present for p in POLICIES if (f, p) in index]
+    ) and pairs_total == PREREGISTERED_RUNS * len(present)
     results.append(
         {
             "id": "H3",
             "statement": "Com gnss_bias, robust pode rejeitar um altímetro correto e falhar onde baseline aterra.",
             "criterion": "pelo menos um par de gnss_bias em que baseline aterra e robust não.",
             "observed": {"only_baseline": only_baseline, "pairs": pairs_total},
-            "complete": bool(present),
-            "verdict": "not_evaluated" if not present else ("observed" if only_baseline >= 1 else "not_observed"),
+            "complete": h3_complete,
+            "verdict": "not_evaluated" if not h3_complete else ("observed" if only_baseline >= 1 else "not_observed"),
             "evidence": f"gnss_bias: {only_baseline} de {pairs_total} pares em que só baseline aterra",
         }
     )
@@ -1189,7 +1209,7 @@ def main(argv: list[str] | None = None) -> int:
         json.dumps(
             {
                 "status": "passed",
-                "root": str(root),
+                "root": relative_text(root),
                 "preregistered": summary["preregistered"],
                 "runs": summary["total_runs"],
                 "hypotheses": {h["id"]: h["verdict"] for h in summary["hypotheses"]},

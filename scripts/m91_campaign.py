@@ -352,6 +352,10 @@ def evaluate_hypotheses(
     det_ok = {s: c["detection"]["sensor_disagreement"] == c["runs"] for s, c in det.items()}
     alarm_ok = {a["scenario"]: a["within_limit"] for a in alarms}
     held = all(det_ok.values()) and all(alarm_ok.values())
+    g1_complete = (
+        len(det) == len(DETECTION_SCENARIOS) and len(alarms) == len(FALSE_ALARM_SCENARIOS)
+        and m9.full_cells(list(det.values()) + [index[(a["scenario"], "guarded")] for a in alarms])
+    )
     out.append(
         _hypothesis(
             "G1",
@@ -360,13 +364,13 @@ def evaluate_hypotheses(
             f"nas células {', '.join(FALSE_ALARM_SCENARIOS)}, cada bandeira em no máximo {FALSE_ALARM_MAX} execução de guarded.",
             {"detection": {s: [c["detection"]["sensor_disagreement"], c["runs"]] for s, c in det.items()},
              "false_alarms": {a["scenario"]: a["flags"] for a in alarms}},
-            "not_evaluated" if not det and not alarms else ("supported" if held else "not_supported"),
+            "not_evaluated" if not g1_complete else ("supported" if held else "not_supported"),
             "; ".join(
                 [f"{s}: {c['detection']['sensor_disagreement']}/{c['runs']} ({'cumpre' if det_ok[s] else 'não cumpre'})" for s, c in det.items()]
                 + [f"falsos alarmes {a['scenario']}: " + ", ".join(f"{k} {v}" for k, v in a["flags"].items())
                    + f" ({'cumpre' if a['within_limit'] else 'não cumpre'})" for a in alarms]
             ),
-            len(det) == len(DETECTION_SCENARIOS) and len(alarms) == len(FALSE_ALARM_SCENARIOS),
+            g1_complete,
         )
     )
 
@@ -379,9 +383,9 @@ def evaluate_hypotheses(
             "guarded não viola S5 com gnss_dropout.",
             "nenhuma execução de guarded com gnss_dropout falha S5 (0 de 30).",
             {"s5_failures": s5, "runs": None if cell is None else cell["runs"]},
-            "not_evaluated" if cell is None else ("supported" if s5 == 0 else "not_supported"),
+            "not_evaluated" if not m9.full_cells([cell] if cell else []) else ("supported" if s5 == 0 else "not_supported"),
             "" if cell is None else f"gnss_dropout, guarded: S5 falhou em {s5} de {cell['runs']}",
-            cell is not None,
+            m9.full_cells([cell] if cell else []),
         )
     )
     cell = index.get(("gnss_dropout", "baseline_guarded"))
@@ -394,11 +398,11 @@ def evaluate_hypotheses(
                 "no_contact": cell["no_contact"], "runs": cell["runs"], "s5_failures": cell["invariant_failures"]["S5"],
                 "r1_failures": cell["requirement_failures"]["R1"], "hard_landing": cell["hard_landing"],
                 "recovered": cell["recovered"]},
-            "not_evaluated" if cell is None else ("supported" if cell["no_contact"] == 0 else "not_supported"),
+            "not_evaluated" if not m9.full_cells([cell] if cell else []) else ("supported" if cell["no_contact"] == 0 else "not_supported"),
             "" if cell is None else (
                 f"gnss_dropout, baseline_guarded: no_contact {cell['no_contact']}/{cell['runs']}, hard_landing {cell['hard_landing']}, "
                 f"recuperou {cell['recovered']}, S5 falhou {cell['invariant_failures']['S5']}, R1 falhou {cell['requirement_failures']['R1']}"),
-            cell is not None,
+            m9.full_cells([cell] if cell else []),
         )
     )
 
@@ -413,11 +417,11 @@ def evaluate_hypotheses(
             f"(landed) é registado contra o teto previsto de cerca de 3 ± 1, sem critério.",
             None if cell is None else {"r1_met": cell["r1_met"], "runs": cell["runs"], "recovered": cell["recovered"],
                                       "draws_below_10_m": small},
-            "not_evaluated" if cell is None else ("supported" if cell["r1_met"] >= G3_MIN_R1 else "not_supported"),
+            "not_evaluated" if not m9.full_cells([cell] if cell else []) else ("supported" if cell["r1_met"] >= G3_MIN_R1 else "not_supported"),
             "" if cell is None else (
                 f"gnss_bias, guarded: R1 cumprido em {cell['r1_met']} de {cell['runs']}; recuperou {cell['recovered']}, "
                 f"hard_landing {cell['hard_landing']}, sorteios com magnitude abaixo de {G3_SMALL_DRAW_M:g} m: {small}"),
-            cell is not None,
+            m9.full_cells([cell] if cell else []),
         )
     )
 
@@ -431,6 +435,9 @@ def evaluate_hypotheses(
                 "holds": guarded["recovered"] >= robust["recovered"] - G4_TOLERANCE,
                 "informative": robust["recovered"] > 0,
             }
+    g4_complete = len(rows) == len(M9_SCENARIOS) and m9.full_cells(
+        [index[(s, p)] for s in rows for p in ("guarded", "robust")]
+    )
     identity = extras.get("command_identity")
     strong = None if identity is None else (identity["pairs_compared"] > 0 and not identity["different"])
     out.append(
@@ -440,19 +447,20 @@ def evaluate_hypotheses(
             f"em cada um dos 9 cenários do M9, guarded recupera (landed com S1 a S5) pelo menos robust menos {G4_TOLERANCE} execuções. "
             "Verificação mais forte, registada à parte: sem bandeiras de guarded, a sequência de comandos é a do robust.",
             {"scenarios": rows, "command_identity": identity},
-            "not_evaluated" if not rows else ("supported" if all(r["holds"] for r in rows.values()) else "not_supported"),
+            "not_evaluated" if not g4_complete else ("supported" if all(r["holds"] for r in rows.values()) else "not_supported"),
             "; ".join(
                 f"{s}: guarded {r['guarded']}, robust {r['robust']} ({'cumpre' if r['holds'] else 'não cumpre'}"
                 f"{'' if r['informative'] else '; não informativa, robust recuperou 0'})" for s, r in rows.items()
             ) + ("" if identity is None else (
                 f". Verificação forte: {identity['identical']} de {identity['pairs_compared']} pares com comandos idênticos"
                 f" ({'cumpre' if strong else 'não cumpre'})")),
-            len(rows) == len(M9_SCENARIOS),
+            g4_complete,
         )
     )
 
     # G5: sem critério de sucesso; regista-se o resultado de guarded nas duas falhas novas.
     rows = {s: index[(s, p)] for s in NEW_FAULTS for p in ("guarded",) if (s, p) in index}
+    g5_complete = len(rows) == len(NEW_FAULTS) and m9.full_cells(list(rows.values()))
     out.append(
         _hypothesis(
             "G5",
@@ -461,11 +469,11 @@ def evaluate_hypotheses(
             {s: {"runs": c["runs"], "recovered": c["recovered"], "hard_landing": c["hard_landing"], "no_contact": c["no_contact"],
                  "r1_failures": c["requirement_failures"]["R1"], "sensor_disagreement": c["detection"]["sensor_disagreement"],
                  "ascent_abort": c["detection"]["ascent_abort"]} for s, c in rows.items()},
-            "not_evaluated" if not rows else "recorded",
+            "not_evaluated" if not g5_complete else "recorded",
             "; ".join(
                 f"{s}, guarded: recuperou {c['recovered']}/{c['runs']}, hard_landing {c['hard_landing']}, no_contact {c['no_contact']}, "
                 f"R1 falhou {c['requirement_failures']['R1']}, ascent_abort {c['detection']['ascent_abort']}" for s, c in rows.items()),
-            len(rows) == len(NEW_FAULTS),
+            g5_complete,
         )
     )
     return out
