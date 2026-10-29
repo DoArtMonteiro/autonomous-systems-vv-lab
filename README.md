@@ -2,7 +2,7 @@
 
 Laboratório em Rust para verificar missões de um veículo autónomo terrestre em duas dimensões. Combina falhas de sensores, comunicação e atuadores com invariantes de segurança, contratos temporais e reprodução determinística. Python coordena campanhas limitadas e a redução de contraexemplos.
 
-**Estado: M7 Mission Control integrado em `main` (PR #9, 25/10/2026); aceitação operacional ainda pendente. M8 integrado em `main` (PR #10, 25/10/2026), com CI em Linux e Windows. M9 não iniciado.** Rust executa a simulação, aplica as políticas de controlo e avalia contratos; Python organiza campanhas, reduz contraexemplos e serve a interface local Mission Control através dos adaptadores versionados `vv-sim-adapter.v1` (veículo terrestre) e `vv-sim-adapter.v2` (foguetão). O controlador recebe apenas observações e configuração da missão. O domínio principal continua a ser um veículo terrestre 2D. O M8 acrescenta um modelo idealizado de foguetão como corpo rígido 6-DOF, verificado contra casos de referência e não validado com dados de voo; o laboratório não controla equipamento real.
+**Estado: M7 Mission Control integrado em `main` (PR #9, 25/10/2026); aceitação operacional ainda pendente. M8 integrado em `main` (PR #10 e PR #11), com CI em Linux e Windows. M9 (aterragem propulsiva em malha fechada) em revisão no ramo `feat/m9-rocket-recovery`, não integrado.** Rust executa a simulação, aplica as políticas de controlo e avalia contratos; Python organiza campanhas, reduz contraexemplos e serve a interface local Mission Control através dos adaptadores versionados `vv-sim-adapter.v1` (veículo terrestre) e `vv-sim-adapter.v2` (foguetão). O controlador recebe apenas observações e configuração da missão. O domínio principal continua a ser um veículo terrestre 2D. O M8 acrescenta um modelo idealizado de foguetão como corpo rígido 6-DOF, verificado contra casos de referência e não validado com dados de voo; o laboratório não controla equipamento real. O M9 fecha a malha sobre esse modelo: dois controladores que só recebem observações de sensores com ruído e falhas tentam aterrar numa plataforma, e um verificador independente avalia requisitos de contacto e invariantes de voo pré-registados no estado real.
 
 ## Executar uma missão
 
@@ -164,6 +164,30 @@ O binário `vv-repair` compara configurações do controlador nas mesmas cargas 
 `scripts/mission_control.py` abre um Mission Control local no navegador: escolher uma missão, alterar as falhas suportadas, correr o simulador através do contrato de adaptador `vv-sim-adapter.v1` e ver os estados gravados (modelo cinemático 2D). [M7: Mission Control, contrato de adaptador e roteiro](docs/m7-mission-control.md).
 
 `crates/vv-rocket` integra a dinâmica 6-DOF de um andar de foguete com massa variável (RK4 de passo fixo) e verifica-a contra casos de referência com tolerâncias fixadas antes da execução: `cargo run --release --manifest-path crates/vv-rocket/Cargo.toml -- verify`. Os doze casos cumprem os critérios ativos; os dois critérios da primeira execução que falharam ou se revelaram inválidos ficam no relatório como histórico e não contam como aprovados. No Mission Control, a página `/rocket` corre três experiências através do contrato `vv-sim-adapter.v2`. É um modelo idealizado, não validado contra dados de voo, e sem modelo de contacto com o solo. [M8: dinâmica de corpo rígido do andar de foguete](docs/m8-rocket-dynamics.md).
+
+A campanha M9 compara as duas políticas em 780 execuções emparelhadas, todas reproduzidas, com sementes de reserva e hipóteses fixadas antes da execução:
+
+```sh
+cargo build --release --manifest-path crates/vv-rocket/Cargo.toml
+crates/vv-rocket/target/release/vv-rocket land crates/vv-rocket/landing/altimeter-bias.json --seed 0 --output runs/m9-bias
+crates/vv-rocket/target/release/vv-rocket replay runs/m9-bias
+python scripts/m9_campaign.py
+python scripts/mission_control.py --port 8780
+```
+
+O comando `land` termina com código 2 neste caso: com o altímetro enviesado em +20 m, a política `baseline` toca no solo a cerca de 20 m/s (requisito `R1`, limite 3 m/s). A política `robust` rejeita o altímetro e aterra. Em `http://127.0.0.1:8780/landing`, escolher "Altimeter bias" e "Compare policies on this case".
+
+O M9.1 acrescenta o invariante `S5` (subida com o motor aceso), as políticas `guarded` e `baseline_guarded` e duas falhas que leem baixo (`altimeter_bias_low`, `gnss_bias_low`). A campanha de aceitação, pré-registada, tem 1050 execuções (sementes 2000 a 2029), todas reproduzidas, e separa deteção, contenção e recuperação:
+
+```sh
+crates/vv-rocket/target/release/vv-rocket land crates/vv-rocket/landing/gnss-bias-guarded.json --seed 0 --output runs/m91-demo
+python scripts/m91_retrospective.py --binary crates/vv-rocket/target/release/vv-rocket
+python scripts/m91_campaign.py
+```
+
+Os resultados, incluindo a hipótese que falhou (G2b) e a regressão prevista em `altimeter_bias_low`, estão em [M9: aterragem propulsiva](docs/m9-powered-landing.md). O Mission Control mostra-os no separador "M9.1 campaign" de `/landing` (`--m91-summary` escolhe outro `summary.json`). `python scripts/m9_campaign.py` continua a dar as mesmas contagens do M9.
+
+No Mission Control, a página `/landing` corre a aterragem propulsiva em malha fechada do M9 através do contrato `vv-sim-adapter.v3`: escolher uma falha, uma política (`baseline`, `robust`, `guarded` ou `baseline_guarded`) e uma semente, ver o resultado da missão, os invariantes de segurança e a evidência de reprodução como três afirmações separadas, e comparar as duas políticas no mesmo caso. [M9: aterragem propulsiva](docs/m9-powered-landing.md).
 
 `--suite m2 --seeds 42 --variants standard` seleciona dez casos. `--max-cases`, `--max-runs`, `--max-artifact-bytes` e `--time-budget-seconds` limitam a campanha antes e durante a execução. `--max-runs` conta invocações do simulador, incluindo repetições, reprodução e análise. Uma expectativa satisfeita não transforma uma missão insegura numa missão bem-sucedida.
 

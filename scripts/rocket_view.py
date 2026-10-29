@@ -61,7 +61,7 @@ pre{{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.4 ui-monospace,Cons
 [hidden]{{display:none!important}}
 </style></head>
 <body><main>
-<p class="meta">V&amp;V lab · Mission Control · <a href="/">Ground vehicle (2D)</a> · Rocket stage (6-DOF)</p>
+<p class="meta">V&amp;V lab · Mission Control · <a href="/">Ground vehicle (2D)</a> · Rocket stage (6-DOF) · <a href="/landing">Powered landing</a></p>
 <h1>Mission Control: rocket stage</h1>
 <p class="physics" id="physics"><b>Rocket stage, 6-DOF rigid body with variable mass.</b> 3D position and velocity,
 attitude quaternion, angular velocity and propellant mass, integrated with fixed-step RK4. Idealized thrust, uniform
