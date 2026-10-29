@@ -185,7 +185,6 @@ def p3_section():
                "p_tango_score": tango_p(b, c, n), "monotone_in_alpha": p3_monotone(b, c, n)}
         for tail in (0.0125, 0.00625):
             row["upper_limit_pp_each_tail_%g" % tail] = 100.0 * (cp_upper(b, n, tail) - cp_lower(c, n, tail))
-        row["upper_limit_pp_each_tail_0.0125_n900"] = 100.0 * (cp_upper(b, 900, 0.0125) - cp_lower(c, 900, 0.0125))
         ex.append(row)
     res["examples"] = ex
     return res
@@ -230,16 +229,16 @@ def main():
         "90_vs_80_alpha_0.0056": fisher_power(100, 0.90, 0.80, 0.0056),
         "90_vs_70_alpha_0.0056": fisher_power(100, 0.90, 0.70, 0.0056),
         "note": "a objecao da revisao dava 0,15 a 0,52 conforme o desenho; aqui o desenho nao emparelhado"}
-    # 5. nao inferioridade agrupada (N = 900 pares, 9 celulas): limite superior conservador de b/N - c/N,
-    #    b = so `guarded` recupera, c = so C recupera; cada limite com cauda 0,0125 (Bonferroni sobre 0,025)
+    # 5. nao inferioridade agrupada (P3: N = 800 pares, 8 celulas): limite superior conservador de b/N - c/N,
+    #    b = so `guarded` recupera, c = so B+ recupera; cada limite com cauda 0,0125 (Bonferroni sobre 0,025)
     ni = []
-    big_n = 900
+    big_n = 800
     for b, c in ((15, 15), (40, 40), (30, 20), (45, 25), (60, 30)):
         d_hat = (b - c) / big_n
         d_up = cp_upper(b, big_n, 0.0125) - cp_lower(c, big_n, 0.0125)
-        ni.append({"b_only_guarded": b, "c_only_C": c, "diff_pp": 100 * d_hat, "upper_limit_pp": 100 * d_up,
+        ni.append({"b_only_guarded": b, "c_only_Bplus": c, "diff_pp": 100 * d_hat, "upper_limit_pp": 100 * d_up,
                    "non_inferior_margin_3pp": d_up <= 0.03})
-    out["P3_noninferiority_examples_N900"] = ni
+    out["P3_noninferiority_examples_N800"] = ni
     # 6. P1: maximo de falhas em 700 execucoes, binomial exato unilateral contra 5%, por degrau de Holm
     out["P1_700_exact_binomial_vs_5pct_by_holm_tail"] = {
         str(t): max(k for k in range(701) if cdf(k, 700, 0.05) <= t) for t in (0.05, 0.025, 0.05 / 3, 0.0125)}
