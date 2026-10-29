@@ -2,6 +2,8 @@
 
 Estado: **rascunho de desenho para revisão independente e decisão do proprietário. Não há implementação do M10.** Este documento não altera código, casos, campanhas nem resultados do M9 e do M9.1. As afirmações marcadas "(suposto)" ou "(incerto)" não foram verificadas no repositório nem em dados externos e têm de ser confirmadas ou refutadas antes de serem usadas como requisito.
 
+Nomes fixos: braços **A**, **B**, **B+**, **C** (secção 6.1); conjuntos de sensores **`E0`** (só os sensores existentes), **`E1`** (`E0` mais barómetro) e **`E2`** (`E1` mais Doppler), para não colidirem com os invariantes `S1` a `S5`; modos `Nominal`, `DegradedNav` e `Untrusted` (secção 8).
+
 Convenções: texto em português europeu (Acordo Ortográfico de 1990), vírgula decimal na prosa e ponto decimal dentro de código. Os números do repositório citados aqui foram lidos de `docs/m9-powered-landing.md`, de `crates/vv-rocket/landing/nominal.json`, de `crates/vv-rocket/landing/m91-nominal.json` e do código em `crates/vv-rocket/src`.
 
 ## 1. Objetivo, pergunta de investigação e fronteira
@@ -40,7 +42,7 @@ Porque não chega, ligado a mecanismos e não só a números:
 
 1. **Ganhos fixos, sem covariância.** `robust` e `guarded` usam ganhos constantes (GNSS 0,15 e 0,25, altímetro 0,1 e 0,004, limiar de resíduo de 3 m durante 5 ciclos; valores de `landing/nominal.json`, não os do fixture de testes do controlador). O filtro não sabe quão incerto está. Depois de uma perda de GNSS aplica o mesmo ganho ao regressar. Não pode produzir um nível de proteção.
 2. **Duas fontes de altitude: deteta, não isola.** O M9.1 acusou-o por escrito ("sem terceira fonte de altitude, não sabe qual das duas está errada"). A regra de desempate "menor altitude" é um palpite que depende do sinal da falha. A medição G5 mostra o custo: 0 de 30 contra 28 de 30.
-3. **A deteção `G1` (30 de 30, 0 falsos alarmes em 210) é mais fácil do que parece.** O ruído é de Irwin-Hall e está limitado a ±2√3 σ, cerca de ±3,46 σ. A diferença bruta entre o radar e a altitude GNSS nunca excede, só por ruído, 3,46 × (0,1 + 0,5) = 2,08 m. O limiar de 3 m está acima desse limite e as magnitudes das falhas são de pelo menos 5 m. Zero falsos alarmes em 210 execuções é, em parte, uma propriedade do ruído limitado e do limiar, e não prova que um detetor com limiar a poucos desvios-padrão tenha uma taxa de falsos alarmes controlada. O resíduo é calculado contra a altitude filtrada, não contra a amostra bruta, o que acrescenta erro de filtro; a conclusão é qualitativa.
+3. **A deteção `G1` (30 de 30, 0 falsos alarmes em 210) é mais fácil do que parece.** O ruído é de Irwin-Hall e está limitado a ±2√3 σ, cerca de ±3,46 σ. A diferença bruta entre o radar e a altitude GNSS nunca excede, só por ruído, 3,46 × (0,1 + 0,5) = 2,08 m. O limiar de 3 m está acima desse limite e as magnitudes das falhas são de pelo menos 5 m. Zero falsos alarmes em 210 execuções é, em parte, uma propriedade do ruído limitado e do limiar, e não prova que um detetor com limiar a poucos desvios-padrão tenha uma taxa de falsos alarmes controlada. O resíduo é calculado contra a altitude filtrada, não contra a amostra bruta, o que acrescenta erro de filtro, e as estatísticas filtradas são quase gaussianas até 3 desvios-padrão (secção 3.8): a folga do ruído limitado vale para amostras brutas e não se transfere para testes filtrados. A conclusão é qualitativa.
 4. **O monitor partilhava a causa da falha.** A regra 2 de subida usa a velocidade vertical estimada, que durante a perda de GNSS é a última velocidade GNSS. O sensor em falha alimenta o monitor que o devia vigiar. A lição para o M10: um monitor só vale se usar informação independente da fonte vigiada.
 5. **Posição horizontal sem qualquer verificação.** Com `gnss_bias` presente desde o primeiro ciclo, nenhum controlador deste modelo pode cumprir `R5` quando o deslocamento excede 10 m (já previsto no M9.1). O M9.1 não explica porque o `R5` medido fica entre 0,73 e 0,97 vezes a magnitude nas 6 execuções recuperadas ("a razão da atenuação não foi investigada"). O M10 não afirma explicá-lo.
 6. **Mudanças de sensor invisíveis ao modo de operação.** Não há conceito de "modo" nem de estado de saúde por sensor com histerese. A decisão é o corte a 15 m, igual em todas as políticas.
@@ -65,8 +67,8 @@ Esta é a secção central: diz o que nenhum algoritmo pode fazer com os sensore
 Factos que importam para o desenho (todos lidos em `landing_sensors.rs` e `prng.rs`):
 
 - Sem latência: a observação no passo `k` mede o estado real em `k`.
-- O ruído é limitado: o radar nunca se afasta mais de 0,35 m, o GNSS em posição mais de 1,73 m, em velocidade mais de 0,17 m/s, o acelerómetro mais de 0,069 m/s². Um detetor gaussiano sobrestima os falsos alarmes neste modelo. As frações de excedência medidas no protótipo estão abaixo da teoria nas caudas (secção 3.8).
-- A força específica medida usa o impulso aplicado no passo anterior mais o arrasto no passo corrente. Nas rampas do acelerador (taxa máxima 1,0 por segundo) isto desfasa a força em cerca de meio ciclo. Estimativa minha (incerto, não verificada): um erro de velocidade transitório de ordem 0,1 a 0,2 m/s durante uma subida do acelerador de 0,4 para 0,8. Tem de ser medido no M10.1 antes de dimensionar o ruído de processo.
+- O ruído é limitado: o radar nunca se afasta mais de 0,35 m, o GNSS em posição mais de 1,73 m, em velocidade mais de 0,17 m/s, o acelerómetro mais de 0,069 m/s². Um detetor sobre amostras brutas sobrestima os falsos alarmes neste modelo; mas para estatísticas filtradas o protótipo mostra caudas quase gaussianas até 3 desvios-padrão (secção 3.8), pelo que **não se conta com essa folga** nos testes do filtro.
+- A força específica medida usa o impulso aplicado no passo anterior mais o arrasto no passo corrente. Nas rampas do acelerador (taxa máxima 1,0 por segundo) isto desfasa a força em cerca de meio ciclo. Analítico (secção 3.8): numa rampa de 0,4 para 0,8 (0,4 s, 845 kN, 26,3 t) a força específica varia cerca de 32 m/s³, o desfasamento de meio ciclo (0,01 s) dá cerca de 0,3 m/s² e, ao fim da rampa, um erro de velocidade de cerca de 0,13 m/s (2,6 desvios-padrão da velocidade GNSS, aplicados de forma coerente): é um **mecanismo de falso alarme** para os testes de recetor. Tem de ser medido no M10.1 antes de dimensionar o ruído de processo.
 - Não há viés de giroscópio, nem deriva, nem passeio aleatório do viés do acelerómetro; o viés da IMU é constante e só em `x_B`. Isto é otimista: um modelo de falha mais realista inclui deriva (secção 5).
 - O altímetro dá a altitude do plano da tubeira, o estimador trabalha no centro de massa: `h_base = z - s_cm·n_z`, com `n_z` a componente vertical de `x_B` medida pela IMU. Erro da distância `s_cm` (massa de propelente estimada): `ds/dm_p = (s_p - s_cm)/m ≈ -1,7e-4 m/kg` com carga cheia, logo cerca de 0,03 a 0,04 m para os 2% de dispersão de propelente mais o erro de consumo estimado (derivação minha a partir de `landing_model.rs`, não medida). É um erro sistemático pequeno face ao ruído do radar (0,1 m), mas não é zero e entra no orçamento de erros.
 - O radar funciona desde os 3000 m. Um radar real tem alcance máximo (suposto: de ordem de quilómetros). O modelo não o tem; isto torna o radar mais forte do que é.
@@ -99,7 +101,7 @@ O caso do demonstrador (`gnss-bias-guarded.json`, início aos 8 s) é, assim, um
 - Com **três** fontes independentes e a hipótese de **uma única falha**, o isolamento é possível: a fonte cujo subconjunto restante é consistente é a errada. A capacidade depende de os desvios-padrão serem comparáveis: se uma das três fontes for muito imprecisa (barómetro com desvio de metros), o isolamento só funciona para magnitudes grandes face a essa incerteza.
 - Com mais de uma falha simultânea, o isolamento pode atribuir a falha à fonte errada. A hipótese de falha única tem de ser testada, e é-o por pares na campanha.
 - **Modo comum e correlação.** A posição e a velocidade do GNSS vêm do mesmo recetor: uma falha do recetor pode corromper as duas de forma coerente (por exemplo, rampa de posição com velocidade consistente). O modelo atual de `gnss_bias` é a exceção otimista: só corrompe a posição, o que a torna detetável por consistência com a velocidade integrada. O altímetro e o barómetro têm causa comum perto do solo (o jato). O barómetro e o GNSS vertical são fisicamente independentes (pressão contra rádio), mas o barómetro tem deriva e erros que dependem da velocidade (secção 4).
-- A altitude do GNSS e a do radar **não** são independentes em dois sentidos: usam o mesmo zero (este modelo), e a posição horizontal e vertical do GNSS partilham o recetor. Por isso, **o canal vertical serve de canário do recetor**: se o isolamento vertical apontar o recetor GNSS como a fonte errada, a posição horizontal do GNSS deve ser tratada como não fiável. Isto é inferência de modo comum e não correção: **não se deve usar a magnitude do viés vertical para corrigir o horizontal**, apesar de `gnss_bias` somar o mesmo valor a x e a z neste simulador. Isso seria ajustar o algoritmo ao modelo de falha injetado.
+- A altitude do GNSS e a do radar **não** são independentes em dois sentidos: usam o mesmo zero (este modelo), e a posição horizontal e vertical do GNSS partilham o recetor. Por isso, **o canal vertical serve de canário do recetor** (só com isolamento, isto é, com terceira fonte em `E1`; em `E0` o canal vertical só sabe que radar e GNSS z discordam): se o isolamento vertical apontar o recetor GNSS como a fonte errada, a posição horizontal do GNSS deve ser tratada como não fiável. Isto é inferência de modo comum e não correção: **não se deve usar a magnitude do viés vertical para corrigir o horizontal**, apesar de `gnss_bias` somar o mesmo valor a x e a z neste simulador. Isso seria ajustar o algoritmo ao modelo de falha injetado.
 
 ### 3.5 Deriva da IMU
 
@@ -111,15 +113,15 @@ Com um viés constante `b` não compensado, o erro de posição cresce como `½�
 | 0,25 | 0,50 m / 0,50 m/s | 3,1 m / 1,25 m/s | 12,5 m / 2,5 m/s |
 | 0,5 | 1,0 m / 1,0 m/s | 6,3 m / 2,5 m/s | 25 m / 5,0 m/s |
 
-Entre dois ciclos de GNSS (0,1 s) a deriva é desprezável (0,0025 m no pior caso). Se o viés estiver estimado antes da perda, a deriva é a do erro residual do estimador de viés, bem menor. Como o viés do modelo está ao longo de `x_B` e o guiamento mantém `x_B` perto da vertical (`tilt_max_tan` 0,2 no caso M9), a deriva horizontal é aproximadamente `b·sin(tilt)`: com 0,5 m/s² e inclinação máxima, cerca de 0,1 m/s², ou seja 5 m em 10 s. A tabela acima é o pior caso para o canal vertical. A atitude não tem viés no modelo; a sua falha (que alteraria a projeção da gravidade e o braço de alavanca do radar) fica fora do âmbito e é uma limitação (secção 12).
+Entre dois ciclos de GNSS (0,1 s) a deriva é desprezável (0,0025 m no pior caso). Se o viés estiver estimado antes da perda, a deriva é a do erro residual do estimador de viés, bem menor. Como o viés do modelo está ao longo de `x_B` e o guiamento mantém `x_B` perto da vertical (`tilt_max_tan` 0,2 no caso M9), a deriva horizontal é aproximadamente `b·sin(tilt)`: com 0,5 m/s² e inclinação máxima, cerca de 0,1 m/s² (`b_h`). O limite de deriva horizontal por estima, usado em 8.2, é então `½·b_h·t²` em posição e `b_h·t` em velocidade: cerca de 0,2 m e 0,2 m/s a 2 s, 1,2 m e 0,5 m/s a 5 s, 4,9 m e 1,0 m/s a 10 s (analítico, sem o erro de velocidade inicial). A tabela acima é o pior caso para o canal vertical. A atitude não tem viés no modelo; a sua falha (que alteraria a projeção da gravidade e o braço de alavanca do radar) fica fora do âmbito e é uma limitação (secção 12).
 
 ### 3.6 Deteção mínima e atraso de deteção, canal vertical (analítico)
 
-Hipóteses: ruído gaussiano, falha em degrau `δ`, teste bilateral a nível `p_fa` por amostra, potência `1 - β`. O limiar em desvios-padrão é `k = Φ⁻¹(1 - p_fa/2)` e o viés mínimo detetável é `MDB = (k + z_β)·σ_d`, com `z_β = Φ⁻¹(1 - β)` unilateral e `σ_d` o desvio-padrão da inovação da fonte contra o resto.
+Hipóteses: ruído gaussiano, falha em degrau `δ`, teste bilateral a nível `p_fa` por amostra, potência `1 - β`. O limiar em desvios-padrão é `k = Φ⁻¹(1 - p_fa/2)` e o viés mínimo detetável de **uma época** é `MDB = (k + z_β)·σ_d`, com `z_β = Φ⁻¹(1 - β)` unilateral e `σ_d` o desvio-padrão da inovação da fonte contra o resto.
 
 Valores usados: `p_fa = 6,3e-5` por amostra, `k = 4`; `β = 0,1`, `z_β = 1,28`; logo `MDB = 5,28·σ_d`.
 
-Para uma fonte `i` com variância de inovação contra o subfiltro sem ela `S_i = P⁻_i + r_i` (`P⁻_i` a variância prevista da altitude sem `i`, `r_i` a variância de ruído de `i`), a não-centralidade do teste de separação é `δ/√S_i`, pelo que `MDB_i = 5,28·√S_i`. Isto é válido para fontes sem estado de desvio próprio (radar e GNSS z).
+Para uma fonte `i` com variância de inovação contra o subfiltro sem ela `S_i = P⁻_i + r_i` (`P⁻_i` a variância prevista da altitude sem `i`, `r_i` a variância de ruído de `i`), a não-centralidade do teste de uma época é `δ/√S_i`, pelo que `MDB_i = 5,28·√S_i`. Isto é válido para fontes sem estado de desvio próprio (radar e GNSS z).
 
 Valores calculados com a covariância do protótipo (secção 3.8), aproximação de uma amostra, ruído gaussiano, valores otimistas porque o protótipo não tem erros não modelados:
 
@@ -130,9 +132,13 @@ Valores calculados com a covariância do protótipo (secção 3.8), aproximaçã
 | 12 s / 192 m | 0,60 | 2,64 |
 | 15 s / 38 m | 0,60 | 2,64 |
 
-Para um barómetro com estado de desvio que o filtro aprende, não existe fórmula fechada simples: o teste passa a detetar uma mudança relativa ao desvio aprendido e não um valor absoluto. Medido no protótipo: degrau de 1 m detetado em 100 de 100 execuções (mediana 0,52 s), 0,5 m em 72 de 100.
+Para um barómetro com estado de desvio que o filtro aprende, não existe fórmula fechada simples: o teste passa a detetar uma mudança relativa ao desvio aprendido e não um valor absoluto (resultados medidos na secção 3.8).
 
-Atraso de deteção para `δ` abaixo do MDB de uma amostra: média sobre `n` amostras independentes reduz `σ_d` por `√n`, logo `n ≈ (MDB/δ)²`. No GNSS, com uma amostra a cada 0,1 s, `δ = 1 m` pede `n ≈ 7`, cerca de 0,7 s; `δ = 0,5 m`, `n ≈ 28`, cerca de 2,8 s. O protótipo dá 1,8 s e 4,1 s (medianas): a lei dá a ordem de grandeza e subestima o atraso por um fator de 2 a 3, porque o filtro absorve parte do viés e as amostras de separação são correlacionadas. Usar o protótipo e não a fórmula para as ordens de grandeza.
+**Atraso de deteção.** A média sobre `n` amostras independentes reduz `σ_d` por `√n`, logo `n ≈ (MDB/δ)²`. No GNSS, com uma amostra a cada 0,1 s, `δ = 1 m` pede `n ≈ 7`, cerca de 0,7 s; `δ = 0,5 m`, `n ≈ 28`, cerca de 2,8 s. Medido no protótipo (medianas, início aos 8 s): a **separação de soluções** demora 1,8 s e 4,1 s, ou seja **2,6 vezes** a fórmula a 1 m e **1,5 vezes** a 0,5 m. Um **CUSUM por fonte** sobre as inovações normalizadas demora 0,7 s e 2,1 s: acompanha a fórmula (e fica abaixo dela a 0,5 m). Para um CUSUM com folga `k_ref` e limiar `h` a um desvio normalizado `μ = δ/√S_i` acima de `k_ref`, o atraso esperado é de ordem `h/(μ - k_ref)` amostras: com `μ = 1/0,5 = 2`, `k_ref = 0,5` e `h = 12`, 8 amostras, 0,8 s, em linha com os 0,7 s medidos (estimativa minha para a forma, medida para o valor).
+
+**Porque a separação bate o MDB de uma época.** O MDB de 2,64 m do GNSS z é o viés que **uma** época revela. Um teste sequencial acumula: a diferença entre a solução completa e a sem a fonte é uma soma ponderada de todas as inovações da fonte desde o início da falha, pelo que a sua razão sinal-ruído cresce com o número de épocas, e o desvio-padrão dessa diferença (0,015 m a 4 s para o GNSS) é muito inferior ao da inovação (0,5 m). Um viés de 1 m é invisível numa época e visível em cerca de 2 s. O MDB de uma época não é, por isso, um limite do detetor sequencial. A fórmula `n ≈ (MDB/δ)²` dá a ordem de grandeza do detetor sequencial ótimo, que o CUSUM atinge. A separação testa uma diferença de estimativas e não de inovações e é mais lenta do que a fórmula, porque o filtro completo absorve parte do viés e as amostras de separação são correlacionadas.
+
+**Taxa de falsos alarmes do CUSUM, definida por constantes.** Com `k_ref = 0,5` e `h = 12`, a aproximação de Siegmund dá um ARL0 gaussiano de 1,0e+06 amostras por fonte para o teste unilateral e 5,2e+05 para o bilateral. Uma execução do protótipo tem 1644 inovações no filtro de quatro fontes; a probabilidade de falso alarme por execução é da ordem de 1644/5,2e+05 = 0,31%, **se** as inovações forem brancas e gaussianas, o que é um pressuposto e não um facto. Em tempo de execução só entram duas constantes (`k_ref`, `h`) por fonte; nenhuma função transcendente.
 
 Limite honesto do método: a fórmula assume ruído gaussiano e independente, estacionário. O ruído do simulador é limitado e as covariâncias reais incluem erros não modelados (secção 3.1).
 
@@ -144,7 +150,7 @@ Limite honesto do método: a fórmula assume ruído gaussiano e independente, es
 
 ### 3.8 Protótipo de viabilidade, canal vertical, sementes de desenvolvimento
 
-Isto é um **brinquedo** em `spikes/m10-nav-feasibility/feasibility.py`: não é a implementação do M10 e **não é evidência para nenhuma hipótese do M10**. Serve para verificar ordens de grandeza das secções 3.3 e 3.6 e para ver se o desenho de separação de soluções funciona de todo.
+Isto é um **brinquedo** em `spikes/m10-nav-feasibility/feasibility.py`: não é a implementação do M10 e **não é evidência para nenhuma hipótese do M10**. Serve para verificar ordens de grandeza das secções 3.3 e 3.6 e para ver se o desenho (filtro sem rejeição, CUSUM por fonte, isolamento por paridade, separação de soluções só para o nível de proteção) funciona de todo.
 
 Comando exato:
 
@@ -152,84 +158,103 @@ Comando exato:
 python spikes/m10-nav-feasibility/feasibility.py > resumo.json
 ```
 
-Máquina: Windows-11-10.0.26300-SP0; AMD64 Family 25 Model 97 Stepping 2, AuthenticAMD; Python 3.14.6. Duração de uma execução: cerca de 21 s. Duas execuções completas deram o mesmo JSON exceto os campos `cost` e `timing_s`. `random.Random` (Mersenne Twister) com as sementes 9000 a 9099, **bloco de desenvolvimento, não de avaliação**; o ruído é o de Irwin-Hall do repositório, mas o gerador não é o SplitMix64.
+Máquina: Windows-11-10.0.26300-SP0; AMD64 Family 25 Model 97 Stepping 2, AuthenticAMD; Python 3.14.6. Duração de uma execução: cerca de 25 s. Duas execuções completas deram o mesmo JSON exceto os campos `cost` e `timing_s`. `random.Random` (Mersenne Twister) com as sementes 9000 a 9099 (**bloco do protótipo, não de avaliação**); o ruído é o de Irwin-Hall do repositório, mas o gerador não é o SplitMix64.
 
-Modelo: descida de 2000 m com 230 m/s até -1,5 m/s, desaceleração constante de 13,22 m/s², 865 ciclos de 0,02 s. Radar 0,1 m a 50 Hz; GNSS z 0,5 m e vz 0,05 m/s a 10 Hz; acelerómetro 0,02 m/s²; barómetro proposto a 25 Hz, ruído 0,5 m, desvio inicial `N(0, 2²)` m, deriva 0,05 m/√s. Bias do acelerómetro nominal `N(0, 0,05²)` m/s². Filtro de Kalman linear de 4 estados (altitude, velocidade, viés do acelerómetro, desvio do barómetro), forma de Joseph, mais três subfiltros (sem radar, sem GNSS, sem barómetro). Separação: `|z_0 - z_i| > 4·√(P_i,zz - P_0,zz)`. Isolamento por NIS médio dos subfiltros numa janela de 1 s depois da deteção. O filtro não rejeita medidas em malha fechada, por isso a covariância não depende dos dados: é calculada uma vez por filtro e verificada contra o filtro de covariância completa (diferença máxima 0 m).
+**Decisões de modelação do protótipo:**
+
+- O filtro não tem passeio aleatório do viés do acelerómetro, porque o viés verdadeiro é constante: modelo e verdade concordam. O NEES é 3,60 / 3,78 / 3,99 / 4,13 aos 2 / 8 / 12 / 16 s, **dentro** do intervalo de 95% (3,45 a 4,55) nos quatro instantes. Um filtro com um passeio aleatório do viés que a verdade não tem dá um NEES médio abaixo da dimensão (3,1 a 3,6, medido numa variante intermédia): é a incoerência entre o ruído de processo e a verdade que desloca o NEES, e não o ruído limitado, que, sendo de média nula, não pode deslocar a média.
+- O ruído de Irwin-Hall com quatro uniformes é limitado a `±2√3 σ` por construção, e o recorte do código a esse valor **não atua** (é uma no-op). A cauda bilateral bruta a 3 desvios-padrão é , contra , da gaussiana, mas as estatísticas **filtradas** do protótipo (a separação) são quase gaussianas até 3 desvios-padrão: , medido contra ,. Só abaixo disso o ruído limitado dá folga, e só em estatísticas que não passaram por um filtro (a inovação do radar sozinho: , a 3 desvios-padrão). **Não se conta com a folga do ruído limitado para testes filtrados.**
+- Detetor **CUSUM por fonte** sobre as inovações normalizadas (colunas "CUSUM"), com os atrasos ao lado das linhas de separação.
+- Isolamento por **paridade no domínio das medidas** (radar menos GNSS z, radar menos barómetro compensado, GNSS z menos barómetro compensado), sob a hipótese de falha única; com duas fontes só se deteta. A regra "maior separação normalizada" fica na tabela como a regra **rejeitada**, mais a variante com piso de `σ_Δ` a 0,5 `σ_0`.
+- No canal horizontal os tampões enchem-se com o histórico completo (os alarmes antes do início contam como falsos alarmes); contar só com as 20 amostras posteriores ao início impõe um piso artificial de 1,9 s ao atraso da janela.
+
+Modelo: descida de 2000 m com 230 m/s até -1,5 m/s, desaceleração constante de 13,22 m/s², 865 ciclos de 0,02 s. Radar 0,1 m a 50 Hz; GNSS z 0,5 m e vz 0,05 m/s a 10 Hz; acelerómetro 0,02 m/s²; barómetro proposto a 25 Hz, ruído 0,5 m, desvio inicial `N(0, 2²)` m, deriva 0,05 m/√s (**a variante otimista da secção 4.1: sem erro estático, escala, latência nem jato**). Viés do acelerómetro nominal `N(0, 0,05²)` m/s², constante. Filtro de Kalman linear de 4 estados (altitude, velocidade, viés do acelerómetro, desvio do barómetro), forma de Joseph, **sem rejeição de medidas**, mais três subfiltros (sem radar, sem GNSS, sem barómetro). Sem rejeição, a covariância não depende dos dados: é calculada uma vez por filtro e verificada contra o filtro de covariância completa (diferença máxima 0 m). O detetor "E1" usa o filtro completo (radar, GNSS e barómetro) e o "E0" o filtro sem barómetro. O nível de proteção por separação (`K_ff = 5,33`, `K_fa = 4`, `K_md = 3`) e `AL_v(h) = max(1 m, 0,02 h)` são os da secção 8.
 
 Nominal (100 execuções, sementes 9000 a 9099):
 
 | Medida | Resultado |
 | --- | --- |
-| Execuções com alarme (separação, qualquer subfiltro) para k = 2,0 / 2,5 / 3,0 / 3,5 / 4,0 | 98 / 81 / 35 / 6 / 0 de 100 |
-| Falsos alarmes com o limiar escolhido (k = 4) | 0 de 100; limite superior unilateral de 95% (Clopper-Pearson) 2,95% |
-| Fração de amostras acima de k = 2,0 / 3,0 / 3,5 / 4,0 (empírica; teoria gaussiana) | 4,54e-2 (4,55e-2) / 2,49e-3 (2,70e-3) / 1,00e-4 (4,65e-4) / 0 (6,3e-5) |
-| NIS médio do radar (1 grau de liberdade) | 0,9988 |
-| NEES médio (4 estados) aos 2 / 8 / 12 / 16 s | 3,59 / 3,14 / 3,09 / 3,28; intervalo bilateral de 95% para a média de 100 execuções: 3,45 a 4,55 |
+| Execuções com alarme de separação (qualquer subfiltro) para k = 2,0 / 2,5 / 3,0 / 3,5 / 4,0 | 98 / 79 / 33 / 7 / 0 de 100 |
+| Fração de amostras de separação acima de k = 2,0 / 3,0 / 3,5 / 4,0 (empírica; teoria gaussiana) | , (,) / , (,) / , (,) / 0e+00 (,) |
+| Execuções com alarme do CUSUM, E1 / E0 (k_ref 0,5, h 12) | 0 / 0 de 100; limite superior unilateral de 95% (Clopper-Pearson) 2,95% |
+| NIS médio do radar (1 grau de liberdade; passos só com radar) | 0,999 |
+| NEES médio (4 estados) aos 2 / 8 / 12 / 16 s | 3,60 / 3,78 / 3,99 / 4,13; intervalo de 95% para a média de 100 execuções: 3,45 a 4,55 |
 | Amostras com erro real acima do nível de proteção | 0 em 86 500 |
+| Amostras com nível de proteção acima de `AL_v(h)` | 0 em 86 500 |
 
-Leitura: o limiar a 4 desvios-padrão dá 0 falsos alarmes em 100 execuções, mas 100 execuções só excluem taxas acima de cerca de 3% por execução (regra aproximada: 3/n). As caudas empíricas ficam abaixo da gaussiana, como previsto para ruído limitado. O NEES médio está **abaixo** da dimensão (4) em 3 de 4 instantes e abaixo do limite inferior do intervalo: o filtro é conservador (covariância maior do que o erro), não otimista. Não investiguei a causa; candidatos: o ruído de processo do viés e o ruído limitado.
+Leitura: com 100 execuções, zero falsos alarmes só exclui taxas acima de cerca de 3% por execução (regra aproximada: 3/n). O NEES está agora dentro do intervalo de confiança nos quatro instantes: o filtro está calibrado no modelo ideal. As frações de separação acima de 3 desvios-padrão ficam em cima da teoria gaussiana. **Atenção a um mecanismo de falso alarme que o brinquedo não tem:** durante uma rampa do acelerador de 0,4 para 0,8 (taxa máxima 1,0 por segundo, 845 kN, 26,3 t), a força específica varia 32,1 m/s³; o desfasamento de meio ciclo do sensor (secção 3.1) dá um erro de aceleração de 0,32 m/s² e, ao fim dos 0,4 s da rampa, um erro de velocidade de 0,13 m/s (analítico). Isso são 2,6 desvios-padrão da velocidade GNSS (0,05 m/s) **aplicados de forma coerente**: um teste de recetor (velocidade GNSS contra IMU) e um CUSUM com `k_ref = 0,5` acumulam-no. O modelo de processo do M10.2 tem de incluir este desfasamento (a atualização temporal usa o impulso do passo anterior, como o sensor), ou o ruído de processo do canal de velocidade tem de o absorver.
 
-Falhas em degrau, canal vertical, 100 sementes por célula, início aos 8 s (583 m no perfil de brinquedo). Ocorreram 0 alarmes antes do início em todas as células e 0 amostras com erro acima do nível de proteção sem alarme (`PL_v` da ordem de 0,4 m neste modelo ideal):
+Falhas em degrau, canal vertical, 100 sementes por célula, início aos 8 s (583 m no perfil de brinquedo). Colunas: CUSUM E1 = execuções com alarme depois do início e atraso mediano / p90 em s; CUSUM E0 = atraso mediano sem barómetro; Separação = detetadas e atraso mediano; Paridade = correto / errado / não isolado (de 100); NIS = isolamento por NIS mínimo do subfiltro correto, de entre as detetadas pela separação; erro final = mediana do erro absoluto do filtro completo e, depois da reconfiguração pelo subfiltro apontado pela paridade (ou sem reconfiguração se não isolou), mediana / máximo, em m. Ocorreram 0 alarmes do CUSUM antes do início em todas as células.
 
-| Fonte | Viés (m) | Detetadas | Atraso mediano / p90 (s) | Isolamento por NIS correto | Isolamento pela maior separação normalizada correto | Erro final do filtro completo (mediana, m) | Erro final depois de reconfigurar (mediana / máx., m) |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| radar | 0,5 | 100 | 0,20 / 0,30 | 100 | 0 | 0,48 | 0,04 / 0,15 |
-| radar | 1 | 100 | 0,10 / 0,14 | 100 | 1 | 0,97 | 0,04 / 0,15 |
-| radar | 5 | 100 | 0,00 / 0,02 | 100 | 0 | 4,83 | 0,04 / 0,15 |
-| radar | 30 | 100 | 0,00 / 0,00 | 100 | 0 | 28,98 | 0,04 / 0,15 |
-| GNSS z | 0,5 | 100 | 4,08 / 5,90 | 57 | 2 | 0,01 | 0,01 / 0,42 |
-| GNSS z | 1 | 100 | 1,80 / 2,50 | 99 | 1 | 0,01 | 0,01 / 0,69 |
-| GNSS z | 3 | 100 | 0,50 / 0,70 | 100 | 0 | 0,02 | 0,01 / 0,04 |
-| GNSS z | 10 | 100 | 0,10 / 0,20 | 100 | 0 | 0,08 | 0,01 / 0,04 |
-| barómetro | 0,5 | 72 | 1,48 / 2,36 | 41 de 72 | 72 de 72 | 0,01 | 0,01 / 0,10 |
-| barómetro | 1 | 100 | 0,52 / 0,74 | 100 | 100 | 0,01 | 0,01 / 0,03 |
-| barómetro | 10 | 100 | 0,04 / 0,04 | 100 | 100 | 0,01 | 0,01 / 0,03 |
+| Fonte | Viés (m) | CUSUM E1 | CUSUM E0 | Separação | Paridade | NIS | Erro final, completo | Erro final, reconfigurado |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| radar | 0,5 | 100; 0,04 / 0,06 | 0,04 | 100; 0,20 | 6 / 0 / 94 | 100 de 100 | 0,52 | 0,52 / 0,55 |
+| radar | 1,0 | 100; 0,02 / 0,02 | 0,02 | 100; 0,10 | 79 / 0 / 21 | 100 de 100 | 1,04 | 0,05 / 1,07 |
+| radar | 5,0 | 100; 0,00 / 0,00 | 0,00 | 100; 0,00 | 100 / 0 / 0 | 100 de 100 | 5,20 | 0,04 / 0,16 |
+| radar | 30,0 | 100; 0,00 / 0,00 | 0,00 | 100; 0,00 | 100 / 0 / 0 | 100 de 100 | 31,19 | 0,04 / 0,16 |
+| GNSS z | 0,5 | 100; 2,10 / 3,60 | 2,10 | 100; 4,06 | 10 / 0 / 90 | 57 de 100 | 0,01 | 0,01 / 0,03 |
+| GNSS z | 1,0 | 100; 0,70 / 1,00 | 0,70 | 100; 1,80 | 55 / 0 / 45 | 99 de 100 | 0,01 | 0,01 / 0,03 |
+| GNSS z | 3,0 | 100; 0,20 / 0,20 | 0,20 | 100; 0,50 | 100 / 0 / 0 | 100 de 100 | 0,02 | 0,01 / 0,03 |
+| GNSS z | 10,0 | 100; 0,00 / 0,00 | 0,00 | 100; 0,10 | 100 / 0 / 0 | 100 de 100 | 0,08 | 0,01 / 0,03 |
+| barómetro | 0,5 | 52; 0,84 / 2,04 | n/a | 70; 1,48 | 4 / 0 / 96 | 34 de 70 | 0,01 | 0,01 / 0,03 |
+| barómetro | 1,0 | 100; 0,32 / 0,44 | n/a | 100; 0,56 | 57 / 0 / 43 | 100 de 100 | 0,01 | 0,01 / 0,03 |
+| barómetro | 10,0 | 100; 0,00 / 0,00 | n/a | 100; 0,04 | 100 / 0 / 0 | 100 de 100 | 0,01 | 0,01 / 0,03 |
 
-(O quadro completo, com as magnitudes 2 e 3 m, o início aos 15 s e o arranque a frio, está no JSON.) Observações:
+(O quadro completo, com as magnitudes 2, 3, 5 e 10 m, o início aos 15 s e todas as colunas, incluindo a regra "maior separação normalizada" com e sem piso, está no JSON.) Observações:
 
-- **A regra de isolamento "maior separação normalizada" falhou**: 0 a 2 de 100 para o radar e o GNSS. A causa provável (não verificada) é que a separação do barómetro tem `σ_Δ` mínima (0,001 m), pelo que a razão normalizada do barómetro é sempre a maior. A regra era a minha primeira escolha e não funciona; o isolamento por consistência (NIS do subfiltro) funciona nestes dados. Isto mostra que o isolamento tem de ser projetado e testado, não assumido.
-- O estimador de variância ponderada fica **dominado pelo radar**: um viés de 30 m no GNSS z desloca a altitude estimada apenas 0,23 m, enquanto um viés de 30 m no radar desloca-a 29 m. Ou seja, num filtro de Kalman o modo de falha de `robust` com `gnss_bias` (rejeitar o radar correto) não aparece, e o que importa passa a ser a falha do radar, a fonte dominante. A deteção do GNSS é lenta (1 m: 1,8 s) mas o seu efeito na altitude é pequeno.
-- Com o início aos 15 s (38 m), as células de GNSS 0,5 m e 1 m têm deteção parcial (2 e 63 de 100), porque o fim do voo chega antes da deteção.
+- **Detetar não é isolar.** O CUSUM deteta todas as falhas de radar e de GNSS z de 0,5 m ou mais, com atrasos de 0,02 / 0,02 s (radar 1 m) a 2,1 / 3,6 s (GNSS z 0,5 m). O isolamento por paridade, com o barómetro otimista, funciona a 100% a partir de 2 m (radar e GNSS z), mas a 0,5 m e a 1 m deixa uma parte importante das execuções "não isoladas" (radar 1 m: 21 de 100; GNSS z 1 m: 45 de 100; barómetro 1 m: 43 de 100) e **nunca isola de forma errada** (zero erradas em todas as células de início a meio de voo). "Não isolado" é o resultado honesto: o estimador mantém a deteção e declara.
+- **A regra "maior separação normalizada" falha** (rejeitada): 0 e 1 de 100 corretas para o radar e para o GNSS z de 5 m, porque a separação do barómetro tem `σ_Δ` de cerca de 0,001 m e a sua razão normalizada é sempre a maior. A variante com piso (`σ_Δ` não inferior a 0,5 `σ_0`) reduz o favorecimento do barómetro (barómetro de 5 m: 35 de 100 em vez de 100) mas continua a não escolher o radar nem o GNSS z (0 e 1 de 100 a 5 m). **Nenhuma ordenação por separação normalizada é usada para isolar**; a separação fica para o nível de proteção.
+- O estimador fica **dominado pelo radar**: um viés de 30 m no GNSS z desloca a altitude estimada apenas 0,24 m, enquanto um viés de 30 m no radar a desloca 31,2 m. Num filtro de Kalman sem rejeição o modo de falha de `robust` com `gnss_bias` (rejeitar o radar correto) não aparece, e o que importa passa a ser a falha do radar, a fonte dominante. Esta é a razão do passo de admissão do radar no arranque a frio (secção 8.4).
+- A detetabilidade do **barómetro** com viés de 0,5 m cai para 52 de 100 (CUSUM) porque o filtro aprende um desvio de 0,5 m como se fosse calibração.
+- Com o início aos 15 s (38 m), as células de GNSS z de 0,5 m e 1 m têm deteção parcial por CUSUM (69 e 100 de 100) e por separação (2 e 65), porque o fim do voo chega antes da deteção.
 - O erro final de uma reconfiguração com o subfiltro certo é de poucos centímetros no modelo ideal; esse valor é otimista (sem erros do braço de alavanca, sem desfasamento da força específica). O que se retira não é o número, mas que o erro depois da reconfiguração depende da fonte restante e não do viés removido.
+- **Falhas de alerta no brinquedo.** Com `AL_v(h) = max(1 m, 0,02 h)` e `T_g = 0,5 s`, o brinquedo dá 0 execuções com falha de alerta para B+ (sem nível de proteção) e 0 para C (com nível de proteção) em 4200 execuções de falha. O CUSUM deteta tão depressa que o erro nunca excede `AL` durante 0,5 s sem declaração, e o nível de proteção nunca excede `AL` (0 amostras em 86 500). **O brinquedo não distingue B+ de C**: não prova que o nível de proteção compre algo. A justificação de C tem de vir da campanha em Rust (célula de pares e falhas lentas), e a regra de ablation (secção 6) pode muito bem concluir que B+ chega.
 
-Arranque a frio (altitude inicial com incerteza de 50 m, falha presente desde o instante 0, o caso das janelas de 0 a 40 s do M9), 100 sementes por célula:
+Arranque a frio (altitude inicial com incerteza de 50 m, falha presente desde o instante 0, o caso das janelas de 0 a 40 s do M9), 100 sementes por célula. Colunas: CUSUM E1 / E0 = execuções com alarme (qualquer fonte); paridade = correto / errado / não isolado, **só com o prior do desvio do barómetro** (sem período saudável anterior não há estimativa certificada, ver a nota); NIS e Sep. = isolamento correto (de entre as detetadas) pelo NIS e pela maior separação normalizada, regras rejeitadas.
 
-| Fonte | Viés (m) | Detetadas | Isolamento por NIS correto | Pela maior separação | Erro final reconfigurado (mediana / máx., m) |
+| Fonte | Viés (m) | CUSUM E1 | CUSUM E0 | Paridade | NIS | Sep. | Erro final, completo | Erro final, reconfigurado |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| radar | 5 | 100 | 100 | 33 / 0 / 67 | 73 | 93 | 4,96 | 4,96 / 4,99 |
+| radar | 10 | 100 | 100 | 100 / 0 / 0 | 95 | 100 | 9,92 | 0,04 / 0,16 |
+| radar | 30 | 100 | 100 | 100 / 0 / 0 | 100 | 100 | 29,77 | 0,04 / 0,16 |
+| GNSS z | 5 | 100 | 100 | 34 / 0 / 66 | 69 | 92 | 0,04 | 0,03 / 0,07 |
+| GNSS z | 10 | 100 | 100 | 100 / 0 / 0 | 98 | 100 | 0,08 | 0,01 / 0,03 |
+| GNSS z | 30 | 100 | 100 | 100 / 0 / 0 | 100 | 100 | 0,23 | 0,01 / 0,03 |
+| barómetro | 5 | 0 | n/a | 0 / 0 / 100 | 4 | 8 | 0,01 | 0,01 / 0,03 |
+| barómetro | 10 | 0 | n/a | 0 / 0 / 100 | 81 | 87 | 0,01 | 0,01 / 0,03 |
+| barómetro | 30 | 100 | n/a | 100 / 0 / 0 | 100 | 100 | 0,01 | 0,01 / 0,03 |
+
+Leitura, por conjunto de sensores (E0 sem barómetro; E1 com o barómetro **otimista** de 2 m):
+
+- **E0, a frio**: o CUSUM deteta que radar e GNSS z discordam em 100 de 100 execuções, mas **não sabe qual está errado**. O isolamento a frio só existe em E1.
+- **E1, a frio, barómetro otimista**: radar ou GNSS z de 10 m são isolados em 100 de 100 pela paridade; de 5 m em 33 e 34 de 100 (radar e GNSS z; **nenhuma errada**, o resto não isolado); de 30 m em 100 e 100 de 100. As regras de NIS e de maior separação normalizada (rejeitadas) dão para 5 m 73 e 69 de 100 (NIS) e 93 e 92 de 100 (separação), mas à custa de não distinguirem "não sei" de "sei": a paridade com limiar isola menos e não erra. A capacidade de isolar 5 m depende por inteiro do desvio inicial assumido para o barómetro (2 m, a variante **otimista**); com `σ_b0 ≥ 5 m` desapareceria (aritmética, não medido), e a secção 4.1 mostra que a variante pessimista é pior do que isso.
+- Um barómetro com desvio de 5 ou 10 m desde 0 s **não é detetado** (0 de 100 pelo CUSUM): o estado de desvio absorve-o. Só 30 m é detetado (100 de 100).
+- **Nota sobre a paridade a frio.** Numa primeira versão do mesmo script a paridade usava a estimativa do desvio do barómetro aprendida pelo filtro 2 s antes da deteção. Com o radar enviesado desde 0 s essa estimativa fica contaminada pela própria falha (o filtro, dominado pelo radar, atribui ao barómetro o desvio simétrico) e o isolamento deu **errado** em 97 de 100 execuções para o radar de 5 m (medido nessa versão intermédia; o código atual, com `cold = True`, usa só o prior). Conclusão de desenho: o desvio do barómetro só pode entrar na paridade como estimativa se vier de um intervalo **certificado** sem alarmes; sem esse intervalo, só o prior.
+
+Canal horizontal só com GNSS (brinquedo adicional; início aos 8 s; 100 sementes; velocidade e IMU como testemunhas). Três testes sobre as inovações normalizadas: **uma época** (inovação isolada acima de 4 desvios-padrão); **janela** (soma de 20 inovações acima de 4√20; o histórico completo preenche a janela, e por isso o atraso já não tem o piso de 1,9 s); **CUSUM** (k_ref 0,5, h 12). Falsos alarmes nominais: 0, 0 e 0 de 100 respetivamente.
+
+| Falha | Valor | Uma época (n de 100; atraso mediano, s) | Janela de 20 | CUSUM | Deslocamento no fim se nunca detetada (m) |
 | --- | --- | --- | --- | --- | --- |
-| radar | 5 | 100 | 73 | 93 | 0,06 / 5,02 |
-| radar | 10 | 100 | 95 | 100 | 0,05 / 10,02 |
-| radar | 30 | 100 | 100 | 100 | 0,04 / 0,16 |
-| GNSS z | 5 | 100 | 69 | 92 | 0,01 / 5,09 |
-| GNSS z | 10 | 100 | 98 | 100 | 0,01 / 9,97 |
-| barómetro | 5 | 8 | 4 de 8 | 8 de 8 | 0,01 / 0,03 |
-| barómetro | 10 | 87 | 81 de 87 | 87 de 87 | 0,01 / 0,09 |
+| degrau de posição (m) | 1,0 | 25; 0,5 | 100; 0,9 | 100; 0,7 | 1,00 |
+| degrau de posição (m) | 3,0 | 100; 0,0 | 100; 0,3 | 100; 0,2 | 3,00 |
+| rampa só de posição (m/s) | 0,03 | 0 | 7; 8,8 | 2; 7,3 | 0,28 |
+| rampa só de posição (m/s) | 0,05 | 0 | 25; 7,3 | 19; 7,8 | 0,46 |
+| rampa só de posição (m/s) | 0,10 | 1; 7,3 | 99; 6,0 | 99; 6,5 | 0,93 |
+| rampa só de posição (m/s) | 0,30 | 100; 5,7 | 100; 2,6 | 100; 2,9 | 2,78 |
+| rampa coerente, posição e velocidade (m/s) | 0,10 | 10; 0,3 | 96; 1,1 | 85; 1,0 | 0,93 |
+| rampa coerente (m/s) | 0,30 | 100; 0,0 | 100; 0,3 | 100; 0,2 | 2,78 |
 
-Leitura: desde o instante 0, uma falha de radar ou de GNSS de 5 m é isolada corretamente em 69 a 93 de 100 execuções, e de 30 m em 100 de 100, **com um desvio do barómetro de 2 m como terceira fonte e um prior de altitude inicial não informativo**. Quando o barómetro tem um desvio de 5 m, é absorvido pelo seu estado e quase não é detetado (8 de 100). A capacidade de isolar 5 m depende por inteiro do desvio inicial assumido para o barómetro; com `σ_b0 ≥ 5 m` desapareceria (aritmética, não medido). Os dois quadros mostram a diferença entre as duas regras de isolamento (a de separação funciona melhor a frio, a de NIS melhor a quente): os resultados dependem do regime e nenhuma regra é "a melhor" sem teste.
+Leitura: com início a meio do voo, degraus de 1 m a 3 m e rampas de 0,1 m/s ou mais são detetados pelo CUSUM e pela janela; rampas de 0,05 m/s ou menos são detetadas em no máximo 25 de 100 execuções, mas o deslocamento que acumulam até ao fim é inferior a 0,5 m. A rampa coerente (recetor com velocidade consistente com a posição) é detetada porque a IMU, neste modelo, é uma testemunha da velocidade com viés pequeno e estimado; o resultado degrada-se quando o viés da IMU for maior ou não estiver estimado, e uma deriva coerente lenta que o estado de viés absorva é indistinguível de um viés do acelerómetro (analítico, não simulado). **Nada disto se aplica a um deslocamento presente desde o instante 0**, que é o caso do M9.
 
-Canal horizontal só com GNSS (brinquedo adicional; início aos 8 s; 100 sementes; velocidade e IMU como testemunhas). Teste de uma época: inovação de posição ou de velocidade acima de 4 desvios-padrão; teste de janela: média de 20 inovações (2 s) acima de 4 desvios-padrão da média. Falsos alarmes nominais: 0 de 100 nos dois testes.
-
-| Falha | Valor | Deteção de uma época (n de 100; atraso mediano) | Deteção de janela (n de 100; atraso mediano) | Deslocamento no fim se nunca detetada |
-| --- | --- | --- | --- | --- |
-| degrau de posição | 1 m | 25; 0,5 s | 100; 1,9 s | 1 m |
-| degrau de posição | 3 m | 100; 0 s | 100; 1,9 s | 3 m |
-| rampa só de posição | 0,03 m/s | 0 | 7; 8,8 s | 0,28 m |
-| rampa só de posição | 0,05 m/s | 0 | 25; 7,3 s | 0,46 m |
-| rampa só de posição | 0,1 m/s | 1; 7,3 s | 99; 6,0 s | 0,93 m |
-| rampa só de posição | 0,3 m/s | 100; 5,7 s | 100; 2,6 s | 2,8 m |
-| rampa coerente (posição e velocidade) | 0,1 m/s | 9; 0,3 s | 88; 1,9 s | 0,93 m |
-| rampa coerente | 0,3 m/s | 100; 0 s | 100; 1,9 s | 2,8 m |
-
-Leitura: com início a meio do voo, degraus de 1 m a 3 m e rampas de 0,1 m/s ou mais são detetados; rampas de 0,05 m/s ou menos são detetadas em no máximo 25 de 100 execuções, mas o deslocamento que acumulam até ao fim é inferior a 0,5 m. A rampa coerente (recetor com velocidade consistente com a posição) é detetada porque a IMU, neste modelo, é uma testemunha da velocidade com viés pequeno e estimado; o resultado degrada-se quando o viés da IMU for maior ou não estiver estimado, e uma deriva coerente lenta que o estado de viés absorva é indistinguível de um viés do acelerómetro (analítico, não simulado). **Nada disto se aplica a um deslocamento presente desde o instante 0**, que é o caso do M9.
-
-Custo (Python 3.14.6, medido em volta de execuções completas; ordem de grandeza, não é o custo em Rust): 0,50 µs por ciclo e por filtro no caminho de estado com ganhos pré-calculados; 67 µs por ciclo e 35 µs por atualização escalar no filtro de covariância completa (forma de Joseph, 4 estados). O custo real do filtro de covariância é o segundo número, porque no M10 as perdas de dados e as rejeições alteram a covariância.
+Custo (Python 3.14.6, medido em volta de execuções completas; ordem de grandeza, não é o custo em Rust): 0,57 µs por ciclo e por filtro no caminho de estado com ganhos pré-calculados; 64 µs por ciclo e 33 µs por atualização escalar no filtro de covariância completa (forma de Joseph, 4 estados). O custo real do filtro de covariância é o segundo número, porque no M10 as perdas de dados e as exclusões alteram a covariância.
 
 ## 4. Modelos de sensores propostos
 
 Os sensores existentes (secção 3.1) não mudam. Os candidatos novos entram no esquema `vv-rocket-landing.v2` (uma versão nova, ver a secção 7) e têm de ter uma justificação física por escrito antes de qualquer campanha.
 
-**Regras contra sensores escolhidos para melhorar os resultados.** (i) Um sensor entra no modelo porque é fisicamente plausível, com parâmetros fixados antes da campanha de avaliação. (ii) Cada sensor tem uma variante otimista e uma pessimista, e ambas são executadas. (iii) Os resultados são apresentados por conjunto de sensores, incluindo o conjunto `S0` (só os sensores existentes). (iv) Os parâmetros dos sensores nunca são ajustados depois de ver resultados. (v) Um sensor que não melhora uma métrica pré-registada na variante pessimista é abandonado e o abandono é reportado. (vi) Fica rejeitado um terceiro altímetro radar com ruído independente de 0,1 m (rejeitado pelo proprietário e, além disso, com causa comum com o primeiro perto do jato) e qualquer sensor que meça a verdade (detetor de contacto, referência de plataforma perfeita).
+**Regras contra sensores escolhidos para melhorar os resultados.** (i) Um sensor entra no modelo porque é fisicamente plausível, com parâmetros fixados antes da campanha de avaliação. (ii) Cada sensor tem uma variante otimista e uma pessimista, e ambas são executadas. (iii) Os resultados são apresentados por conjunto de sensores, incluindo o conjunto `E0` (só os sensores existentes, a configuração primária). (iv) Os parâmetros dos sensores nunca são ajustados depois de ver resultados. (v) Um sensor que não melhora uma métrica pré-registada na variante pessimista é abandonado e o abandono é reportado. (vi) Fica rejeitado um terceiro altímetro radar com ruído independente de 0,1 m (rejeitado pelo proprietário e, além disso, com causa comum com o primeiro perto do jato) e qualquer sensor que meça a verdade (detetor de contacto, referência de plataforma perfeita).
 
-### 4.1 Barómetro (candidato, conjunto `S1`)
+### 4.1 Barómetro (candidato, conjunto `E1`)
 
 Altitude de pressão: o sensor devolve uma altitude calibrada no solo da plataforma. Modelo proposto da medida:
 
@@ -237,25 +262,72 @@ Altitude de pressão: o sensor devolve uma altitude calibrada no solo da platafo
 z_b = (1 + κ)·z + b0 + b_rw(t) + e_din(v) + e_jato(h, u) + w(t - τ_b)
 ```
 
-| Termo | Origem física | Valor proposto (suposto, a rever) |
-| --- | --- | --- |
-| `w` | ruído de leitura | `σ = 0,5 m`, branco, 25 Hz |
-| `b0` | calibração no solo (pressão e temperatura locais) | `N(0, 2²)` m, constante no voo |
-| `b_rw` | deriva do sensor e da atmosfera | passeio aleatório 0,05 m/√s |
-| `κ` | erro de escala da atmosfera (gradiente de temperatura): `h` não é só `ln(p0/p)` | uniforme em ±0,5% (incerto); a 2000 m são ±10 m |
-| `e_din(v)` | erro de posição da fonte de pressão estática: `Δp = c_p·½ρ v²` dá `Δh = c_p·v²/(2g)` | `c_p` entre -0,5% e +0,5% (incerto): a 230 m/s, até ±13,5 m; a 50 m/s, 0,6 m |
-| `e_jato(h, u)` | perturbação da pressão estática junto ao solo pelo jato (recirculação, efeito de solo), cresce com o acelerador `u` e com a proximidade do solo | `-A·u·exp(-h/h_g)` com `A` entre 0 e 10 m e `h_g` de 10 a 30 m (incerto; 1 hPa vale cerca de 8,3 m a nível do mar) |
-| `τ_b` | latência do sensor e do filtro de pressão | 0,04 s (suposto): a 230 m/s, 9 m |
+Os valores são **supostos** e há duas variantes, ambas calculadas na porta de decisão (`spikes/m10-nav-feasibility/baro_gate.py`):
+
+| Termo | Origem física | Otimista | Pessimista |
+| --- | --- | --- | --- |
+| `w` | ruído de leitura | `σ = 0,5 m`, branco, 25 Hz (média de 1 s: 0,1 m) | igual |
+| `b0` | calibração no solo (pressão e temperatura locais) | `N(0, 2²)` m, constante no voo; só prior, sem aprendizagem | igual |
+| `b_rw` | deriva do sensor e da atmosfera | passeio aleatório 0,05 m/√s | igual |
+| `κ` | erro de escala da atmosfera (gradiente de temperatura): `h` não é só `ln(p0/p)` | uniforme em ±0,2% | uniforme em ±0,5% (a 2000 m são ±10 m) |
+| `e_din(v)` | erro de posição da fonte de pressão estática: `Δp = c_p·½ρ v²` dá `Δh = c_p·v²/(2g)` | `c_p` em ±0,5% (a 230 m/s, ±13,5 m) | `c_p` em ±3% (a 230 m/s, ±81 m; a 50 m/s, ±3,8 m) |
+| `e_jato(h, u)` | perturbação da pressão estática junto ao solo pelo jato (recirculação, efeito de solo), cresce com o acelerador `u` e com a proximidade do solo | `-A·u·exp(-h/h_g)` com `A ≤ 3 m`, `h_g = 15 m` | `A ≤ 10 m`, `h_g = 30 m` (1 hPa vale cerca de 8,3 m a nível do mar) |
+| `τ_b` | latência do sensor e do filtro de pressão, nominal 0,04 s, **compensada** pelo filtro | incerteza da compensação ±0,005 s | ±0,02 s (a 60 m/s, 1,2 m) |
+
+**Porquê `c_p` de vários por cento na variante pessimista.** O veículo desce base primeiro (tubeira para baixo) em escoamento separado na esteira; as portas de pressão estática ficam em escoamento perturbado e o seu coeficiente de pressão varia com o número de Mach e com a atitude em várias percentagens da pressão dinâmica. ±0,5% é o valor de uma sonda calibrada em escoamento limpo e era demasiado otimista para esta geometria (suposto; sem dados, e é por isso que a variante pessimista é executada). A latência entra como **incerteza da compensação** (`Δτ·v`), não como `τ` bruto: o filtro conhece a latência nominal e atrasa-se a si próprio; o que fica é o erro dessa estimativa. Usar o `τ` bruto de 0,04 s (9 m a 230 m/s) sobrestimaria o erro.
 
 A modelação evita `ln` e `pow` no caminho de determinismo: o sensor emite diretamente a altitude de pressão (calculada pelo próprio modelo do sensor com os operadores permitidos). Só o cálculo do próprio modelo físico do jato usa `exp` do crate, que é permitida.
 
-**Independência.** A pressão e o rádio (radar e GNSS) são fisicamente independentes: um viés do radar não afeta o barómetro e vice-versa. O barómetro não é independente do jato nem da velocidade (os termos `e_din` e `e_jato`), e tem deriva própria. Perto do solo a causa comum com o radar é o jato. A velocidade mostra o problema central do barómetro: **o erro dinâmico e a latência crescem com a velocidade, o jato cresce perto do solo, e o jato é exatamente onde a velocidade é pequena**. A janela de altitude em que o barómetro é pelo menos tão bom como a incerteza que tem de resolver pode ser muito estreita ou nula. Isto é uma conclusão (incerta) que decide se o barómetro entra.
+**Independência.** A pressão e o rádio (radar e GNSS) são fisicamente independentes: um viés do radar não afeta o barómetro e vice-versa. O barómetro não é independente do jato nem da velocidade (os termos `e_din` e `e_jato`), e tem deriva própria. Perto do solo a causa comum com o radar é o jato. A velocidade mostra o problema central do barómetro: **o erro dinâmico e a latência crescem com a velocidade, o jato cresce perto do solo, e o jato é exatamente onde a velocidade é pequena**.
 
-**Porta de decisão M10.0 para o barómetro.** Antes de qualquer implementação, calcular analiticamente, com a variante pessimista, a margem de isolamento em função da altitude: a razão entre a magnitude de uma falha de 5 a 50 m e a incerteza do barómetro nessa altitude (erro estático, escala, latência). Se não houver nenhuma faixa de altitude, antes do compromisso de guiamento (secção 8), em que a margem exceda 2 a 3, o barómetro **não entra** e a conclusão é registada: com os sensores existentes não há terceira fonte de altitude absoluta, e as falhas de altitude constantes desde o início são não isoláveis; ficam declaradas.
+**Porta de decisão M10.0, calculada.** Orçamento de erro do barómetro (RSS dos termos, cada termo limitado com a sua amplitude máxima como 1 σ, convenção conservadora da revisão; pior caso = soma das amplitudes máximas, com `b0`, ruído e deriva a 3 σ; acelerador junto do solo 0,5) ao longo de uma descida **aproximada do M9** (integrador 1D local, ignição estimada a cerca de 1330 m; não é o simulador Rust): se um barómetro é a terceira fonte de altitude, uma falha de magnitude `m` só é isolável onde `m / RSS ≥ 3`.
+
+| Altitude (m) | Velocidade (m/s) | Otimista: RSS / pior caso (m) | Pessimista: RSS / pior caso (m) | Pessimista com `b0` aprendido (σ 0,3 m): RSS / pior caso (m) |
+| --- | --- | --- | --- | --- |
+| 3000 | 200 | 12,0 / 24,0 | 63,1 / 87,0 | 63,1 / 81,9 |
+| 2000 | 220 | 13,1 / 24,2 | 74,6 / 95,0 | 74,6 / 89,8 |
+| 1000 | 198 | 10,4 / 19,7 | 60,0 / 75,4 | 60,0 / 70,3 |
+| 500 | 140 | 5,5 / 13,4 | 30,1 / 41,9 | 30,1 / 36,8 |
+| 200 | 88 | 2,9 / 9,6 | 12,2 / 21,5 | 12,1 / 16,4 |
+| 100 | 62 | 2,3 / 8,3 | 6,4 / 14,7 | 6,1 / 9,6 |
+| 50 | 44 | 2,1 / 7,6 | 3,8 / 11,8 | 3,3 / 6,7 |
+| 38 | 38 | 2,1 / 7,5 | 3,4 / 11,4 | 2,8 / 6,3 |
+| 10 | 20 | 2,2 / 7,8 | 4,2 / 11,4 | 3,7 / 6,3 |
+
+**Validação do cálculo.** Com o conjunto antigo (`c_p` 0,5%, `τ` bruto 0,04 s, `A` 10 m, `h_g` 30 m) e o perfil de brinquedo, o script dá RSS de 19,2 m a 2000 m, 6,5 m a 500 m, 3,0 m a 100 m, 2,7 m a 50 m, 4,2 m a 10 m, que reproduz os valores da revisão independente (19 a 20 m, 7 m, 3,0 m, 2,6 m a 38-50 m, 4,2 m).
+
+**Banda de altitude com margem ≥ 3 (critério estatístico: `m / RSS ≥ 3`)** e a janela **útil**, acima de `h_commit(m) = m / 0,21` (a altitude abaixo da qual uma correção de `m` deixa de ser absorvível pelo acelerador: com ignição a 0,75 da desaceleração disponível e um máximo aceitável de 0,95, uma correção até 21% da altitude ainda cabe; estimativa minha que ignora a latência do acelerador e a massa; a secção 8.3 define `h_commit` para os modos):
+
+| Falha `m` (m) | `h_commit(m)` (m) | Otimista | Pessimista | Pessimista com `b0` aprendido |
+| --- | --- | --- | --- | --- |
+| 5 | 24 | nenhuma; acima de `h_commit`: nenhuma | nenhuma; acima de `h_commit`: nenhuma | nenhuma; acima de `h_commit`: nenhuma |
+| 10 | 48 | 5 a 257 m; acima de `h_commit`: 48 a 257 m | 29 a 31 m; acima de `h_commit`: nenhuma | 14 a 51 m; acima de `h_commit`: 48 a 51 m |
+| 20 | 95 | 5 a 622 m; acima de `h_commit`: 95 a 622 m | 5 a 104 m; acima de `h_commit`: 95 a 104 m | 5 a 109 m; acima de `h_commit`: 95 a 109 m |
+| 30 | 143 | 5 a 961 m; acima de `h_commit`: 143 a 961 m | 5 a 161 m; acima de `h_commit`: 143 a 161 m | 5 a 164 m; acima de `h_commit`: 143 a 164 m |
+
+Com o critério de pior caso (`m ≥` soma das amplitudes máximas):
+
+| Falha `m` (m) | Otimista | Pessimista | Pessimista com `b0` aprendido |
+| --- | --- | --- | --- |
+| 5 | nenhuma | nenhuma | nenhuma |
+| 10 | 5 a 230 m | nenhuma | 5 a 106 m |
+| 20 | 5 a 1023 m | 5 a 178 m | 5 a 252 m |
+| 30 | 5 a 3000 m | 5 a 324 m | 5 a 399 m |
+
+Sensibilidade ao coeficiente estático, janela útil: c_p 1%: 48 a 112 m (10 m), 95 a 292 m (20 m); c_p 5%: nenhuma (10 m), nenhuma (20 m).
+
+**Conclusão, dita sem rodeios.**
+
+- **Falhas de 5 m: nenhuma banda de isolamento em nenhuma variante, nenhum critério.** O barómetro não isola 5 m em altitude nenhuma, nem com o desvio de calibração aprendido.
+- **Falhas de 10 m: só a variante otimista dá janela útil** (de 48 a 257 m). Na variante pessimista a banda estatística é de 29 a 31 m, **abaixo** de `h_commit(10 m)` = 48 m: não há janela útil, nem pelo critério de pior caso. Com `b0` aprendido a janela útil é de 48 a 51 m, ou seja, 3 m de altitude (menos de 0,1 s).
+- **Falhas de 20 e 30 m**: na variante pessimista só se isolam abaixo de 104 m e 161 m; a janela útil é de 95 a 104 m e 143 a 161 m, cerca de 9 e 18 m de altitude, 0,15 a 0,3 s a 60 a 70 m/s. Com a variante otimista é de centenas de metros.
+- **O barómetro pode não isolar falhas de 10 m ou menos na janela útil**, e isso depende da variante: é um resultado do modelo suposto do sensor, não da física. O conjunto `E1` fica **condicional**: só corre se o proprietário aceitar a variante otimista como hipótese de trabalho com esta ressalva à vista, e os resultados com `E1` são apresentados por variante.
+
+**O que muda no resto do documento.** As afirmações que assentavam no barómetro de 2 m, sem erro estático, escala, latência nem jato, ficam restringidas à variante otimista de `E1`: o isolamento a frio de 5 m (69 a 93 de 100 pelas regras de NIS e de separação, 33 a 34 de 100 por paridade e sem erradas, secção 3.8), a linha 1 do quadro da secção 5, a segunda parte de H-H (canário do recetor) e a versão com terceira fonte do critério de recuperação vertical (P2 é a versão `E0`). Em `E0` (sem barómetro, a **configuração primária** do pré-registo) não existe terceira fonte: deteta-se, declara-se, e o desempate só pode vir de um prior (secção 8.5).
 
 Modos de falha do barómetro: desvio (degrau) de calibração, deriva, escala errada, entupimento ou congelamento (valor preso), saturação, perturbação do jato.
 
-### 4.2 Velocímetro Doppler (candidato, conjunto `S2`, só se aprovado)
+### 4.2 Velocímetro Doppler (candidato, conjunto `E2`, só se aprovado)
 
 Os aterradores planetários usam radares Doppler de feixes múltiplos porque medem a velocidade em relação ao solo de forma independente do GNSS.
 
@@ -272,7 +344,7 @@ v_dop = (1 + s)·R(q)·(v + ω × r_ant) + n_d(t)      (componentes de B ou N, c
 | Viés | desalinhamento dos feixes: escala e rotação constantes |
 | Falhas | perda de captura, saltos de escala, ruído aumentado perto do solo |
 
-**Avaliação honesta.** O Doppler mede velocidade, não posição. Não observa um deslocamento constante da posição (secção 3.3). Não corrige nenhuma das falhas medidas no M9.1: `altimeter_bias_low`, `gnss_bias` e `gnss_bias_low` são falhas de posição ou de altitude. O ganho único que lhe encontro é o de fornecer uma terceira fonte de velocidade independente do recetor GNSS, para falhas de modo comum do recetor que corrompem posição e velocidade de forma coerente (secção 3.4); e o de reduzir a dependência da IMU durante perdas de GNSS mais longas (a deriva da secção 3.5 para `b` alto). No protótipo, a IMU já deteta degraus de velocidade de 0,3 m/s ou mais, o que reduz a necessidade do Doppler para degraus. Para deriva coerente lenta, a IMU absorve e o Doppler ajudaria. **Recomendação: não incluir o Doppler na linha de base `S1`; incluí-lo só como conjunto opcional `S2`, avaliado nas células de falha coerente do recetor, e abandoná-lo se não ajudar nessas células.**
+**Avaliação honesta.** O Doppler mede velocidade, não posição. Não observa um deslocamento constante da posição (secção 3.3). Não corrige nenhuma das falhas medidas no M9.1: `altimeter_bias_low`, `gnss_bias` e `gnss_bias_low` são falhas de posição ou de altitude. O ganho único que lhe encontro é o de fornecer uma terceira fonte de velocidade independente do recetor GNSS, para falhas de modo comum do recetor que corrompem posição e velocidade de forma coerente (secção 3.4); e o de reduzir a dependência da IMU durante perdas de GNSS mais longas (a deriva da secção 3.5 para `b` alto). No protótipo, a IMU já deteta degraus de velocidade de 0,3 m/s ou mais, o que reduz a necessidade do Doppler para degraus. Para deriva coerente lenta, a IMU absorve e o Doppler ajudaria. **Recomendação: não incluir o Doppler na linha de base `E1`; incluí-lo só como conjunto opcional `E2`, avaliado nas células de falha coerente do recetor, e abandoná-lo se não ajudar nessas células.**
 
 ### 4.3 Resumo da independência
 
@@ -282,7 +354,7 @@ v_dop = (1 + s)·R(q)·(v + ω × r_ant) + n_d(t)      (componentes de B ou N, c
 | radar contra barómetro | sim, exceto jato | causa comum perto do solo |
 | GNSS posição contra GNSS velocidade | **não** (mesmo recetor) | falha de recetor corrompe os dois |
 | GNSS contra IMU | sim | a IMU não mede posição; a velocidade integrada deriva com o viés |
-| GNSS velocidade contra Doppler | sim | só em `S2` |
+| GNSS velocidade contra Doppler | sim | só em `E2` |
 | barómetro contra IMU | sim | a IMU só liga altitudes, não as fixa |
 
 ### 4.4 O que fica não observável, e a opção da posição relativa à plataforma
@@ -295,12 +367,12 @@ As colunas "deteção", "isolamento" e "recuperação" são previsões fundament
 
 | # | Falha | Modelo e parâmetros | Deteção | Isolamento | Recuperação | Prior. |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Viés de altitude do GNSS | existente: `z += m`, `m` em ±[5, 30] m, janela 0 a 40 s | sim, se houver fonte absoluta independente (radar): protótipo 5 m em 0 s | só com terceira fonte (barómetro) ou por prior; a frio 5 m: 69 a 93% | alta no canal vertical (o radar domina); o horizontal fica comprometido (linha 2) | C |
+| 1 | Viés de altitude do GNSS | existente: `z += m`, `m` em ±[5, 30] m, janela 0 a 40 s | sim, se houver fonte absoluta independente (radar): protótipo 5 m em 0 s | só com terceira fonte (barómetro, `E1`) ou por prior; a frio 5 m com o barómetro otimista: 33 a 34 de 100 por paridade, sem erradas (3.8); barómetro pessimista: sem janela útil (4.1) | alta no canal vertical (o radar domina); o horizontal fica comprometido (linha 2) | C |
 | 2 | Viés horizontal do GNSS | novo: `x += m` (e `y`), sem `z`; `m` em ±[5, 30] m; desde 0 s e com início a meio | desde 0 s: **não** observável; início a meio: degrau ≥ 3 m em 1 época, 1 m em 2 s | n/a (um grupo só); canário do recetor se z também falhar | `R5` não recuperável desde 0 s; toque suave fora da plataforma sim | C (controlo negativo) |
 | 3 | Perda de dados | existente: `gnss_dropout`, `altimeter_dropout`, 2 a 10 s | trivial (dado em falta) | n/a | `robust` 28 a 29 de 30; `baseline` 6 a 7 de 30; deriva da IMU da secção 3.5 | C |
 | 4 | Recuperação intermitente | novo: 2 a 5 janelas curtas (0,2 a 2 s) de perda, intervalos de 0,5 a 3 s | sim | n/a | risco de oscilação de readmissão; depende da histerese | T |
-| 5 | Deriva do barómetro | novo: rampa `r` em ±[0,05, 0,5] m/s, ou escala `κ` | lenta: baixa abaixo de 0,1 m/s por época (análogo da rampa) | sim se radar e GNSS bons | alta (pouco peso) | C (só `S1`) |
-| 6 | Desvio do barómetro | novo: degrau de ±[2, 20] m; transitório do jato | grande: sim; pequeno: absorvido pelo estado | sim | alta | C (só `S1`) |
+| 5 | Deriva do barómetro | novo: rampa `r` em ±[0,05, 0,5] m/s, ou escala `κ` | lenta: baixa abaixo de 0,1 m/s por época (análogo da rampa) | sim se radar e GNSS bons | alta (pouco peso) | C (só `E1`) |
+| 6 | Desvio do barómetro | novo: degrau de ±[2, 20] m; transitório do jato | grande: sim; pequeno: absorvido pelo estado | sim | alta | C (só `E1`) |
 | 7 | Viés e deriva da IMU | existente: constante 0,05 a 0,5 m/s² em `x_B`; novo: rampa 0,01 a 0,1 m/s² por segundo, passeio aleatório | sim no canal vertical (estado de viés); deriva rápida mais difícil | n/a (grandeza própria) | alta se radar bom; sem radar e GNSS, tabela 3.5 | C |
 | 8 | Atraso de medida | novo: `τ` de 0,02 a 0,2 s no radar, GNSS ou barómetro | **a 230 m/s, 0,1 s são 23 m**: aparece como resíduo proporcional a `v`, não constante | possível por correlação do resíduo com `v` (requer estado de atraso ou teste) | só com modelo de atraso; senão degrada tudo | T |
 | 9 | Valor preso (congelado) | novo: repete a última amostra durante 1 a 10 s | por igualdade exata de amostras consecutivas (impossível com ruído) ou por resíduo crescente | sim se a fonte tem alternativas | análoga à perda de dados | T |
@@ -311,7 +383,7 @@ As colunas "deteção", "isolamento" e "recuperação" são previsões fundament
 | 14 | Falsa deteção, isolamento errado | taxa em execuções nominais e com ruído aumentado; isolamento incorreto em pares | medida | medida | n/a | C |
 | 15 | Sem estimativa segura | altitude: radar contra GNSS com barómetro inútil; horizontal: sem fonte | sim (desacordo) | **não** | nenhuma ação física salva; declarar | C |
 
-**Estratégia de amostragem das combinações.** Não é uma cobertura exaustiva: o espaço de faltas é infinito e o modelo é simplificado. O plano é: (a) as células de uma falha para todos os tipos prioritários; (b) **pares** dos tipos prioritários (rascunho: `altimeter_bias` e `gnss_bias`, cada um com sinal sorteado por semente, `gnss_dropout`, `altimeter_dropout`, `imu_accel_bias`, `gnss_horizontal_bias` e valor preso, mais o desvio do barómetro: 8 tipos, 28 pares, dos quais 7 envolvem o barómetro e só correm com sensores `S1`; magnitudes e janelas sorteadas por semente, com sobreposição forçada de pelo menos 1 s); (c) varrimentos dirigidos junto das fronteiras de decisão (secção 10). Combinações de três ou mais falhas ficam fora de âmbito e a afirmação do M10 limita-se a "pares". Uma execução em que uma das duas falhas não atuou (`acted: false`, regra do M9) conta como erro de sorteio, não como resultado.
+**Estratégia de amostragem das combinações.** Não é uma cobertura exaustiva: o espaço de faltas é infinito e o modelo é simplificado. O plano é: (a) as células de uma falha para todos os tipos prioritários; (b) **seis pares pré-registados** (secção 10.3), com o sinal de cada viés sorteado por semente e sobreposição forçada de pelo menos 1 s; os pares com o desvio do barómetro só existem em `E1`; (c) varrimentos dirigidos junto das fronteiras de decisão (secção 10.3). Combinações de três ou mais falhas ficam fora de âmbito e a afirmação do M10 limita-se a "pares". Uma execução em que uma das duas falhas não atuou (`acted: false`, regra do M9) conta como erro de sorteio, não como resultado.
 
 ## 6. Arquiteturas candidatas
 
@@ -325,32 +397,71 @@ GNSS:        y = p + b_gnss (+ ruído);   y_v = v (+ ruído)
 barómetro:   z_b = p_z + b_baro (+ ...)
 ```
 
-O sistema é **linear de variação no tempo** com a atitude como entrada conhecida (medida). Portanto um **filtro de Kalman linear de variação no tempo (LTV)** é exato a menos do ruído de atitude (entra no ruído de processo: erro de aceleração `|f|·1e-4 ≤ 3e-3 m/s²`, desprezável face a 0,02). **Não é preciso um EKF** (não há não-linearidade no filtro) **nem um filtro de erro de estado (ESKF)** (não há estado de atitude a linearizar). A complexidade de um ESKF só se justificaria se a atitude fosse estimada (por exemplo, com viés do giroscópio), o que o modelo não tem. Estados propostos: posição (3), velocidade (3), viés do acelerómetro (1, ao longo de `x_B`; ver a decisão do proprietário), desvio do barómetro (1): 8 estados. A atualização usa medidas escalares em sequência (os ruídos são independentes), o que evita inversões de matrizes.
+O sistema é **linear de variação no tempo** com a atitude como entrada conhecida (medida). Portanto um **filtro de Kalman linear de variação no tempo (LTV)** é exato a menos do ruído de atitude (entra no ruído de processo: erro de aceleração `|f|·1e-4 ≤ 3e-3 m/s²`, desprezável face a 0,02). **Não é preciso um EKF** (não há não-linearidade no filtro) **nem um filtro de erro de estado (ESKF)** (não há estado de atitude a linearizar). Estados propostos: posição (3), velocidade (3), viés do acelerómetro (1, ao longo de `x_B`; ver a decisão do proprietário), desvio do barómetro (1, só em `E1`): 8 estados. A atualização usa medidas escalares em sequência (os ruídos são independentes), o que evita inversões de matrizes.
 
 Aritmética permitida: `+ - * /`, `sqrt` e `exp` do crate. Sem funções transcendentes em tempo de execução: os limiares do qui-quadrado são constantes pré-calculadas (por exemplo, 1 grau de liberdade: 10,83 a 1e-3, 15,14 a 1e-4, 19,51 a 1e-5, 23,93 a 1e-6; comparam-se quadrados, sem `sqrt`); a simetrização `P = ½(P + Pᵀ)` e a forma de Joseph mantêm a covariância válida; um piso nas diagonais e a verificação de diagonais positivas disparam uma reinicialização com covariância inflada e uma bandeira.
 
-| | A: ganho fixo + votação | B: Kalman LTV + NIS | C: B + separação de soluções | D: IMM ou banco de hipóteses | E: M-estimação (Huber) |
-| --- | --- | --- | --- | --- | --- |
-| Estrutura | filtro complementar IMU+GNSS+radar estendido, votação 2 em 3 por resíduos | um filtro de 8 estados, rejeição por NIS, forma de Joseph | B mais um subfiltro por grupo de fontes excluído (radar, recetor GNSS, barómetro) | `K` filtros (por exemplo, 1 nominal + 1 por fonte com viés) com mistura | filtro único com pesos de Huber nas inovações |
-| Deteta | desacordo por limiar | inovação anómala por fonte | separação `|x_0 - x_i|` com limiar estatístico | probabilidade de modelo | outliers (amostras) |
-| Isola | só com votação, sem consistência | só rejeitando a fonte com a inovação anómala | sim com ≥ 3 fontes, por exclusão consistente | sim, probabilidade de hipótese | não; só reduz influência |
-| Nível de proteção | não | só do `P` do filtro (sem falhas) | sim: `PL = max(K_ff σ_0, max_i(K_fa σ_Δi + K_md σ_i))` | possível (probabilidade posterior) | não |
-| Modos de falha | votação não é correção; uma fonte dominante e viesada vence; ganhos não sabem a incerteza | uma fonte com viés constante absorvida, adaptação lenta; desvios de modelo | falha dupla; dependência da hipótese de falha única; custo `n_grupos + 1` filtros | probabilidades de transição difíceis; colapso do banco | não deteta viés constante; só picos |
-| Parâmetros livres | cerca de 12 (ganhos e limiares) | `Q` (da especificação da IMU), viés `Q`, `K_fa` | + `K_md`, limites de alerta, dwell | matriz `K×K` de transições, magnitudes de hipóteses | limiar de Huber |
-| Cálculo por ciclo (ordem de grandeza, estimativa minha) | dezenas de flops | cerca de 1 a 1,6 kflop (8 estados, 2,7 atualizações escalares por ciclo) | cerca de 4 a 6,5 kflop (4 filtros) | `K`-vezes B mais mistura `O(K² n²)` | 1,5-vezes B |
-| Memória | desprezável | 8 + 36 duplos | 4 × (8 + 36) duplos, cerca de 1,4 kB | `K` × B | igual a B |
-| Determinismo | trivial | sequência fixa de atualizações, sem inversão | igual, quatro filtros em ordem fixa | mistura com normalizações | iteração com número fixo de passos |
-| Testabilidade | simples, mas sem garantias | consistência NEES e NIS testável; calibração do falso alarme | + calibração de `P_i - P_0`, isolamento por pares | difícil de calibrar | simples |
+### 6.1 Os braços
 
-Em tempo de relógio, o custo de B e de C face ao ciclo de 20 ms é desprezável e face ao custo atual por execução do simulador (14,7 s para 1050 execuções, medido depois da revisão, ou seja cerca de 14 ms por execução com 4 tarefas) não deverá passar de 1,2 a 2 vezes (estimativa minha, a medir no M10.2).
+Os nomes dos braços são fixos e usados em todo o documento (e no pré-registo):
 
-**Escolha preferida e porque.** **C**, introduzida por fases: primeiro B (M10.2), depois C (M10.3) só se B deixar uma lacuna de integridade ou de isolamento mensurável nas células de desenvolvimento. C é a estrutura mais pequena que produz as três coisas que a pergunta pede: deteção, isolamento (onde há redundância) e um nível de proteção comparável com um limite de alerta, tudo sob uma hipótese explícita (falha única). D tem a mesma capacidade mas mais parâmetros difíceis de calibrar com 100 sementes por célula. E não resolve o viés constante, que é o modo de falha dominante. A é um *ablation* de baixo custo que mostra que votação não é correção.
+- **A**: ganho fixo + votação 2 em 3. **Braço de comparação**, não um perdedor pré-comprometido: o resultado de A é medido e reportado como for.
+- **B**: Kalman LTV com rejeição por NIS de uma época (o filtro simples convencional, o que um engenheiro escreveria primeiro).
+- **B+**: Kalman LTV **sem rejeição de medidas** + CUSUM por fonte + isolamento por paridade + gestor de modos. **Sem nível de proteção.**
+- **C**: B+ mais um **nível de proteção vertical por separação de soluções** (subfiltros por grupo de fontes).
+- D (IMM ou banco de hipóteses) e E (M-estimação de Huber) ficam como alternativas descartadas por escrito, não corridas.
 
-**Regras de ablation que C tem de passar na campanha (pré-registadas na secção 10).** C tem de superar:
+| | A | B | B+ | C | D: IMM | E: Huber |
+| --- | --- | --- | --- | --- | --- | --- |
+| Estrutura | filtro complementar IMU+GNSS+radar estendido, votação 2 em 3 por resíduos | um filtro de 8 estados, **rejeição por NIS de uma época**, forma de Joseph | um filtro de 8 estados **sem rejeição**; CUSUM por fonte; paridade; exclusão explícita e reinicialização (6.4) | B+ mais um subfiltro por grupo de fontes (radar, recetor GNSS, barómetro em `E1`) | `K` filtros com mistura | filtro único com pesos de Huber |
+| Deteta | desacordo por limiar | inovação anómala de uma época | teste sequencial por fonte (CUSUM) | igual a B+ (a separação **não** deteta) | probabilidade de modelo | outliers (amostras) |
+| Isola | só votação, sem consistência | rejeitando a fonte da inovação anómala | paridade no domínio das medidas, hipótese de falha única; com duas fontes só deteta | igual a B+ | probabilidade de hipótese | não |
+| Nível de proteção | não | só do `P` do filtro (sem falhas) | só do `P` do filtro (sem falhas) | sim, só vertical: `PL_v = max(K_ff σ_0, max_i(K_fa σ_Δi + K_md σ_i))` | possível | não |
+| Modos de falha | votação não é correção; uma fonte dominante e viesada vence | a rejeição depende dos dados: as medidas aceites diferem entre filtros; um viés lento é absorvido | deteção lenta de vieses pequenos; reprocessamento limitado; hipótese de falha única | B+ mais: falha dupla; custo `n_grupos + 1` filtros | probabilidades de transição difíceis | não deteta viés constante |
+| Parâmetros livres | cerca de 12 (ganhos e limiares) | `Q`, `K_fa` da inovação, limiar de rejeição | `Q`, `k_ref`, `h` por fonte, limiar de paridade, janela de certificação | B+ mais `K_md`, `K_ff`, `AL`, dwell | matriz `K×K`, magnitudes | limiar de Huber |
+| Cálculo por ciclo (ordem de grandeza, estimativa minha) | dezenas de flops | cerca de 1 a 1,6 kflop (8 estados, 2,7 atualizações escalares) | cerca de 1,2 a 1,8 kflop, mais reprocessamento limitado a 25 ciclos por ciclo | cerca de 4 a 6,5 kflop (3 a 4 filtros) | `K`-vezes B mais mistura | 1,5-vezes B |
+| Memória | desprezável | 8 + 36 duplos | B mais um anel de 6 s de IMU e medidas, 12 instantâneos | 3 a 4 × (8 + 36) duplos mais o anel, cerca de 1,6 kB mais o anel | `K` × B | igual a B |
+| Determinismo | trivial | sequência fixa de atualizações, sem inversão | igual, o anel e o reprocessamento são de tamanho fixo | igual, filtros em ordem fixa | mistura com normalizações | iteração com número fixo de passos |
+| Testabilidade | simples, mas sem garantias | NEES e NIS testáveis; o falso alarme depende dos dados | NEES exato (o conjunto de medidas não depende dos dados); falso alarme por constantes (ARL0) | + calibração de `P_i - P_0` | difícil de calibrar | simples |
 
-1. **B** (filtro único com NIS e lógica de modos simples) numa das duas medidas: recuperação emparelhada nas células de pares, ou limite superior da taxa de falhas de alerta. Se não superar B em pelo menos 10 pontos percentuais numa delas, a arquitetura preferida passa a ser B.
-2. `guarded` (a base atual) nas células com viés de altitude de qualquer sinal.
-3. **A** (ganho fixo mais votação), para mostrar que a votação não chega: A deve falhar em pelo menos um tipo de par em que C não falha.
+Em tempo de relógio, o custo de B, B+ e C face ao ciclo de 20 ms é desprezável e face ao custo atual por execução do simulador (14,7 s para 1050 execuções, medido depois da revisão, ou seja cerca de 14 ms por execução com 4 tarefas) não deverá passar de 1,2 a 2 vezes (estimativa minha, a medir no M10.2).
+
+### 6.2 Porque o estimador principal não rejeita medidas
+
+A separação de soluções assume que o filtro completo (`x_0, P_0`) e o subfiltro sem o grupo `i` (`x_i, P_i`) processam **conjuntos de medidas encaixados**: o do subfiltro é um subconjunto do do filtro completo, o mesmo modelo, o mesmo ruído de processo. Nessas condições, `cov(x_0 - x_i) = P_i - P_0` e os limiares de separação (`σ_Δ = √(P_i - P_0)`) e os níveis de proteção têm significado. Com **rejeição por NIS no filtro principal**, as medidas aceites dependem dos dados e diferem entre o filtro principal e cada subfiltro (um rejeita uma amostra que o outro aceita); os conjuntos deixam de ser encaixados, `cov(x_0 - x_i) ≠ P_i - P_0` e os limiares de separação e os níveis de proteção ficam **por especificar**. Decisão (D1): o filtro principal **não tem rejeição por amostra**. Uma fonte só sai por **exclusão explícita decidida pelo monitor** (6.3), seguida de uma regra documentada de reinicialização e reprocessamento (6.4). B, o filtro simples convencional, mantém a rejeição por NIS de uma época **por ser o braço de comparação**: B contra B+ testa a deteção sequencial contra a rejeição de uma época.
+
+### 6.3 Deteção e isolamento
+
+- **Deteção (D2): teste sequencial por fonte.** CUSUM bilateral sobre as inovações normalizadas de cada fonte (radar, GNSS z, GNSS vz, barómetro), com a folga `k_ref` e o limiar `h` precalculados. A taxa de falsos alarmes fica fixada por constantes (ARL0 por Siegmund; secção 3.6), e não pela cauda de uma única época. No protótipo: `k_ref = 0,5`, `h = 12`, 0 de 100 execuções nominais com alarme, atraso de 0,7 s para 1 m de GNSS z (secção 3.8). Os valores finais saem das sementes de desenvolvimento.
+- **Isolamento (D2): paridade no domínio das medidas**, sob a hipótese de falha única. Em `E1`, três resíduos independentes de `z` (radar menos GNSS z; radar menos barómetro compensado do desvio `b_baro`; GNSS z menos barómetro compensado), cada um normalizado pelo seu desvio-padrão (que inclui a incerteza do desvio do barómetro: só o prior sem intervalo certificado, ver 3.8). A fonte `i` é a falhada quando o resíduo que **não** a envolve é consistente (abaixo de 3 desvios-padrão) e os outros dois são inconsistentes (de pelo menos 3). Qualquer outro padrão é "não isolado", e a política trata o resultado como detetado, não isolado (secção 8.5). Com **duas** fontes de altitude (`E0`), só se deteta.
+- **Nunca se ordena por separação normalizada por `σ_Δ`.** A separação do subfiltro sem barómetro tem `σ_Δ` de cerca de 1 mm: a razão normalizada é sempre a maior e aponta para a fonte errada (medido, secção 3.8). Se uma separação normalizada for usada para alguma coisa, `σ_Δ` tem um piso fixado como fração de `σ_0` (a variante de 0,5 `σ_0` mostrou-se insuficiente para isolar; por isso não é usada para isolar).
+
+### 6.4 Exclusão, reinicialização e reprocessamento
+
+Quando o monitor exclui o grupo `s` (alarme do CUSUM mais isolamento por paridade, ou o grupo definido pela regra de ambiguidade de 8.5):
+
+1. o instante provável do início é o último instante em que o CUSUM de `s` esteve a zero (a estimativa padrão do instante de mudança), `t̂_0`;
+2. o filtro principal é reposto no instantâneo **certificado** mais recente anterior a `t̂_0` menos 1 s (instantâneos de estado e covariância a cada 0,5 s num anel de 12; certificado = todos os CUSUM abaixo de metade de `h` nesse instante);
+3. o anel de IMU e de medidas desde esse instante é reprocessado **sem `s`**, no máximo 25 ciclos por ciclo de controlo (o custo por ciclo é limitado, Q1), com o estado `Degraded` declarado até o reprocessamento alcançar o presente;
+4. `s` passa a `Excluded`; segue a máquina de readmissão de 8.3;
+5. em C, o banco de subfiltros é reiniciado do mesmo instantâneo sem `s`; o nível de proteção deixa de ser calculável (e o estado vertical não pode ser `Trusted`) enquanto restar menos de duas fontes de altitude, porque não existe subfiltro alternativo.
+
+Se não houver instantâneo certificado (falha desde 0 s), aplica-se a regra de arranque a frio de 8.4.
+
+### 6.5 Nível de proteção vertical por separação (só C)
+
+O nível de proteção `PL_v = max(K_ff σ_0, max_i(K_fa σ_Δi + K_md σ_i))` com `K_ff = 5,33`, `K_fa = 4`, `K_md = 3` (protótipo; valores finais do desenvolvimento) é comparado com `AL_v(h)`. **Só serve o nível de proteção e a sua comparação com o limite de alerta; não deteta nem isola.** A hipótese de falha única e o conjunto encaixado de medidas (6.2) são as condições. Em `E0`, com duas fontes de altitude, cada subfiltro tem uma fonte mais a IMU, e o nível de proteção existe (cada subfiltro tem uma fonte de altitude), mas é grande: é a declaração honesta.
+
+### 6.6 Escolha preferida e ablations
+
+**Preferida: "KF sem rejeição + CUSUM por fonte + isolamento por paridade + nível de proteção vertical por separação de soluções + gestor de modos"**, isto é, **C**, introduzida por fases: primeiro B e B+ (M10.2), depois C (M10.3), só se B+ deixar uma lacuna de integridade mensurável nas células de desenvolvimento. D tem a mesma capacidade mas mais parâmetros difíceis de calibrar com 100 sementes por célula. E não resolve o viés constante, que é o modo de falha dominante.
+
+**Ablations, com o que cada uma testa** (pré-registadas, secção 10):
+
+1. **C contra B+: o que justifica a complexidade extra** (o nível de proteção e os subfiltros). Métrica única: a taxa de falhas de alerta verticais (I1, secção 9), emparelhada por semente e agrupada nas seis células de pares (hipótese H-C, teste primário P4). Se C não superar B+ por pelo menos 3 pontos percentuais agrupados, a arquitetura preferida passa a ser B+ e a conclusão é reportada.
+2. **B+ contra B**: deteção sequencial contra rejeição de uma época, na recuperação das células de falha única verticais e nos falsos alarmes. **Reportado**, fora da lista primária.
+3. **`guarded`** (a base atual): não inferioridade nas nove células do M9 (P3) e comparação nas células com viés de altitude de qualquer sinal (reportada).
+4. **A** (ganho fixo mais votação) é **um braço de comparação, não um perdedor pré-comprometido**: as diferenças emparelhadas A contra C são reportadas nas mesmas células, sem hipótese que presuma o resultado.
 
 ## 7. Arquitetura proposta
 
@@ -364,10 +475,10 @@ flowchart LR
     end
     subgraph CTRL["Lado do controlador: só observações e configuração"]
         VAL["Validação das observações"]
-        EST["Estimador principal 8 estados"]
-        SUB["Subfiltros sem radar, sem GNSS, sem barómetro"]
-        FDI["Monitor de falhas: NIS, separação, isolamento"]
-        INT["Integridade: níveis de proteção e estado de confiança"]
+        EST["Estimador principal 8 estados, sem rejeição de medidas"]
+        SUB["Subfiltros sem radar, sem GNSS, sem barómetro (só C)"]
+        FDI["Monitor: CUSUM por fonte, paridade, exclusão e reprocessamento"]
+        INT["Integridade: nível de proteção vertical (só C) e estado de confiança"]
         MODE["Gestor de modos"]
         GUID["Guiamento e controlo"]
         SAFE["Monitor de segurança independente, só pode cortar"]
@@ -377,7 +488,8 @@ flowchart LR
     VAL --> EST
     VAL --> SUB
     EST --> FDI
-    SUB --> FDI
+    FDI -->|"exclusão"| EST
+    SUB --> INT
     FDI --> INT
     EST --> INT
     INT --> MODE
@@ -403,9 +515,9 @@ NavIn      { altimeter: Option<f64>, gnss: Option<Gnss{pos, vel}>, baro: Option<
              doppler: Option<[f64;3]>, imu: Imu }                      // novos campos Option
 GroupHealth{ Healthy | Suspect | Excluded | Probation }                // por grupo: radar, gnss, baro
 NavSol     { pos, vel, acc_bias, baro_bias, sigma_pos, sigma_vel, source: Full | Without(Group) }
-Integrity  { pl_vertical, pl_horizontal_vel, hp_status: Verified|Unverified,
+Integrity  { pl_vertical (só C), pl_horizontal_vel, hp_status: Verified|Unverified,
              status: Trusted | Degraded | Untrusted, flags }
-Mode       { Nominal | DegradedNav | SafeAbort }
+Mode       { Nominal | DegradedNav | Untrusted }
 ```
 
 Os campos novos de `Estimate` (e da amostra de traço) são `Option` e só se serializam quando a política os produz, como o M9.1 fez, para que os traços de `baseline`, `robust` e `guarded` mantenham os bytes. Os campos do verificador novos (esquema `vv-rocket-landing-verification.v3`, aditivo) incluem erro de estimação por ciclo, NEES e NIS recalculados com a verdade, e a contagem de falhas de alerta.
@@ -413,10 +525,10 @@ Os campos novos de `Estimate` (e da amostra de traço) são `Option` e só se se
 **Tempo dentro da ordem de eventos existente.** A ordem total por passo `k` do M9 não muda: abrir janelas de falha, **se `k` é ciclo de controlo: observar, estimar, comandar**, atuador, integração RK4, fim do propelente e contacto, registo. Dentro do passo "estimar e comandar", a sequência passa a ser fixa e total:
 
 1. validar a observação (não finito, fora de gama, saturação: o dado passa a ausente com bandeira);
-2. atualização temporal do filtro principal e dos subfiltros com a IMU;
-3. atualizações de medidas por ordem fixa: radar, GNSS posição `x, y, z`, GNSS velocidade `x, y, z`, barómetro, Doppler;
-4. testes do monitor (NIS por fonte, separação, isolamento, janela de readmissão);
-5. integridade (níveis de proteção);
+2. atualização temporal do filtro principal (e, em C, dos subfiltros) com a IMU;
+3. atualizações de medidas por ordem fixa, só dos grupos não `Excluded`: radar, GNSS posição `x, y, z`, GNSS velocidade `x, y, z`, barómetro, Doppler;
+4. monitor: CUSUM por fonte, paridade, decisões de exclusão (com reinicialização e reprocessamento, 6.4) e janela de readmissão;
+5. integridade (em C, nível de proteção vertical);
 6. gestor de modos (com dwell e histerese);
 7. guiamento e controlo (lei dependente do modo);
 8. monitor de segurança independente (só pode cortar).
@@ -430,15 +542,21 @@ Os campos novos de `Estimate` (e da amostra de traço) são `Option` e só se se
 Fisicamente, o acelerador mínimo (0,4 × 845 kN = 338 kN) excede o peso a qualquer massa do voo (no máximo 30 t, cerca de 294 kN): o veículo **não pode pairar** com o motor aceso; se parar acima do solo, sobe. O corte é irreversível e não há reacendimento (`S4`), nem RCS. Em consequência:
 
 - Não existe um estado seguro de "esperar" nem de "arremeter". "Abortar" significa cortar e cair, o que a regra de subida do M9.1 já faz, e o resultado é uma queda de uma altura que o monitor limita.
-- Um erro de altitude de `Δh` no fim da queima dá, em primeira aproximação, uma velocidade de contacto `v_c = √(v_t² + 2·a·Δh)` com `a` a desaceleração líquida disponível (estimativa minha, ignora a dinâmica do acelerador): com o acelerador mínimo no fim, `a ≈ 338 kN/26,3 t − 9,81 ≈ 3 m/s²`, e o limite de `R1` (3 m/s) tolera `Δh ≈ (9 − 2,25)/(2·3) ≈ 1,1 m`. **O erro de altitude tolerado no fim da queima é da ordem de 1 m**, o que só o radar (0,1 m) garante. Sem o radar fiável, a altitude fina não está disponível e a recuperação é, em geral, impossível. O desempate probabilístico em metros não ajuda: qualquer escolha errada de dezenas de metros falha `R1`.
+- Um erro de altitude de `Δh` no fim da queima dá, em primeira aproximação, uma velocidade de contacto `v_c = √(v_t² + 2·a·Δh)` com `a` a desaceleração líquida disponível (estimativa minha, ignora a dinâmica do acelerador). O limite de `R1` (3 m/s) tolera `Δh = (9 - 2,25)/(2·a) = 6,75/(2a)`. Com o acelerador mínimo no fim, `a ≈ 338 kN/26,3 t − 9,81 ≈ 3 m/s²` e `Δh ≈ 1,1 m`. Com o acelerador perto da referência do caso (cerca de 0,53, o que dá `a ≈ 7,3 m/s²`; valor derivado para dar o limite de 0,46 m fixado no desenho, não medido no simulador; a referência de atitude do caso é 0,6) a tolerância desce para `Δh ≈ 0,46 m`. **O erro de altitude tolerado no fim da queima é, portanto, de 0,5 a 1,1 m** (0,46 m do lado do acelerador alto, 1,11 m do lado do acelerador mínimo), o que só o radar (0,1 m) garante. Sem o radar fiável, a altitude fina não está disponível e a recuperação é, em geral, impossível. O desempate probabilístico em metros não ajuda: qualquer escolha errada de dezenas de metros falha `R1`.
 
 Portanto, "seguro" no M10 significa, por ordem: (1) evitar agravar (não perseguir uma posição horizontal duvidosa; não reacender; não hesitar), (2) declarar a perda de confiança com antecedência, (3) priorizar um **toque vertical suave fora da plataforma** quando a confiança horizontal é insuficiente, (4) aceitar o corte do M9.1 como último recurso. Não promete mais.
 
-### 8.2 Prioridade do toque suave contra a plataforma
+### 8.2 Lei lateral degradada
 
-Quando a posição horizontal não está verificada (recetor suspeito, ou deslocamento não observável), a lei lateral que persegue a plataforma pode levar o veículo para a posição errada com velocidade lateral que depois não se anula. Em modo degradado, a lei lateral muda para **anular a velocidade horizontal** (usa a velocidade GNSS ou a IMU integrada, que não sofrem o viés de posição), sem perseguir a plataforma. O custo é `R5` e possivelmente `S2`; o ganho é `R1` a `R4` e `S1` a `S5` seguros. O `S2` (50 m) precisa de conhecimento horizontal que o modo degradado não tem: a proteção de `S2` passa a ser uma aposta no prior (dispersões iniciais de ±30 m mais a deriva). A campanha mede-o; não o garante. Uma lei lateral só de velocidade tem custo: a deriva da IMU da secção 3.5 e a perda da correção da posição inicial dispersa.
+Quando a posição horizontal não está verificada (recetor suspeito, ou deslocamento não observável), a lei lateral que persegue a plataforma pode levar o veículo para a posição errada com velocidade lateral que depois não se anula. Em `DegradedNav` e em `Untrusted` a lei lateral deixa de perseguir a posição GNSS e passa a:
 
-Atenção a um risco: o M9.1 já faz isto implicitamente em `gnss_bias` (24 de 30 tocam fora da plataforma com `R1` cumprido). O M10 torna-o deliberado e declarado.
+1. **estimar a posição por navegação por estima**: a última posição horizontal **fiável** (a do último instantâneo certificado, 6.4) em relação à plataforma, propagada só com a IMU (atitude medida, força específica medida, viés estimado); o limite de deriva é o da secção 3.5: `½·b_h·t²` em posição e `b_h·t` em velocidade, com `b_h ≈ b·sin(inclinação) ≈ 0,1 m/s²` para `b = 0,5 m/s²` e inclinação máxima de 0,2 (`tilt_max_tan`): cerca de 0,2 m e 0,2 m/s a 2 s, 1,2 m e 0,5 m/s a 5 s, 4,9 m e 1,0 m/s a 10 s (analítico; mais o erro de velocidade inicial); com o viés já estimado antes da perda, bem menos;
+2. **só usar a velocidade GNSS depois de um teste de consistência com a IMU**: a velocidade e a posição GNSS vêm do mesmo recetor, por isso a velocidade não é uma testemunha independente da posição se o recetor avariou. O teste compara a variação da velocidade GNSS numa janela de 1 s com o integral da aceleração medida pela IMU; só se a diferença ficar dentro de 4 desvios-padrão combinados (incluindo a incerteza do viés) é que a velocidade GNSS entra na lei; senão a lei usa só a velocidade por estima;
+3. **anular a velocidade horizontal** (por estima, ou GNSS depois do teste), sem perseguir a plataforma; um termo de posição fraco em direção à plataforma, com a posição por estima, só enquanto o limite de deriva da alínea 1 for inferior a um quarto da distância à plataforma (valor inicial a afinar nas sementes de desenvolvimento), e nunca com a posição GNSS suspeita.
+
+O custo é `R5` e possivelmente `S2`; o ganho **visado** (não garantido) é `R1` a `R4` e `S1` a `S5`. O `S2` (50 m) precisa de conhecimento horizontal que o modo degradado só tem enquanto a deriva da alínea 1 for pequena: a proteção de `S2` passa a ser uma aposta no prior (dispersões iniciais de ±30 m mais a deriva). A campanha mede-o; não o garante. Uma lei lateral só de velocidade tem custo: a deriva da IMU da secção 3.5 e a perda da correção da posição inicial dispersa.
+
+Atenção a um risco: o M9.1 já faz isto implicitamente em `gnss_bias` (24 de 30 tocam fora da plataforma com `R1` cumprido). O M10 torna-o deliberado e declarado. **Limite desta lei:** nas células com `gnss_bias` desde 0 s não existe posição horizontal fiável anterior (a primeira medida já contém o deslocamento); a estima parte então da posição GNSS inicial, o termo de posição fraco da alínea 3 fica desligado e a lei só anula a velocidade.
 
 ### 8.3 Modos, entradas e saídas
 
@@ -446,30 +564,71 @@ Parâmetros simbólicos; os valores iniciais saem das sementes de desenvolviment
 
 | Modo | Entrada | Efeito |
 | --- | --- | --- |
-| `Nominal` | todos os grupos `Healthy`; `PL_v ≤ AL_v(h)` e `PL_hv ≤ AL_hv`; `hp_status` pode ser `Unverified` com etiqueta explícita | guiamento do M9 (persegue a plataforma se o recetor está `Healthy` e o canário vertical está limpo) |
-| `DegradedNav` | um grupo `Excluded` ou `Suspect`, ou `PL > AL` durante `n_in` ciclos seguidos | lei lateral só de velocidade, limite de inclinação reduzido, ganhos conservadores; navegação com a solução sem o grupo excluído |
-| `SafeAbort` | nenhuma solução consistente (nenhum subconjunto passa), ou `PL > AL` durante `T_max` | sem perseguição; mantém a atitude vertical; mantém as regras de corte; declara `Untrusted` |
+| `Nominal` | todos os grupos `Healthy`; estado vertical `Trusted` (em C: `PL_v ≤ AL_v(h)`; em B e B+: sem exclusão e `K_ff σ_z ≤ AL_v(h)`); `PL_hv ≤ AL_hv`; `hp_status` pode ser `Unverified` com etiqueta explícita | guiamento do M9 (persegue a plataforma se o recetor está `Healthy` e o canário vertical está limpo) |
+| `DegradedNav` | um grupo `Suspect`, `Excluded` ou `Probation`, ou (em C) `PL_v > AL_v(h)` durante `n_in` ciclos seguidos | lei lateral degradada (8.2), limite de inclinação reduzido, ganhos conservadores; navegação com a solução sem o grupo excluído |
+| `Untrusted` | nenhuma solução consistente (nenhum subconjunto passa), ou os dois grupos de altitude `Excluded` ou em desacordo sem isolamento por `T_max` (valor inicial 2 s), ou (em C) `PL_v > AL_v(h)` durante `T_max` | só lei vertical, **sem perseguição lateral**; mantém as regras de corte; declara `Untrusted` |
+
+**`Untrusted` não é um estado seguro.** É uma declaração de que a navegação já não merece confiança. O veículo continua a travar porque o acelerador mínimo excede o peso (8.1); a lei vertical continua a mandar para o alvo de -1,5 m/s e as regras de corte (subida, 15 m) continuam ativas. O nome `SafeAbort` foi evitado de propósito: sugeriria uma segurança que o modelo não dá.
+
+**Critérios de `Suspect` e de `Excluded` por grupo** (valores iniciais; `h` é o limiar do CUSUM):
+
+- `Healthy → Suspect`: o CUSUM de uma fonte do grupo ultrapassa `h/2`; ou um resíduo de paridade que envolve o grupo ultrapassa 2 desvios-padrão em duas janelas seguidas de 1 s; ou o grupo está sem dados há mais de 0,2 s.
+- `Suspect → Healthy`: o CUSUM abaixo de `h/4` e a paridade abaixo de 2 desvios-padrão durante 1 s (histerese).
+- `Suspect → Excluded`: alarme do CUSUM (acima de `h`) com isolamento por paridade, ou sem dados há mais de 0,5 s, ou o grupo apontado pela regra de ambiguidade de 8.5. A exclusão dispara a reinicialização e o reprocessamento de 6.4.
+- `Excluded → Probation → Healthy`: ver a readmissão abaixo.
+
+**`h_commit`.** `h_commit = Δ_ref / 0,21`, com `Δ_ref = 10 m` (a magnitude mais baixa do intervalo de `altimeter_bias` que o desenho tenta isolar e a escala de `R5`), isto é, cerca de **48 m, valor inicial 50 m**. Derivação (estimativa minha): com ignição a 0,75 da desaceleração disponível e um máximo aceitável de 0,95, o acelerador absorve uma correção de altitude até `(1 − 0,75/0,95) = 21%` da altitude; abaixo de `Δ_ref/0,21` uma correção de `Δ_ref` já não cabe. O valor final confirma-se no M10.4.
 
 Critérios de entrada e saída, com histerese e permanência (valores de projeto a decidir, secção 10):
 
 - `Nominal` para `DegradedNav`: uma das condições durante `n_in` ciclos de controlo seguidos (valor inicial: 3 ciclos, 60 ms).
-- `DegradedNav` para `Nominal`: **todas** as condições de `Nominal` durante `T_hold` seguidos (valor inicial: 2 s) e `PL < ρ·AL` com `ρ = 0,8`. Entrar é rápido e sair é lento, para evitar oscilação.
-- `DegradedNav` para `SafeAbort`: sem solução consistente durante `n_safe` ciclos, ou `PL > AL` durante `T_max`.
-- `SafeAbort`: **trancado** durante o resto da descida abaixo da altitude de compromisso `h_commit`; acima dela pode regressar a `DegradedNav` depois de `T_safe` com a condição resolvida (valor inicial: 5 s).
-- Abaixo de `h_lock` (valor inicial: 30 m) o modo não muda a favor de `Nominal`; só se agrava. Perto do solo, trocas de lei fazem mais mal do que a incerteza.
+- `DegradedNav` para `Nominal`: **todas** as condições de `Nominal` durante `T_hold` seguidos (valor inicial: 2 s) e (em C) `PL_v < ρ·AL_v` com `ρ = 0,8`. Entrar é rápido e sair é lento, para evitar oscilação.
+- `DegradedNav` para `Untrusted`: sem solução consistente durante `n_safe` ciclos, ou `PL_v > AL_v(h)` durante `T_max`.
+- `Untrusted` acima de `h_commit`: pode regressar a `DegradedNav` depois de `T_safe` com a condição resolvida (valor inicial: 5 s).
+- **Abaixo de `h_commit`** nenhuma transição melhora o modo (nem para `Nominal` nem a partir de `Untrusted`): só se agrava. Perto do solo, trocas de lei fazem mais mal do que a incerteza. Não há um `h_lock` separado: `h_commit` cobre-o.
 - Máximo de transições por execução limitado por `T_voo / T_hold` (propriedade testável).
 
-**Readmissão depois de falhas transitórias.** Cada grupo tem uma máquina de estados `Healthy → Suspect → Excluded → Probation → Healthy`. `Probation`: o grupo volta a entrar no filtro com covariância inflada depois de `m` épocas seguidas (por exemplo, 10) com NIS dentro do limiar, sem salto brusco no estado. Uma perda de dados de 2 a 10 s deixa o grupo `Excluded` até à readmissão.
+**Readmissão depois de falhas transitórias.** Cada grupo tem uma máquina de estados `Healthy → Suspect → Excluded → Probation → Healthy`. `Probation`: o grupo volta a entrar no filtro com covariância inflada depois de `m` épocas seguidas (por exemplo, 10) com o CUSUM do grupo (calculado fora do filtro principal, contra a solução sem o grupo) abaixo de `h/4`, sem salto brusco no estado. Uma perda de dados de 2 a 10 s deixa o grupo `Excluded` até à readmissão.
 
-**Decisão em função dos níveis de proteção e dos limites de alerta.** `AL_v(h)`, `AL_hv`, `AL_h` são limites de projeto derivados dos requisitos. Proposta inicial (incerta, a rever com um varrimento de sensibilidade nas sementes de desenvolvimento): `AL_v(h) = max(1 m, 0,02·h)`, `AL_hv = 0,5 m/s` (metade de `R2`), `AL_h = 10 m` (`R5`). A posição horizontal não tem subfiltro alternativo (um grupo só), por isso o seu nível de proteção inclui um termo de viés não detetável: `PL_h = K_ff σ_h + B_h`, com `B_h` o maior viés assumido não detetável. Com `B_h` de 30 m (a gama do M9) `PL_h > AL_h` sempre: é a declaração honesta, "posição horizontal não verificada". O valor de `B_h` é uma decisão do proprietário (secção 13).
+**Decisão em função dos níveis de proteção e dos limites de alerta.** `AL_v(h)`, `AL_hv`, `AL_h` são limites de projeto derivados dos requisitos. Proposta inicial (incerta, a rever com um varrimento de sensibilidade nas sementes de desenvolvimento): `AL_v(h) = max(1 m, 0,02·h)` com `h` a altitude **verdadeira** na avaliação, `AL_hv = 0,5 m/s` (metade de `R2`), `AL_h = 10 m` (`R5`). A posição horizontal não tem subfiltro alternativo (um grupo só), por isso o seu nível de proteção inclui um termo de viés não detetável: `PL_h = K_ff σ_h + B_h`, com `B_h` o maior viés assumido não detetável. Com `B_h` de 30 m (a gama do M9) `PL_h > AL_h` sempre: a posição horizontal **nunca é `Trusted`**, e essa é a declaração honesta, "posição horizontal não verificada". O valor de `B_h` é uma decisão do proprietário (secção 13).
 
-**Composição com o corte a 15 m.** A regra "velocidade vertical estimada positiva abaixo de 15 m corta o motor" existe em todas as políticas e fica como último recurso. O gestor de modos só pode **acrescentar** condições de corte, nunca anular o corte nem reacender. O monitor de segurança independente é de sentido único (só corta): mantém a regra do M9.1 de subida mantida durante 1 s e deve usar uma velocidade vertical **independente da fonte vigiada** (uma lição de G2b): a velocidade integrada da IMU corrigida pelo radar, e não a última velocidade GNSS.
+**Composição com o corte a 15 m.** A regra "velocidade vertical estimada positiva abaixo de 15 m corta o motor" existe em todas as políticas e fica como último recurso. O gestor de modos só pode **acrescentar** condições de corte, nunca anular o corte nem reacender.
 
-**Desempate quando há ambiguidade.** Quando duas fontes de altitude discordam e nada as separa, qualquer regra fixa é uma aposta num sinal de falha (a regra "menor altitude" do `guarded` perdeu 28 execuções). Opções: (a) uma probabilidade a priori de falha por fonte (decisão do proprietário), escolhendo a máxima posteriori e reportando as falhas dos dois sentidos com simetria (`altimeter_bias` e `altimeter_bias_low` ao mesmo tempo); (b) declarar `SafeAbort` e deixar o corte fazer o resto. A campanha reporta as duas; não escolhe pelo resultado.
+### 8.4 Arranque a frio e células com falha desde 0 s
+
+As células `altimeter_bias` e `altimeter_bias_low` do M9 têm a janela de falha aberta desde `t = 0`. Num filtro de Kalman o radar domina (σ = 0,1 m contra 0,5 m): um viés de 30 m no radar desloca a estimativa 29 m (secção 3.8). Por isso o estimador **não admite o radar à cabeça**. A regra de arranque, copiada da de `robust` (`landing_controller.rs`, `update_robust`: inicializa na primeira medida GNSS):
+
+1. **inicializar na primeira medida GNSS** (posição e velocidade) com a covariância do ruído do GNSS;
+2. o grupo radar começa em `Probation` e é **admitido depois de uma janela de consistência**: `N_adm` ciclos seguidos (valor de partida: 5, como `altimeter_rejection_cycles` de `robust`, alargável a 25) em que `|radar − altitude prevista da base| ≤ g_adm` (valor de partida: 3 m, como `altimeter_residual_threshold_m` de `robust`);
+3. depois de admitido, o radar entra no filtro **sem rejeição** (D1) e passa a ser vigiado pelo CUSUM.
+
+**Previsão pré-registada para as células com falha desde 0 s.** Com viés ≥ 5 m (a gama do M9) e `g_adm = 3 m`, o radar nunca é admitido: o estimador fica GNSS + IMU, que é exatamente o que `robust` faz depois de rejeitar o radar. Prevê-se, portanto, que C recupere em `altimeter_bias` e em `altimeter_bias_low` **aproximadamente o que `robust` recupera** (28 de 30 nas duas, 93%; a previsão para C é de 80% a 100%, e fica registada como "**sem vantagem de recuperação sobre `robust`**"), com a diferença de que C **declara** (radar `Excluded`, estado `Degraded`, nível de proteção vertical de GNSS + IMU). A vantagem sobre `guarded` em `altimeter_bias_low` (0 de 30) vem de a regra "menor altitude" ter sido substituída pela regra de arranque, que é um **prior** (confiar no GNSS), não de isolamento. O espelho, `gnss_bias_low` desde 0 s, é previsto **falhar** como em `robust` (0 de 30): o prior de arranque estaria errado, e C só declara. Isto fica escrito antes da campanha para que uma recuperação boa em `altimeter_bias_low` não seja lida como prova de isolamento.
+
+**Critério de saída do M10.0.** Antes do pré-registo, uma execução Rust de viabilidade da regra de arranque contra `robust` nas células `altimeter_bias` e `altimeter_bias_low` do M9.1. A regra não tem parâmetros livres (os valores acima são os de `robust`); a execução é uma **comparação em células já publicadas** (sementes 2000 a 2029, resultados já conhecidos), **não uma afinação**: nenhum parâmetro é escolhido com os resultados de 2000 a 2029, e qualquer ajuste faz-se nas sementes de desenvolvimento 5000 a 5099. Aceita-se se a regra reproduzir as recuperações de `robust` dentro de 2 execuções em 30 nas duas células; senão regista-se e a previsão acima é revista **antes** do pré-registo.
+
+### 8.5 Desempate quando há ambiguidade
+
+Quando duas fontes de altitude discordam e nada as separa (isolamento "não isolado", ou `E0` sem terceira fonte), qualquer regra fixa é uma aposta num sinal de falha (a regra "menor altitude" do `guarded` perdeu 28 execuções). Opções: (a) uma probabilidade a priori de falha por fonte (decisão do proprietário), escolhendo a máxima posteriori e reportando as falhas dos dois sentidos com simetria (`altimeter_bias` e `altimeter_bias_low` ao mesmo tempo); (b) manter a solução principal, passar a `DegradedNav`/`Untrusted` e declarar. **O padrão pré-registado é (b)**; (a) é uma opção do proprietário. A regra de arranque de 8.4 é a única exceção, e é um prior declarado.
+
+### 8.6 Monitor de segurança independente
+
+O monitor de segurança é de sentido único (só corta): mantém a regra do M9.1 de subida mantida durante 1 s. A sua velocidade vertical **não pode depender da fonte vigiada** (uma lição de G2b: a velocidade estimada durante a perda de GNSS era a última velocidade GNSS). Define o seu próprio estimador de velocidade vertical por integração da IMU (força específica medida, atitude medida, gravidade conhecida), corrigido por uma fonte escolhida **pelo grupo excluído**:
+
+| Grupo excluído ou suspeito | Correção da velocidade vertical do monitor |
+| --- | --- |
+| nenhum | velocidade vertical do GNSS e derivada do radar (janela de 0,5 s), com alarme de desacordo |
+| radar | **só** velocidade vertical do GNSS (o radar excluído não pode corrigir a IMU) |
+| recetor GNSS | **só** derivada do radar (janela de 0,5 s, desvio de cerca de 0,14 m/s) |
+| radar e GNSS | só a IMU com o último viés estimado; deriva `b·t` limitada pela tabela 3.5; o corte por subida só atua com a velocidade acima do limite mais a margem da deriva |
+| barómetro (`E1`) | como "nenhum"; o barómetro não corrige o monitor |
 
 ## 9. Requisitos e matriz de verificação
 
 Identificadores novos: `N` navegação, `F` gestão de falhas, `MD` segurança de modos (não `M`, que colide com os marcos), `Q` qualidade de software, `I` integridade (avaliada com a verdade). Os `R1` a `R6` e `S1` a `S5` não mudam. Tipos de evidência: **O** observação de simulação, **E** estimativa estatística, **P** propriedade testada, **G** garantia formal (nenhuma).
+
+**Canais.** A integridade é avaliada **por canal**: vertical (`v`), velocidade horizontal (`hv`) e posição horizontal (`hp`), cada uma com o seu limite de alerta e o seu estado declarado. `hp` é apresentada à parte: com `B_h = 30 m` nunca é `Trusted` (8.3), o que é a declaração honesta e não uma conquista.
+
+**Semântica das janelas (fixada).** Há **falha de alerta** num canal numa execução quando existe um intervalo de pelo menos `T_g` (0,5 s) de ciclos consecutivos em que o erro verdadeiro desse canal excede o limite de alerta **enquanto o estado declarado desse canal é `Trusted`**. O limite vertical é `AL_v(h)` calculado com a altitude **verdadeira** `h`; `AL_hv = 0,5 m/s`; `AL_h = 10 m`. **Estado declarado de cada braço** (para que a comparação de falhas de alerta seja definida em todos): B é `Trusted` enquanto nenhuma fonte foi rejeitada nos últimos `T_hold` e `K_ff σ_z ≤ AL_v(h)` (B não tem nível de proteção de separação, só o `P` do filtro); B+ é `Trusted` enquanto nenhum grupo está `Suspect`/`Excluded` e `K_ff σ_z ≤ AL_v(h)`; C acrescenta `PL_v ≤ AL_v(h)`; A é `Trusted` enquanto a votação 2 em 3 concorda; `baseline`, `robust` e `guarded` declaram `Trusted` sempre, exceto `guarded` quando alguma das suas três bandeiras está ativa (as bandeiras do M9.1).
 
 | Id | Requisito | Métrica | Limite | Método | Evid. |
 | --- | --- | --- | --- | --- | --- |
@@ -478,93 +637,146 @@ Identificadores novos: `N` navegação, `F` gestão de falhas, `MD` segurança d
 | N3 | consistência do NIS por sensor | média do NIS por sensor e fração de amostras acima do limiar | reportado com intervalo | verificador | E |
 | N4 | erro horizontal e `R5` com recetor saudável | erro da posição horizontal no contacto | reportado | verificador | O |
 | F1 | atraso de deteção por classe de falha | mediana e p90 do atraso | reportado; comparar com o analítico da secção 3.6 | verificador, execuções com falha em degrau | E |
-| F2 | falsos alarmes | execuções nominais e de falhas não sensoriais com mudança de modo ou bandeira sem falha | limite superior de 95% (Clopper-Pearson) reportado; objetivo: ≤ 2 de 100 por célula | campanha | E |
+| F2 | falsos alarmes | transições espúrias: uma mudança de modo ou bandeira **fora de qualquer janela de falha injetada mais `T_hold` mais 1 s de `Probation`** (nas células de perda de dados, as transições dentro da janela e da readmissão são legítimas) | limite superior unilateral de 95% (Clopper-Pearson) agrupado nas células sem falha de sensor e nas de perda de dados fora das janelas, objetivo ≤ 2% (H-F2); por célula, reportado | campanha | E |
 | F3 | isolamento correto, incorreto e não isolado | contagens separadas | reportado por par de fontes | verificador compara a fonte isolada com a falha injetada | E |
 | F4 | falha de deteção | execuções com falha atuada e nenhum alarme | reportado | campanha | E |
-| F5 | recuperação | `landed` com `S1` a `S5`; e, à parte, toque suave fora da plataforma (`R1` a `R4`, `R6`, `S1` a `S5` cumpridos, `R5` falhado) | reportado; comparações emparelhadas | campanha | E |
+| F5 | recuperação | `landed` com `S1` a `S5`; e, à parte, **toque suave fora da plataforma** (`R1` a `R4`, `R6`, `S1` a `S5` cumpridos, `R5` falhado) | reportado; comparações emparelhadas | campanha | E |
 | F6 | readmissão depois de falha transitória | tempo até `Healthy`; número de readmissões espúrias | reportado | verificador e testes dirigidos | O |
-| I1 | falha de alerta (integridade) | execuções em que o erro real excede `AL` durante mais de `T_g` (0,5 s) sem que o estado declarado seja diferente de `Trusted` | limite superior de 95% reportado; objetivo: ≤ 5% por célula com falha detetável | verificador com a verdade, invariante novo | E |
-| I2 | declaração desnecessária | fração do tempo com estado declarado ≠ `Trusted` e erro real < `AL/2` | reportado | verificador | O |
-| I3 | cobertura do nível de proteção | fração de ciclos com erro real > `PL` | reportado; objetivo: abaixo da taxa nominal do `K_ff` | verificador | E |
-| MD1 | nenhuma transição de modo insegura | transições para `Nominal` com `PL > AL`, ou sem dwell, ou abaixo de `h_lock` | zero, sob propriedade e em todas as execuções | teste de propriedade (sequências pseudoaleatórias fixas) e verificador | P, O |
+| I1v | falha de alerta vertical (integridade) | execuções com falha de alerta no canal `v` (definição acima) | **limite superior unilateral de 95% agrupado ≤ 5%** nas 7 células de falha única detetável (P1); por célula, limite superior de 95% reportado, com a marca "acima de 10%" apenas como sinalização | verificador com a verdade, invariante novo | E |
+| I1hv | falha de alerta, velocidade horizontal | idem no canal `hv` | reportado por célula | verificador | E |
+| I1hp | falha de alerta, posição horizontal | idem no canal `hp` | reportado; nunca `Trusted`, por construção | verificador | O |
+| I2v, I2hv | declaração desnecessária | fração do tempo com estado declarado ≠ `Trusted` e erro verdadeiro < `AL/2`, por canal | reportado | verificador | O |
+| I3 | excedência do nível de proteção | **contagem por execução** de ciclos com erro verdadeiro > `PL`; número de execuções com pelo menos um ciclo, com limite superior de Clopper-Pearson **sobre execuções** | reportado; não é uma taxa por ciclo | verificador | E |
+| MD1 | nenhuma transição de modo insegura | transições que melhoram o modo abaixo de `h_commit`, ou para `Nominal` com `PL > AL` ou sem dwell | zero, sob propriedade e em todas as execuções | teste de propriedade (sequências pseudoaleatórias fixas) e verificador | P, O |
 | MD2 | número de transições limitado | transições por execução | ≤ `T_voo / T_hold` | teste de propriedade e verificador | P, O |
 | MD3 | decisões só de observações | importações e identificadores dos módulos `nav_*` | zero referências à verdade | teste de código-fonte (como no M9) | P |
-| Q1 | tempo limitado por ciclo | número de operações do ciclo é constante e independente dos dados | sem laços de duração variável | revisão e teste de contagem | P |
-| Q2 | memória limitada | sem alocação no ciclo; tamanho fixo | zero alocações | revisão | P |
+| Q1 | tempo limitado por ciclo | número de operações do ciclo tem um limite constante e independente dos dados (o reprocessamento está limitado a 25 ciclos por ciclo) | sem laços de duração ilimitada | revisão e teste de contagem | P |
+| Q2 | memória limitada | sem alocação no ciclo; tamanho fixo (anel de 6 s incluído) | zero alocações | revisão | P |
 | Q3 | entradas hostis | observações não finitas, fora de gama, ficheiros de caso malformados | rejeição ou tratamento como ausente, sem pânico | testes com entradas adversas | P |
 | Q4 | reprodução | `replay` recalcula estimativa, modos e integridade | igual byte a byte | `vv-rocket replay` | P |
 | Q5 | M9 inalterado | traços M9 e M9.1 | iguais byte a byte; hashes fixados | testes de regressão existentes e retrospetiva | P |
 | R/S | `R1` a `R6`, `S1` a `S5` | como no M9 | como no M9 | verificador existente | O |
 
+**Limite de I1 e de H-I1.** Há **um** limite: 5%, limite superior unilateral de 95%, **agrupado** nas sete células de falha única detetável (P1, secção 10.5). Por célula reporta-se o limite superior; uma célula acima de 10% é sinalizada, e a sinalização não é um critério de hipótese. A exigência por célula com 100 execuções (zero falhas dá 3,6% bilateral) mal deixaria margem.
+
 Garantia formal: **nenhuma** para nenhum requisito. As taxas são estimativas condicionais às dispersões e às gamas assumidas.
 
 ## 10. Pré-registo (rascunho)
 
-Este rascunho fixa a forma da avaliação, não os números finais. Os números marcados "[ajustar]" são provisórios e só se fixam, por hash, depois da fase de desenvolvimento e antes de qualquer execução de avaliação.
+Este rascunho fixa a forma da avaliação, não os números finais. Os números marcados "[ajustar]" são provisórios e só se fixam, por hash, depois da fase de desenvolvimento e antes de qualquer execução de avaliação. **Âmbito:** os blocos de sementes desta secção valem para o crate `vv-rocket`; o `vv-lab` usa outros blocos (por exemplo 42, 1337, 2026) e não é afetado.
 
 ### 10.1 Sementes e congelação
 
 Sementes já usadas e portanto **proibidas** para avaliação: 0 a 40 (afinação do M9), 1000 a 1029 (campanha M9), 2000 a 2029 (campanha M9.1), 9000 a 9099 (protótipo deste documento).
 
-- **Desenvolvimento em Rust** (afinação de ruídos de processo, limiares, `AL`, dwell): 5000 a 5099.
-- **Avaliação**: 3000 a 3099 (100 sementes por célula, nunca executadas). Reserva: 6000 a 6099, só se um erro de código invalidar a avaliação; a reserva é divulgada e a primeira avaliação não é reutilizada.
-- **Congelação**: antes da avaliação, um commit regista o SHA-256 de `landing/m10-nominal.json`, do ficheiro de limiares (`K_fa`, `K_md`, `K_ff`, `AL`, dwell, `h_lock`, `h_commit`) e do ficheiro dos modelos de sensor (barómetro, Doppler se existir). O script de campanha recusa-se a correr se algum hash diferir. Nenhum limiar, requisito, gama ou hipótese é ajustado depois de ver os resultados da avaliação.
+| Bloco | Sementes | Uso |
+| --- | --- | --- |
+| teste, CI e demonstrações | **4000 a 4009** (pré-registado, disjunto dos outros) | testes de integração, CI, traços de demonstração; nunca avaliação |
+| desenvolvimento | 5000 a 5099 | afinação de ruídos de processo, limiares, `AL`, dwell, regra de arranque (sob o protocolo de 10.4) |
+| avaliação | 3000 a 3099 | 100 sementes por célula, nunca executadas |
+| reserva | 6000 a 6099 | só se um erro de código invalidar a avaliação; divulgada, e a primeira avaliação não é reutilizada |
+| protótipo | 9000 a 9099 | `spikes/m10-nav-feasibility`; não são sementes de avaliação |
+
+**Regra de proteção da avaliação.** O futuro script de campanha do M10 **recusa qualquer semente de avaliação** (3000 a 3099, e 6000 a 6099 depois de divulgada) a menos que receba `--evaluation` **e** os hashes de congelação coincidam. A CI, os testes e as demonstrações nunca passam `--evaluation`; um teste de CI verifica que o script termina com erro quando recebe uma semente de avaliação sem a opção.
+
+**Congelação.** Antes da avaliação, um commit regista o SHA-256 de `landing/m10-nominal.json` e dos ficheiros de casos de cada família. A congelação cobre o **modelo de caso**, os **limiares** (`K_fa`, `K_md`, `K_ff`, `k_ref`, `h`, limiar de paridade, `AL`, dwell, `h_commit`, `N_adm`, `g_adm`) e os **parâmetros dos modelos de sensor** (barómetro, Doppler se existir). Os limiares vivem **no JSON do caso**, como no M9.1, e por isso entram no mesmo hash. O script recusa-se a correr se algum hash diferir. Nenhum limiar, requisito, gama ou hipótese é ajustado depois de ver os resultados da avaliação.
 
 ### 10.2 Braços (configurações comparadas)
 
 | Braço | Estimador | Sensores |
 | --- | --- | --- |
-| `baseline`, `robust`, `guarded` | existentes | `S0` |
-| A | ganho fixo + votação | `S0` |
-| B | Kalman LTV + NIS | `S0`, `S1` |
-| C | B + separação de soluções + gestor de modos | `S0`, `S1` |
+| `baseline`, `robust`, `guarded` | existentes | `E0` |
+| A | ganho fixo + votação (comparação, sem resultado presumido) | `E0` |
+| B | Kalman LTV + rejeição por NIS de uma época | `E0`, `E1` |
+| B+ | Kalman LTV sem rejeição + CUSUM + paridade + gestor de modos, sem nível de proteção | `E0`, `E1` |
+| C | B+ mais nível de proteção vertical por separação de soluções | `E0`, `E1` |
 
-Oito braços. O conjunto `S0` é o ponto de partida: mostra o que a arquitetura consegue sem novos sensores. O `S2` (Doppler) só corre nas células de falha coerente do recetor, se aprovado.
+Conjuntos de sensores (renomeados para não colidirem com os invariantes `S1` a `S5`): **`E0`** só os sensores existentes; **`E1`** `E0` mais barómetro; **`E2`** `E1` mais Doppler. **`E0` é a configuração primária do pré-registo.** `E1` é condicional à porta do barómetro (secção 4.1, resultado: janela útil nula para 5 e 10 m na variante pessimista) e corre por variante do sensor; `E2` só nas células de falha coerente do recetor, se aprovado.
 
-### 10.3 Células e número de execuções (rascunho)
+### 10.3 Células, tamanho e chunks (`E0`)
+
+Objetivo: o que a pergunta precisa, cerca de 15 000 execuções ou menos. Cortes: sem células de pares para `baseline` nem `robust` (as falhas únicas já os falham ou já foram medidas); `baseline` só no nominal; `guarded` fora dos varrimentos (não tem parâmetros a varrer); A só entra nas células de pares cujas duas falhas componentes ele recupera em pelo menos 50% nas sementes de desenvolvimento (a contagem abaixo é o limite superior).
 
 | Família | Células | Braços | Sementes | Execuções |
 | --- | --- | --- | --- | --- |
-| nominal e as 10 falhas existentes | 11 | 8 | 100 | 8 800 |
-| falhas novas de uma só falha, sem barómetro (viés horizontal, rampa horizontal, recetor coerente, deriva da IMU, valor preso, outliers, atraso) | 7 | 8 | 100 | 5 600 |
-| falhas do barómetro (desvio, deriva, jato) | 3 | 2 (`S1`) | 100 | 600 |
-| pares, 7 tipos sem barómetro: 21 pares | 21 | 8 | 100 | 16 800 |
-| pares com desvio do barómetro: 7 pares | 7 | 2 (`S1`) | 100 | 1 400 |
-| varrimentos dirigidos (5 famílias × 7 pontos) | 35 | 3 (`guarded`, B, C) | 30 | 3 150 |
-| **Total** | | | | **36 350** |
+| F1: nominal e as 10 falhas existentes | 11 | `robust`, `guarded`, A, B, B+, C (6), mais `baseline` só no nominal | 100 | 6 700 |
+| F2: falhas novas de uma só falha (viés horizontal desde 0 s, viés horizontal a meio de voo, recetor coerente, deriva da IMU, valor preso do radar, outliers, atraso do radar) | 7 | `guarded`, A, B, B+, C (5) | 100 | 3 500 |
+| F3: pares (6 células pré-registadas, abaixo) | 6 | `guarded`, A, B, B+, C (5) | 100 | 3 000 |
+| F5: varrimentos dirigidos (4 famílias × 7 pontos) | 28 | B+, C | 30 | 1 680 |
+| **Total `E0`** | | | | **14 880** |
 
-**Estimativa de cálculo** (estimativa minha, a medir no M10.2). Medida do M9.1 depois da revisão: 1050 execuções com reprodução em 14,7 s com `--jobs 4` (a medida original, antes da revisão, foi 33,9 s), ou seja cerca de 14 ms por execução. A 14 ms por execução, 36 350 execuções são cerca de 8,5 minutos; com o banco de filtros a custar 1,2 a 2 vezes mais, entre 10 e 17 minutos de relógio, mais as repetições de desenvolvimento. Os artefactos são o limite real: a campanha M9 ocupou cerca de 290 MB para 780 execuções (0,37 MB por execução), ou seja cerca de 13 GB para 36 350. Proposta: guardar por execução só `run.json` e `verification.json` e o hash do traço; guardar o traço completo só das execuções com falha de requisito, de invariante ou de integridade, com um teto de artefactos (por exemplo, 1 GiB) como no M9.1. A reprodução recalcula o traço a partir de `case.json` e da semente e compara o hash. O formato exato é uma decisão do proprietário.
+**Pares pré-registados (F3), sinal de cada viés sorteado por semente:** (1) `altimeter_bias` e `gnss_dropout`; (2) `altimeter_bias_low` e `gnss_dropout`; (3) `gnss_bias` e `altimeter_dropout`; (4) `altimeter_bias` e `imu_accel_bias`; (5) `gnss_bias_low` e `imu_accel_bias`; (6) `altimeter_bias` e `gnss_bias` (duas fontes de altitude em falha: viola a hipótese de falha única, previsto isolar mal). Sobreposição forçada de pelo menos 1 s; uma execução em que uma das duas falhas não atuou (`acted: false`, regra do M9) conta como erro de sorteio, não como resultado.
 
-### 10.4 Hipóteses (rascunho; sentido do falhanço declarado)
+**Varrimentos (F5):** início de `altimeter_bias`, início de `gnss_bias` (sete pontos em redor da ignição, de `h_commit` e do corte a 15 m); magnitude de `altimeter_bias` a meio de voo de 0,5 a 5 m (junto do MDB); taxa da rampa de deriva do radar de 0,03 a 0,3 m/s.
 
-As hipóteses dizem como falham. Os limiares numéricos são provisórios [ajustar].
+**`E1`, condicional** (corre só se o proprietário aceitar a porta, por variante otimista e pessimista): células de barómetro (desvio, deriva, jato) × B+, C × 2 variantes × 100 = 1 200, mais as quatro células verticais de viés × B+, C × 2 variantes × 100 = 1 600; **2 800**, ou seja 17 680 no máximo.
 
-- **H-N1 (recuperação vertical).** Com `S1`, C recupera (`landed` com `S1` a `S5`) em pelo menos 80 de 100 execuções de cada uma de `altimeter_bias` e `altimeter_bias_low`, e fica pelo menos 60 pontos percentuais acima de `guarded` em `altimeter_bias_low`. **Falsificada** se C ficar abaixo de 80 em qualquer das duas, ou se a diferença emparelhada face a `guarded` não for significativa (McNemar exato com correção de Holm).
-- **H-N2 (toque suave horizontal).** Em `gnss_bias` (x e z) C cumpre `R1` a `R4` e `S1` a `S5` em pelo menos 90 de 100 execuções e declara a navegação não fiável (estado ≠ `Trusted`) em pelo menos 90 de 100. **Falsificada** se C perseguir a posição enviesada e falhar `R1`, ou se não declarar.
-- **H-I1 (integridade).** Em todas as células de falha única com falha atuada e detetável, o limite superior de 95% da taxa de falhas de alerta (I1) é de no máximo 10%. **Falsificada** em qualquer célula em que seja superior.
-- **H-F2 (falsos alarmes).** Nas células sem falha de sensor (nominal, atuador, perda de dados), C produz no máximo 2 de 100 mudanças de modo espúrias por célula. **Falsificada** se uma célula passar de 2. (O M9.1 teve 0 em 210 com um limiar acima do ruído limitado; este critério testa um limiar a poucos desvios-padrão.)
-- **H-H (controlo negativo, previsão de que a deteção falha).** Num viés horizontal do GNSS desde o instante 0 e de magnitude ≥ 10 m **sem** viés vertical (`gnss_horizontal_bias`), C não o deteta (no máximo 10 de 100 deteções). **Falsificada** se detetar em mais de 20 de 100, o que apontaria uma fuga de informação ou um erro, já que o deslocamento é não observável. Em `gnss_bias` (x e z), a deteção por canário do recetor é esperada em 90 de 100 ou mais e é uma previsão separada.
-- **H-S (sem regressão).** Nas nove células M9 e na nominal, C recupera no mínimo `guarded − 5` de 100. **Falsificada** se qualquer célula ficar abaixo.
-- **H-MD (segurança de modos).** Nenhuma transição insegura nem excesso de transições (MD1, MD2) em nenhuma execução.
-- **H-C (ablation).** C supera B em 10 pontos percentuais ou mais, na recuperação emparelhada das células de pares ou no limite superior da taxa de falhas de alerta. Se não, a arquitetura preferida passa a ser B e a conclusão é reportada.
-- **H-A (votação não chega).** A falha em pelo menos um par em que C não falha (diferença emparelhada ≥ 15 pontos percentuais).
+**Chunks por família**, cada um sob um teto de execuções, bytes, tempo e tarefas do mesmo tipo do de `scripts/m9_campaign.py` (`MAX_RUNS`, `MAX_ARTIFACT_BYTES`, `MAX_TIME_BUDGET_SECONDS`, `MAX_JOBS`); o teto de execuções por chunk do M10 fixa-se no M10.1 (partida: 2 500; o do M9 é 1000):
 
-### 10.5 Tratamento estatístico
+| Chunk | Conteúdo | Execuções |
+| --- | --- | --- |
+| F1a | `baseline` (nominal), `robust`, `guarded` | 2 300 |
+| F1b | A, B | 2 200 |
+| F1c | B+, C | 2 200 |
+| F2a | `guarded`, A, B | 2 100 |
+| F2b | B+, C | 1 400 |
+| F3a | `guarded`, A, B | 1 800 |
+| F3b | B+, C | 1 200 |
+| F5 | B+, C | 1 680 |
 
-- Contagens com intervalos exatos de Clopper-Pearson a 95% por célula. Comparações emparelhadas (mesmo caso: dispersões, magnitude, janela) por McNemar exato (teste binomial bilateral sobre os pares discordantes). Correção de Holm sobre a lista fechada de comparações primárias acima. Não se usam valores-p fora desta lista.
+**Agregação pré-registada.** Um script de agregação único lê os oito `summary.json`, verifica que cada chunk tem o conjunto completo de sementes, os mesmos hashes de congelação e nenhuma execução com `acted: false` por contar, junta por (célula, braço, semente) e só então calcula os critérios primários. Um chunk em falta ou incompleto torna os critérios que dele dependem **não avaliáveis**. O resumo agregado inclui o hash de cada `summary.json` dos chunks.
+
+**Estimativa de cálculo** (a partir da taxa medida, a confirmar no M10.2). Medida do M9.1 depois da revisão: 1050 execuções com reprodução em 14,7 s com `--jobs 4` na máquina do proprietário, ou seja 71 execuções por segundo, cerca de 14 ms por execução. 14 880 execuções são 208 s, cerca de 3,5 minutos; com o banco de filtros a custar 1,2 a 2 vezes mais, entre 4 e 7 minutos; com `E1` (17 680), entre 5 e 8,5 minutos. As repetições de desenvolvimento dominam: uma avaliação da campanha de desenvolvimento (11 células de F1 × 100 sementes × 1 braço = 1 100 execuções) leva cerca de 15 a 30 s, e o protocolo de 10.4 prevê 30 avaliações por braço, quatro braços afinados: 120 avaliações, 30 a 60 minutos.
+
+**Artefactos.** A campanha M9 ocupou cerca de 290 MB para 780 execuções (0,37 MB por execução, com traços completos). Proposta: guardar por execução só `run.json` e `verification.json` (resumos) e o **hash do traço**, que a reprodução recalcula a partir de `case.json` e da semente e compara. **Traço completo** só (i) da amostra pré-registada: as execuções das sementes 3000 a 3004 de cada célula e braço (5%, cerca de 744 execuções, cerca de 275 MB), e (ii) das execuções com falha de requisito, de invariante ou de integridade, **até 50 por célula e braço**, com um teto de 1 GiB por chunk como no M9.1. A regra de retenção fica escrita antes da avaliação; o tamanho dos resumos não está medido e mede-se no M10.1.
+
+### 10.4 Protocolo de afinação por braço (justiça da ablation)
+
+Cada braço com parâmetros afináveis (A, B, B+, C) é afinado com **o mesmo protocolo**, para que a comparação não favoreça o braço com mais esforço:
+
+- as mesmas sementes de desenvolvimento (5000 a 5099) e o mesmo conjunto de células de desenvolvimento (as 11 de F1);
+- a mesma métrica de afinação: média, sobre as células de F1, da taxa de recuperação (`landed` com `S1` a `S5`), sujeita à restrição de, no nominal, no máximo 2 de 100 transições espúrias;
+- o mesmo orçamento de iterações: 30 avaliações da campanha de desenvolvimento por braço, com um procedimento de pesquisa fixado antes (pesquisa aleatória com semente explícita sobre os espaços de parâmetros listados no ficheiro de congelação);
+- o número de parâmetros afinados de cada braço é reportado (A tem cerca de 12, B+ cerca de 8, C cerca de 12), porque o mesmo orçamento não dá a mesma liberdade;
+- depois da afinação, tudo congela por hash. Os parâmetros de `baseline`, `robust` e `guarded` são os do M9 e do M9.1; não são reafinados.
+
+### 10.5 Hipóteses e pontos finais
+
+**Uma família primária fechada, enumerada pelo nome, com correção de Holm sobre exatamente esta lista (alfa familiar 0,05):** P1, P2, P3 e P4. Tudo o resto é **reportado**, sem valores-p. Os limiares numéricos são provisórios [ajustar]. O sentido do falhanço está declarado.
+
+- **P1 (integridade vertical).** A taxa de falhas de alerta verticais (I1v) de C em `E0`, agrupada nas 7 células de falha única detetável (`altimeter_bias`, `altimeter_bias_low`, `gnss_bias`, `gnss_bias_low`, `imu_accel_bias`, valor preso do radar, atraso do radar; 700 execuções), contra um limite absoluto de **5%**: teste binomial exato unilateral de que a taxa é inferior a 5%. Suportada se o número de falhas for de no máximo 25 em 700 com alfa 0,05, 23 com 0,025, 22 com 0,0167 ou 0,0125 (o limiar depende do degrau de Holm). Sem falhas, o limite superior é de 0,43%. **Falsificada** se o número exceder o limiar do degrau. Aviso: as sete células partilham as mesmas 100 sementes (as mesmas dispersões), por isso as 700 execuções não são independentes e o limite agrupado é otimista; a taxa por célula é reportada.
+- **P2 (recuperação em `altimeter_bias_low`, versão `E0`).** O critério de recuperação vertical com terceira fonte dependeria do barómetro (`E1`). Em `E0` a previsão pré-registada de 8.4 é que C recupere aproximadamente o que `robust` recupera, por prior e não por isolamento. P2: teste binomial exato unilateral de que a taxa de recuperação (`landed` com `S1` a `S5`) de C em `altimeter_bias_low` é superior a **80%**, 100 execuções. Suportada com pelo menos 87 de 100 (alfa 0,05), 89 (0,025 ou 0,0167) ou 90 (0,0125). **Falsificada** se ficar abaixo. A declaração (estado ≠ `Trusted` com o radar `Excluded`) é **reportada**; a recuperação em `gnss_bias_low` (esperada falhar) também. Se o proprietário preferir, P2 pode ser formulada como declaração em vez de recuperação, mas o `E0` consegue recuperar por prior, e esconder isso seria pior.
+- **P3 (não inferioridade a `guarded`).** C contra `guarded` nas **nove células do M9** (nominal e as 8 falhas do M9; 900 pares emparelhados por semente), `E0`. Com `b` = pares em que só `guarded` recupera e `c` = pares em que só C recupera, a diferença `(b − c)/900` tem de ter limite superior conservador abaixo de uma margem de **3 pontos percentuais** (limite de Clopper-Pearson superior de `b/900` menos limite inferior de `c/900`, cada um com a cauda do degrau de Holm dividida por dois). Exemplos com cauda de 0,0125 para cada limite: `b = c = 15`: limite superior 2,0 pp, não inferior; `b = c = 40`: 3,2 pp, **não** demonstra (com 40 discordâncias para cada lado o desenho não tem poder para 3 pp). **Aviso de agrupamento**: o agrupamento deixa que ganhos numa célula (por exemplo `altimeter_bias_low`, em que `guarded` recupera 0 de 30) mascarem regressões noutra. Por isso as diferenças por célula são **reportadas** com o intervalo exato, e uma regressão de mais de 10 pontos numa célula é sinalizada nos resultados, sem ser critério.
+- **P4 (H-C: o que justifica o nível de proteção).** C contra B+ numa **única** métrica: a falha de alerta vertical (I1v) por execução, emparelhada por semente e agrupada nas seis células de pares (F3; 600 pares), `E0`. McNemar exato bilateral sobre os pares discordantes ao alfa do degrau de Holm, **e** diferença agrupada a favor de C de pelo menos **3 pontos percentuais**. **Falsificada** (e a arquitetura preferida passa a B+) se qualquer das duas falhar. Poder (McNemar exato, aritmética de `power_thresholds.py`, discordâncias supostas: só B+ falha em 3,5% dos pares e só C em 0,5% para 3 pp; 5,5% e 0,5% para 5 pp; 7% e 1% para 6 pp): **por célula** (100 pares) o poder a alfa 0,0125 é de 0,02 (3 pp), 0,13 (5 pp) e 0,21 (6 pp); a alfa 0,05, 0,09, 0,35, 0,44. **Agrupado** (600 pares) é de 0,90, 1,00 e 1,00 a alfa 0,0125. Com 300 pares efetivos (por as células partilharem sementes) é de 0,47 (3 pp) e 0,88 (5 pp) a 0,0125. Para uma diferença de 10 pontos (20% contra 10%) o poder por célula é de 0,71. A objeção da revisão fica confirmada: comparar proporções independentes de 90% e 80% com 100 por célula a alfa 0,0056 tem poder de 0,17, e o agrupamento é necessário.
+
+**Reportados (sem valores-p e fora da família primária):**
+
+- **H-N2 (toque suave horizontal).** Em `gnss_bias` (x e z), C cumpre `R1` a `R4`, **`R6`** e `S1` a `S5` (o toque suave de F5, com `R5` falhado) em pelo menos 96 de 100 execuções (o limiar efetivo de 90% sob a regra de Clopper-Pearson, ver 10.6) e declara a navegação não fiável (estado ≠ `Trusted`) em pelo menos 96 de 100.
+- **H-I1 (integridade por célula).** O limite superior de 95% da taxa de falhas de alerta (I1v) por célula de falha única detetável; sinaliza-se uma célula acima de 10%. O critério é P1.
+- **H-F2 (falsos alarmes).** Transições espúrias (F2: fora de qualquer janela injetada mais `T_hold` mais 1 s) agrupadas nas células nominal, `thrust_loss`, `ignition_delay`, `gimbal_stuck` e, fora das janelas, `gnss_dropout` e `altimeter_dropout` (600 execuções de C): suportada se o limite superior unilateral de 95% for de no máximo 2%, isto é, no máximo 6 em 600. Por célula, 0 de 100 dá 3,0% unilateral (3,6% bilateral): o objetivo de "no máximo 2 de 100" **não é suportável** com 100 execuções por célula.
+- **H-H (controlo negativo, previsão de que a deteção falha).** Num viés horizontal do GNSS desde o instante 0 e de magnitude ≥ 10 m **sem** viés vertical, C não o deteta: **suportada com no máximo 10 deteções em 100; falsificada com mais de 20 em 100; 11 a 20 de 100: inconclusiva.** Uma deteção forte apontaria uma fuga de informação ou um erro, já que o deslocamento é não observável. Em `gnss_bias` (x e z), a deteção por canário do recetor é uma previsão separada que só se aplica a `E1` (variante otimista), porque em `E0` o canário vertical só sabe que radar e GNSS z discordam.
+- **H-MD (segurança de modos).** Nenhuma transição insegura nem excesso de transições (MD1, MD2) em nenhuma execução (propriedade, não estatística).
+- **B+ contra B** (deteção sequencial contra rejeição de uma época): diferenças emparelhadas de recuperação nas células verticais de F1 e de transições espúrias, reportadas por célula e agrupadas.
+- **A contra C**: diferenças emparelhadas nas mesmas células. A é um braço de comparação; nenhuma hipótese presume o seu resultado.
+
+### 10.6 Tratamento estatístico
+
+- Contagens com intervalos exatos de Clopper-Pearson a 95% por célula. Comparações emparelhadas (mesmo caso: dispersões, magnitude, janela) por McNemar exato (teste binomial bilateral sobre os pares discordantes). Correção de Holm sobre a lista fechada de **quatro** testes primários (P1 a P4). **Não se usam valores-p fora desta lista**; não há formulações do tipo "qualquer um dos pares" ou "qualquer de duas métricas"; cada hipótese tem um conjunto de células e uma métrica fixados.
+- **Limiares efetivos sob a regra do Clopper-Pearson** (intervalo bilateral de 95%, 100 execuções): "pelo menos 80 de 100" só fica **suportado** com 89 de 100 (o limite inferior de 88 de 100 é 79,98%, uma fração abaixo de 80%); "pelo menos 90 de 100" só com 96; "pelo menos 95%" só com 100 de 100. "No máximo 5% (limite superior)" só com 0 de 100; "no máximo 10%" só com 4 de 100; "no máximo 20%" só com 11 de 100. Os limiares em "[ajustar]" são lidos através disto; entre o limiar nominal e o efetivo o resultado é **inconclusivo**, não falhado.
 - Todos os resultados são **condicionais às dispersões e às gamas assumidas**, que não são os de um veículo real. Não há extrapolação para fiabilidade.
+- As células que partilham sementes não são independentes; os limites agrupados tratam as execuções como independentes e são otimistas, o que fica escrito ao lado de cada resultado agrupado.
 - Resultados nas execuções com `acted: false` ou sem reprodução verificada contam como erro de execução, não como resultado (regra do M9).
 - Cada resultado é classificado como **suportado**, **não suportado** ou **inconclusivo** (o intervalo de Clopper-Pearson contém o limiar de decisão), e **não avaliável** se a célula tem menos execuções do que as planeadas. Os resultados inconclusivos e as hipóteses falhadas são reportados com o mesmo destaque que os suportados.
 
-### 10.6 Testes negativos que podem falsificar o benefício
+### 10.7 Testes negativos que podem falsificar o benefício
 
 1. Viés horizontal desde 0 s (H-H): previsto não detetável. Uma deteção forte aponta fuga ou erro.
 2. Variante pessimista dos sensores novos (erro estático do barómetro, latência, jato): se C melhorar só na variante otimista, o benefício é do modelo do sensor e não da arquitetura.
-3. Simetria de sinal: `altimeter_bias` e `altimeter_bias_low` (e as de GNSS) devem dar resultados estatisticamente simétricos em C. Uma assimetria como a do `guarded` indica regra dependente do sinal.
-4. Pares que violam a hipótese de falha única (viés do radar e desvio do barómetro): previsto isolar mal; mede-se a taxa de isolamento errado.
+3. Simetria de sinal: `altimeter_bias` e `altimeter_bias_low` (e as de GNSS) devem dar resultados estatisticamente simétricos em C para falhas a meio de voo. A regra de arranque a frio é um prior com assimetria declarada (8.4): `gnss_bias_low` desde 0 s é previsto falhar. Uma assimetria na meio de voo como a do `guarded` indica regra dependente do sinal.
+4. Pares que violam a hipótese de falha única (viés do radar e viés do GNSS; viés do radar e desvio do barómetro): previsto isolar mal; mede-se a taxa de isolamento errado.
 5. Execuções nominais com 1% de outliers: testam falsos alarmes e oscilação de modo.
 6. Permutação das sementes de ruído dos sensores: o resultado de C não pode depender de uma ligação com a verdade.
-7. Remoção do FDI em C (ablation): confirma que o benefício vem do isolamento e não da forma do filtro.
+7. Remoção do monitor (CUSUM e paridade) em C (ablation): confirma que o benefício vem da deteção e do isolamento e não da forma do filtro.
 
 ## 11. Roteiro
 
@@ -572,14 +784,14 @@ Esforço em dias de trabalho de uma pessoa; estimativa grosseira, incerta (±50%
 
 | Marco | Entregáveis | Critérios de saída medidos | Esforço |
 | --- | --- | --- | --- |
-| M10.0 desenho e porta de decisão | este documento revisto; decisões do proprietário (secção 13); porta analítica do barómetro; modelos de sensor e de falha escritos | revisão independente sem bloqueios; hashes dos modelos escolhidos; lista de requisitos congelada | 2 a 4 |
-| M10.1 fundações | tipo de matriz simétrica; esquema `v2` (barómetro, falhas novas, latência); verificador `v3` com erro de estimação, NEES, NIS, falhas de alerta; teste de isolamento estendido aos módulos `nav_*` | traços M9 e M9.1 iguais byte a byte; testes unitários dos sensores novos; `cargo fmt`, `clippy`, `test`, `build --release` e as campanhas do README passam | 5 a 8 |
-| M10.2 estimador B | filtro LTV com NIS e forma de Joseph; modo de desenvolvimento; ferramentas de campanha | NEES médio nas sementes 5000 a 5099 dentro do intervalo, ou conservador e reportado; NIS por sensor; custo por ciclo medido | 5 a 7 |
-| M10.3 separação e modos | subfiltros, isolamento, níveis de proteção, gestor de modos, lei lateral só de velocidade, monitor de segurança | testes de propriedade de MD1 e MD2; isolamento e atraso em degraus sintéticos coerentes com o analítico (ordem de grandeza) | 6 a 9 |
-| M10.4 desenvolvimento e congelação | campanha de desenvolvimento nas sementes 5000 a 5099; escolha de limiares, `AL`, dwell; entradas hostis; ficheiros de hash | limiares congelados por hash num commit; relatório de desenvolvimento; nenhuma semente de avaliação tocada | 4 a 6 |
-| M10.5 avaliação e revisão | campanha única de avaliação nas sementes 3000 a 3099; revisão independente; resultados | hipóteses classificadas; resultados fiéis às contagens; revisão sem bloqueios; M9 intacto | 4 a 6 |
+| M10.0 desenho e porta de decisão | este documento revisto; decisões do proprietário (secção 13); porta analítica do barómetro (`baro_gate.py`); modelos de sensor e de falha escritos; execução Rust de viabilidade da regra de arranque a frio contra `robust` | revisão independente sem bloqueios; **(i) a execução Rust da regra de arranque a frio de 8.4 reproduz as recuperações de `robust` nas células `altimeter_bias` e `altimeter_bias_low` do M9.1 (dentro de 2 em 30), em células já publicadas e sem afinação; (ii) veredicto da porta do barómetro registado por escrito (resultado atual: janela útil nula para 5 e 10 m na variante pessimista, `E1` condicional)**; hashes dos modelos escolhidos; lista de requisitos e de hipóteses primárias congelada | 4 a 6 |
+| M10.1 fundações | tipo de matriz simétrica; esquema `v2` (barómetro, falhas novas, latência); verificador `v3` com erro de estimação, NEES, NIS, falhas de alerta; teste de isolamento estendido aos módulos `nav_*`; script de campanha com a recusa das sementes de avaliação | traços M9 e M9.1 iguais byte a byte; testes unitários dos sensores novos; teste de CI da recusa; `cargo fmt`, `clippy`, `test`, `build --release` e as campanhas do README passam | 5 a 8 |
+| M10.2 estimadores B e B+ | filtro LTV sem rejeição (B+) e com NIS (B); CUSUM, paridade, reprocessamento; modo de desenvolvimento; ferramentas de campanha e de agregação por chunks | NEES médio nas sementes 5000 a 5099 dentro do intervalo; NIS por sensor; falsos alarmes do CUSUM nominais; custo por ciclo medido | 6 a 8 |
+| M10.3 separação e modos | subfiltros e nível de proteção vertical (C), gestor de modos, lei lateral degradada, monitor de segurança | testes de propriedade de MD1 e MD2; isolamento e atraso em degraus sintéticos coerentes com o analítico (ordem de grandeza) | 6 a 9 |
+| M10.4 desenvolvimento e congelação | campanha de desenvolvimento nas sementes 5000 a 5099 com o protocolo de 10.4; escolha de limiares, `AL`, dwell, `h_commit`; entradas hostis; ficheiros de hash | limiares congelados por hash num commit; relatório de desenvolvimento; nenhuma semente de avaliação tocada | 4 a 6 |
+| M10.5 avaliação e revisão | oito chunks de avaliação nas sementes 3000 a 3099 com `--evaluation`; agregação; revisão independente; resultados | hipóteses primárias classificadas; resultados fiéis às contagens; revisão sem bloqueios; M9 intacto | 4 a 6 |
 
-Portas do proprietário: depois do M10.0 (aprovação do desenho e das decisões), depois do M10.1 (modelos de sensor e identidade dos traços), antes da congelação (valores numéricos do pré-registo) e antes da avaliação (confirmação de que as sementes de avaliação não foram tocadas). A passagem de B a C só se faz depois do M10.2 e é decisão do proprietário com base no relatório de desenvolvimento.
+**Portas do proprietário** (três): **no fim do M10.0** (aprovação do desenho, das decisões e dos critérios de saída acima), **antes da congelação** (valores numéricos do pré-registo, no fim do M10.4) e **antes da avaliação** (confirmação de que as sementes de avaliação não foram tocadas e de que os hashes coincidem). A passagem de B+ a C só se faz depois do M10.2 e é decisão do proprietário com base no relatório de desenvolvimento.
 
 ## 12. Registo de riscos e limitações científicas
 
@@ -588,20 +800,23 @@ Portas do proprietário: depois do M10.0 (aprovação do desenho e das decisões
 | Idealização do modelo (sem latência, terreno plano, sem alcance do radar, zeros iguais) faz o radar e a comparação radar contra GNSS parecerem melhores | alta | alto | declarar nos resultados; variantes pessimistas dos sensores; latência e cota do terreno no esquema `v2` como opção | resultados continuam condicionais ao modelo |
 | Independência dos sensores assumida (barómetro, Doppler) sem dados | média | alto | variantes otimista e pessimista; porta analítica do barómetro; abandono se não ajudar | modelo de sensor continua suposto |
 | Hipótese de falha única | alta | alto | pares na campanha; medir isolamento errado | triplas fora de âmbito |
-| Fuga de afinação (afinar nas sementes de avaliação) | média | muito alto | blocos de sementes disjuntos, congelação por hash, script que recusa-se a correr | disciplina do processo |
+| Fuga de afinação (afinar nas sementes de avaliação) | média | muito alto | blocos de sementes disjuntos, congelação por hash, script que recusa as sementes de avaliação sem `--evaluation` e sem hashes iguais, protocolo de afinação igual para todos os braços | disciplina do processo |
 | Poder estatístico com 30 sementes por célula | alta (M9.1) | médio | 100 sementes por célula nas células primárias, Clopper-Pearson, Holm; cálculo barato | diferenças de poucos pontos continuam não interpretáveis |
 | Custo de cálculo e de artefactos | média | médio | resumos em vez de traços completos, tetos de execuções e tempo, `--jobs` | decisão do formato |
 | Regressão da evidência do M9 | baixa | muito alto | traços e hashes fixados; teste de identidade; mudanças aditivas com `Option` | custa disciplina em cada mudança de estrutura |
 | Ruído limitado e não gaussiano torna os limiares gaussianos conservadores | certa | baixo | reportar a diferença empírica; calibrar na fase de desenvolvimento | limiares podem ser pessimistas |
-| NEES conservador (observado no protótipo) esconde problemas de calibração do filtro | média | médio | reportar o NEES em cada fase; só aceitar conservador se reportado e com impacto medido | |
+| O NEES do protótipo está calibrado (3,6 a 4,1 contra 4), mas só porque modelo e verdade coincidem; num filtro com erros não modelados (braço de alavanca, desfasamento da força específica) o NEES sobe | média | médio | reportar o NEES em cada fase; só aceitar um desvio se reportado e com impacto medido | |
 | Desfasamento da força específica da IMU (meio ciclo nas rampas do acelerador) cria erro de velocidade não modelado | média (incerto) | médio | medir no M10.1; ruído de processo; teste dirigido | |
 | Viés da IMU só em `x_B` e constante (otimista) | alta | médio | falhas de deriva e de passeio aleatório no esquema `v2` | |
-| Um gestor de modos novo introduz oscilação ou transições inseguras | média | alto | histerese, dwell, `h_lock`, testes de propriedade, MD1 e MD2 | |
+| Um gestor de modos novo introduz oscilação ou transições inseguras | média | alto | histerese, dwell, `h_commit`, testes de propriedade, MD1 e MD2 | |
 | O canário do recetor leva a tratar como falha uma falha só de altitude | média | médio | medir falsos positivos de canário nas falhas de altímetro e do barómetro | |
 | A atitude não é considerada falhável; uma falha de atitude invalida a projeção da gravidade e o braço de alavanca | baixa no modelo | alto | limitação declarada; fora de âmbito | |
-| O barómetro pode não ter faixa de altitude útil | média (incerto) | médio | porta analítica do M10.0 | |
+| O barómetro não tem janela útil para falhas de 10 m ou menos na variante pessimista (calculado, 4.1) | alta | médio | `E0` é a configuração primária; `E1` condicional e por variante | os resultados de `E1` dependem do modelo suposto do sensor |
 | Comparações com `guarded` afetadas por caudas diferentes do nominal (piso de 29 de 30 sem falha) | média | baixo | comparação emparelhada; reportar o piso | |
 | Ajuste de resultados: usar um sensor novo ou um limiar para fazer células ficarem verdes | média | muito alto | regras da secção 4; relatório por conjunto de sensores; resultados negativos reportados | |
+| Os testes agrupados (P1, P3, P4) mascaram células más e tratam execuções que partilham sementes como independentes | alta | médio | resultados por célula sempre reportados; sinalização de regressões acima de 10 pontos; poder com amostra efetiva menor calculado (10.5) | os limites agrupados são otimistas |
+| A regra de arranque a frio é um prior (confiar no GNSS): recupera `altimeter_bias_low` e falha `gnss_bias_low` desde 0 s | certa | médio | previsão escrita antes da campanha (8.4); declaração reportada; critério de saída do M10.0 | uma boa recuperação não é prova de isolamento |
+| Reprocessamento depois de uma exclusão (6.4) atrasa a convergência e pode introduzir um transitório | média | médio | limite de 25 ciclos por ciclo, estado `Degraded` declarado durante o reprocessamento, teste dirigido | |
 
 ## Revisão independente
 
@@ -613,14 +828,14 @@ Decisões necessárias antes de qualquer implementação:
 
 1. **Âmbito e linguagem de resultados**: aprovar que o M10 mede recuperação e declaração em separado, e que o toque suave fora da plataforma (`R1` a `R4`, `R6`, `S1` a `S5` cumpridos, `R5` falhado) é uma classificação de análise adicional, sem alterar `landed`.
 2. **Barómetro**: incluir ou não, sujeito à porta analítica do M10.0 com a variante pessimista (erro estático dependente de `v²`, latência, jato). Aceitar o abandono se não houver faixa útil.
-3. **Doppler**: excluir da linha de base e incluir só como conjunto opcional `S2` nas células de falha coerente do recetor, ou excluir por completo.
+3. **Doppler**: excluir da linha de base e incluir só como conjunto opcional `E2` nas células de falha coerente do recetor, ou excluir por completo.
 4. **Sensor relativo à plataforma**: confirmar que fica fora do âmbito (a posição horizontal desde um deslocamento constante fica não verificada) ou abrir um marco próprio com o seu custo.
 5. **Posição horizontal**: aceitar que `hp_status` fica `Unverified` por construção e o valor de `B_h` (deslocamento não detetável assumido) para o nível de proteção horizontal.
 6. **Limites de alerta** `AL_v(h)`, `AL_hv`, `AL_h` e os fatores `K_fa`, `K_md`, `K_ff`: aprovar o método (varrimento de sensibilidade nas sementes de desenvolvimento) e a regra de congelação.
-7. **Desempate com ambiguidade**: probabilidade a priori de falha por fonte (máximo a posteriori) ou declarar `SafeAbort`. Em qualquer caso, reportar os dois sinais de falha com simetria.
-8. **Semântica de `SafeAbort`**: aceitar que "seguro" aqui é declarar e evitar agravar, sem estado seguro físico (sem pairar, sem reacendimento).
+7. **Desempate com ambiguidade**: probabilidade a priori de falha por fonte (máximo a posteriori) ou declarar (`DegradedNav`/`Untrusted`). Em qualquer caso, reportar os dois sinais de falha com simetria.
+8. **Semântica de `Untrusted`**: aceitar que "seguro" aqui é declarar e evitar agravar, sem estado seguro físico (sem pairar, sem reacendimento).
 9. **Estado de viés do acelerómetro**: escalar ao longo de `x_B` (8 estados) ou três eixos (10 estados, componentes laterais mal observáveis).
 10. **Esquemas**: aceitar `vv-rocket-landing.v2` (falhas e sensores novos, latência) e `vv-rocket-landing-verification.v3` (aditivo), com a consequência para `source_sha256` e as execuções guardadas.
-11. **Sementes e orçamento**: confirmar os blocos 5000 a 5099 (desenvolvimento), 3000 a 3099 (avaliação), 6000 a 6099 (reserva), as 100 sementes por célula e o formato de artefactos com teto.
-12. **Faseamento**: B primeiro e C só se o relatório de desenvolvimento mostrar uma lacuna, ou implementar C logo.
-13. **Hipóteses e limiares provisórios** da secção 10.4: rever e autorizar a sua congelação depois do M10.4.
+11. **Sementes e orçamento**: confirmar os blocos 4000 a 4009 (teste, CI e demonstrações), 5000 a 5099 (desenvolvimento), 3000 a 3099 (avaliação), 6000 a 6099 (reserva), as 100 sementes por célula, a divisão em chunks e o formato de artefactos com teto.
+12. **Faseamento**: B e B+ primeiro e C só se o relatório de desenvolvimento mostrar uma lacuna, ou implementar C logo.
+13. **Hipóteses e limiares provisórios** da secção 10.5: rever e autorizar a sua congelação depois do M10.4.

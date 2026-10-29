@@ -43,7 +43,7 @@ SIG_BARO = 0.5
 BARO_OFFSET_SIGMA = 2.0  # desvio inicial do baro relativo ao referencial do solo (proposto)
 BARO_RW = 0.05  # deriva do baro em m/sqrt(s) (proposto)
 ACC_BIAS_SIGMA = 0.05  # bias do acelerometro nominal, m/s^2 (a gama de falha do M9 e 0,05 a 0,5)
-ACC_BIAS_RW = 1e-3  # passeio aleatorio do bias no filtro, m/s^2/sqrt(s)
+ACC_BIAS_RW = 0.0  # passeio aleatorio do bias no filtro: 0, porque o bias verdadeiro e constante (modelo e verdade concordam)
 P0 = [1.0**2, 0.2**2, ACC_BIAS_SIGMA**2, BARO_OFFSET_SIGMA**2]
 COLD_P0 = [50.0**2, 2.0**2, ACC_BIAS_SIGMA**2, BARO_OFFSET_SIGMA**2]
 COLD_E0 = (50.0, 2.0)
@@ -55,6 +55,14 @@ K_FA = 4.0  # limiar de separacao (em desvios-padrao da separacao)
 K_MD = 3.0  # fator de deteccao falhada para o nivel de protecao
 K_FF = 5.33  # fator sem falha para o nivel de protecao
 ISO_WINDOW_S = 1.0  # atraso/janela do isolamento por NIS
+CUSUM_K = 0.5  # CUSUM bilateral sobre inovacoes normalizadas: folga de referencia (em desvios-padrao)
+CUSUM_H = 12.0  # limiar do CUSUM; ARL0 gaussiano calculado por Siegmund (constantes pre-calculadas)
+PAR_T = 3.0  # limiar de paridade (desvios-padrao) para "consistente" / "inconsistente"
+PAR_WINDOW_STEPS = 50  # 1 s depois da deteccao, epocas comuns de 5 Hz (k multiplo de 10)
+PAR_SNAP_STEPS = 100  # o desvio estimado do barometro e lido 2 s antes da deteccao
+FLOOR_FRAC = 0.5  # variante com piso: sigma_delta >= 0,5 sigma_0 (so para ordenar; nao e usada na deteccao)
+AL_MIN, AL_FRAC = 1.0, 0.02  # AL_v(h) = max(1 m, 0,02 h) (proposta do documento)
+TG_STEPS = 25  # T_g = 0,5 s
 MAGNITUDES = [0.5, 1.0, 2.0, 3.0, 5.0, 10.0, 30.0]
 ONSETS_S = [8.0, 15.0]  # 8 s: cerca de 580 m; 15 s: cerca de 38 m (perfil de brinquedo)
 SOURCES = ["R", "G", "B"]
@@ -135,6 +143,7 @@ def joseph_update(p, h, r):
 
 
 PRIORS = {}
+PBB = {}
 
 
 def updates_at(step, excluded):
@@ -156,6 +165,7 @@ def build_schedule(excluded, keep_p=False):
     p = [[CFG["p0"][i] if i == j else 0.0 for j in range(4)] for i in range(4)]
     sched, p00, p_list = [], [], []
     prior_z, prior_b = [], []
+    pbb = []
     n_updates = 0
     for k in range(N + 1):
         if k > 0:
@@ -170,9 +180,11 @@ def build_schedule(excluded, keep_p=False):
             n_updates += 1
         sched.append(ups)
         p00.append(p[0][0])
+        pbb.append(p[3][3])
         if keep_p:
             p_list.append([row[:] for row in p])
     PRIORS[excluded] = (prior_z, prior_b)
+    PBB[excluded] = pbb
     return sched, p00, p_list, n_updates
 
 
@@ -222,6 +234,7 @@ def run_filter(sched, data, want_state_at=(), keep_innov=False):
     zs = [0.0] * (N + 1)
     nis = [0.0] * (N + 1)
     cnt = [0] * (N + 1)
+    bbs = [0.0] * (N + 1)
     states = {}
     half_dt2 = 0.5 * DT * DT
     for k in range(N + 1):
@@ -247,10 +260,11 @@ def run_filter(sched, data, want_state_at=(), keep_innov=False):
             nis[k] += y * y / s
             cnt[k] += 1
         zs[k] = z
+        bbs[k] = bb
         if k in want_state_at:
             states[k] = (z, v, ba, bb)
     if keep_innov:
-        return zs, nis, cnt, states, innov
+        return zs, nis, cnt, states, innov, bbs
     return zs, nis, cnt, states
 
 
@@ -275,6 +289,49 @@ def clopper_upper(k, n, alpha=0.05):
         else:
             hi = mid
     return hi
+
+
+def cusum_alarms(innov, k_ref=None, h=None):
+    """CUSUM bilateral por fonte sobre inovacoes normalizadas. Devolve [(passo, codigo)]; a fonte que
+    alarma volta a zero (reinicio padrao)."""
+    k_ref = CUSUM_K if k_ref is None else k_ref
+    h = CUSUM_H if h is None else h
+    g = {}
+    alarms = []
+    for k, code, y in innov:
+        gp, gn = g.get(code, (0.0, 0.0))
+        gp = max(0.0, gp + y - k_ref)
+        gn = max(0.0, gn - y - k_ref)
+        if gp > h or gn > h:
+            alarms.append((k, code))
+            gp = gn = 0.0
+        g[code] = (gp, gn)
+    return alarms
+
+
+def arl0_siegmund(k_ref, h):
+    """ARL0 (amostras) do CUSUM unilateral, aproximacao de Siegmund para ruido gaussiano; bilateral = metade."""
+    b = h + 1.166
+    one = (math.exp(2.0 * k_ref * b) - 2.0 * k_ref * b - 1.0) / (2.0 * k_ref * k_ref)
+    return one, one / 2.0
+
+
+def irwin_hall4_tail_two_sided(x_sigma):
+    """P(|X| > x_sigma * sigma) para X = sigma*sqrt(3)*(u1+u2+u3+u4-2) (Irwin-Hall n=4, sem recorte)."""
+    s = 2.0 + x_sigma / math.sqrt(3.0)  # soma u1..u4 acima de s
+    if s >= 4.0:
+        return 0.0
+    m = int(math.floor(4.0 - s))
+    tail = sum((-1) ** j * math.comb(4, j) * (4.0 - s - j) ** 4 for j in range(m + 1)) / 24.0
+    return 2.0 * tail
+
+
+def longest_run(flags):
+    best = cur = 0
+    for f in flags:
+        cur = cur + 1 if f else 0
+        best = max(best, cur)
+    return best
 
 
 # --- canal horizontal so com GNSS (brinquedo adicional) -------------------------------------------
@@ -309,31 +366,40 @@ def gen_h(seed, fault=None, onset_s=8.0):
 
 
 def horizontal_alarm(innov, kf, window=20):
-    """Primeiro instante (passo) com alarme: inovacao de posicao ou velocidade isolada acima de K_FA,
-    ou media de `window` inovacoes de posicao (ou de velocidade) acima de K_FA/sqrt(window)."""
+    """Primeiro passo >= kf com alarme, calculado sobre TODO o historico (os tampoes enchem-se antes do
+    inicio da falha, por isso o atraso de janela nao tem o piso artificial de `window` amostras).
+    single: inovacao isolada acima de K_FA. window: soma de `window` inovacoes normalizadas
+    (posicao ou velocidade) acima de K_FA * sqrt(window). Devolve tambem se houve alarme antes de kf."""
     buf = {1: [], 2: []}
     first = {"single": None, "window": None}
+    early = {"single": False, "window": False}
     for k, code, y in innov:
         b = buf[code]
         b.append(y)
         if len(b) > window:
             b.pop(0)
-        if first["single"] is None and abs(y) > K_FA:
-            first["single"] = k
-        if first["window"] is None and len(b) == window and abs(sum(b)) / math.sqrt(window) > K_FA:
-            first["window"] = k
+        hit_single = abs(y) > K_FA
+        hit_window = len(b) == window and abs(sum(b)) / math.sqrt(window) > K_FA
+        for key, hit in (("single", hit_single), ("window", hit_window)):
+            if hit:
+                if k < kf:
+                    early[key] = True
+                elif first[key] is None:
+                    first[key] = k
+    first["early"] = early
     return first
 
 
 def horizontal_study(sched):
     out = {"nominal": {}, "cells": []}
-    nom = {"single": 0, "window": 0}
+    nom = {"single": 0, "window": 0, "cusum": 0}
     for seed in SEEDS_NOMINAL:
         d = gen_h(seed)
-        _, _, _, _, innov = run_filter(sched, d, keep_innov=True)
+        _, _, _, _, innov, _ = run_filter(sched, d, keep_innov=True)
         f = horizontal_alarm(innov, 0)
-        for key in nom:
-            nom[key] += 1 if f[key] is not None else 0
+        for key in ("single", "window"):
+            nom[key] += 1 if (f[key] is not None or f["early"][key]) else 0
+        nom["cusum"] += 1 if cusum_alarms(innov) else 0
     out["nominal"] = {"runs": len(SEEDS_NOMINAL), "false_alarm_runs": nom}
     onset_s = 8.0
     kf = int(round(onset_s / DT))
@@ -342,21 +408,26 @@ def horizontal_study(sched):
     cases += [("coherent", v) for v in (0.1, 0.3, 1.0, 3.0)]
     t_end = N * DT
     for kind, val in cases:
-        res = {"single": [], "window": []}
+        res = {"single": [], "window": [], "cusum": []}
+        early_runs = {"single": 0, "window": 0, "cusum": 0}
         err_end = []
         for seed in SEEDS_FAULT:
             d = gen_h(seed, (kind, val), onset_s)
-            zs, _, _, _, innov = run_filter(sched, d, keep_innov=True)
+            zs, _, _, _, innov, _ = run_filter(sched, d, keep_innov=True)
             f = horizontal_alarm(innov, kf)
-            for key in res:
-                # so alarmes depois do inicio contam como deteccao (alarmes antes sao falsos alarmes)
-                innov_after = [x for x in innov if x[0] >= kf]
-                fa = horizontal_alarm(innov_after, kf)
-                res[key].append(None if fa[key] is None else (fa[key] - kf) * DT)
+            for key in ("single", "window"):
+                res[key].append(None if f[key] is None else (f[key] - kf) * DT)
+                early_runs[key] += 1 if f["early"][key] else 0
+            al = cusum_alarms(innov)
+            if any(k < kf for k, _ in al):
+                early_runs["cusum"] += 1
+            post = [k for k, _ in al if k >= kf]
+            res["cusum"].append(None if not post else (post[0] - kf) * DT)
             err_end.append(abs(zs[N] - (H_P0 + H_V * t_end)))
         row = {"fault": kind, "value": val, "runs": len(SEEDS_FAULT),
                "offset_at_end_if_undetected_m": val if kind == "step" else val * (t_end - onset_s),
-               "median_estimate_error_at_end_m": statistics.median(err_end)}
+               "median_estimate_error_at_end_m": statistics.median(err_end),
+               "alarm_before_onset_runs": early_runs}
         for key in res:
             det = [x for x in res[key] if x is not None]
             row[key] = {"detected": len(det), "median_delay_s": statistics.median(det) if det else None,
@@ -383,11 +454,26 @@ def main():
     nees_inv = {k: inverse(p_full[k]) for k in NEES_STEPS}
     kiso = int(round(ISO_WINDOW_S / DT))
 
+    def pl_at(k):
+        """Nivel de protecao vertical por separacao de solucoes (independente dos dados)."""
+        pl = K_FF * math.sqrt(p00s[None][k])
+        for ex in SOURCES:
+            pl = max(pl, K_FA * sig_delta[ex][k] + K_MD * math.sqrt(p00s[ex][k]))
+        return pl
+
     def analyse(data, want_nees=False):
+        """Corre os 4 filtros. Para o principal (E1) e para o sem-barometro (E0) guarda as inovacoes
+        normalizadas (CUSUM) e, para o principal, a trajetoria do desvio do barometro estimado."""
         zs, nis, cnt, st = {}, {}, {}, {}
+        extra = {}
         for ex in names:
-            zs[ex], nis[ex], cnt[ex], st[ex] = run_filter(scheds[ex], data, NEES_STEPS if (want_nees and ex is None) else ())
-        return zs, nis, cnt, st
+            if ex in (None, "B"):
+                zs[ex], nis[ex], cnt[ex], st[ex], inn, bbs = run_filter(
+                    scheds[ex], data, NEES_STEPS if (want_nees and ex is None) else (), keep_innov=True)
+                extra[ex] = (inn, bbs)
+            else:
+                zs[ex], nis[ex], cnt[ex], st[ex] = run_filter(scheds[ex], data)
+        return zs, nis, cnt, st, extra
 
     def stats_for_run(data, zs, nis, cnt):
         """Estatisticas de separacao normalizadas e alarmes por passo."""
@@ -396,7 +482,7 @@ def main():
 
     # --- autoverificacao: filtro de covariancia completa vs ganhos pre-calculados -----------------
     d = gen_run(SEEDS_NOMINAL[0])
-    zs_chk, _, _, _ = run_filter(scheds[None], d)
+    zs_chk = run_filter(scheds[None], d)[0]
     x = [d["x0"][0], d["x0"][1], 0.0, 0.0]
     p = [[CFG["p0"][i] if i == j else 0.0 for j in range(4)] for i in range(4)]
     worst_diff = 0.0
@@ -424,11 +510,14 @@ def main():
     nis_radar, nis_radar_n = 0.0, 0
     radar_exceed = {2.0: 0, 3.0: 0, 4.0: 0}
     pl_exceed_samples = 0
+    pl_gt_al_samples = 0
+    cusum_fa_runs = {"E1": 0, "E0": 0}
+    cusum_fa_by_source = {0: 0, 1: 0, 2: 0, 3: 0}
     nominal_final_err = []
     for seed in SEEDS_NOMINAL:
         data = gen_run(seed)
         t1 = time.perf_counter()
-        zs, nis, cnt, st = analyse(data, want_nees=True)
+        zs, nis, cnt, st, extra = analyse(data, want_nees=True)
         t_filter += time.perf_counter() - t1
         n_filter_cycles += 4 * (N + 1)
         ratio = stats_for_run(data, zs, nis, cnt)
@@ -471,30 +560,99 @@ def main():
             if abs(zs[None][k] - truth(k)[0]) > pl:
                 pl_exceed_samples += 1
         nominal_final_err.append(abs(zs[None][N] - truth(N)[0]))
+        for key, ex in (("E1", None), ("E0", "B")):
+            al = cusum_alarms(extra[ex][0])
+            if al:
+                cusum_fa_runs[key] += 1
+            if ex is None:
+                for _, c in al:
+                    cusum_fa_by_source[c] += 1
+        for k in range(N + 1):
+            if pl_at(k) > max(AL_MIN, AL_FRAC * truth(k)[0]):
+                pl_gt_al_samples += 1
     nees_mean = {str(round(k * DT, 2)): nees_sum[k] / len(SEEDS_NOMINAL) for k in NEES_STEPS}
     n_nom = len(SEEDS_NOMINAL)
     nees_lo = 4.0 - 1.96 * math.sqrt(2.0 * 4.0 / n_nom)
     nees_hi = 4.0 + 1.96 * math.sqrt(2.0 * 4.0 / n_nom)
 
-    def fault_cells(onsets, mags):
+    def fault_cells(onsets, mags, cold=False):
         nonlocal t_filter, n_filter_cycles
         cells = []
+        pl_arr = [pl_at(k) for k in range(N + 1)]
+        floor_arr = {ex: [max(sig_delta[ex][k], FLOOR_FRAC * math.sqrt(p00s[None][k])) for k in range(N + 1)] for ex in SOURCES}
+        code_of = {"R": CODE["R"], "G": CODE["Gz"], "B": CODE["B"]}
         for onset_s in onsets:
           kf = int(round(onset_s / DT))
           for src in SOURCES:
             for mag in mags:
-                delays, iso_instant_ok, iso_nis_ok, n_det = [], 0, 0, 0
+                delays, iso_instant_ok, iso_floor_ok, iso_nis_ok, n_det = [], 0, 0, 0, 0
                 pre_fa = 0
                 missed_samples = 0
-                err_full, err_reconf = [], []
+                err_full, err_reconf, err_reconf_par = [], [], []
                 n_iso_eval = 0
+                c1_delays, c0_delays, c1_pre, c0_pre, c1_first_ok = [], [], 0, 0, 0
+                par = {"correct": 0, "wrong": 0, "not_isolated": 0}
+                par_margin = []
+                miss_b_plus = miss_c = 0
                 for seed in SEEDS_FAULT:
                     data = gen_run(seed, (src, mag), onset_s)
                     t1 = time.perf_counter()
-                    zs, nis, cnt, st = analyse(data)
+                    zs, nis, cnt, st, extra = analyse(data)
                     t_filter += time.perf_counter() - t1
                     n_filter_cycles += 4 * (N + 1)
                     ratio = stats_for_run(data, zs, nis, cnt)
+                    zt_end = truth(N)[0]
+                    # --- CUSUM por fonte (E1 = principal com barometro; E0 = sem barometro) ---
+                    al1 = cusum_alarms(extra[None][0])
+                    c1_pre += 1 if any(k < kf for k, _ in al1) else 0
+                    post1 = [(k, c) for k, c in al1 if k >= kf]
+                    first1 = post1[0][0] if post1 else None
+                    if post1:
+                        c1_delays.append((first1 - kf) * DT)
+                        c1_first_ok += 1 if post1[0][1] == code_of[src] else 0
+                    if src != "B":
+                        al0 = cusum_alarms(extra["B"][0])
+                        c0_pre += 1 if any(k < kf for k, _ in al0) else 0
+                        post0 = [k for k, _ in al0 if k >= kf]
+                        if post0:
+                            c0_delays.append((post0[0] - kf) * DT)
+                    # --- paridade no dominio das medidas (E1), isolamento depois da deteccao por CUSUM ---
+                    pick_par = None
+                    if first1 is not None:
+                        ks = max(0, first1 - PAR_SNAP_STEPS)
+                        if cold:
+                            # sem periodo saudavel anterior: o desvio do barometro so tem o prior (a estimativa do
+                            # filtro ja esta contaminada pela falha presente desde 0 s)
+                            sb2 = BARO_OFFSET_SIGMA**2 + BARO_RW**2 * (first1 + PAR_WINDOW_STEPS) * DT
+                            bhat = 0.0
+                        else:
+                            sb2 = PBB[None][ks] + BARO_RW**2 * (first1 + PAR_WINDOW_STEPS - ks) * DT
+                            bhat = extra[None][1][ks]
+                        start = first1 + (-first1) % 10
+                        eps = [k for k in range(start, min(N, first1 + PAR_WINDOW_STEPS) + 1, 10) if k in data["gz"] and k in data["baro"]]
+                        if eps:
+                            n_e = len(eps)
+                            m1 = sum(data["radar"][k] - data["gz"][k] for k in eps) / n_e
+                            m2 = sum(data["radar"][k] - (data["baro"][k] - bhat) for k in eps) / n_e
+                            m3 = sum(data["gz"][k] - (data["baro"][k] - bhat) for k in eps) / n_e
+                            s1 = math.sqrt((R_VAR["R"] + R_VAR["Gz"]) / n_e)
+                            s2 = math.sqrt((R_VAR["R"] + R_VAR["B"]) / n_e + sb2)
+                            s3 = math.sqrt((R_VAR["Gz"] + R_VAR["B"]) / n_e + sb2)
+                            n1, n2, n3 = abs(m1) / s1, abs(m2) / s2, abs(m3) / s3
+                            # hipotese R: n3 pequeno, n1 e n2 grandes; G: n2 pequeno, n1 e n3 grandes; B: n1 pequeno
+                            hyp = {"R": (n3, (n1, n2)), "G": (n2, (n1, n3)), "B": (n1, (n2, n3))}
+                            cand = [h for h, (opp, others) in hyp.items() if opp < PAR_T and min(others) >= PAR_T]
+                            if len(cand) == 1:
+                                par["correct" if cand[0] == src else "wrong"] += 1
+                                pick_par = cand[0]
+                            else:
+                                par["not_isolated"] += 1
+                            par_margin.append({"R": min(n1, n2), "G": min(n1, n3), "B": min(n2, n3)}[src])
+                        else:
+                            par["not_isolated"] += 1
+                    else:
+                        par["not_isolated"] += 1
+                    # --- separacao de solucoes (so para o nivel de protecao e para comparacao) ---
                     first = None
                     for k in range(N + 1):
                         if any(ratio[ex][k] > K_FA for ex in SOURCES):
@@ -503,28 +661,29 @@ def main():
                                 break
                             first = k
                             break
-                    # pre-onset alarm does not hide post-onset detection: find first exceedance after onset
                     if first is None or first < kf:
                         first = next((k for k in range(kf, N + 1) if any(ratio[ex][k] > K_FA for ex in SOURCES)), None)
-                    # integridade: erro acima do PL antes do primeiro alarme pos-inicio
                     end_alarm = first if first is not None else N + 1
                     for k in range(kf, end_alarm):
-                        pl = K_FF * math.sqrt(p00s[None][k])
-                        for ex in SOURCES:
-                            pl = max(pl, K_FA * sig_delta[ex][k] + K_MD * math.sqrt(p00s[ex][k]))
-                        if abs(zs[None][k] - truth(k)[0]) > pl:
+                        if abs(zs[None][k] - truth(k)[0]) > pl_arr[k]:
                             missed_samples += 1
-                    zt_end = truth(N)[0]
+                    # --- falhas de alerta: erro > AL durante >= T_g enquanto declarado Confiavel ---
+                    end_c = first1 if first1 is not None else N + 1
+                    flags_b = [abs(zs[None][k] - truth(k)[0]) > max(AL_MIN, AL_FRAC * truth(k)[0]) for k in range(kf, end_c)]
+                    flags_c = [f and pl_arr[kf + i] <= max(AL_MIN, AL_FRAC * truth(kf + i)[0]) for i, f in enumerate(flags_b)]
+                    miss_b_plus += 1 if longest_run(flags_b) >= TG_STEPS else 0
+                    miss_c += 1 if longest_run(flags_c) >= TG_STEPS else 0
                     err_full.append(abs(zs[None][N] - zt_end))
+                    err_reconf_par.append(abs(zs[pick_par][N] - zt_end) if pick_par else abs(zs[None][N] - zt_end))
                     if first is None:
                         err_reconf.append(abs(zs[None][N] - zt_end))
                         continue
                     n_det += 1
                     delays.append((first - kf) * DT)
-                    # isolamento instantaneo: maior separacao normalizada
                     pick = max(SOURCES, key=lambda ex: ratio[ex][first])
                     iso_instant_ok += 1 if pick == src else 0
-                    # isolamento por NIS na janela [first, first+kiso]: subfiltro mais consistente
+                    pick_f = max(SOURCES, key=lambda ex: abs(zs[None][first] - zs[ex][first]) / floor_arr[ex][first])
+                    iso_floor_ok += 1 if pick_f == src else 0
                     k_end = min(N, first + kiso)
                     score = {}
                     for ex in SOURCES:
@@ -534,26 +693,37 @@ def main():
                     pick2 = min(SOURCES, key=lambda ex: score[ex])
                     iso_nis_ok += 1 if pick2 == src else 0
                     n_iso_eval += 1
-                    # reconfiguracao: usa o subfiltro escolhido depois de first+kiso
                     err_reconf.append(abs(zs[pick2][N] - zt_end))
-                cells.append({
+
+                def dstat(xs):
+                    return {"median": percentile(xs, 0.5), "p90": percentile(xs, 0.9), "max": max(xs) if xs else None}
+
+                cell = {
                     "onset_s": onset_s, "source": src, "magnitude_m": mag, "runs": len(SEEDS_FAULT),
-                    "detected": n_det,
-                    "detection_delay_s": {
-                        "median": percentile(delays, 0.5), "p90": percentile(delays, 0.9), "max": max(delays) if delays else None,
-                    },
+                    "cusum_E1": {"detected": len(c1_delays), "delay_s": dstat(c1_delays),
+                                 "alarm_before_onset_runs": c1_pre, "first_alarm_on_faulty_source": c1_first_ok},
+                    "parity_isolation_E1": dict(par, median_margin_sigma=statistics.median(par_margin) if par_margin else None),
+                    "separation_detected": n_det,
+                    "separation_delay_s": dstat(delays),
                     "isolation_correct_max_separation": iso_instant_ok,
+                    "isolation_correct_max_separation_floored": iso_floor_ok,
                     "isolation_correct_min_nis": iso_nis_ok,
                     "isolation_evaluated": n_iso_eval,
-                    "alarm_before_onset_runs": pre_fa,
-                    "missed_alert_samples_before_alarm": missed_samples,
+                    "alarm_before_onset_runs_separation": pre_fa,
+                    "missed_alert_samples_before_separation_alarm": missed_samples,
+                    "missed_alert_runs_Tg_0.5s": {"B_plus_no_PL": miss_b_plus, "C_with_PL": miss_c},
                     "final_abs_error_m": {
                         "full_filter_median": statistics.median(err_full),
                         "full_filter_max": max(err_full),
-                        "reconfigured_median": statistics.median(err_reconf),
-                        "reconfigured_max": max(err_reconf),
+                        "reconfigured_by_nis_median": statistics.median(err_reconf),
+                        "reconfigured_by_nis_max": max(err_reconf),
+                        "reconfigured_by_parity_median": statistics.median(err_reconf_par),
+                        "reconfigured_by_parity_max": max(err_reconf_par),
                     },
-                })
+                }
+                if src != "B":
+                    cell["cusum_E0"] = {"detected": len(c0_delays), "delay_s": dstat(c0_delays), "alarm_before_onset_runs": c0_pre}
+                cells.append(cell)
         return cells
 
     # --- falhas ------------------------------------------------------------------------------------
@@ -562,14 +732,17 @@ def main():
     saved = (CFG["p0"], CFG["e0"])
     CFG["p0"], CFG["e0"] = COLD_P0, COLD_E0
     scheds_w, p00s_w, sig_w = scheds, p00s, sig_delta
+    priors_w, pbb_w = dict(PRIORS), dict(PBB)
     scheds, p00s, n_upd_c = {}, {}, {}
     for ex in names:
         s_, p00_, _, nu_ = build_schedule(ex)
         scheds[ex], p00s[ex] = s_, p00_
     sig_delta = {ex: [math.sqrt(max(p00s[ex][k] - p00s[None][k], 1e-12)) for k in range(N + 1)] for ex in SOURCES}
-    cold_cells = fault_cells([0.0], COLD_MAGNITUDES)
+    cold_cells = fault_cells([0.0], COLD_MAGNITUDES, cold=True)
     CFG["p0"], CFG["e0"] = saved
     scheds, p00s, sig_delta = scheds_w, p00s_w, sig_w
+    PRIORS.update(priors_w)
+    PBB.update(pbb_w)
 
     # --- sigma e MDB analitico aproximado por instante ---------------------------------------------
     z_beta = 1.2816  # potencia 0,90 (unilateral)
@@ -607,12 +780,19 @@ def main():
     per_cycle_cov_us = t_cov / (reps * (N + 1)) * 1e6
     per_update_cov_us = t_cov / (reps * n_upd[None]) * 1e6
 
+    # desfasamento de meio ciclo da forca especifica numa rampa do acelerador (analitico)
+    thrust_max_n, mass_kg, ramp_rate = 845e3, 26.3e3, 1.0  # valores do documento (secao 8.1 e 3.1)
+    da_dt = ramp_rate * thrust_max_n / mass_kg  # m/s^3 por unidade de acelerador/s
+    lag_s = 0.5 * DT
+    ramp_s = 0.4  # rampa de 0,4 para 0,8 (taxa maxima 1,0/s)
+    force_lag = {"dfdt_mps3": da_dt, "half_cycle_lag_s": lag_s, "accel_error_mps2": da_dt * lag_s,
+                 "velocity_error_after_ramp_mps": da_dt * lag_s * ramp_s, "ramp_s": ramp_s}
     theory_sample = {str(kk): phi_tail2(kk) for kk in FA_SWEEP}
     emp_sample = {str(kk): sample_exceed[kk] / samples for kk in FA_SWEEP}
     runs_alarm = {str(kk): nominal_sweep_runs[kk] for kk in FA_SWEEP}
     out = {
         "label": "prototipo de viabilidade, canal vertical, sementes de desenvolvimento (NAO e evidencia do M10)",
-        "command": "python spikes/m10-nav-feasibility/feasibility.py",
+        "command": "python spikes/m10-nav-feasibility/feasibility.py > resumo.json",
         "machine": {
             "platform": platform.platform(),
             "processor": platform.processor(),
@@ -624,7 +804,11 @@ def main():
         },
         "seeds": {"nominal": [SEEDS_NOMINAL[0], SEEDS_NOMINAL[-1]], "fault": [SEEDS_FAULT[0], SEEDS_FAULT[-1]],
                   "note": "bloco de desenvolvimento; nao sao sementes de avaliacao"},
-        "detector": {"K_fa": K_FA, "K_md": K_MD, "K_ff": K_FF, "isolation_window_s": ISO_WINDOW_S},
+        "detector": {"K_fa": K_FA, "K_md": K_MD, "K_ff": K_FF, "isolation_window_s": ISO_WINDOW_S,
+                     "cusum_k_ref": CUSUM_K, "cusum_h": CUSUM_H,
+                     "cusum_arl0_samples_one_sided_two_sided_siegmund": arl0_siegmund(CUSUM_K, CUSUM_H),
+                     "parity_threshold_sigma": PAR_T, "floor_fraction_of_sigma0": FLOOR_FRAC,
+                     "AL_v": "max(%.1f m, %.2f h)" % (AL_MIN, AL_FRAC), "T_g_s": TG_STEPS * DT},
         "self_check_max_abs_diff_z_m": worst_diff,
         "nominal": {
             "runs": n_nom,
@@ -638,9 +822,18 @@ def main():
             "nees_mean_dim4_by_time_s": nees_mean,
             "nees_95_interval_for_mean_of_runs": [nees_lo, nees_hi],
             "samples_error_above_protection_level": pl_exceed_samples,
+            "samples_PL_above_AL": pl_gt_al_samples,
+            "cusum_false_alarm_runs": cusum_fa_runs,
+            "cusum_false_alarm_runs_upper95_clopper_pearson": {k_: clopper_upper(v_, n_nom) for k_, v_ in cusum_fa_runs.items()},
+            "cusum_false_alarms_by_source_code_E1": {str(k_): v_ for k_, v_ in cusum_fa_by_source.items()},
             "final_abs_error_m_median_max": [statistics.median(nominal_final_err), max(nominal_final_err)],
         },
         "analytic_mdb_approx": mdb_rows,
+        "irwin_hall_tails": {
+            "note": "cauda bilateral P(|X|>k sigma): Irwin-Hall n=4 exata (o recorte a 2 sqrt(3) sigma nao atua) contra gaussiana",
+            "k": {str(kk): {"irwin_hall_raw": irwin_hall4_tail_two_sided(kk), "gaussian": phi_tail2(kk)} for kk in (2.0, 3.0, 3.4)},
+        },
+        "force_lag_during_throttle_ramp": force_lag,
         "faults": cells,
         "faults_cold_start": cold_cells,
         "horizontal_gnss_only_channel": horizontal,
