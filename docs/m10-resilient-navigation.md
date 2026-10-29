@@ -855,23 +855,139 @@ O estudo foi escrito por um autor e contestado por três revisores que não o es
 
 ## Decisão do proprietário
 
-Decisões necessárias antes de qualquer implementação:
+### Estado da porta de aprovação (29/10/2026)
 
-1. **Âmbito e linguagem de resultados**: aprovar que o M10 mede recuperação e declaração em separado, e que o toque suave fora da plataforma (`R1` a `R4`, `R6`, `S1` a `S5` cumpridos, `R5` falhado) é uma classificação de análise adicional, sem alterar `landed`.
-2. **Barómetro**: incluir ou não, sujeito à porta analítica do M10.0 com a variante pessimista (erro estático dependente de `v²`, latência, jato). Aceitar o abandono se não houver faixa útil.
-3. **Doppler**: excluir da linha de base e incluir só como conjunto opcional `E2` nas células de falha coerente do recetor, ou excluir por completo.
-4. **Sensor relativo à plataforma**: confirmar que fica fora do âmbito (a posição horizontal desde um deslocamento constante fica não verificada) ou abrir um marco próprio com o seu custo.
-5. **Posição horizontal**: aceitar que `hp_status` fica `Unverified` por construção e o valor de `B_h` (deslocamento não detetável assumido) para o nível de proteção horizontal.
-6. **Limites de alerta** `AL_v(h)`, `AL_hv`, `AL_h` e os fatores `K_fa`, `K_md`, `K_ff`: aprovar o método (varrimento de sensibilidade nas sementes de desenvolvimento) e a regra de congelação.
-7. **Desempate com ambiguidade**: probabilidade a priori de falha por fonte (máximo a posteriori) ou declarar (`DegradedNav`/`Untrusted`). Em qualquer caso, reportar os dois sinais de falha com simetria.
-8. **Semântica de `Untrusted`**: aceitar que "seguro" aqui é declarar e evitar agravar, sem estado seguro físico (sem pairar, sem reacendimento).
-9. **Estado de viés do acelerómetro**: escalar ao longo de `x_B` (8 estados) ou três eixos (10 estados, componentes laterais mal observáveis).
-10. **Esquemas**: aceitar `vv-rocket-landing.v2` (falhas e sensores novos, latência) e `vv-rocket-landing-verification.v3` (aditivo), com a consequência para `source_sha256` e as execuções guardadas.
-11. **Sementes e orçamento**: confirmar os blocos 4000 a 4009 (teste, CI e demonstrações), 5000 a 5099 (desenvolvimento), 3000 a 3099 (avaliação), 6000 a 6099 (reserva), as 100 sementes por célula, a divisão em chunks e o formato de artefactos com teto.
-12. **Faseamento**: B e B+ primeiro e C só se o relatório de desenvolvimento mostrar uma lacuna, ou implementar C logo.
-13. **Hipóteses e limiares provisórios** da secção 10.5: rever e autorizar a sua congelação depois do M10.4.
-14. **Arquitetura**: aprovar B+ como arquitetura de referência, a que se aplica a família primária, e C como extensão condicional à lacuna medida e à P4.
-15. **Regressões previstas**: aceitar que `gnss_bias` e `gnss_bias_low` desde 0 s são falhas verticais previstas em `E0`, com `gnss_bias` como regressão face a `guarded` (6 de 30), reportadas e excluídas da P3 pelo mecanismo.
-16. **Limites da campanha**: autorizar a subida do teto por bloco para 2500 execuções e o formato de artefactos com resumos e hashes dos traços.
+**Aprovado pelo proprietário:** B+ como arquitetura experimental de referência; `E0` como configuração inicial de sensores; C como extensão condicional (decisão 14). Tudo o resto está **por decidir**. O M10 completo não começa antes de as 16 decisões estarem fechadas. Isto inclui o M10.0, com a execução Rust do arranque a frio, e não há código do M10 em `crates/vv-rocket` nem uso das sementes 3000 a 3099.
 
-**Porta de aprovação.** O M10.0 só começa com aprovação explícita das decisões 1 a 16, ou com as alterações que o proprietário indicar. Até lá não se escreve código do M10 no `crates/vv-rocket` e nenhuma semente de avaliação (3000 a 3099) é usada.
+Três princípios valem para todo o registo:
+
+- **Uma regressão prevista não é aceite como segura.** Uma falha prevista de `R1` é uma aterragem dura. Escrevê-la antes da campanha só impede que o resultado seja reinterpretado depois; não a torna aceitável.
+- **`Untrusted` não é um estado fisicamente seguro.** É uma declaração do controlador sobre a sua navegação. O veículo continua a travar, porque o acelerador mínimo excede o peso, e pode tocar duro ou fora da plataforma. Nenhum resultado `Untrusted` conta como "seguro" em nenhuma tabela.
+- **C só é adotada depois de uma experiência que a possa reprovar** (decisão 12). O argumento a priori a favor de C não basta.
+
+Formato de cada entrada: recomendação, alternativas, implicações científicas, riscos.
+
+### 1. Âmbito e linguagem dos resultados
+
+- **Recomendação.** Reportar três contagens separadas por célula: **recuperação** (`landed` com `S1` a `S5`), **contenção** (`S1` a `S5` cumpridos) e **declaração** (estado diferente de `Trusted` antes de o erro verdadeiro exceder o limite de alerta). O toque suave fora da plataforma (`R1` a `R4`, `R6`, `S1` a `S5`, com `R5` falhado) é uma **classificação de análise**. Não é `landed`, não é um sucesso da missão e não é "seguro": o veículo tocou fora da plataforma.
+- **Alternativas.** (a) Contar o toque suave fora da plataforma como recuperação parcial. (b) Reportar só `landed`.
+- **Implicações científicas.** A pergunta de investigação tem duas metades, recuperar e reconhecer quando não se pode. Cada uma precisa da sua contagem. Juntá-las esconde o resultado de uma atrás do outro.
+- **Riscos.** (a) torna os resultados mais favoráveis do que são. (b) apaga a parte do reconhecimento.
+
+### 2. Barómetro (`E1`)
+
+- **Recomendação.** Manter fora até à porta analítica do M10.0. A porta usa a variante **pessimista**: erro estático de 3% da pressão dinâmica, incerteza na compensação da latência e perturbação do jato perto do solo. `E1` só entra se houver uma faixa acima de `h_commit` com margem de isolamento de pelo menos 3 para falhas de 10 m. Com os parâmetros atuais **não há** essa faixa (`baro_gate.py`), por isso o resultado previsto é o abandono.
+- **Alternativas.** (a) Usar a variante otimista. (b) Incluir o barómetro só para deteção, sem isolamento. (c) Abandoná-lo já.
+- **Implicações científicas.** Sem o barómetro, a altitude tem duas fontes. O `E0` deteta desacordo mas não isola, o que limita P2 e as células de falha desde 0 s.
+- **Riscos.** (a) cria uma terceira fonte que não existe fisicamente a 200 m/s: é a falha "sensor acrescentado para dar bons resultados". (b) parece pouco útil, porque deteção já existe com duas fontes.
+
+### 3. Velocímetro Doppler (`E2`)
+
+- **Recomendação.** Excluir da linha de base. Manter como conjunto opcional, só para as células de falha coerente do recetor (posição e velocidade corrompidas juntas), e só num marco posterior.
+- **Alternativas.** (a) Incluí-lo já. (b) Excluí-lo por completo.
+- **Implicações científicas.** Mede velocidade e não posição. Não corrige nenhuma das falhas medidas no M9 e M9.1, nem observa um viés constante de posição.
+- **Riscos.** Mais um modelo de sensor com parâmetros assumidos e sem dados, para um benefício que só aparece em falhas raras.
+
+### 4. Sensor relativo à plataforma
+
+- **Recomendação.** Fora do âmbito do M10. Declarar que a posição horizontal desde um deslocamento constante fica **não verificada**.
+- **Alternativas.** Um marco próprio (visão ou farol na plataforma), com o seu modelo e o seu custo.
+- **Implicações científicas.** É o único sensor que torna observável o viés horizontal constante. Sem ele, `R5` com `gnss_bias` grande é impossível para qualquer arquitetura, e o M10 não pode afirmar nada sobre isso.
+- **Riscos.** Um modelo de visão idealizado exageraria a capacidade. Deixá-lo de fora limita o resultado, mas de forma honesta.
+
+### 5. Posição horizontal e `B_h`
+
+- **Recomendação.** `hp_status` fica `Unverified` por construção, com `B_h` = 30 m (o máximo da gama de `gnss_bias`). Daí resulta `PL_h > AL_h` sempre, e a posição horizontal nunca é declarada `Trusted`.
+- **Alternativas.** Um `B_h` menor (por exemplo, 10 m), o que deixa a posição horizontal ser `Trusted` em parte do voo.
+- **Implicações científicas.** É a declaração correta para uma grandeza não observável. Um `B_h` menor é uma suposição sobre a falha, não uma medida.
+- **Riscos.** Com `Unverified` permanente, a lei lateral nunca usa plenamente a posição GNSS para corrigir o deslocamento inicial. Isto pode piorar `R5` em casos nominais e tem de ser medido, comparando com `guarded` no nominal.
+
+### 6. Limites de alerta e fatores
+
+- **Recomendação.** `AL_v(h) = max(1 m, 0,02·h)`, `AL_hv` = 0,5 m/s, `AL_h` = 10 m como valores de partida, e `K_ff`, `K_fa`, `K_md` do protótipo. Os valores finais saem de um varrimento de sensibilidade só nas sementes 5000 a 5099, com uma métrica fixada antes, e ficam congelados por hash no modelo de caso.
+- **Alternativas.** Fixar os valores já, sem varrimento. Derivá-los de uma especificação externa (não existe nenhuma para este veículo).
+- **Implicações científicas.** Os limites de alerta definem o que é "falha de alerta". Mudá-los depois de ver os resultados de avaliação invalidaria P1 e P4.
+- **Riscos.** Limites largos tornam P1 trivial. Limites apertados dão declarações desnecessárias (I2). O varrimento tem de reportar as duas consequências.
+
+### 7. Desempate com ambiguidade
+
+- **Recomendação.** Por omissão, declarar (`DegradedNav` ou `Untrusted`) e manter a solução principal. Uma regra com probabilidade a priori por fonte entra **só como braço reportado**, avaliado com os dois sinais de falha ao mesmo tempo (`altimeter_bias` e `altimeter_bias_low`, `gnss_bias` e `gnss_bias_low`).
+- **Alternativas.** (a) A regra "menor altitude" do `guarded`. (b) Máximo a posteriori com um prior escolhido pelo proprietário.
+- **Implicações científicas.** Com duas fontes e nada que as separe, qualquer regra fixa é uma aposta no sinal da falha. O M9.1 mostrou-o: a regra "menor altitude" ganhou em `gnss_bias` e perdeu 28 de 30 em `altimeter_bias_low`. Um prior não é isolamento e tem de ser descrito como tal.
+- **Riscos.** Declarar sem recuperar dá regressões previstas (decisão 15). Usar um prior dá resultados que dependem do sinal da falha injetada, o que uma campanha só com sinais positivos esconderia.
+
+### 8. Semântica de `Untrusted`
+
+- **Recomendação.** `Untrusted` significa "o controlador declara que a sua navegação vertical não é fiável". Efeito: lei vertical sem perseguição lateral, regras de corte mantidas, nenhuma alteração para melhor abaixo de `h_commit`. **Não é um estado seguro.** O veículo continua a travar (338 kN de acelerador mínimo contra cerca de 294 kN de peso) e pode tocar duro.
+  - Os resultados de execuções `Untrusted` são classificados pelos mesmos `R1` a `R6` e `S1` a `S5` de qualquer outra execução.
+  - A eficácia de `Untrusted` mede-se em duas partes: a antecedência da declaração face ao erro verdadeiro, e o que acontece depois no estado real (contenção, velocidade de contacto).
+- **Alternativas.** (a) Chamar-lhe "modo seguro". (b) Um modo de terminação, cortar já, que transforma toda a declaração em queda livre.
+- **Implicações científicas.** Neste aterrador não existe estado seguro físico: não pode pairar, não reacende, não tem RCS. O que o M10 pode afirmar é declaração e não agravamento, não segurança.
+- **Riscos.** (a) é exatamente a sobreafirmação que o proprietário proibiu. (b) é pior do que continuar a travar na maior parte dos casos, e só se justifica com uma subida, que o M9.1 já trata.
+
+### 9. Estado de viés do acelerómetro
+
+- **Recomendação.** Um estado escalar ao longo de `x_B` (8 estados no total), que é o eixo das falhas `imu_accel_bias` do M9.
+- **Alternativas.** Três eixos (10 estados).
+- **Implicações científicas.** As componentes laterais do viés são mal observáveis com a atitude quase vertical. Estimá-las acrescenta covariância sem informação.
+- **Riscos.** Um viés lateral real não é modelado, e passa para a deriva da navegação inercial. Fica declarado como limitação.
+
+### 10. Esquemas
+
+- **Recomendação.** `vv-rocket-landing.v2`, com falhas e sensores novos e latência, e `vv-rocket-landing-verification.v3`, aditivo. Os campos novos são `Option` e só se serializam nas políticas novas, para que os traços de `baseline`, `robust`, `guarded` e `baseline_guarded` mantenham os bytes.
+- **Alternativas.** Estender os esquemas atuais sem nova versão.
+- **Implicações científicas.** O `source_sha256` muda, e as execuções guardadas do M9 e do M9.1 deixam de passar `replay` com o binário novo, como já aconteceu depois da revisão. Os hashes dos traços e os veredictos históricos não mudam. As pastas históricas ficam intactas como registo.
+- **Riscos.** Uma versão nova é trabalho de compatibilidade. Sem versão nova, um ficheiro antigo seria lido com outro significado.
+
+### 11. Sementes e orçamento
+
+- **Recomendação.** Blocos 4000 a 4009 (testes, CI, demonstrações), 5000 a 5099 (desenvolvimento), 3000 a 3099 (avaliação) e 6000 a 6099 (reserva). 100 sementes por célula. O script recusa as sementes de avaliação sem `--evaluation` e sem os hashes congelados; CI e testes nunca passam a opção.
+- **Alternativas.** 30 sementes por célula, como no M9, ou 200.
+- **Implicações científicas.** Com 30 por célula, P4 e P1 não têm poder (secção 10.5). Com 100 e agrupamento, o poder da P4 é de cerca de 0,90 para 3 pontos percentuais.
+- **Riscos.** As células partilham sementes, por isso o agrupamento sobrestima o número efetivo de execuções. O poder com 300 pares efetivos cai para cerca de 0,47.
+
+### 12. Faseamento e experiência de adoção de C
+
+- **Recomendação.** Construir B e B+ (M10.2). C só é construída se uma **experiência de lacuna** nas sementes 5000 a 5099 a justificar, e só é adotada se passar a P4 na avaliação.
+  - A experiência de lacuna é pré-escrita antes de correr. Métrica: execuções com falha de alerta vertical (I1v) de B+. Células: as seis células de pares e as de falha única detetável. Critério: limite superior de 95% de I1v de B+ acima de 5% agrupado, ou pelo menos uma falha de alerta numa célula de pares em que a hipótese de falha única é violada.
+  - Sem lacuna, C não é construída e o relatório diz que a complexidade não se justificou.
+  - Com lacuna, C é construída com o mesmo orçamento de afinação de B+. Tem de **reduzir essa mesma métrica nas mesmas células** de desenvolvimento antes da congelação, e depois passar a P4 com sementes novas.
+  - Inclui um controlo negativo: um par de falhas que viola a hipótese de falha única em que se prevê que C **também** falhe, para confirmar que a P4 não mede só sorte.
+- **Alternativas.** (a) Implementar C logo. (b) Nunca construir C.
+- **Implicações científicas.** O protótipo não distingue B+ de C. A única justificação a priori de C, o limite de integridade sob falha não detetada, é exatamente o que a experiência mede. Adotar C sem ela seria escolher complexidade por ser sofisticada.
+- **Riscos.** A experiência de lacuna usa sementes de desenvolvimento, por isso há o risco de afinar B+ para não ter lacuna. Mitigação: B+ é congelado por hash antes da experiência de lacuna.
+
+### 13. Hipóteses e limiares
+
+- **Recomendação.** A família primária P1 a P4 da secção 10.5, aplicada a B+ (P4 a C contra B+). Os limiares provisórios são revistos uma vez, nas sementes de desenvolvimento, e congelados no fim do M10.4, antes de qualquer semente de avaliação.
+  - Antes da congelação: especificar a P3 com um valor-p (ou passar a um procedimento de sequência fixa) e completar `power_thresholds.py` com os valores de 300 pares e dos degraus de Holm.
+- **Alternativas.** Congelar os limiares já. Só reportar, sem família.
+- **Implicações científicas.** Com uma família fechada e correção de Holm, um resultado positivo vale como teste. Sem família, cada número é exploratório.
+- **Riscos.** Limiares provisórios revistos com dados de desenvolvimento podem ficar ajustados a esses dados. A reserva 6000 a 6099 serve para repetir a avaliação se houver suspeita.
+
+### 14. Arquitetura (**aprovada**)
+
+- **Decisão do proprietário.** B+ como arquitetura experimental de referência, `E0` como configuração inicial, C como extensão condicional à decisão 12.
+- **Implicações científicas e riscos.** Estão na secção 6.6. A família primária aplica-se a B+.
+
+### 15. Regressões previstas
+
+- **Recomendação.** As células `gnss_bias` e `gnss_bias_low` com falha desde 0 s ficam registadas como **falhas previstas, não aceites como seguras**:
+  - Os seus resultados são reportados com o intervalo exato, ao lado de `guarded` e `robust`, e contam como falhas em todas as tabelas.
+  - A exclusão de `gnss_bias` da P3 só impede que a não inferioridade seja decidida por uma célula cujo resultado se conhece pelo mecanismo. Não torna a regressão aceitável: o relatório mostra-a como o primeiro custo de B+ face a `guarded`.
+  - A previsão de declaração (H-N2) é um critério separado. Declarar a perda de confiança antes de uma aterragem dura **não** compensa a aterragem dura.
+  - Uma mitigação, o braço com prior da decisão 7, é avaliada e reportada nas mesmas células, para mostrar quanto da regressão é recuperável e a que custo no sinal oposto.
+- **Alternativas.** (a) Aceitar a regressão como custo de projeto. (b) Manter a regra "menor altitude" do `guarded` dentro de B+, o que recupera `gnss_bias` e perde `altimeter_bias_low`. (c) Incluir `gnss_bias` na P3, o que provavelmente reprova a P3 pelo mecanismo.
+- **Implicações científicas.** Em `E0` com falha desde 0 s, duas fontes discordam e nada as separa. Nenhuma arquitetura sem prior recupera as duas direções. A regressão é uma propriedade do problema, não um erro de B+, mas continua a ser uma aterragem dura.
+- **Riscos.** (a) é a aceitação automática que o proprietário recusou. (b) esconde a mesma aposta noutra célula. (c) é honesto mas torna a P3 inútil. A decisão é do proprietário.
+
+### 16. Limites da campanha
+
+- **Recomendação.** 14 880 execuções em `E0`, em 8 blocos de no máximo 2 300. O teto por bloco sobe de 1000 para 2500. Guardam-se resumos e hashes de todos os traços. Traços completos só para uma amostra pré-registada e para as falhas, até um teto de artefactos por bloco. A regra de escolha das falhas a guardar é fixada antes.
+- **Alternativas.** Manter o teto de 1000 com mais blocos. Guardar todos os traços.
+- **Implicações científicas.** A reprodução independente continua possível para qualquer execução: o caso, a semente e o hash do traço chegam para a regenerar e comparar.
+- **Riscos.** Sem os traços completos guardados, uma análise posterior exige reexecução. O tamanho dos resumos ainda não foi medido.
+
+### Porta de aprovação
+
+O M10.0 começa só quando as decisões 1 a 13, 15 e 16 estiverem aprovadas, ou alteradas pelo proprietário, e registadas neste documento com a data. A decisão 14 já está aprovada. Até lá não se escreve código do M10 em `crates/vv-rocket`, não se executa a experiência de arranque a frio em Rust e não se usa nenhuma semente de avaliação (3000 a 3099).
