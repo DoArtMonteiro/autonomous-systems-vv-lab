@@ -460,7 +460,7 @@ O nível de proteção `PL_v = max(K_ff σ_0, max_i(K_fa σ_Δi + K_md σ_i))` c
 
 1. **C contra B+: o que justifica a complexidade extra** (o nível de proteção e os subfiltros). Métrica única: a taxa de falhas de alerta verticais (I1, secção 9), emparelhada por semente e agrupada nas seis células de pares (hipótese H-C, teste primário P4). Se C não superar B+ por pelo menos 3 pontos percentuais agrupados, C não é adotada e a conclusão é reportada.
 2. **B+ contra B**: deteção sequencial contra rejeição de uma época, na recuperação das células de falha única verticais e nos falsos alarmes. **Reportado**, fora da lista primária.
-3. **`guarded`** (a base atual): não inferioridade nas nove células do M9 (P3) e comparação nas células com viés de altitude de qualquer sinal (reportada).
+3. **`guarded`** (a base atual): não inferioridade em oito das nove células do M9 (P3; `gnss_bias` reportada à parte e incluída na avaliação global de segurança, secção 9.1) e comparação nas células com viés de altitude de qualquer sinal (reportada).
 4. **A** (ganho fixo mais votação) é **um braço de comparação, não um perdedor pré-comprometido**: as diferenças emparelhadas A contra C são reportadas nas mesmas células, sem hipótese que presuma o resultado.
 
 ## 7. Arquitetura proposta
@@ -661,6 +661,25 @@ Identificadores novos: `N` navegação, `F` gestão de falhas, `MD` segurança d
 
 Garantia formal: **nenhuma** para nenhum requisito. As taxas são estimativas condicionais às dispersões e às gamas assumidas.
 
+### 9.1 Classificação dos resultados e avaliação global de segurança
+
+Cada execução é classificada em **quatro dimensões independentes**. Nenhuma substitui outra, e nenhuma é calculada a partir do que o controlador declarou, exceto a terceira.
+
+| Dimensão | Definição | Fonte | O que não é |
+| --- | --- | --- | --- |
+| **Recuperação** | resultado `landed` (`R1` a `R6` cumpridos) com `S1` a `S5` cumpridos | verificador, estado real | uma declaração `Untrusted` nunca é recuperação |
+| **Contenção** | `S1` a `S5` cumpridos durante todo o voo, com ou sem contacto | verificador, estado real | não diz nada sobre a aterragem |
+| **Declaração de incerteza** | o estado declarado do canal passou a diferente de `Trusted` antes de o erro verdadeiro desse canal exceder o limite de alerta (sem falha de alerta, I1) | controlador (declaração) comparado pelo verificador com a verdade | não é recuperação nem segurança: é o controlador a saber que não sabe |
+| **Segurança física** | classe do resultado no estado real: **R** recuperado; **T** toque intacto fora da plataforma (`R1` a `R4`, `R6` e `S1` a `S5` cumpridos, `R5` falhado); **U** inseguro (qualquer de `S1` a `S5`, `R1` a `R4` ou `R6` falhado, ou `no_contact`) | verificador, estado real | só existe em relação aos requisitos assumidos deste demonstrador; T é uma missão falhada, não um sucesso |
+
+Regras:
+
+1. **A classe de segurança física depende só do estado real.** Uma execução com declaração antecipada e aterragem dura é U, e conta como U em todas as tabelas.
+2. **Avaliação global de segurança.** Todas as células da campanha entram numa tabela global por braço, com as contagens R, T e U e o intervalo exato de cada uma. Estão lá também as células excluídas de uma hipótese específica (por exemplo, `gnss_bias` fora da P3) e as células com regressão prevista. Excluir uma célula de um teste científico **nunca** a retira da avaliação global.
+3. **Comparação direta com `guarded`.** A tabela global e a tabela por célula mostram sempre `guarded` ao lado de B+ (e de C, se existir), com as diferenças emparelhadas por semente. Uma regressão face a `guarded` aparece com o seu valor e intervalo em todas as tabelas em que a célula aparece. Uma regressão prevista não muda de cor nem de categoria por ter sido prevista.
+4. **Custos não pré-aprovados.** O proprietário aprovou o enquadramento de medida e de relato das regressões previstas (decisão 15), **não** o seu custo em segurança ou em desempenho. O relatório final apresenta esses custos para decisão; não os dá como aceites.
+5. **O objetivo é o valor de verificação, não o número de células verdes.** Um braço que recupera menos mas declara corretamente e não piora a classe física é reportado como tal; um braço que recupera mais à custa de mais U em células de sinal oposto também.
+
 ## 10. Pré-registo (rascunho)
 
 Este rascunho fixa a forma da avaliação, não os números finais. Os números marcados "[ajustar]" são provisórios e só se fixam, por hash, depois da fase de desenvolvimento e antes de qualquer execução de avaliação. **Âmbito:** os blocos de sementes desta secção valem para o crate `vv-rocket`; o `vv-lab` usa outros blocos (por exemplo 42, 1337, 2026) e não é afetado.
@@ -678,6 +697,8 @@ Sementes já usadas e portanto **proibidas** para avaliação: 0 a 40 (afinaçã
 | protótipo | 9000 a 9099 | `spikes/m10-nav-feasibility`; não são sementes de avaliação |
 
 **Regra de proteção da avaliação.** O futuro script de campanha do M10 **recusa qualquer semente de avaliação** (3000 a 3099, e 6000 a 6099 depois de divulgada) a menos que receba `--evaluation` **e** os hashes de congelação coincidam. A CI, os testes e as demonstrações nunca passam `--evaluation`; um teste de CI verifica que o script termina com erro quando recebe uma semente de avaliação sem a opção.
+
+**Manifesto de congelação.** Antes de qualquer acesso às sementes de avaliação, um commit cria `landing/m10-freeze.json` com o SHA-256 de: (a) o modelo de caso e os ficheiros de casos de cada família, com as configurações dos braços; (b) o texto do pré-registo, isto é, as secções 9, 9.1 e 10 deste documento nesse commit, com as hipóteses, os critérios de avaliação, os limiares efetivos e a família primária; (c) o código de agregação e de classificação da campanha; (d) o `source_sha256` do simulador e do verificador. O script de campanha recusa `--evaluation` se algum hash não coincidir. O proprietário confirma o manifesto na porta antes da avaliação.
 
 **Congelação.** Antes da avaliação, um commit regista o SHA-256 de `landing/m10-nominal.json` e dos ficheiros de casos de cada família. A congelação cobre o **modelo de caso**, os **limiares** (`K_fa`, `K_md`, `K_ff`, `k_ref`, `h`, limiar de paridade, `AL`, dwell, `h_commit`, `N_adm`, `g_adm`) e os **parâmetros dos modelos de sensor** (barómetro, Doppler se existir). Os limiares vivem **no JSON do caso**, como no M9.1, e por isso entram no mesmo hash. O script recusa-se a correr se algum hash diferir. Nenhum limiar, requisito, gama ou hipótese é ajustado depois de ver os resultados da avaliação.
 
@@ -748,7 +769,7 @@ Cada braço com parâmetros afináveis (A, B, B+, C) é afinado com **o mesmo pr
 
 - **P1 (integridade vertical).** A taxa de falhas de alerta verticais (I1v) de B+ em `E0`, agrupada nas 7 células de falha única detetável (`altimeter_bias`, `altimeter_bias_low`, `gnss_bias`, `gnss_bias_low`, `imu_accel_bias`, valor preso do radar, atraso do radar; 700 execuções), contra um limite absoluto de **5%**: teste binomial exato unilateral de que a taxa é inferior a 5%. Suportada se o número de falhas for de no máximo 25 em 700 com alfa 0,05, 23 com 0,025, 22 com 0,0167 ou 0,0125 (o limiar depende do degrau de Holm). Sem falhas, o limite superior é de 0,43%. **Falsificada** se o número exceder o limiar do degrau. Aviso: as sete células partilham as mesmas 100 sementes (as mesmas dispersões), por isso as 700 execuções não são independentes e o limite agrupado é otimista; a taxa por célula é reportada.
 - **P2 (recuperação em `altimeter_bias_low`, versão `E0`).** O critério de recuperação vertical com terceira fonte dependeria do barómetro (`E1`). Em `E0` a previsão pré-registada de 8.4 é que B+ (como C) recupere aproximadamente o que `robust` recupera, por prior e não por isolamento. P2: teste binomial exato unilateral de que a taxa de recuperação (`landed` com `S1` a `S5`) de B+ em `altimeter_bias_low` é superior a **80%**, 100 execuções. Suportada com pelo menos 87 de 100 (alfa 0,05), 89 (0,025 ou 0,0167) ou 90 (0,0125). **Falsificada** se ficar abaixo. A declaração (estado ≠ `Trusted` com o radar `Excluded`) é **reportada**; a recuperação em `gnss_bias_low` (esperada falhar) também. Se o proprietário preferir, P2 pode ser formulada como declaração em vez de recuperação, mas o `E0` consegue recuperar por prior, e esconder isso seria pior.
-- **P3 (não inferioridade a `guarded`).** B+ contra `guarded` em **oito das nove células do M9** (nominal e as falhas do M9 exceto `gnss_bias`; 800 pares emparelhados por semente), `E0`. `gnss_bias` fica fora do teste porque a secção 8.4 prevê nela uma regressão pelo mecanismo, antes de qualquer execução do M10; o seu resultado e o intervalo exato são **reportados** à parte, como regressão prevista. Com `b` = pares em que só `guarded` recupera e `c` = pares em que só B+ recupera, a diferença `(b − c)/800` tem de ter limite superior conservador abaixo de uma margem de **3 pontos percentuais** (limite de Clopper-Pearson superior de `b/900` menos limite inferior de `c/900`, cada um com a cauda do degrau de Holm dividida por dois). Exemplos com cauda de 0,0125 para cada limite: `b = c = 15`: limite superior 2,0 pp, não inferior; `b = c = 40`: 3,2 pp, **não** demonstra (com 40 discordâncias para cada lado o desenho não tem poder para 3 pp). **Aviso de agrupamento**: o agrupamento deixa que ganhos numa célula (por exemplo `altimeter_bias_low`, em que `guarded` recupera 0 de 30) mascarem regressões noutra. Por isso as diferenças por célula são **reportadas** com o intervalo exato, e uma regressão de mais de 10 pontos numa célula é sinalizada nos resultados, sem ser critério.
+- **P3 (não inferioridade a `guarded`).** B+ contra `guarded` em **oito das nove células do M9** (nominal e as falhas do M9 exceto `gnss_bias`; 800 pares emparelhados por semente), `E0`. `gnss_bias` fica fora do teste porque a secção 8.4 prevê nela uma regressão pelo mecanismo, antes de qualquer execução do M10; o seu resultado e o intervalo exato são **reportados** à parte, como regressão prevista. Com `b` = pares em que só `guarded` recupera e `c` = pares em que só B+ recupera, a diferença `(b − c)/800` é testada contra uma margem de não inferioridade de **3 pontos percentuais** (H0: `(b − c)/n ≥ 0,03`). **Valor-p primário:** teste de score emparelhado de Tango e Nam (máxima verosimilhança restrita do modelo multinomial, aproximação normal), que entra na ordenação de Holm como os outros. **Valor-p reportado ao lado:** a construção conservadora por limites de Clopper-Pearson (limite superior de `b/n` menos limite inferior de `c/n`, cada um com cauda `α/2`), com `p` igual ao menor `α` a que declara não inferioridade. Esta trata `b` e `c` como independentes, quando são negativamente correlacionados, e perde poder. Exemplos com `n = 800` (`spikes/m10-nav-feasibility/power_thresholds.py`): `b = c = 15`: score 0,00011, Clopper-Pearson 0,0032; `b = c = 40`: score 0,0047, Clopper-Pearson 0,063 (a construção conservadora falharia em todos os degraus de Holm); `b = 10, c = 25`: score 2,6e-8; `b = 30, c = 5`: score 0,57, não inferioridade não demonstrada. **Antes da congelação**, a dimensão exata do teste de score é verificada por enumeração nas taxas de discordância esperadas; se exceder o alfa nominal, a P3 passa à construção de Clopper-Pearson. **Aviso de agrupamento**: o agrupamento deixa que ganhos numa célula (por exemplo `altimeter_bias_low`, em que `guarded` recupera 0 de 30) mascarem regressões noutra. Por isso as diferenças por célula são **reportadas** com o intervalo exato, e uma regressão de mais de 10 pontos numa célula é sinalizada nos resultados, sem ser critério.
 - **P4 (H-C: o que justifica o nível de proteção).** C contra B+ numa **única** métrica: a falha de alerta vertical (I1v) por execução, emparelhada por semente e agrupada nas seis células de pares (F3; 600 pares), `E0`. McNemar exato bilateral sobre os pares discordantes ao alfa do degrau de Holm, **e** diferença agrupada a favor de C de pelo menos **3 pontos percentuais**. **Falsificada** (e C não é adotada; B+ fica) se qualquer das duas falhar. Poder (McNemar exato, aritmética de `power_thresholds.py`, discordâncias supostas: só B+ falha em 3,5% dos pares e só C em 0,5% para 3 pp; 5,5% e 0,5% para 5 pp; 7% e 1% para 6 pp): **por célula** (100 pares) o poder a alfa 0,0125 é de 0,02 (3 pp), 0,13 (5 pp) e 0,21 (6 pp); a alfa 0,05, 0,09, 0,35, 0,44. **Agrupado** (600 pares) é de 0,90, 1,00 e 1,00 a alfa 0,0125. Com 300 pares efetivos (por as células partilharem sementes) é de 0,47 (3 pp) e 0,88 (5 pp) a 0,0125. Para uma diferença de 10 pontos (20% contra 10%) o poder por célula é de 0,71. A objeção da revisão fica confirmada: comparar proporções independentes de 90% e 80% com 100 por célula a alfa 0,0056 tem poder de 0,17, e o agrupamento é necessário.
 
 **Reportados (sem valores-p e fora da família primária):**
@@ -786,9 +807,9 @@ Esforço em dias de trabalho de uma pessoa; estimativa grosseira, incerta (±50%
 
 | Marco | Entregáveis | Critérios de saída medidos | Esforço |
 | --- | --- | --- | --- |
-| M10.0 desenho e porta de decisão | este documento revisto; decisões do proprietário (secção 13); porta analítica do barómetro (`baro_gate.py`); modelos de sensor e de falha escritos; execução Rust de viabilidade da regra de arranque a frio contra `robust` | revisão independente sem bloqueios; **(i) a execução Rust da regra de arranque a frio de 8.4 reproduz as recuperações de `robust` nas células `altimeter_bias` e `altimeter_bias_low` do M9.1 (dentro de 2 em 30), em células já publicadas e sem afinação; (ii) veredicto da porta do barómetro registado por escrito (resultado atual: janela útil nula para 5 e 10 m na variante pessimista, `E1` condicional)**; hashes dos modelos escolhidos; lista de requisitos e de hipóteses primárias congelada | 4 a 6 |
+| M10.0 desenho e porta de decisão | este documento revisto; decisões do proprietário (secção 13); porta analítica do barómetro (`baro_gate.py`); modelos de sensor e de falha escritos; verificação da regra de arranque a frio no protótipo | revisão independente sem bloqueios; **(i) a regra de arranque a frio de 8.4 verificada no protótipo; a execução Rust contra `robust` passa para o M10.2 (ver "Estado do M10.0"); (ii) veredicto da porta do barómetro registado por escrito (resultado atual: janela útil nula para 5 e 10 m na variante pessimista, `E1` condicional)**; hashes dos modelos escolhidos; lista de requisitos e de hipóteses primárias congelada | 4 a 6 |
 | M10.1 fundações | tipo de matriz simétrica; esquema `v2` (barómetro, falhas novas, latência); verificador `v3` com erro de estimação, NEES, NIS, falhas de alerta; teste de isolamento estendido aos módulos `nav_*`; script de campanha com a recusa das sementes de avaliação | traços M9 e M9.1 iguais byte a byte; testes unitários dos sensores novos; teste de CI da recusa; `cargo fmt`, `clippy`, `test`, `build --release` e as campanhas do README passam | 5 a 8 |
-| M10.2 estimadores B e B+ | filtro LTV sem rejeição (B+) e com NIS (B); CUSUM, paridade, reprocessamento; modo de desenvolvimento; ferramentas de campanha e de agregação por chunks | NEES médio nas sementes 5000 a 5099 dentro do intervalo; NIS por sensor; falsos alarmes do CUSUM nominais; custo por ciclo medido | 6 a 8 |
+| M10.2 estimadores B e B+ | filtro LTV sem rejeição (B+) e com NIS (B); CUSUM, paridade, reprocessamento; modo de desenvolvimento; ferramentas de campanha e de agregação por chunks | a regra de arranque a frio de B+ reproduz as recuperações de `robust` nas células `altimeter_bias` e `altimeter_bias_low` do M9.1 (dentro de 2 em 30), em células já publicadas e sem afinação; NEES médio nas sementes 5000 a 5099 dentro do intervalo; NIS por sensor; falsos alarmes do CUSUM nominais; custo por ciclo medido | 6 a 8 |
 | M10.3 separação e modos | subfiltros e nível de proteção vertical (C), gestor de modos, lei lateral degradada, monitor de segurança | testes de propriedade de MD1 e MD2; isolamento e atraso em degraus sintéticos coerentes com o analítico (ordem de grandeza) | 6 a 9 |
 | M10.4 desenvolvimento e congelação | campanha de desenvolvimento nas sementes 5000 a 5099 com o protocolo de 10.4; escolha de limiares, `AL`, dwell, `h_commit`; entradas hostis; ficheiros de hash | limiares congelados por hash num commit; relatório de desenvolvimento; nenhuma semente de avaliação tocada | 4 a 6 |
 | M10.5 avaliação e revisão | oito chunks de avaliação nas sementes 3000 a 3099 com `--evaluation`; agregação; revisão independente; resultados | hipóteses primárias classificadas; resultados fiéis às contagens; revisão sem bloqueios; M9 intacto | 4 a 6 |
@@ -846,18 +867,69 @@ O estudo foi escrito por um autor e contestado por três revisores que não o es
 
 **Fica por resolver antes da congelação (M10.4), não antes da aprovação.**
 
-- Os valores de poder com 300 pares e os limiares de P1 nos degraus de Holm estão no texto, mas o script ainda não os calcula.
-- A P3 assenta em limites e não produz um valor-p; tem de ser especificada para entrar na ordenação de Holm, ou passar a um procedimento de sequência fixa.
+- Resolvido no M10.0: `power_thresholds.py` calcula os valores de 300 pares e os limiares de P1 em todos os degraus de Holm, e a P3 tem um valor-p (teste de score de Tango e Nam, com a construção de Clopper-Pearson reportada ao lado).
+- A dimensão exata do teste de score da P3 ainda não foi verificada por enumeração.
 - Os tamanhos dos resumos por execução ainda não foram medidos.
 - O teto de execuções por bloco tem de subir de 1000 para 2500, com justificação.
 
 **O que não está demonstrado.** Nada neste documento é evidência das hipóteses do M10. O protótipo é um canal vertical de brinquedo, com sementes de desenvolvimento próprias. Não distingue B+ de C. Não usa o simulador do M8 nem o modelo de falhas do M9. Não há garantias formais.
 
+## Estado do M10.0 e porta do M10.1
+
+**Critérios de saída do M10.0 (secção 11).**
+
+| Critério | Estado | Evidência |
+| --- | --- | --- |
+| Revisão independente sem bloqueios | cumprido para o desenho; a verificação final do pacote do M10.0 está na secção "Revisão independente" | três revisões, mais a verificação do M10.0 |
+| (i) Regra de arranque a frio | **cumprido no protótipo, adiado em Rust** | ver abaixo |
+| (ii) Veredicto da porta do barómetro | **cumprido: `E1` não entra no M10** | `baro_gate.py`: na variante pessimista não há faixa útil acima de `h_commit` para falhas de 5 e 10 m; para 20 e 30 m a faixa dura 0,15 a 0,3 s. As células condicionais de `E1` (até 2 800 execuções) saem da campanha, que fica em 14 880 execuções (`E0`) |
+| Modelos de sensor e de falha escritos | cumprido para `E0` | secções 3 a 5; os modelos dos sensores existentes não mudam |
+| Requisitos e hipóteses primárias | **estrutura congelada, valores provisórios** | identificadores e definições das secções 9 e 9.1, braços, família P1 a P4 e regras de classificação ficam fixados. Os valores numéricos ficam congelados no fim do M10.4 pelo manifesto (secção 10.1) |
+
+**Desvio ao roteiro: a execução Rust da regra de arranque a frio.** O roteiro pedia, no M10.0, uma execução Rust da regra contra `robust`. Não foi feita. Uma execução com significado precisa do estimador B+, que é implementação do M10.2. Aplicar a regra ao navegador de ganho fixo existente seria comparar `robust` consigo próprio. Por isso o critério passa, sem alterações, para os critérios de saída do M10.2, ainda sobre células já publicadas e sem afinação. No M10.0 a regra foi verificada no protótipo do canal vertical (`python spikes/m10-nav-feasibility/coldstart.py`, sementes 9000 a 9099, `E0`, falha ativa desde 0 s, 100 execuções por célula):
+
+| Célula | Radar admitido | Erro final mediano / máximo | Dentro de 1,1 m | Desacordo declarado |
+| --- | --- | --- | --- | --- |
+| nominal | 100%, no primeiro ciclo possível (0,10 s) | 0,01 / 0,03 m | 100% | nunca |
+| viés do radar de ±5, ±10, ±20, ±30 m | 0% | 0,04 / 0,16 m | 100% | 100%, a 1,0 s |
+| viés do GNSS z de ±5 m | 0% | 5,0 / 5,16 m | 0% | 100%, a 1,0 s |
+| viés do GNSS z de ±10 m | 0% | 10,0 / 10,16 m | 0% | 100%, a 1,0 s |
+| viés do GNSS z de ±30 m | 0% | 30,0 / 30,16 m | 0% | 100%, a 1,0 s |
+
+O protótipo confirma o sentido das previsões de 8.4. O radar enviesado nunca é admitido, e com o GNSS enviesado desde 0 s o erro final é o próprio viés: declarado, não recuperado. O valor da recuperação com viés do radar (erro de 0,16 m no máximo) **não** é uma previsão para o simulador. No protótipo a IMU é quase perfeita e o modelo coincide com a verdade, por isso o número é só um limite superior otimista. A previsão de 8.4 (próximo de `robust`, 28 de 30) mantém-se. A regra do desacordo declarado (radar não admitido 1 s depois do início com o GNSS presente) é uma escolha do protótipo e fica por especificar no M10.3.
+
+**Riscos científicos que ficam.**
+
+- `E0` tem duas fontes de altitude. Com uma falha presente desde o início, nenhuma regra sem prior resolve a ambiguidade, e as células `gnss_bias` e `gnss_bias_low` desde 0 s ficam previstas como aterragens duras (classe U). O custo não está aprovado (decisão 15).
+- O protótipo não usa o simulador do M8 nem o modelo de falhas do M9, e não distingue B+ de C. Todas as previsões quantitativas para o simulador estão por medir.
+- A dimensão exata do teste de score da P3 está por verificar por enumeração.
+- As execuções agrupadas partilham sementes; o número efetivo de execuções independentes é menor do que o nominal.
+- Os parâmetros de dispersão, de ruído e de falha são assumidos. Os resultados valem só condicionalmente a eles.
+- Sem sensor relativo à plataforma, a posição horizontal desde um deslocamento constante não é observável. Nada no M10 a pode verificar.
+
+**Porta do M10.1 (fundações).** O M10.1 precisa de aprovação própria. Âmbito proposto:
+
+- tipo de matriz simétrica de tamanho fixo em `math.rs`;
+- esquema `vv-rocket-landing.v2` com as falhas novas de `E0` (atraso, valor preso, outliers intermitentes, viés horizontal a meio do voo, recetor coerente);
+- verificador `vv-rocket-landing-verification.v3` com as quatro dimensões da secção 9.1 (recuperação, contenção, declaração e classe física R, T, U), erro de estimação, NEES, NIS e falhas de alerta, calculados com a verdade só no verificador;
+- teste de isolamento estendido aos módulos `nav_*`;
+- script de campanha do M10 com a recusa das sementes de avaliação e a verificação do manifesto de congelação.
+
+Critérios de saída do M10.1:
+
+- traços M9 e M9.1 iguais byte a byte (hashes fixados nos testes);
+- testes unitários de cada falha nova, com casos negativos;
+- teste de CI da recusa das sementes de avaliação;
+- testes de entradas hostis no esquema `v2`;
+- `cargo fmt --check`, `clippy`, `test`, `build --release` e as campanhas do README a passar em Linux e Windows.
+
+**Fora do âmbito do M10.1:** nenhum estimador (B, B+ ou C), nenhuma campanha de desenvolvimento e nenhuma semente de avaliação.
+
 ## Decisão do proprietário
 
 ### Estado da porta de aprovação (29/10/2026)
 
-**Aprovado pelo proprietário:** B+ como arquitetura experimental de referência; `E0` como configuração inicial de sensores; C como extensão condicional (decisão 14). Tudo o resto está **por decidir**. O M10 completo não começa antes de as 16 decisões estarem fechadas. Isto inclui o M10.0, com a execução Rust do arranque a frio, e não há código do M10 em `crates/vv-rocket` nem uso das sementes 3000 a 3099.
+**Decisão do proprietário (29/10/2026).** As configurações recomendadas das decisões 1 a 14 e 16 estão **aprovadas**, incluindo B+ como arquitetura experimental de referência, `E0` como configuração inicial de sensores e C como extensão condicional. Na decisão 15 está aprovado o **enquadramento de medida e de relato**, mas **não** o custo em segurança ou em desempenho das regressões previstas (secção 9.1, regra 4). O M10.0 está autorizado: consolidação da investigação, especificação de arquitetura, requisitos, plano de verificação e preparação da porta seguinte. A implementação completa do M10 e a campanha de avaliação final precisam cada uma da aprovação do marco correspondente.
 
 Três princípios valem para todo o registo:
 
@@ -960,7 +1032,7 @@ Formato de cada entrada: recomendação, alternativas, implicações científica
 ### 13. Hipóteses e limiares
 
 - **Recomendação.** A família primária P1 a P4 da secção 10.5, aplicada a B+ (P4 a C contra B+). Os limiares provisórios são revistos uma vez, nas sementes de desenvolvimento, e congelados no fim do M10.4, antes de qualquer semente de avaliação.
-  - Antes da congelação: especificar a P3 com um valor-p (ou passar a um procedimento de sequência fixa) e completar `power_thresholds.py` com os valores de 300 pares e dos degraus de Holm.
+  - Feito no M10.0: valor-p da P3 (secção 10.5) e `power_thresholds.py` completo. Antes da congelação: verificar por enumeração a dimensão exata do teste de score da P3.
 - **Alternativas.** Congelar os limiares já. Só reportar, sem família.
 - **Implicações científicas.** Com uma família fechada e correção de Holm, um resultado positivo vale como teste. Sem família, cada número é exploratório.
 - **Riscos.** Limiares provisórios revistos com dados de desenvolvimento podem ficar ajustados a esses dados. A reserva 6000 a 6099 serve para repetir a avaliação se houver suspeita.
@@ -979,7 +1051,8 @@ Formato de cada entrada: recomendação, alternativas, implicações científica
   - Uma mitigação, o braço com prior da decisão 7, é avaliada e reportada nas mesmas células, para mostrar quanto da regressão é recuperável e a que custo no sinal oposto.
 - **Alternativas.** (a) Aceitar a regressão como custo de projeto. (b) Manter a regra "menor altitude" do `guarded` dentro de B+, o que recupera `gnss_bias` e perde `altimeter_bias_low`. (c) Incluir `gnss_bias` na P3, o que provavelmente reprova a P3 pelo mecanismo.
 - **Implicações científicas.** Em `E0` com falha desde 0 s, duas fontes discordam e nada as separa. Nenhuma arquitetura sem prior recupera as duas direções. A regressão é uma propriedade do problema, não um erro de B+, mas continua a ser uma aterragem dura.
-- **Riscos.** (a) é a aceitação automática que o proprietário recusou. (b) esconde a mesma aposta noutra célula. (c) é honesto mas torna a P3 inútil. A decisão é do proprietário.
+- **Riscos.** (a) é a aceitação automática que o proprietário recusou. (b) esconde a mesma aposta noutra célula. (c) é honesto mas torna a P3 inútil.
+- **Decisão do proprietário (29/10/2026).** Aprovado o enquadramento de medida e de relato. O custo das regressões **não** está pré-aprovado: as regressões ficam visíveis em todos os resultados, com comparação direta com `guarded`, e entram na avaliação global de segurança (secção 9.1) mesmo quando excluídas de uma hipótese.
 
 ### 16. Limites da campanha
 
@@ -990,4 +1063,4 @@ Formato de cada entrada: recomendação, alternativas, implicações científica
 
 ### Porta de aprovação
 
-O M10.0 começa só quando as decisões 1 a 13, 15 e 16 estiverem aprovadas, ou alteradas pelo proprietário, e registadas neste documento com a data. A decisão 14 já está aprovada. Até lá não se escreve código do M10 em `crates/vv-rocket`, não se executa a experiência de arranque a frio em Rust e não se usa nenhuma semente de avaliação (3000 a 3099).
+Fechada para o M10.0 em 29/10/2026 (ver acima). A porta seguinte é a do M10.1, descrita na secção "Estado do M10.0 e porta do M10.1". Nenhuma semente de avaliação (3000 a 3099) foi usada.

@@ -121,6 +121,76 @@ def fisher_power(n, p1, p2, alpha):
     return power
 
 
+# --- P3: valor-p para a ordenacao de Holm ---------------------------------------------------------
+P3_MARGIN = 0.03
+
+
+def p3_declares(b, c, n, alpha, margin=P3_MARGIN):
+    """Construcao conservadora do pre-registo: CP superior de b/n menos CP inferior de c/n, cada um com
+    cauda alpha/2, abaixo da margem."""
+    return cp_upper(b, n, alpha / 2.0) - cp_lower(c, n, alpha / 2.0) < margin
+
+
+def p3_pvalue(b, c, n, margin=P3_MARGIN):
+    """Menor alfa a que a construcao declara nao inferioridade (bisecao; 1,0 se nem a alfa = 1)."""
+    if not p3_declares(b, c, n, 1.0, margin):
+        return 1.0
+    lo, hi = 0.0, 1.0
+    for _ in range(45):
+        mid = 0.5 * (lo + hi)
+        if p3_declares(b, c, n, mid, margin):
+            hi = mid
+        else:
+            lo = mid
+    return hi
+
+
+def p3_monotone(b, c, n, grid=60):
+    """A construcao e monotona em alfa se a folga (limite - margem) nunca sobe com alfa."""
+    prev = None
+    for i in range(1, grid + 1):
+        a = i / grid
+        gap = cp_upper(b, n, a / 2.0) - cp_lower(c, n, a / 2.0)
+        if prev is not None and gap > prev + 1e-12:
+            return False
+        prev = gap
+    return True
+
+
+def tango_p(b, c, n, margin=P3_MARGIN):
+    """Valor-p unilateral de tipo score (Tango/Nam, MLE restrito multinomial) para H0: (pb - pc) >= margem.
+    Aproximacao normal via erf; codigo de analise, nao de simulacao."""
+    d = margin
+    # MLE restrito de pc sob pb = pc + d: raiz de b/(q+d) + c/q - 2(n-b-c)/(1-2q-d) = 0
+    lo, hi = 1e-12, (1.0 - d) / 2.0 - 1e-12
+    for _ in range(100):
+        q = 0.5 * (lo + hi)
+        g = b / (q + d) + (c / q if c else 0.0) - 2.0 * (n - b - c) / (1.0 - 2.0 * q - d)
+        if g > 0.0:
+            lo = q
+        else:
+            hi = q
+    var = n * (2.0 * q + d - d * d)
+    z = (b - c - n * d) / math.sqrt(var)
+    return 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
+
+
+def p3_section():
+    n = 800
+    res = {"n_pairs": n, "margin": P3_MARGIN, "definition":
+           "p3 = menor alfa a que cp_upper(b/n, alfa/2) - cp_lower(c/n, alfa/2) < margem (bisecao)"}
+    ex = []
+    for b, c in ((15, 15), (40, 40), (10, 25), (30, 5)):
+        row = {"b": b, "c": c, "diff_pp": 100.0 * (b - c) / n, "p3_cp": p3_pvalue(b, c, n),
+               "p_tango_score": tango_p(b, c, n), "monotone_in_alpha": p3_monotone(b, c, n)}
+        for tail in (0.0125, 0.00625):
+            row["upper_limit_pp_each_tail_%g" % tail] = 100.0 * (cp_upper(b, n, tail) - cp_lower(c, n, tail))
+        row["upper_limit_pp_each_tail_0.0125_n900"] = 100.0 * (cp_upper(b, 900, 0.0125) - cp_lower(c, 900, 0.0125))
+        ex.append(row)
+    res["examples"] = ex
+    return res
+
+
 def main():
     out = {"label": "limiares efetivos e potencia (aritmetica exata; NAO e evidencia do M10)",
            "command": "python spikes/m10-nav-feasibility/power_thresholds.py > potencia.json"}
@@ -170,6 +240,17 @@ def main():
         ni.append({"b_only_guarded": b, "c_only_C": c, "diff_pp": 100 * d_hat, "upper_limit_pp": 100 * d_up,
                    "non_inferior_margin_3pp": d_up <= 0.03})
     out["P3_noninferiority_examples_N900"] = ni
+    # 6. P1: maximo de falhas em 700 execucoes, binomial exato unilateral contra 5%, por degrau de Holm
+    out["P1_700_exact_binomial_vs_5pct_by_holm_tail"] = {
+        str(t): max(k for k in range(701) if cdf(k, 700, 0.05) <= t) for t in (0.05, 0.025, 0.05 / 3, 0.0125)}
+    # 7. McNemar exato com 300 pares efetivos (P4)
+    m300 = []
+    for label, pb, pc in (("3 pp (3,5% / 0,5%)", 0.035, 0.005), ("5 pp (5,5% / 0,5%)", 0.055, 0.005)):
+        m300.append({"scenario": label, **{"power_alpha_%g" % a: mcnemar_power(300, pb, pc, a)
+                                           for a in (0.05, 0.025, 0.05 / 3, 0.0125)}})
+    out["P4_mcnemar_power_300_effective_pairs"] = m300
+    # 8. P3: valor-p para Holm
+    out["P3_pvalue"] = p3_section()
     json.dump(out, __import__("sys").stdout, indent=1)
     print()
 
