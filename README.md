@@ -187,7 +187,7 @@ python scripts/m91_campaign.py
 
 Os resultados, incluindo a hipótese que falhou (G2b) e a regressão prevista em `altimeter_bias_low`, estão em [M9: aterragem propulsiva](docs/m9-powered-landing.md). O Mission Control mostra-os no separador "M9.1 campaign" de `/landing` (`--m91-summary` escolhe outro `summary.json`). `python scripts/m9_campaign.py` continua a dar as mesmas contagens do M9.
 
-No Mission Control, a página `/landing` corre a aterragem propulsiva em malha fechada do M9 através do contrato `vv-sim-adapter.v3`: escolher uma falha, uma política (`baseline` ou `robust`) e uma semente, ver o resultado da missão, os invariantes de segurança e a evidência de reprodução como três afirmações separadas, e comparar as duas políticas no mesmo caso. [M9: aterragem propulsiva](docs/m9-powered-landing.md).
+No Mission Control, a página `/landing` corre a aterragem propulsiva em malha fechada do M9 através do contrato `vv-sim-adapter.v3`: escolher uma falha, uma política (`baseline`, `robust`, `guarded` ou `baseline_guarded`) e uma semente, ver o resultado da missão, os invariantes de segurança e a evidência de reprodução como três afirmações separadas, e comparar as duas políticas no mesmo caso. [M9: aterragem propulsiva](docs/m9-powered-landing.md).
 
 `--suite m2 --seeds 42 --variants standard` seleciona dez casos. `--max-cases`, `--max-runs`, `--max-artifact-bytes` e `--time-budget-seconds` limitam a campanha antes e durante a execução. `--max-runs` conta invocações do simulador, incluindo repetições, reprodução e análise. Uma expectativa satisfeita não transforma uma missão insegura numa missão bem-sucedida.
 
