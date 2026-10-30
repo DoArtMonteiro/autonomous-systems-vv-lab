@@ -1,225 +1,107 @@
 # Autonomous Systems V&V Lab
 
-Laboratório em Rust para verificar missões de um veículo autónomo terrestre em duas dimensões. Combina falhas de sensores, comunicação e atuadores com invariantes de segurança, contratos temporais e reprodução determinística. Python coordena campanhas limitadas e a redução de contraexemplos.
+A Rust and Python laboratory for repeatable autonomous-mission simulation, fault injection and verification.
 
-**Estado: M7 Mission Control integrado em `main` (PR #9, 25/10/2026); aceitação operacional ainda pendente. M8 integrado em `main` (PR #10 e PR #11), com CI em Linux e Windows. M9 (aterragem propulsiva em malha fechada) e M9.1 (endurecimento de segurança) integrados em `main` (PR #12, 29/10/2026, por merge commit para preservar a cronologia do pré-registo), depois de revisão independente e com CI em Linux e Windows.** Rust executa a simulação, aplica as políticas de controlo e avalia contratos; Python organiza campanhas, reduz contraexemplos e serve a interface local Mission Control através dos adaptadores versionados `vv-sim-adapter.v1` (veículo terrestre) e `vv-sim-adapter.v2` (foguetão). O controlador recebe apenas observações e configuração da missão. O domínio principal continua a ser um veículo terrestre 2D. O M8 acrescenta um modelo idealizado de foguetão como corpo rígido 6-DOF, verificado contra casos de referência e não validado com dados de voo; o laboratório não controla equipamento real. O M9 fecha a malha sobre esse modelo: dois controladores que só recebem observações de sensores com ruído e falhas tentam aterrar numa plataforma, e um verificador independente avalia requisitos de contacto e invariantes de voo pré-registados no estado real.
+**Status:** M9 and M9.1 are integrated in `main`. M10.0 is a design package open for review in [PR #13](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/13); its implementation and campaign have not started.
 
-## Executar uma missão
+The main simulator models a two-dimensional ground vehicle. A separate, idealised six-degree-of-freedom rocket model supports the M8 and M9 research campaigns. Neither model controls real hardware, and the rocket model has no flight-data validation.
 
-Requisitos: Rust e Cargo na versão indicada em `rust-toolchain.toml`. Python 3.10 ou superior para campanhas e minimização; não exige bibliotecas adicionais.
+[Architecture](docs/architecture.md) · [M9 landing results](docs/m9-powered-landing.md) · [M8 model](docs/m8-rocket-dynamics.md) · [Reproduction](docs/reproducibility.md) · [M9 integration, PR #12](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/12)
+
+## The problem
+
+A mission can look safe to a controller while the true simulated state violates a constraint. Sensor, communication and actuator faults make that gap harder to inspect. This project separates the controller's observations from the simulator's true state, then records enough evidence to replay a failure and inspect the contract that detected it.
+
+## What is implemented
+
+- A deterministic Rust simulator for two-dimensional ground-vehicle missions, including seeded sensor, communication and actuator faults.
+- Safety invariants and finite-trace temporal contracts, evaluated by a verifier separate from the mission controller.
+- Ordered event logs, deterministic replay and bounded counterexample minimisation.
+- Python campaign runners and a local Mission Control interface using versioned simulation adapters.
+- A six-degree-of-freedom rocket dynamics package with fixed-step integration and reference cases.
+- Closed-loop powered-landing simulations for M9 and the M9.1 safety-guard follow-up.
+
+The controller uses sensor observations, not the true position. The verifier may use the true state to evaluate safety properties. A passing safety result, mission completion and progress are reported separately.
+
+## Architecture
+
+```mermaid
+flowchart TB
+    A[Scenario and seed] --> B[Deterministic simulation]
+    B --> C[True vehicle state]
+    C --> D[Sensors, communication and fault models]
+    D --> E[Observed state]
+    E --> F[Mission controller]
+    F --> G[Actuator model]
+    G --> B
+    B --> H[Independent verifier]
+    E --> H
+    F --> H
+    B --> I[Ordered event log]
+    H --> J[Verification report]
+    I --> K[Deterministic replay]
+    K --> H
+    J --> L[Bounded Python campaigns]
+    L --> M[Counterexample minimiser]
+```
+
+The rocket package uses a separate adapter. Its M9 landing controller sees noisy sensor observations; the verifier checks the simulated state against predeclared contact and flight invariants. The simulation stops at the model's contact condition. It does not model landing-leg dynamics, bounce, tip-over or real vehicle hardware.
+
+## Engineering decisions
+
+- **Separate observation from truth.** The controller cannot read the true state. The verifier can use it to check invariants independently.
+- **Make a failure replayable.** Integer coordinates, fixed time steps, an explicit pseudo-random generator and an ordered event stream reduce platform-dependent variation. Replay checks the recorded inputs and reconstructed outputs.
+- **Treat hashes as integrity checks, not signatures.** SHA-256 detects changed inputs and logs. It does not prove who created an artefact.
+- **Bound campaigns before execution.** Run, case, artefact-size and time limits constrain campaign work. A failed expectation or a safe trajectory does not by itself mean that the mission completed.
+- **Keep results tied to a model.** Rocket campaign findings apply to the idealised model and its assumptions, not to flight hardware.
+
+## Evidence and results
+
+The M9 and M9.1 result document reports **780 M9 runs comparing two policies** and **1,050 M9.1 runs**, with replay checks and predeclared campaign conditions. The campaign scripts are published, but the original raw outputs are not stored in public `main`. Treat the totals as project-reported results; the original outputs are unavailable for direct inspection.
+
+[PR #12](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/12) merged M9/M9.1 on 29/10/2026. [Its CI run](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/actions/runs/40852112731) passed Linux and Windows verification, including canonical output checks. The checks are automated CI; they do not establish independent human approval. The M9.1 report also records a failed predeclared hypothesis and a regression, rather than presenting only passing outcomes.
+
+For the M8 model, see the [reference cases and model assumptions](docs/m8-rocket-dynamics.md). For campaign commands and artefacts, see the [reproducibility guide](docs/reproducibility.md).
+
+## Run locally
+
+Requirements: Rust and Cargo as pinned in `rust-toolchain.toml`; Python 3.10 or newer for campaign scripts.
 
 ```sh
 cargo run -- run scenarios/basic-mission.json --seed 42 --output runs/basic
 cargo run -- replay runs/basic/events.json
 cargo test
-```
-
-Cada execução grava `events.json`, `report.json` e `mission.json`. Com `--contracts`, grava também o artefacto versionado `verification.json`. A saída de `run` mantém o contrato do M1: `0` quando os invariantes passam, `2` quando há violações e `1` para erros de configuração, integridade ou execução. Uma falha temporal fica no artefacto de verificação e não altera os códigos de saída legados. Uma missão pode ter segurança PASS e ficar incompleta ou estagnada. A conclusão também não apaga uma violação de segurança.
-
-`mission.json` confirma a chegada física aos pontos de passagem por ordem e apresenta o resultado `completed`, `incomplete`, `stalled` ou `invalid_terminated`. Inclui progresso, tempo em paragem de segurança e motivo da classificação. O controlador usa apenas observações; esta confirmação pertence à análise independente.
-
-## Injetar e reproduzir falhas
-
-```sh
-cargo run -- run scenarios/gps-dropout.json --seed 42 --output runs/gps
-cargo run -- run scenarios/communication-fault.json --seed 42 --output runs/communication
-cargo run -- run scenarios/restricted-zone-failure.json --seed 42 --output runs/failure
-cargo run -- replay runs/failure/events.json
-```
-
-O terceiro comando termina com código `2`: a trajetória entra na zona restrita. A reprodução termina com código `0` se reconstruir exatamente essa execução, incluindo as violações. Consultar `report.json` para o identificador do invariante, passo, estado real e observado, causa e condição esperada e observada.
-
-`safe-fallback-failure.json` e `invalid-transition.json` ativam alterações deliberadas do controlador, identificadas em `validation_mutants`, para provar que o verificador deteta a falta de entrada no estado de segurança `fallback` e uma transição inválida. São cenários de validação do verificador.
-
-Primeira violação da zona restrita, com campos selecionados do relatório da semente 42:
-
-```json
-{
-  "name": "restricted_zone",
-  "passed": false,
-  "failures": [{
-    "tick": 4,
-    "truth_position": { "x_mm": 3000, "y_mm": 4250 },
-    "trigger_event_sequence": 29,
-    "trigger_event_kind": "tick_result",
-    "expected": "truth position and swept segment outside restricted polygon",
-    "observed_result": "from=(2500,4250); to=(3000,4250)"
-  }]
-}
-```
-
-## Arquitetura
-
-```mermaid
-flowchart LR
-    Config[Cenário e semente] --> Sim[Relógio lógico e escalonador]
-    Sim --> Truth[Veículo: estado real]
-    Truth --> GPS[GPS: observações e falhas]
-    GPS --> Comm[Comunicação: perda e atraso]
-    Comm --> Sensor[Estado observado e confiança]
-    Sensor --> Mission[Controlador e missão]
-    Mission --> Actuator[Atuador e falhas M3]
-    Actuator --> Truth
-    Truth --> Verify[Verificador independente]
-    Sensor --> Verify
-    Mission --> Verify
-    Sim --> Events[Eventos ordenados e integridade]
-    Verify --> Report[Relatório e telemetria]
-    Truth --> Progress[Progresso independente da missão]
-    Progress --> MissionReport[mission.json]
-    Events --> Replay[Reexecução dos eventos]
-    Replay --> Verify
-    Replay --> Progress
-    Report --> Campaign[Campanhas Python limitadas]
-    MissionReport --> Campaign
-    Campaign --> Reduce[Redução com identidade da falha]
-    Reduce --> Config
-```
-
-Um pacote Rust mantém as fronteiras entre simulação, veículo, sensores, falhas, missão, verificação, reprodução e interface de linha de comandos. O controlador decide a partir das observações e não lê a posição real. O motor usa-a para mover o veículo e gerar amostras; o verificador usa-a para avaliar os invariantes.
-
-Os quatro invariantes de segurança verificam:
-
-- **`restricted_zone`**: nem a posição inicial nem o segmento percorrido podem tocar ou entrar no polígono restrito.
-- **`world_bounds`**: a posição e o segmento percorrido mantêm-se dentro dos limites do mundo.
-- **`safe_fallback`**: confiança abaixo do limiar durante o intervalo configurado exige o estado de segurança de paragem.
-- **`valid_state_transitions`**: cada mudança de missão e segurança tem de respeitar o respetivo grafo.
-
-Os limites do ambiente são explícitos e também são verificados. [Contrato do modelo e da reprodução](docs/architecture.md).
-
-Baixa confiança impede movimento logo no primeiro passo. O monitor confirma também que uma ordem de paragem corresponde a ausência de deslocamento real. A verificação das transições compara o grafo, a cadeia de eventos e os estados anteriores e atuais.
-
-## Contratos temporais e atuadores
-
-O M3 acrescenta contratos JSON versionados em `scenarios/m3/`. O esquema aceita apenas operadores e predicados tipados; não avalia expressões ou código fornecido no ficheiro. Rust executa um monitor de traço finito e grava os resultados, a evidência e as referências aos eventos em `verification.json`. Os artefactos v1 `events.json` e `report.json` mantêm-se compatíveis.
-
-```sh
-cargo run -- run scenarios/m3/nominal-stop.json --seed 42 --output runs/m3-stop --contracts scenarios/m3/contracts-stop.json --actuator scenarios/m3/actuator-continued-stop.json
-cargo run -- replay runs/m3-stop/events.json
-```
-
-O primeiro comando demonstra uma falha temporal causada pela continuação do movimento após a ordem de paragem. Como os invariantes de segurança passam, o código de saída de `run` continua a ser `0`; o comando apresenta `temporal status: Fail` e guarda o resultado no artefacto novo. A reprodução volta a avaliar o monitor e valida o artefacto `verification.json`. [Exemplo completo com contraexemplo reduzido e hashes](docs/m3-results.md).
-
-Os operadores disponíveis são `always`, `never`, `bounded_response`, `ordered_transition` e `bounded_progress`. A numeração começa no passo 1. Um limite `N` inclui o passo do gatilho e expira em `gatilho + N`; uma resposta no próprio passo satisfaz o contrato. Um gatilho contínuo qualifica uma obrigação por cada sequência contínua que atinja `trigger_for_ticks`; uma observação falsa ou desconhecida reinicia essa sequência. Respostas a comandos de movimento são correlacionadas pelo identificador do comando. Uma ausência de observação registada pelo simulador é um facto conhecido de localização não fiável; quando falta telemetria no traço sem esse facto, a condição dependente da localização fica desconhecida. `command_resolved` exige uma resolução observada no atuador. Se não houver resolução até ao prazo, o contrato falha e o monitor regista `Timeout` como resultado derivado, sem o atribuir ao atuador. `command_applied` exige movimento físico no prazo, mesmo quando o atuador comunica explicitamente uma falha. Uma falha explícita do atuador pode satisfazer `command_resolved`, mas não `command_applied`. Uma violação demonstrada é `FAIL`; uma propriedade cumprida no intervalo observado é `PASS`; uma obrigação ainda aberta no fim do traço é `INCONCLUSIVE`. A conclusão da missão não encerra obrigações de resposta. Estes resultados descrevem o traço finito observado, não garantem todas as execuções futuras.
-
-O modelo do atuador suporta perda de comandos de movimento, atraso determinístico e continuação de um movimento que ainda esteja em curso após uma ordem de paragem. Uma ação final de paragem limpa esse movimento; uma falha de continuação posterior não o reativa. Um comando atrasado pode, contudo, sobrepor-se a uma paragem e iniciar movimento, preservando o passo de origem. A configuração sem falhas preserva o comportamento do M2. Os eventos do atuador registam o passo do comando de origem, o prazo e o passo de execução. O modelo pode aplicar um comando atrasado depois de o controlador entrar em `fallback`.
-
-Para reduzir e reproduzir o contraexemplo de paragem:
-
-```sh
-cargo build --release
-python scripts/m3_minimize_failure.py scenarios/m3/nominal-stop.json --contracts scenarios/m3/contracts-stop.json --actuator scenarios/m3/actuator-continued-stop.json --contract-id stop_response --seed 42 --output runs/m3-stop-counterexample
-cargo run -- replay runs/m3-stop-counterexample/original/events.json
-cargo run -- replay runs/m3-stop-counterexample/reduced/events.json
-```
-
-O minimizador mantém o identificador do contrato, o tipo de propriedade, o mecanismo de continuação do movimento, o gatilho, o prazo, a violação e a reprodução determinística. Guarda os artefactos originais e reduzidos.
-
-## Determinismo e integridade
-
-Há dois modos distintos:
-
-1. **Nova execução pela semente:** cenário e semente iguais produzem JSON canónico e somas de controlo iguais.
-2. **Reprodução dos eventos:** carrega o cenário e a sequência de entradas, reconstrói a simulação e compara os estados, as transições, a telemetria e os invariantes com o manifesto original.
-
-A reprodução confirma também que as entradas registadas correspondem à semente. Por isso, depende da mesma versão do gerador pseudoaleatório e das regras do modelo.
-
-Coordenadas inteiras, passos fixos, algoritmo pseudoaleatório explícito e ordem total dos eventos evitam dependências de tempo real e diferenças de arredondamento. Os hashes SHA-256 detetam alterações no cenário e no registo. Não são assinaturas: quem substituir deliberadamente todo o artefacto e recalcular os hashes pode criar um novo registo válido. A confiança na origem exige guardar a soma de controlo numa fonte independente.
-
-O formato tem versão e rejeita campos desconhecidos e valores fora dos limites. A compatibilidade entre versões do simulador exige testes; a versão do formato não garante por si só o mesmo comportamento futuro.
-
-## Campanha e verificações
-
-```sh
-cargo fmt --check
-cargo clippy --all-targets -- -D warnings
-cargo test
-cargo build --release
 python -m unittest discover -s tests -p "test_*.py"
-python scripts/run_campaign.py --seeds 42,1337,2026 --output-root runs/campaign
 ```
 
-`--suite all` executa a matriz de regressão M1/M2. A campanha M3 é uma matriz separada, com limites próprios, para não ultrapassar o orçamento pedido ao executar cada conjunto:
+To verify the rocket reference cases and run one landing scenario:
 
 ```sh
-python scripts/run_campaign.py --suite all --variants standard,short-stall,fault-stress --seeds 42,1337 --max-runs 256 --max-cases 80 --max-artifact-bytes 67108864 --time-budget-seconds 120 --output-root runs/campaign
+cargo run --release --manifest-path crates/vv-rocket/Cargo.toml -- verify
+cargo run --release --manifest-path crates/vv-rocket/Cargo.toml -- land crates/vv-rocket/landing/altimeter-bias.json --seed 0 --output runs/m9-bias
+cargo run --release --manifest-path crates/vv-rocket/Cargo.toml -- replay runs/m9-bias
 ```
 
-Para executar a matriz M3 predefinida, com dez cenários e três sementes:
+An expected safety violation can make a `run` command exit with code `2`; that is a simulated finding, not a test harness failure. See the scenario's result and report before interpreting the exit code.
 
-```sh
-python scripts/run_campaign.py --suite m3 --seeds 42,1337,2026 --max-runs 90 --max-cases 30 --max-artifact-bytes 67108864 --time-budget-seconds 120 --output-root runs/m3-campaign
-```
+## Development timeline
 
-Cada campanha grava JSON, resumo Markdown e evidência por cenário, variante e semente. Verifica a repetição canónica e reproduz cada caso. A campanha M3 apresenta separadamente contratos temporais, segurança e progresso da missão, e identifica contratos e contraexemplos reduzidos.
+- **08/10/2026:** deterministic mission simulation and replay introduced in [commit `cfadcdb`](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/commit/cfadcdb).
+- **12/10/2026:** temporal contracts and actuator fault injection added in [commit `a22db7d`](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/commit/a22db7d).
+- **23/10/2026:** adversarial campaigns and deterministic failure replay added in [commit `d491b4a`](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/commit/d491b4a).
+- **24/10/2026:** controller-repair findings and the evidence-based replay workbench integrated through [PR #6](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/6) and [PR #7](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/7).
+- **25/10/2026:** M7 Mission Control and the simulator-adapter contract integrated through [PR #9](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/9), merged as commit [`ec2a2ab`](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/commit/ec2a2ab8e237d51c65df96aa7ca99b1c465ec624).
+- **25/10/2026:** the six-degree-of-freedom rocket model and reference verification added in [commit `8b04960`](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/commit/8b04960).
+- **29/10/2026:** M9 and M9.1 integrated through [PR #12](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/12).
 
-A campanha M4 compara `DominantAxis` e `XFirst` em quatro cenários e três sementes. Compara os calendários externos regenerados por reprodução independente e regista segurança, contratos, progresso, hashes, duração e espaço retido. [Instruções para executar a campanha M4](docs/reproducibility.md) e [resultados verificados](docs/m4-results.md).
+Dates above are commit or merge dates, not operational acceptance dates.
 
-O binário `vv-adversary` gera falhas a partir de uma semente, procura violações nas duas políticas, reduz cada falha e grava casos que `replay-m4` reproduz. Não usa cenários de falha predefinidos. [Motor adversarial, resultados medidos e ablação](docs/adversarial-engine.md).
+## Limits and current status
 
-O binário `vv-repair` compara configurações do controlador nas mesmas cargas de falhas, reproduz os contraexemplos conhecidos em cada candidata, procura classes de falha novas e aplica os critérios de aceitação escritos no ficheiro da experiência. `python scripts/m6_repair_lab.py --output-root runs/m6` gera a evidência, a análise emparelhada e um relatório HTML estático. [Reparação do controlador, resultados e limitações](docs/m6-controller-repair.md).
+- The ground-vehicle model is two-dimensional and simulated.
+- The rocket model is idealised; no flight data, physical hardware or landing-leg contact model validates it.
+- Full M9/M9.1 campaign output is not included in the public repository.
+- M10.0 remains a design package in an open PR. Do not treat its proposed resilience work as implemented.
+- Mission Control runs locally and is not an operational service.
 
-`scripts/replay_workbench.py` gera uma página local, só de leitura, que mostra um contraexemplo gravado tick a tick, o veredicto da candidata, a integridade dos artefactos e o resultado de `replay-m4`. [Bancada de reprodução visual](docs/replay-workbench.md).
-
-`scripts/mission_control.py` abre um Mission Control local no navegador: escolher uma missão, alterar as falhas suportadas, correr o simulador através do contrato de adaptador `vv-sim-adapter.v1` e ver os estados gravados (modelo cinemático 2D). [M7: Mission Control, contrato de adaptador e roteiro](docs/m7-mission-control.md).
-
-`crates/vv-rocket` integra a dinâmica 6-DOF de um andar de foguete com massa variável (RK4 de passo fixo) e verifica-a contra casos de referência com tolerâncias fixadas antes da execução: `cargo run --release --manifest-path crates/vv-rocket/Cargo.toml -- verify`. Os doze casos cumprem os critérios ativos; os dois critérios da primeira execução que falharam ou se revelaram inválidos ficam no relatório como histórico e não contam como aprovados. No Mission Control, a página `/rocket` corre três experiências através do contrato `vv-sim-adapter.v2`. É um modelo idealizado, não validado contra dados de voo, e sem modelo de contacto com o solo. [M8: dinâmica de corpo rígido do andar de foguete](docs/m8-rocket-dynamics.md).
-
-A campanha M9 compara as duas políticas em 780 execuções emparelhadas, todas reproduzidas, com sementes de reserva e hipóteses fixadas antes da execução:
-
-```sh
-cargo build --release --manifest-path crates/vv-rocket/Cargo.toml
-crates/vv-rocket/target/release/vv-rocket land crates/vv-rocket/landing/altimeter-bias.json --seed 0 --output runs/m9-bias
-crates/vv-rocket/target/release/vv-rocket replay runs/m9-bias
-python scripts/m9_campaign.py
-python scripts/mission_control.py --port 8780
-```
-
-O comando `land` termina com código 2 neste caso: com o altímetro enviesado em +20 m, a política `baseline` toca no solo a cerca de 20 m/s (requisito `R1`, limite 3 m/s). A política `robust` rejeita o altímetro e aterra. Em `http://127.0.0.1:8780/landing`, escolher "Altimeter bias" e "Compare policies on this case".
-
-O M9.1 acrescenta o invariante `S5` (subida com o motor aceso), as políticas `guarded` e `baseline_guarded` e duas falhas que leem baixo (`altimeter_bias_low`, `gnss_bias_low`). A campanha de aceitação, pré-registada, tem 1050 execuções (sementes 2000 a 2029), todas reproduzidas, e separa deteção, contenção e recuperação:
-
-```sh
-crates/vv-rocket/target/release/vv-rocket land crates/vv-rocket/landing/gnss-bias-guarded.json --seed 0 --output runs/m91-demo
-python scripts/m91_retrospective.py --binary crates/vv-rocket/target/release/vv-rocket
-python scripts/m91_campaign.py
-```
-
-Os resultados, incluindo a hipótese que falhou (G2b) e a regressão prevista em `altimeter_bias_low`, estão em [M9: aterragem propulsiva](docs/m9-powered-landing.md). O Mission Control mostra-os no separador "M9.1 campaign" de `/landing` (`--m91-summary` escolhe outro `summary.json`). `python scripts/m9_campaign.py` continua a dar as mesmas contagens do M9.
-
-No Mission Control, a página `/landing` corre a aterragem propulsiva em malha fechada do M9 através do contrato `vv-sim-adapter.v3`: escolher uma falha, uma política (`baseline`, `robust`, `guarded` ou `baseline_guarded`) e uma semente, ver o resultado da missão, os invariantes de segurança e a evidência de reprodução como três afirmações separadas, e comparar as duas políticas no mesmo caso. [M9: aterragem propulsiva](docs/m9-powered-landing.md).
-
-`--suite m2 --seeds 42 --variants standard` seleciona dez casos. `--max-cases`, `--max-runs`, `--max-artifact-bytes` e `--time-budget-seconds` limitam a campanha antes e durante a execução. `--max-runs` conta invocações do simulador, incluindo repetições, reprodução e análise. Uma expectativa satisfeita não transforma uma missão insegura numa missão bem-sucedida.
-
-GitHub Actions executa formatação, Clippy, testes Rust e Python, cobertura mínima de 80%, as campanhas M1, M2, M3 e M4, minimização e reprodução em Linux e Windows. Compara os hashes canónicos entre os dois sistemas. [Resultados do M4](docs/m4-results.md), [resultados do M3](docs/m3-results.md), [resultados do M2](docs/m2-results.md), [resultados do M1](docs/m1-results.md) e [contrato de reprodução](docs/reproducibility.md).
-
-## Reduzir uma falha
-
-O par `f-zone-nominal.json` e `g-zone-fault.json` mantém missão, geometria e limiar de confiança. O primeiro conclui com segurança PASS. Com ruído de GPS, o segundo toca na zona restrita. Não utiliza `validation_mutants`.
-
-```sh
-cargo build --release
-cargo run -- run scenarios/m2/g-zone-fault.json --seed 42 --output runs/original
-python scripts/minimize_failure.py scenarios/m2/g-zone-fault.json --seed 42 --output runs/minimized --max-candidates 80 --time-budget-seconds 30
-cargo run -- run runs/minimized/scenarios/minimized.json --seed 42 --output runs/reduced
-cargo run -- replay runs/original/events.json
-cargo run -- replay runs/reduced/events.json
-```
-
-Os dois comandos `run` terminam com código 2, por violação esperada. Executar os comandos seguintes mesmo após esse código. O script localiza o executável em `target/release`; `--binary` ou `VV_LAB_BINARY` permitem indicar outro caminho.
-
-Na semente 42, a redução verificada diminui o horizonte de 32 para 19 passos e o ruído máximo de 500 para 3 mm. Conserva `restricted_zone`, a transição real do exterior para a fronteira e uma observação com ruído que influencia o movimento. O cenário reduzido reproduz exatamente a sua própria execução; não tem de gerar a mesma trajetória ou o mesmo hash do original.
-
-`runs/minimized/summary.json` e `summary.md` apresentam assinaturas antes e depois, reduções aceites, candidatos rejeitados, limites e comandos concretos. As pastas `original/` e `final/` contêm eventos e relatórios já reproduzidos. Por omissão, a pesquisa conserva a semente e limita-se a 80 candidatos, 30 segundos, 16 MiB retidos e 32 MiB temporários. Se nenhum candidato válido conservar a falha, apresenta esse resultado.
-
-Também é possível selecionar `--property mission:stalled` para reduzir uma estagnação. A pesquisa mantém a classificação, os critérios de progresso e a política. É uma redução prática limitada, sem garantia de mínimo global. [Exemplo M2 com evidência e métricas](docs/m2-results.md) e [catálogo de cenários](docs/scenario-catalogue.md).
-
-## Simplificações deliberadas
-
-- Movimento cinemático numa grelha 2D, com orientação cardinal e velocidade discreta. Sem aceleração, dinâmica dos pneus, colisões entre veículos ou física de terreno.
-- Pontos de passagem e controlador simples. Não existe planeamento de trajetórias para evitar a zona restrita; o verificador deteta uma trajetória insegura.
-- Confiança do GPS e envelhecimento das observações seguem regras explícitas do modelo. Não representam um estimador probabilístico calibrado.
-- As mensagens transportam observações do GPS. Não há protocolo de rede real, múltiplos agentes ou controlo de equipamento.
-- A integridade do registo não prova a segurança de um sistema real. O laboratório verifica propriedades deste modelo e das entradas fornecidas.
-- Sem interface gráfica, serviços distribuídos ou alojamento. A pesquisa tem uma ordem determinística, mas um orçamento de tempo atingido pode interrompê-la mais cedo numa máquina lenta.
-- A avaliação M4 cobre duas políticas determinísticas neste modelo. O calendário externo iguala as falhas e o ruído, mas não força observações iguais quando as trajetórias divergem.
+Further model contracts and campaign reports are linked from the [repository documentation](docs/architecture.md).
