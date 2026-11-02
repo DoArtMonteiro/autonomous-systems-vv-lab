@@ -294,3 +294,35 @@ fn the_specific_force_lag_is_measured_and_bounded_by_the_actuator() {
     // Ramps: bounded by the throttle rate limit (1/s, 845 kN): 1.5 steps of 8.45 kN over m.
     assert!(ramp < 0.6, "{ramp}");
 }
+
+#[test]
+fn m10_traces_and_verifications_are_bit_identical_on_every_platform() {
+    // Pinned on Windows and checked on Linux by CI, as for the M9 traces. These pins follow the
+    // development configuration (m10-nominal.json); they are re-set when the case is retuned and
+    // frozen with it before any evaluation.
+    let stuck =
+        json!([{"kind": "altimeter_stuck", "start_s": 9.0, "end_s": 15.0, "magnitude": 0.0}]);
+    for (label, case, want_trace, want_verification) in [
+        (
+            "nominal",
+            with("m10_b_plus", json!([])),
+            "147a360e9606ef7442054f0642556c0e385c451846317456f8e29c77f563972b",
+            "e74b755f445f17232ad21845c625f9fc880300413eea489e8a2548735e96f4d7",
+        ),
+        (
+            "stuck radar",
+            with("m10_b_plus", stuck),
+            "38c869aabc4892758b7ac8219987837b1aba37a024f911985ff7c84220845120",
+            "0744c68ab622c35ea4643c5ac6bbe83826e7bb25cfd2532b0609daebd474dd7d",
+        ),
+    ] {
+        let art = artifacts(&bytes(&case), 4000).unwrap();
+        let (t, v) = (
+            vv_rocket::sha256_hex(&art.trace),
+            vv_rocket::sha256_hex(&art.verification),
+        );
+        eprintln!("{label}: trace {t} verification {v}");
+        assert_eq!(t, want_trace, "{label} trace");
+        assert_eq!(v, want_verification, "{label} verification");
+    }
+}
