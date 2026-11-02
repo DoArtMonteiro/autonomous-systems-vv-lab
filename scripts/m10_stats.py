@@ -12,7 +12,7 @@ Subcomandos:
 - `compare`: comparações emparelhadas por semente entre dois braços a partir dos `records.json`
   de campanhas M10 (o mesmo caso por semente: dispersões, magnitude e janela). Por célula: pares,
   recuperações de cada braço, `b` (só o primeiro recupera), `c` (só o segundo recupera) e um
-  intervalo conservador da diferença por limites de Clopper-Pearson. Com sementes de
+  intervalo da diferença com cobertura de pelo menos 95% (Clopper-Pearson com Bonferroni). Com sementes de
   desenvolvimento o resultado é exploratório: não há valores-p fora da família primária (10.6).
 
 Só usa a biblioteca padrão; sem aleatoriedade. Código de análise, fora da simulação.
@@ -214,9 +214,10 @@ def paired(records: list[dict[str, Any]], first: str, second: str, metric: str =
         rows.append({
             "cell": cell, "pairs": n, "first": sum(x), "second": sum(y), "b_only_first": b, "c_only_second": c,
             "difference_pp": 100.0 * (c - b) / n,
-            # Conservador: trata b e c como independentes (são negativamente correlacionados).
-            "difference_ci95_pp": [100.0 * (cp_lower(c, n, 0.025) - cp_upper(b, n, 0.025)),
-                                   100.0 * (cp_upper(c, n, 0.025) - cp_lower(b, n, 0.025))],
+            # Quatro limites unilaterais de Clopper-Pearson com cauda 0,0125: pela desigualdade de
+            # Bonferroni, a cobertura conjunta é de pelo menos 95%, qualquer que seja a correlação.
+            "difference_ci95_pp": [100.0 * (cp_lower(c, n, 0.0125) - cp_upper(b, n, 0.0125)),
+                                   100.0 * (cp_upper(c, n, 0.0125) - cp_lower(b, n, 0.0125))],
         })
     return {"first": first, "second": second, "metric": metric, "rows": rows,
             "note": "paired by seed; development seeds are exploratory: no p-values outside the primary family"}

@@ -475,6 +475,9 @@ impl NavSystem {
             let b = self.x[BIAS];
             self.monitor.vz += self.dt * (u.z - b * n.z);
             self.rates.imu_dv += self.dt * (u.z - b * n.z);
+        } else {
+            // A cycle without IMU breaks the integral the anchored witness relies on.
+            self.rates.history_len = 0;
         }
         self.rates.since_epoch += 1;
         self.push_rates(z_radar, gnss);
@@ -906,10 +909,11 @@ impl NavSystem {
         }
         let hist = &w.history[..w.history_len];
         let last = hist[hist.len() - 1];
+        // Without an epoch before the change point the witness would again cover only time after
+        // the onset: no witness, so no isolation.
         let anchor = hist[..hist.len() - 1]
             .iter()
-            .rposition(|e| e.0 <= change_t - ANCHOR_MARGIN_S)
-            .unwrap_or(0);
+            .rposition(|e| e.0 <= change_t - ANCHOR_MARGIN_S)?;
         let k: u32 = hist[anchor + 1..].iter().map(|e| e.3).sum();
         let span = last.0 - hist[anchor].0;
         let sv = self.prm.gnss_velocity_sigma_mps;

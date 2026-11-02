@@ -66,7 +66,7 @@ Cada desvio tem a razão medida. Nenhum altera hipóteses, células, braços ou 
 
 Tabela do estado da PR 15, mantida como registo. A tabela atual, com a testemunha ancorada e os nove braços e variantes, está na iteração M10.3, secção 10.
 
-Recuperações (`landed` com `S1` a `S5`), com o binário e o modelo de caso deste commit (SHA-256 de `m10-nominal.json`: `86417497572048c2e45b84750a26e63e5c0d83a4feb80cc425e3086f6ec9f461`). Comando, por braço e família: `python scripts/m10_campaign.py --seeds 5000-5099 --scenarios F1 --arms <braço> --jobs 8`, e o mesmo com `--scenarios F2,F3`. Máquina: Windows 11, AMD64 Family 25 Model 97, Python 3.14.6; cerca de 10 s por 1 100 execuções com 8 tarefas. Em cada célula e braço uma execução foi reproduzida com `vv-rocket replay`, e todas foram verificadas. **São números de desenvolvimento, não de avaliação.**
+Recuperações (`landed` com `S1` a `S5`), com o binário e o modelo de caso do commit da PR 15 (SHA-256 de `m10-nominal.json` nesse commit: `86417497572048c2e45b84750a26e63e5c0d83a4feb80cc425e3086f6ec9f461`). Comando, por braço e família: `python scripts/m10_campaign.py --seeds 5000-5099 --scenarios F1 --arms <braço> --jobs 8`, e o mesmo com `--scenarios F2,F3`. Máquina: Windows 11, AMD64 Family 25 Model 97, Python 3.14.6; cerca de 10 s por 1 100 execuções com 8 tarefas. Em cada célula e braço uma execução foi reproduzida com `vv-rocket replay`, e todas foram verificadas. **São números de desenvolvimento, não de avaliação.**
 
 | Célula | `robust` | `guarded` | A | B | B+ | B+: isolamento correto / errado / nenhum | B+: I1v | B+: T / U |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -135,7 +135,7 @@ Nesta iteração, B+ foi tratada como referência a contestar, não como desenho
 
 ### 1. Contabilidade do isolamento (F3)
 
-O veredicto F3 olhava só para o grupo isolado: um isolamento do grupo certo **antes** do início da falha contava como correto. Agora cada isolamento sai em `navigation.isolation_events` com o instante e um veredicto próprio (`correct`, `before_onset`, `wrong`), e a execução só é `correct` se todos os isolamentos seguirem o início de uma falha do mesmo grupo. Teste: `an_isolation_before_the_fault_onset_is_not_credited` (a mesma execução julgada contra uma falha deslocada para depois do isolamento, e contra uma falha de outro grupo). Na campanha de desenvolvimento as contagens não mudaram: nenhum isolamento anterior ao início tinha acontecido. O defeito era real, mas não tinha inflacionado os números publicados.
+O veredicto F3 olhava só para o grupo isolado: um isolamento do grupo certo **antes** do início da falha contava como correto. Agora cada isolamento sai em `navigation.isolation_events` com o instante e um veredicto próprio (`correct`, `before_onset`, `wrong`), e a execução só é `correct` se todos os isolamentos seguirem o início de uma falha do mesmo grupo. Um isolamento depois do fim da janela da falha do mesmo grupo continua a contar como correto: nomeia o grupo que falhou, e o atraso de deteção é medido à parte. Teste: `an_isolation_before_the_fault_onset_is_not_credited` (a mesma execução julgada contra uma falha deslocada para depois do isolamento, e contra uma falha de outro grupo). Na campanha de desenvolvimento as contagens não mudaram: nenhum isolamento anterior ao início tinha acontecido. O defeito era real, mas não tinha inflacionado os números publicados.
 
 ### 2. Testemunha da IMU ancorada antes do ponto de mudança
 
@@ -145,12 +145,12 @@ O veredicto F3 olhava só para o grupo isolado: um isolamento do grupo certo **a
 
 | Célula (B+) | Isolamento correto / errado / nenhum, antes | Depois | Recuperadas, antes / depois | `U`, antes / depois |
 | --- | --- | --- | --- | --- |
-| `gnss_coherent_ramp` | 77 / 8 / 15 | 85 / 1 / 14 | 53 / 58 | 21 / 13 |
+| `gnss_coherent_ramp` | 77 / 8 / 15 | 84 / 1 / 15 | 53 / 57 | 21 / 14 |
 | `altimeter_outliers` | 96 / 1 / 3 | 97 / 0 / 3 | 94 / 94 | 6 / 6 |
-| `altimeter_stuck` | 100 / 0 / 0 | 100 / 0 / 0 | 92 / 92 | 6 / 6 |
-| `altimeter_delay` | 100 / 0 / 0 | 100 / 0 / 0 | 79 / 79 | 17 / 17 |
+| `altimeter_stuck` | 100 / 0 / 0 | 98 / 0 / 2 | 92 / 91 | 6 / 6 |
+| `altimeter_delay` | 100 / 0 / 0 | 99 / 0 / 1 | 79 / 78 | 17 / 18 |
 
-As outras 20 células não mudaram. Global de B+: `R` de 1 404 para 1 409, `U` de 719 para 711. Fica um isolamento errado (semente 5001, rampa de 0,5 m/s): o degrau de velocidade é pequeno face à incerteza acumulada da testemunha. Testes: `the_anchored_imu_witness_stops_blaming_the_radar_for_a_coherent_receiver_ramp` (semente 5019: radar acusado com a janela, recetor isolado com a âncora) e os testes de isolamento anteriores.
+As outras 20 células não mudaram. Global de B+: `R` de 1 404 para 1 406, `U` de 719 para 713. Sem época anterior ao ponto de mudança (o histórico guarda 4 s) ou com um ciclo sem IMU no intervalo, a testemunha não existe e não há isolamento: a âncora mais antiga voltaria a ver só o tempo depois do início (achado da revisão independente). Esta regra custa uma recuperação em cada uma de `altimeter_stuck`, `altimeter_delay` e `gnss_coherent_ramp` face a uma âncora de recurso, sem isolamentos errados novos. Antes: `docs/evidence/m10-dev/campaign-pr15/m10_b_plus.json` (binário do commit `b27bd5e`). Fica um isolamento errado (semente 5001, rampa de 0,5 m/s): o degrau de velocidade é pequeno face à incerteza acumulada da testemunha. Testes: `the_anchored_imu_witness_stops_blaming_the_radar_for_a_coherent_receiver_ramp` (semente 5019: radar acusado com a janela, recetor isolado com a âncora) e os testes de isolamento anteriores.
 
 ### 3. Independência estatística da paridade
 
@@ -174,7 +174,7 @@ O diagnóstico corrigido está em "Leitura", acima: a perda é lateral. A regra 
 | par `altimeter_bias_low` + `gnss_dropout` | 41, 32, 27 | 85, 0, 15 | 92 |
 | as outras 22 células | sem diferença em nenhuma execução | | |
 
-Global de B+: `R` de 1 409 para 1 497, `T` de 280 para 216, `U` de 711 para 687. Das 15 `U` que restam, 10 falham `R2` e 5 `R1` (perdas longas que acabam perto do toque); no nominal, B+ falha `R2` em 6 de 100. É uma alteração da semântica aprovada de `untrusted` e fica para decisão do proprietário. Teste: `the_exploratory_bounded_chase_keeps_the_pad_when_untrusted_comes_from_missing_data` (semente 5004: `T` com a regra aprovada, `R` com a variante).
+Global de B+: `R` de 1 406 para 1 494, `T` de 281 para 217, `U` de 713 para 689. Das 15 `U` que restam, 10 falham `R2` e 5 `R1` (perdas longas que acabam perto do toque); no nominal, B+ falha `R2` em 6 de 100. É uma alteração da semântica aprovada de `untrusted` e fica para decisão do proprietário. Teste: `the_exploratory_bounded_chase_keeps_the_pad_when_untrusted_comes_from_missing_data` (semente 5004: `T` com a regra aprovada, `R` com a variante).
 
 ### 5. Arquitetura C: a lacuna que a disparou não está ao alcance de C
 
@@ -194,7 +194,7 @@ Medido: NEES médio de 48,8 com `thrust_loss` contra 6,6 no nominal (7 estados).
 
 ### 8. Dimensão exata da P3, agora com script commitado
 
-`python scripts/m10_stats.py size` enumera o modelo multinomial completo com n = 800 na fronteira `p_b = p_c + 0,03`, `p_c` de 0,5% a 8%, aos quatro alfas de Holm. A região de rejeição de cada `c` é `b ≤ b_max(c)`; a monotonia foi verificada em todos os pontos (`--monotone-step 1`, 27 s). Resultado: dimensão de 0,0094 a 0,0122 a alfa 0,0125 e de 0,046 a 0,050 a alfa 0,05; o pior rácio entre dimensão e alfa é 0,997. O critério pré-registado (excesso relativo de no máximo 10%) é cumprido: o teste de score é conservador e continua a ser o valor-p primário da P3. O resultado reproduz o relato do verificador do M10.0. Testes em `tests/test_m10_stats.py`, incluindo a igualdade da enumeração com a força bruta para n = 40.
+`python scripts/m10_stats.py size` enumera o modelo multinomial completo com n = 800 na fronteira `p_b = p_c + 0,03`, `p_c` de 0,5% a 8%, aos quatro alfas de Holm (a grelha pré-registada). A região de rejeição de cada `c` é `b ≤ b_max(c)`; a monotonia foi verificada em todos os pontos (`--monotone-step 1`, 27 s). Resultado: dimensão de 0,0094 a 0,0122 a alfa 0,0125 e de 0,046 a 0,050 a alfa 0,05; o pior rácio entre dimensão e alfa é 0,997 na grelha. O critério pré-registado (excesso relativo de no máximo 10%) é cumprido e o teste de score continua a ser o valor-p primário da P3. Fora da grelha o teste não é conservador em todo o lado: a revisão independente mediu, com `p_c` de 0,15 a 0,40, um rácio de até 1,003 (dimensão 0,01254 a alfa 0,0125 e 0,05007 a alfa 0,05), dentro do critério mas acima do nominal. O resultado reproduz o relato do verificador do M10.0. Testes em `tests/test_m10_stats.py`, incluindo a igualdade da enumeração com a força bruta para n = 40.
 
 ### 9. Afinação com o mesmo protocolo para A, B e B+ (10.4)
 
@@ -206,11 +206,11 @@ Medido: NEES médio de 48,8 com `thrust_loss` contra 6,6 no nominal (7 estados).
 | B | 6 | 0,7427 | 0,7455 (2) | 0,7264 a 0,7455 | 24 |
 | B+ | 8 | 0,7445 | 0,7445 (0) | 0,0982 a 0,7445 | 17 |
 
-Leitura: a métrica de F1 de A não depende de nenhum dos seus parâmetros (F1 não tem falhas que a votação decida). O melhor ponto de B ganha 3 execuções em 1 100 sobre a partida, abaixo da resolução de 100 sementes por célula e dentro do otimismo que a própria seleção introduz. B+ não melhora sobre a configuração de partida, que já tinha sido afinada à mão (desvio 5); as 13 avaliações inadmissíveis são as de `cusum_h` baixo ou `cusum_k` baixo, com falsos alarmes nominais. **Consequência para a justiça da comparação:** com o mesmo orçamento, nenhum braço muda de forma mensurável; a diferença entre A, B e B+ não vem de afinação desigual. Proposta de congelação: os valores partilhados de partida para os três braços (ver "Decisões do proprietário").
+Leitura: a métrica de F1 de A não depende de nenhum dos seus parâmetros (F1 não tem falhas que a votação decida). O melhor ponto de B ganha 3 execuções em 1 100 sobre a partida, abaixo da resolução de 100 sementes por célula e dentro do otimismo que a própria seleção introduz. B+ não melhora sobre a configuração de partida, que já tinha sido afinada à mão nas mesmas sementes (desvio 5); das 13 avaliações inadmissíveis, 11 têm `cusum_k` = 0,25 e as outras 2 `cusum_k` = 0,5 com `cusum_h` até 12, todas com falsos alarmes nominais. Os parâmetros chegam ao braço: em A, `vote_threshold_m` de 2 e de 8 dão traços diferentes com `altimeter_stuck` (semente 5000); a insensibilidade é da métrica de F1. **Limites da justiça:** o orçamento é igual, a cobertura não (5, 6 e 8 parâmetros; 432, 1 728 e 10 368 combinações, cerca de 7%, 2% e 0,3% cobertos), e o ponto de partida de B+ foi afinado antes nas mesmas sementes. O que se pode dizer é que, com este orçamento, nenhum braço melhorou de forma mensurável sobre o seu ponto de partida; não que a afinação desigual esteja excluída. Proposta de congelação: os valores partilhados de partida para os três braços (ver "Decisões do proprietário").
 
 ### 10. Tabela de desenvolvimento desta iteração
 
-Binário deste commit e modelo de caso com `anchored_imu_witness` ligado (SHA-256 `c28a258c94a17b6ce1e8eb5a1442d977b4c951a0913375661ec3dddf8d05784a`). Comando por braço: `python scripts/m10_campaign.py --seeds 5000-5099 --scenarios F1,F2,F3 --arms <braço> --jobs 8 --output-root runs/m10-dev/<braço>`; com `*`, o mesmo modelo com `bounded_chase_when_untrusted` ligado (`--template`). Resumos em `docs/evidence/m10-dev/campaign/` e `campaign-bounded-chase/`. Máquina: Windows 11, AMD64 Family 25 Model 97, Python 3.14.6; cerca de 15 s por 2 400 execuções com 8 tarefas. Uma execução retida por célula e braço foi reproduzida com `vv-rocket replay`, todas verificadas. As políticas do M9 dão os mesmos números da tabela anterior. **Números de desenvolvimento, não de avaliação.**
+Binário deste commit; modelo de caso `m10-nominal.json` com `anchored_imu_witness` ligado (SHA-256 do modelo de caso: `c28a258c94a17b6ce1e8eb5a1442d977b4c951a0913375661ec3dddf8d05784a`; o do binário está em cada resumo). O modelo de caso de desenvolvimento liga a testemunha ancorada antes da decisão 1 do proprietário; com `false`, B+ volta ao comportamento da PR 15. Comando por braço: `python scripts/m10_campaign.py --seeds 5000-5099 --scenarios F1,F2,F3 --arms <braço> --jobs 8 --output-root runs/m10-dev/<braço>`; com `*`, o mesmo modelo com `bounded_chase_when_untrusted` ligado (`--template`). Resumos em `docs/evidence/m10-dev/campaign/` e `campaign-bounded-chase/`. Máquina: Windows 11, AMD64 Family 25 Model 97, Python 3.14.6; cerca de 15 s por 2 400 execuções com 8 tarefas. Uma execução retida por célula e braço foi reproduzida com `vv-rocket replay`, todas verificadas. As políticas do M9 dão os mesmos números da tabela anterior. **Números de desenvolvimento, não de avaliação.**
 
 Recuperações em 100:
 
@@ -227,12 +227,12 @@ Recuperações em 100:
 | `imu_accel_bias` | 89 | 89 | 89 | 89 | 89 | 89 | 89 | 89 | 89 | 0/0/100 | 0 |
 | `altimeter_bias_low` | 0 | 92 | 0 | 92 | 94 | 94 | 92 | 94 | 94 | 0/0/100 | 0 |
 | `gnss_bias_low` | 23 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0/0/100 | 0 |
-| `altimeter_stuck` | 40 | 94 | 94 | 62 | 94 | 92 | 72 | 94 | 92 | 100/0/0 | 0 |
-| `altimeter_delay` | 19 | 1 | 1 | 0 | 82 | 79 | 0 | 82 | 79 | 100/0/0 | 0 |
+| `altimeter_stuck` | 40 | 94 | 94 | 62 | 94 | 91 | 72 | 94 | 91 | 98/0/2 | 0 |
+| `altimeter_delay` | 19 | 1 | 1 | 0 | 82 | 78 | 0 | 82 | 78 | 99/0/1 | 0 |
 | `altimeter_outliers` | 96 | 93 | 93 | 56 | 94 | 94 | 90 | 94 | 94 | 97/0/3 | 0 |
 | `gnss_horizontal_bias_t0` | 7 | 6 | 6 | 6 | 7 | 7 | 6 | 7 | 7 | 0/0/100 | 0 |
 | `gnss_horizontal_bias` | 9 | 10 | 10 | 10 | 15 | 15 | 10 | 15 | 15 | 0/0/100 | 0 |
-| `gnss_coherent_ramp` | 14 | 2 | 2 | 13 | 20 | 58 | 13 | 20 | 58 | 85/1/14 | 0 |
+| `gnss_coherent_ramp` | 14 | 2 | 2 | 13 | 20 | 57 | 13 | 20 | 57 | 84/1/15 | 0 |
 | `imu_accel_drift` | 91 | 58 | 58 | 59 | 79 | 74 | 59 | 79 | 74 | 0/0/100 | 0 |
 | par `altimeter_bias` + `gnss_dropout` | 1 | 92 | 92 | 43 | 41 | 41 | 89 | 85 | 85 | 0/0/100 | 0 |
 | par `altimeter_bias_low` + `gnss_dropout` | 0 | 92 | 0 | 43 | 41 | 41 | 89 | 85 | 85 | 0/0/100 | 0 |
@@ -250,12 +250,12 @@ Avaliação global de segurança (24 células, 2 400 execuções por braço; cla
 | `guarded` | 1 147 | 312 | 941 | n/a | n/a |
 | A | 1 163 | 283 | 954 | 3 | 0 |
 | B | 1 379 | 307 | 714 | 2 | 0 |
-| B+ | 1 409 | 280 | 711 | 1 | 5 |
+| B+ | 1 406 | 281 | 713 | 1 | 5 |
 | A* | 1 299 | 179 | 922 | 3 | 0 |
 | B* | 1 467 | 243 | 690 | 2 | 0 |
-| B+* | 1 497 | 216 | 687 | 1 | 5 |
+| B+* | 1 494 | 217 | 689 | 1 | 5 |
 
-Comparações emparelhadas por semente (`python scripts/m10_stats.py compare <registos> --first guarded --second m10_b_plus`), reportadas sem valor-p: nas oito células da P3, `b` = 2 pares em que só `guarded` recupera e `c` = 7 em que só B+ recupera, em 800. É um ensaio da maquinaria da P3 em sementes de desenvolvimento, não um resultado da P3. Diferenças de pelo menos 5 pontos entre B+ e `guarded` por célula: a favor de B+ em `altimeter_bias_low` (+94), `altimeter_delay` (+78), `gnss_coherent_ramp` (+56), `pair altimeter_bias± + imu_accel_bias` (+58), `pair altimeter_bias_low + gnss_dropout` (+41), `imu_accel_drift` (+16), `gnss_horizontal_bias` (+5); contra B+ em `gnss_bias` (−21, regressão prevista), `pair gnss_bias + altimeter_dropout` (−19, o mesmo mecanismo) e `pair altimeter_bias + gnss_dropout` (−51 com a regra aprovada; −7 com a variante `*`). Contra `robust`, a única regressão de B+ acima de 5 pontos é esse par (−51; −7 com a variante).
+Comparações emparelhadas por semente (`python scripts/m10_stats.py compare <registos> --first guarded --second m10_b_plus`), reportadas sem valor-p (`docs/evidence/m10-dev/paired-*.json`): nas oito células da P3, `b` = 2 pares em que só `guarded` recupera e `c` = 7 em que só B+ recupera, em 800. É um ensaio da maquinaria da P3 em sementes de desenvolvimento, não um resultado da P3. Diferenças de pelo menos 5 pontos entre B+ e `guarded` por célula: a favor de B+ em `altimeter_bias_low` (+94), `altimeter_delay` (+77), `gnss_coherent_ramp` (+55), `pair altimeter_bias± + imu_accel_bias` (+58), `pair altimeter_bias_low + gnss_dropout` (+41), `imu_accel_drift` (+16), `gnss_horizontal_bias` (+5); contra B+ em `gnss_bias` (−21, regressão prevista), `pair gnss_bias + altimeter_dropout` (−19, o mesmo mecanismo) e `pair altimeter_bias + gnss_dropout` (−51 com a regra aprovada; −7 com a variante `*`). Contra `robust`, a única regressão de B+ acima de 5 pontos é esse par (−51; −7 com a variante).
 
 **Regressões de segurança.** Em 22 das 24 células, B+ não tem mais de 2 execuções `U` acima de `robust` nem perde 5 ou mais recuperações. As exceções são os dois pares com `gnss_dropout`: 27 `U` contra 8 de `robust` com a regra aprovada, 15 com a variante. Este par continua a ser uma regressão material de segurança face a `robust` com a regra aprovada; não está aceite.
 
@@ -266,22 +266,22 @@ Comparações emparelhadas por semente (`python scripts/m10_stats.py compare <re
 | Falha (parâmetro) | B+: pior instante, recuperadas | B+: gama | B: gama | A: gama |
 | --- | --- | --- | --- | --- |
 | `altimeter_stuck` (3 s) | qualquer, 18 | 18 a 18 | 18 a 18 | 2 (8 s) a 20 |
-| `altimeter_delay` (0,1 s) | 11 s, 17 | 17 a 18 | 15 a 17 | 0 a 0 |
+| `altimeter_delay` (0,1 s) | 2 s, 15 | 15 a 18 | 15 a 17 | 0 a 0 |
 | `gnss_coherent_ramp` (1 m/s) | 2 s, 2 | 2 a 20 | 1 a 20 | 0 a 13 |
 | `gnss_dropout` (5 s) | 6 s, 17 | 17 a 19 | 17 a 19 | 17 a 19 |
 | `imu_accel_drift` (0,05 m/s² por s) | 2 s, 16 | 16 a 17 | 16 a 17 | 3 a 17 |
 
-Nenhum isolamento errado e nenhuma falha de alerta vertical em todo o varrimento. O ponto fraco de B+ é uma rampa coerente do recetor que começa cedo (2 a 6 s, antes ou logo depois da ignição a cerca de 4,2 s): 2 de 20 a 2 s, 12 de 20 a 6 s, pelo menos 13 de 20 a partir de 7 s. Com um início tão cedo não há instantâneo certificado anterior ao início menos 1 s no anel, e a correção recai na inflação da covariância vertical, sem reposição do estado (6.4). A valor preso e o atraso do radar são indiferentes ao instante.
+Nenhum isolamento errado e nenhuma falha de alerta vertical em todo o varrimento. O ponto fraco de B+ é uma rampa coerente do recetor que começa cedo (2 a 6 s, antes ou logo depois da ignição a cerca de 4,2 s): 2 de 20 a 2 s, 12 de 20 a 6 s, pelo menos 13 de 20 a partir de 7 s. Com um início tão cedo não há instantâneo certificado anterior ao início menos 1 s no anel, e a correção recai na inflação da covariância vertical, sem reposição do estado (6.4). O valor preso do radar é indiferente ao instante; o atraso do radar varia entre 15 e 18 em 20.
 
 ### 12. Decisões do proprietário
 
 Cada decisão tem a evidência acima. Nenhuma foi tomada por mim; as recomendações estão marcadas.
 
-1. **Paridade no domínio das taxas (desvio 1).** Alternativas: (a) aceitar, com a testemunha ancorada; (b) vetar e voltar à paridade de 6.3 (só deteta em `E0`). Evidência: sem ela, B+ recupera 8, 0 e 0 em `altimeter_stuck`, `altimeter_delay` e `gnss_coherent_ramp`; com ela, 92, 79 e 58, com 1 isolamento errado em 2 400 execuções e 0 em 1 900 sem falha de taxa; o limite pela união não depende de independência. **Recomendação: (a).**
+1. **Paridade no domínio das taxas (desvio 1).** Alternativas: (a) aceitar, com a testemunha ancorada; (b) vetar e voltar à paridade de 6.3 (só deteta em `E0`). Evidência: sem ela, B+ recupera 8, 0 e 0 em `altimeter_stuck`, `altimeter_delay` e `gnss_coherent_ramp`; com ela, 91, 78 e 57, com 1 isolamento errado em 2 400 execuções e 0 em 1 900 sem falha de taxa; o limite pela união não depende de independência. **Recomendação: (a).**
 2. **Arquitetura C (decisão 12).** Alternativas: (a) não construir C e registar a experiência de lacuna como disparada por uma falha de modo comum fora do modelo de falhas de C; (b) construir C para a avaliação, sabendo que a P4 não é cumprível com B+ em 0,17% de I1v nos pares. **Recomendação: (a).** O que reduziria esta falha é uma terceira fonte de altitude, não um nível de proteção.
 3. **Semântica de `untrusted` (decisão 8) e o par com `gnss_dropout`.** Alternativas: (a) manter a regra aprovada (B+ 41 contra `robust` 92, regressão de segurança material não aceite); (b) adotar a perseguição limitada só quando `untrusted` vem de dados em falta (B+ 85, 15 `U` contra 8 de `robust`, nenhuma outra célula muda em 2 400 execuções); (c) aceitar a regressão. **Recomendação: (b)**, como emenda escrita a 8.3 antes da congelação, com o par ainda reportado como regressão residual de 7 pontos face a `robust`.
 4. **Regressão prevista em `gnss_bias` (decisão 15).** Alternativas: (a) aceitar como limite de `E0` (secção 6 acima: ambiguidade não observável e incompatível com o envelope de atuação); (b) voltar à regra "menor altitude" de `guarded` (21 em `gnss_bias`, 0 em `altimeter_bias_low`). **Recomendação: (a)**, reportada à parte como já pré-registado.
-5. **Congelação.** Pronto para congelar: o código deste commit, o modelo de caso de desenvolvimento (com `anchored_imu_witness` ligado e a decisão 3 aplicada), os valores partilhados de partida para A, B e B+ (secção 9), `scripts/m10_campaign.py`, `scripts/m10_stats.py`, os testes e o documento de desenho com as emendas aprovadas. Falta antes da avaliação: as decisões 1 a 4; o manifesto `m10-freeze.json`, que só o proprietário autoriza; refixar os hashes do M10 em `tests/m10.rs` sobre a configuração congelada; e o script de agregação dos oito chunks.
+5. **Congelação.** Pronto para congelar: o código deste commit, o modelo de caso de desenvolvimento (com `anchored_imu_witness` ligado, o que pressupõe a decisão 1, e `bounded_chase_when_untrusted` a ligar só se a decisão 3 for aprovada), os valores partilhados de partida para A, B e B+ (secção 9), `scripts/m10_campaign.py`, `scripts/m10_stats.py`, os testes e o documento de desenho com as emendas aprovadas. Falta antes da avaliação: as decisões 1 a 4; o manifesto `m10-freeze.json`, que só o proprietário autoriza; refixar os hashes do M10 em `tests/m10.rs` sobre a configuração congelada; e o script de agregação dos oito chunks.
 
 ## Limitações abertas
 

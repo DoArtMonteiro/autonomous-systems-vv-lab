@@ -311,6 +311,18 @@ fn the_anchored_imu_witness_stops_blaming_the_radar_for_a_coherent_receiver_ramp
 }
 
 #[test]
+fn a_slow_receiver_ramp_is_never_blamed_on_the_radar() {
+    // A slow coherent ramp moves the CUSUM slowly; without a GNSS epoch before the change point
+    // inside the 4 s history there is no anchored witness and no isolation (declare, not isolate).
+    for seed in [4000, 4001, 4002] {
+        let ramp = json!([{"kind": "gnss_coherent_ramp", "start_s": 4.0, "end_s": 40.0, "magnitude": 0.1}]);
+        let (nav, v) = final_nav(&with("m10_b_plus", ramp), seed);
+        assert_eq!(nav["isolated_radar"], false, "{seed}");
+        assert_ne!(v["navigation"]["isolation"], "wrong", "{seed}");
+    }
+}
+
+#[test]
 fn the_exploratory_bounded_chase_keeps_the_pad_when_untrusted_comes_from_missing_data() {
     // Development seed 5004 of pair_altimeter_bias+gnss_dropout: the radar is never admitted and
     // the receiver drops out, so the navigation is untrusted. The approved law damps the lateral

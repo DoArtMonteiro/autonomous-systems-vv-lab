@@ -2,8 +2,8 @@
   "schema": "vv-m10-campaign.v1",
   "command": "python scripts/m10_campaign.py --seeds 5000-5099 --scenarios F1,F2,F3 --arms m10_b_plus --jobs 8 --template runs/m10-dev-chase/template.json --output-root runs/m10-dev-chase/m10_b_plus",
   "machine": "Windows-11-10.0.26300-SP0; AMD64 Family 25 Model 97 Stepping 2, AuthenticAMD; Python 3.14.6",
-  "duration_s": 18.6,
-  "binary_sha256": "a82ca967ea539f5cf2d0f32c2855ad0d43ccbbe5078a0e8875086f4925690481",
+  "duration_s": 16.1,
+  "binary_sha256": "45c9ee25caadeebd3fdace37f9bdf0de160f4c60701b386482f275f35dfd9da6",
   "template_sha256": "fdd7b9bac25dba112097b18876fd3243ddb6e949d95c805eb22f8b12b6db13ef",
   "evaluation": false,
   "freeze": null,
@@ -111,7 +111,7 @@
     5099
   ],
   "total_runs": 2400,
-  "mean_trace_bytes": 484059,
+  "mean_trace_bytes": 484037,
   "replay": {
     "replayed": 24,
     "verified": 24,
@@ -585,18 +585,18 @@
       "arm": "m10_b_plus",
       "runs": 100,
       "not_acted": 0,
-      "recovered": 92,
+      "recovered": 91,
       "recovered_ci95": [
-        0.8484,
-        0.9648
+        0.836,
+        0.958
       ],
       "contained": 100,
       "classes": {
-        "R": 92,
-        "T": 2,
+        "R": 91,
+        "T": 3,
         "U": 6
       },
-      "hard_landings": 8,
+      "hard_landings": 9,
       "no_contact": 0,
       "navigation": {
         "vertical_alert_failures": 0,
@@ -606,19 +606,19 @@
         ],
         "hv_alert_failures": 0,
         "hp_alert_failures": 0,
-        "vertical_declaration_applicable": 0,
+        "vertical_declaration_applicable": 2,
         "runs_declared_in_every_window": 100,
         "median_declaration_delay_s": 0.01,
         "spurious_degradation_runs": 1,
         "unsafe_transitions": 0,
         "transition_bound_violations": 0,
-        "nees_mean_of_runs": 6.581650082138908,
-        "final_mode_untrusted": 0,
-        "median_vertical_trusted_fraction": 0.713918210256952,
+        "nees_mean_of_runs": 255836.70477127135,
+        "final_mode_untrusted": 2,
+        "median_vertical_trusted_fraction": 0.7086024978466838,
         "isolation": {
-          "correct": 100,
+          "correct": 98,
           "wrong": 0,
-          "none": 0
+          "none": 2
         }
       }
     },
@@ -627,18 +627,18 @@
       "arm": "m10_b_plus",
       "runs": 100,
       "not_acted": 0,
-      "recovered": 79,
+      "recovered": 78,
       "recovered_ci95": [
-        0.6971,
-        0.8651
+        0.6861,
+        0.8567
       ],
       "contained": 100,
       "classes": {
-        "R": 79,
+        "R": 78,
         "T": 4,
-        "U": 17
+        "U": 18
       },
-      "hard_landings": 21,
+      "hard_landings": 22,
       "no_contact": 0,
       "navigation": {
         "vertical_alert_failures": 0,
@@ -648,19 +648,19 @@
         ],
         "hv_alert_failures": 0,
         "hp_alert_failures": 0,
-        "vertical_declaration_applicable": 0,
+        "vertical_declaration_applicable": 1,
         "runs_declared_in_every_window": 100,
         "median_declaration_delay_s": 0.0,
         "spurious_degradation_runs": 0,
         "unsafe_transitions": 0,
         "transition_bound_violations": 0,
-        "nees_mean_of_runs": 12.507841774097985,
-        "final_mode_untrusted": 0,
+        "nees_mean_of_runs": 17350.29811305287,
+        "final_mode_untrusted": 1,
         "median_vertical_trusted_fraction": 0.3195985123105419,
         "isolation": {
-          "correct": 100,
+          "correct": 99,
           "wrong": 0,
-          "none": 0
+          "none": 1
         }
       }
     },
@@ -696,9 +696,9 @@
         "spurious_degradation_runs": 0,
         "unsafe_transitions": 0,
         "transition_bound_violations": 0,
-        "nees_mean_of_runs": 6.44055135272294,
+        "nees_mean_of_runs": 6.549819149533254,
         "final_mode_untrusted": 0,
-        "median_vertical_trusted_fraction": 0.6569396274297064,
+        "median_vertical_trusted_fraction": 0.657803931664797,
         "isolation": {
           "correct": 97,
           "wrong": 0,
@@ -795,18 +795,18 @@
       "arm": "m10_b_plus",
       "runs": 100,
       "not_acted": 0,
-      "recovered": 58,
+      "recovered": 57,
       "recovered_ci95": [
-        0.4771,
-        0.678
+        0.4671,
+        0.6686
       ],
       "contained": 100,
       "classes": {
-        "R": 58,
+        "R": 57,
         "T": 29,
-        "U": 13
+        "U": 14
       },
-      "hard_landings": 42,
+      "hard_landings": 43,
       "no_contact": 0,
       "navigation": {
         "vertical_alert_failures": 0,
@@ -816,19 +816,19 @@
         ],
         "hv_alert_failures": 1,
         "hp_alert_failures": 0,
-        "vertical_declaration_applicable": 1,
+        "vertical_declaration_applicable": 2,
         "runs_declared_in_every_window": 100,
         "median_declaration_delay_s": 0.05,
         "spurious_degradation_runs": 0,
         "unsafe_transitions": 0,
         "transition_bound_violations": 0,
-        "nees_mean_of_runs": 513.9316483379943,
-        "final_mode_untrusted": 14,
+        "nees_mean_of_runs": 652.3179912683036,
+        "final_mode_untrusted": 15,
         "median_vertical_trusted_fraction": 0.34603008306517996,
         "isolation": {
-          "correct": 85,
+          "correct": 84,
           "wrong": 1,
-          "none": 14
+          "none": 15
         }
       }
     },
@@ -1132,12 +1132,12 @@
     {
       "arm": "m10_b_plus",
       "runs": 2400,
-      "R": 1497,
-      "T": 216,
-      "U": 687,
+      "R": 1494,
+      "T": 217,
+      "U": 689,
       "U_ci95": [
-        0.2682,
-        0.3048
+        0.269,
+        0.3056
       ]
     }
   ]
