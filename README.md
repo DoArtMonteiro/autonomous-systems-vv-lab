@@ -92,6 +92,17 @@ python scripts/m10_campaign.py --seeds 5000-5019 --scenarios nominal,altimeter_s
 
 The campaign script refuses the evaluation seeds (3000 to 3099) and the reserve seeds (6000 to 6099) unless the owner has frozen the configuration.
 
+### M10 navigation workbench
+
+Mission Control has an engineering workbench for the M10 navigation: pick a fault scenario (none, one or two faults), compare up to four policies on the same seed, scrub a shared time cursor across the trajectory, estimation-error, sensor, CUSUM and mode-timeline charts, read why the run recovered, touched down off the pad or was unsafe, replay it and download a reproducible evidence package. It refuses the evaluation and reserve seeds and shows development results only.
+
+```sh
+cargo build --release --manifest-path crates/vv-rocket/Cargo.toml
+python scripts/mission_control.py --port 8780   # then open http://127.0.0.1:8780/workbench
+```
+
+See [docs/m10-mission-control.md](docs/m10-mission-control.md) for the journeys, routes, security properties and limitations.
+
 An expected safety violation can make a `run` command exit with code `2`; that is a simulated finding, not a test harness failure. See the scenario's result and report before interpreting the exit code.
 
 ## Development timeline

@@ -1,0 +1,57 @@
+{
+  "schema": "vv-workbench-journeys.v1",
+  "note": "Demonstration presets for the Mission Control workbench (docs/m10-mission-control.md). Development seeds only (5000 to 5099); the outcomes named in expectation were observed with the development configuration at the commit that added this file and may change while the estimator is tuned. Nothing here is an evaluation result.",
+  "journeys": [
+    {
+      "id": "nominal",
+      "title": "Nominal mission, nominal navigation",
+      "narrative": "A 22 t stage falls from about 3 km at 200 m/s, lights its engine at about 4.2 s and brakes to a 1.5 m/s descent over the pad. No fault is injected. The three policies see the same dispersed initial state and the same sensor noise. Use this run as the reference picture: the estimate sits inside its declared band, the radar and GNSS agree up to the centre-of-mass offset, the CUSUM statistics stay well below their threshold and the M10 arms declare nominal navigation for most of the descent.",
+      "policies": ["m10_b_plus", "m10_a", "robust"],
+      "seed": 5000,
+      "faults": [],
+      "look_at": [
+        "Vertical estimation error: a few decimetres, far inside the alert limit, with the k_ff sigma band around it",
+        "CUSUM traces far below the threshold h",
+        "Swimlanes: radar and GNSS healthy, vertical channel trusted, no isolation marker",
+        "Touchdown inside the 10 m R5 circle on the top view"
+      ],
+      "expectation": "All three policies land (class R). The M10 arms declare degraded navigation during the cold start before the radar is admitted."
+    },
+    {
+      "id": "altimeter-stuck",
+      "title": "Recoverable sensor fault: radar altimeter stuck",
+      "narrative": "From 8 s to 12 s the radar altimeter repeats the value it delivered just before the window, while the vehicle keeps descending at more than 100 m/s. B+ compares the vertical-rate witnesses (radar slope, GNSS vertical velocity, IMU integration), finds that only the radar is inconsistent, isolates the radar group, restores a certified snapshot and reprocesses without it. Arm A votes on altitudes and has no rate witness; arm B rejects measurements epoch by epoch. robust and guarded cannot run this fault: altimeter_stuck exists only in case schema v2, so the M9 policies are refused by the adapter.",
+      "policies": ["m10_b_plus", "m10_b", "m10_a"],
+      "seed": 5000,
+      "faults": [
+        {"kind": "altimeter_stuck", "magnitude": 0, "start_s": 8.0, "end_s": 12.0}
+      ],
+      "look_at": [
+        "Sensor panel: the radar error against truth ramps while the GNSS error stays flat",
+        "CUSUM: the radar statistic stays below h; the isolation comes from the rate parity, not from the CUSUM alarm",
+        "Declared uncertainty: sigma_z grows while the radar is excluded and falls when it is readmitted",
+        "Swimlanes: the radar group going suspect then excluded, and the isolation marker with its verdict",
+        "Why this outcome: isolation verdict and time relative to the fault onset, and A's failed requirements"
+      ],
+      "expectation": "B+ lands (class R) with one correct radar isolation; B lands without isolating; A touches down hard and off the pad (class U, R2 and R5 failed)."
+    },
+    {
+      "id": "bias-plus-gnss-dropout",
+      "title": "Two faults: biased altimeter and a GNSS outage",
+      "narrative": "The radar altimeter reads 20 m high for the whole flight and the GNSS delivers nothing from 8 s to 14 s. The radar is never admitted by B+ because its bias is there from the cold start; when the GNSS also drops out, both altitude groups are out, so B+ declares untrusted navigation and, by design, stops chasing the pad laterally. The vehicle keeps braking, but untrusted is a declaration, not a safe state: it drifts off the pad and touches down too fast sideways. robust does not estimate an accelerometer bias and lands. This is the open development regression recorded in docs/m10-implementation.md, shown here as it is.",
+      "policies": ["m10_b_plus", "robust", "guarded"],
+      "seed": 5000,
+      "faults": [
+        {"kind": "altimeter_bias", "magnitude": 20.0, "start_s": 0.0, "end_s": 40.0},
+        {"kind": "gnss_dropout", "magnitude": 0, "start_s": 8.0, "end_s": 14.0}
+      ],
+      "look_at": [
+        "Swimlanes: mode untrusted from about 8.5 s, then degraded again after the GNSS returns",
+        "Top view: B+ touches down outside the 10 m circle while robust and guarded reach the pad",
+        "Why this outcome: class U from R2 and R5 at contact, with no vertical alert failure",
+        "Sensor panel: the constant 20 m radar error and the GNSS gap"
+      ],
+      "expectation": "B+ touches down hard and off the pad (class U, R2 and R5 failed) without a vertical alert failure; robust and guarded land."
+    }
+  ]
+}
