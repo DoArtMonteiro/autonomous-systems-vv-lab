@@ -25,8 +25,11 @@ function Run($exe, [string[]]$arguments, $cwd) {
     } finally { Pop-Location }
 }
 
-Step "Ground-vehicle simulator (vv-lab, root package)"
-Run "cargo" @("build", "--release", "--bin", "vv-lab") $repo
+Step "Ground-vehicle simulator (vv-lab, root package, bundled copy)"
+# Built from desktop/ so desktop/.cargo/config.toml links the VC runtime statically, into its own
+# target directory so the developer build in target/ is untouched. The sources are the same.
+$vvlab = Join-Path $desktop "target\root-static\release\vv-lab.exe"
+Run "cargo" @("build", "--release", "--bin", "vv-lab", "--manifest-path", (Join-Path $repo "Cargo.toml"), "--target-dir", (Join-Path $desktop "target\root-static")) $desktop
 
 Step "Domain hosts (desktop workspace)"
 Run "cargo" @("build", "--release", "-p", "vv-domain-rocket", "-p", "vv-domain-ground", "-p", "vv-domain-reference") $desktop
@@ -35,7 +38,7 @@ Step "Staging domains into $stage"
 if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
 $domains = @(
     @{ id = "rocket-landing"; crate = "domain-rocket"; exe = "vv-domain-rocket.exe"; extra = @() },
-    @{ id = "ground-vehicle"; crate = "domain-ground"; exe = "vv-domain-ground.exe"; extra = @((Join-Path $repo "target\release\vv-lab.exe")) },
+    @{ id = "ground-vehicle"; crate = "domain-ground"; exe = "vv-domain-ground.exe"; extra = @($vvlab) },
     @{ id = "reference-oscillator"; crate = "domain-reference"; exe = "vv-domain-reference.exe"; extra = @() }
 )
 foreach ($d in $domains) {
