@@ -1,7 +1,7 @@
 """Adapter `vv-sim-adapter.v3` for the `rocket-landing` model (M9 closed-loop powered landing).
 
 Wraps `vv-rocket land` / `replay` (crates/vv-rocket). A request names a controller policy,
-a seed and at most one fault; the adapter validates them against the pre-registered ranges
+a seed and up to two faults (`faults`, or the single-fault form `fault`); the adapter validates them against the pre-registered ranges
 (docs/m9-powered-landing.md), builds the landing case from the nominal template and runs it.
 
 Contract v3 exists because the request has categorical inputs (policy, fault kind) that the
@@ -64,6 +64,21 @@ MODEL_VALIDITY = ("Idealized demonstrator; not flight software and not validated
 DT_S = 0.01
 DURATION_S = 40.0
 MAX_SEED = 2**32 - 1  # one run per seed; the campaign uses 1000 to 1029
+MAX_FAULTS = 2  # the M10 campaign pairs (F3) are the largest combination the design studies
+# Seeds held back for the M10 evaluation and its reserve (docs/m10-resilient-navigation.md, 10.1). Nothing
+# behind this adapter may run them: a run would be a look at the evaluation before the configuration is frozen.
+EVALUATION_SEEDS = range(3000, 3100)
+RESERVE_SEEDS = range(6000, 6100)
+
+
+def protected_seed(seed: Any) -> bool:
+    return isinstance(seed, int) and not isinstance(seed, bool) and (seed in EVALUATION_SEEDS or seed in RESERVE_SEEDS)
+
+
+def seed_refusal(seed: int) -> str:
+    which = "evaluation seed (3000 to 3099)" if seed in EVALUATION_SEEDS else "reserve seed (6000 to 6099)"
+    return (f"seed {seed} is an M10 {which}; those seeds are never run before the evaluation configuration is "
+            f"frozen. Use a development seed such as 5000 to 5099")
 
 POLICIES = {
     "baseline": "Uses the latest reading of each sensor and trusts the radar altimeter for height.",
@@ -179,16 +194,22 @@ class LandingAdapter(RocketAdapter):
                       "units": {"length": "m", "time": "s", "mass": "kg", "force": "N", "angle": "rad"},
                       "validity": MODEL_VALIDITY},
             "capabilities": {
-                "policies": [{"id": p, "description": d} for p, d in POLICIES.items()],
+                "policies": [{"id": p, "description": d, "template": self._template_path(p).name,
+                              "navigation_declarations": p in M10_POLICIES} for p, d in POLICIES.items()],
                 "faults": [{"kind": k, "label": label, "description": text,
                             "magnitude": None if mag is None else {"min": mag[0], "max": mag[1], "unit": mag[2], "default": dm},
                             "window_length_s": None if win is None else {"min": win[0], "max": win[1]},
                             "default_start_s": start, "default_end_s": end,
                             "policies": sorted(M10_POLICIES) if k in M10_FAULTS else None}
                            for k, (label, text, mag, win, dm, start, end) in FAULTS.items()],
+                "max_faults": MAX_FAULTS,
                 "seed": {"min": 0, "max": MAX_SEED,
+                         "protected": [{"min": r.start, "max": r.stop - 1, "use": use}
+                                       for r, use in ((EVALUATION_SEEDS, "M10 evaluation"), (RESERVE_SEEDS, "M10 reserve"))],
+                         "development": {"min": 5000, "max": 5099},
                          "note": "0 is the nominal case without dispersions; sensor noise stays on. Other seeds also disperse "
-                                 "the initial state, propellant, thrust and Isp."},
+                                 "the initial state, propellant, thrust and Isp. The M10 evaluation and reserve seeds are "
+                                 "refused."},
                 "time": {"step_s": DT_S, "duration_s": DURATION_S},
                 "labels": LABELS,
                 "requirements": {"pad_radius_m": t["requirements"]["r5_position_m"],
@@ -202,7 +223,7 @@ class LandingAdapter(RocketAdapter):
         }
 
     def validate(self, request: Any) -> dict[str, Any]:
-        req = _only(request, {"schema", "model", "policy", "seed", "fault"}, "request")
+        req = _only(request, {"schema", "model", "policy", "seed", "fault", "faults"}, "request")
         if req.get("schema") != REQUEST_SCHEMA_V3:
             raise AdapterError(f"schema must be {REQUEST_SCHEMA_V3}")
         if req.get("model") != MODEL_ID:
@@ -210,48 +231,84 @@ class LandingAdapter(RocketAdapter):
         if req.get("policy") not in POLICIES:
             raise AdapterError(f"policy must be one of {sorted(POLICIES)}")
         seed = _int(req.get("seed"), "seed", 0, MAX_SEED)
-        fault = self._fault(req.get("fault"))
-        if fault is not None and fault["kind"] in M10_FAULTS and req["policy"] not in M10_POLICIES:
-            raise AdapterError(f"fault.kind {fault['kind']} exists only in case schema v2 and needs an M10 policy "
-                               f"({', '.join(sorted(M10_POLICIES))})")
-        return {"schema": REQUEST_SCHEMA_V3, "model": MODEL_ID, "policy": req["policy"], "seed": seed, "fault": fault}
+        if protected_seed(seed):
+            raise AdapterError(seed_refusal(seed))
+        faults = self._faults(req)
+        for index, fault in enumerate(faults):
+            if fault["kind"] in M10_FAULTS and req["policy"] not in M10_POLICIES:
+                name = "fault" if "fault" in req else f"faults[{index}]"
+                raise AdapterError(f"{name}.kind {fault['kind']} exists only in case schema v2 and needs an M10 policy "
+                                   f"({', '.join(sorted(M10_POLICIES))})")
+        return {"schema": REQUEST_SCHEMA_V3, "model": MODEL_ID, "policy": req["policy"], "seed": seed, "faults": faults}
+
+    @classmethod
+    def _faults(cls, req: dict) -> list[dict[str, Any]]:
+        """`faults` (a list of up to MAX_FAULTS) is canonical; `fault` (one object or null) is the single-fault form.
+
+        The order is kept: the simulator applies the faults in list order and the run identity says what ran.
+        """
+        if "fault" in req and "faults" in req:
+            raise AdapterError("send either fault or faults, not both")
+        if "faults" not in req:
+            single = cls._fault(req.get("fault"))
+            return [] if single is None else [single]
+        given = req["faults"]
+        if not isinstance(given, list):
+            raise AdapterError("faults must be a list")
+        if len(given) > MAX_FAULTS:
+            raise AdapterError(f"faults must have at most {MAX_FAULTS} entries")
+        faults = []
+        for index, value in enumerate(given):
+            if value is None:
+                raise AdapterError(f"faults[{index}] must be an object")
+            faults.append(cls._fault(value, f"faults[{index}]"))
+        kinds = [f["kind"] for f in faults]
+        if len(set(kinds)) != len(kinds):
+            raise AdapterError(f"faults must not repeat a kind ({kinds[0]} twice)")
+        return faults
 
     @staticmethod
-    def _fault(value: Any) -> dict[str, Any] | None:
+    def _fault(value: Any, name: str = "fault") -> dict[str, Any] | None:
         if value is None:
             return None
-        obj = _only(value, {"kind", "magnitude", "start_s", "end_s"}, "fault")
+        obj = _only(value, {"kind", "magnitude", "start_s", "end_s"}, name)
         kind = obj.get("kind")
         if not isinstance(kind, str) or kind not in FAULTS:
-            raise AdapterError(f"fault.kind must be one of {list(FAULTS)}")
+            raise AdapterError(f"{name}.kind must be one of {list(FAULTS)}")
         _, _, magnitude, window, *_ = FAULTS[kind]
         if magnitude is None:
             given = obj.get("magnitude", 0)
             if isinstance(given, bool) or not isinstance(given, (int, float)) or given != 0:
-                raise AdapterError(f"fault.magnitude does not apply to {kind}; omit it or use 0")
+                raise AdapterError(f"{name}.magnitude does not apply to {kind}; omit it or use 0")
             size = 0.0
         else:
-            size = _number(obj.get("magnitude"), "fault.magnitude", magnitude[0], magnitude[1], None)
-        start, end = _seconds(obj.get("start_s"), "fault.start_s"), _seconds(obj.get("end_s"), "fault.end_s")
+            size = _number(obj.get("magnitude"), f"{name}.magnitude", magnitude[0], magnitude[1], None)
+        start, end = _seconds(obj.get("start_s"), f"{name}.start_s"), _seconds(obj.get("end_s"), f"{name}.end_s")
         if end <= start:
-            raise AdapterError("fault.end_s must be after fault.start_s")
+            raise AdapterError(f"{name}.end_s must be after {name}.start_s")
         if window is not None and not round(window[0] / DT_S) <= end - start <= round(window[1] / DT_S):
-            raise AdapterError(f"fault.end_s must make the {kind} window last between {window[0]:g} and {window[1]:g} s")
+            raise AdapterError(f"{name}.end_s must make the {kind} window last between {window[0]:g} and {window[1]:g} s")
         return {"kind": kind, "magnitude": size, "start_s": start / 100, "end_s": end / 100}
+
+    @staticmethod
+    def _template_path(policy: str) -> Path:
+        return TEMPLATE_M10 if policy in M10_POLICIES else TEMPLATE_M91 if policy in M91_POLICIES else TEMPLATE
 
     def case_for(self, req: dict) -> dict:
         policy = req["policy"]
         template = (self.template_m10 if policy in M10_POLICIES else self.template_m91 if policy in M91_POLICIES
                     else self.template)
         case = json.loads(json.dumps(template))
-        fault = req["fault"]
+        faults = req["faults"]
         case["controller"]["policy"] = req["policy"]
-        case["faults"] = [] if fault is None else [dict(fault)]
-        text = "nominal" if fault is None else (f"{fault['kind']} {fault['magnitude']:g} from {fault['start_s']:g} s "
-                                                 f"to {fault['end_s']:g} s")
+        case["faults"] = [dict(f) for f in faults]
+        text = " + ".join(f"{f['kind']} {f['magnitude']:g} from {f['start_s']:g} s to {f['end_s']:g} s"
+                          for f in faults) or "nominal"
         name = f"Mission Control landing: {text}, {req['policy']} policy"
-        if len(name) > 80:  # the simulator limits names to 80 characters; the longer M9.1 names need the short form
+        if len(name) > 80:  # the simulator limits names to 80 characters; the longer names need the short form
             name = f"Landing: {text}, {req['policy']}"
+        if len(name) > 80:  # two faults: name the kinds only; the faults themselves are in case.faults
+            name = f"Landing: {' + '.join(f['kind'] for f in faults)}, {req['policy']}"
         case["name"] = name[:80]
         return case
 
@@ -266,10 +323,8 @@ class LandingAdapter(RocketAdapter):
         if done.returncode not in (0, 2) or not all((out / n).is_file() for n in OUTPUT_FILES):
             raise AdapterError(f"vv-rocket land refused the case (exit {done.returncode}): {done.stderr.strip()[-400:]}")
 
-    def verify(self, run_dir: Path) -> dict[str, Any]:
-        """Typed view of a stored run: replay by this build plus integrity and identity checks."""
-        run_dir = Path(run_dir)
-        problems: list[str] = []
+    def replay(self, run_dir: Path) -> dict[str, Any]:
+        """`vv-rocket replay` of a stored run by this build: recomputes trace, verification and manifest."""
         done = self._call("replay", str(run_dir))
         try:
             report = json.loads(done.stdout) if done.returncode in (0, 1) else None
@@ -277,9 +332,16 @@ class LandingAdapter(RocketAdapter):
             report = None
         if not (isinstance(report, dict) and isinstance(report.get("status"), str)
                 and isinstance(report.get("checks"), list)):
-            report = None
-        replay = ({"status": "error", "detail": done.stderr.strip()[-400:]} if report is None
-                  else {"status": report["status"], "checks": report["checks"]})
+            return {"status": "error", "detail": done.stderr.strip()[-400:], "exit_code": done.returncode}
+        return {"status": report["status"], "checks": report["checks"], "exit_code": done.returncode,
+                "schema": report.get("schema"), "source_sha256": report.get("source_sha256")}
+
+    def verify(self, run_dir: Path) -> dict[str, Any]:
+        """Typed view of a stored run: replay by this build plus integrity and identity checks."""
+        run_dir = Path(run_dir)
+        problems: list[str] = []
+        full = self.replay(run_dir)
+        replay = {k: full[k] for k in ("status", "checks", "detail") if k in full}
 
         def load(name: str) -> Any:
             path = run_dir / name
@@ -292,7 +354,8 @@ class LandingAdapter(RocketAdapter):
                 problems.append(f"{name} is not valid JSON")
                 return None
 
-        trace, manifest, verification = load("trace.json"), load("run.json"), load("verification.json")
+        trace, manifest, verification, case = (load("trace.json"), load("run.json"), load("verification.json"),
+                                               load("case.json"))
         problems.extend(self._input_binding_problems(run_dir))
         problems.extend(f"{name} is not produced by this adapter" for name in sorted(set(_files(run_dir)) - EXPECTED_FILES))
         binary_sha = self._binary_sha()
@@ -315,6 +378,8 @@ class LandingAdapter(RocketAdapter):
             "events": (trace or {}).get("events", []),
             "summary": (trace or {}).get("summary", {}),
             "verification": verification if isinstance(verification, dict) else {},
+            # The case the simulator ran (k_ff, CUSUM threshold, alert limits), shown by the workbench; no verdict reads it.
+            "case": case if isinstance(case, dict) else {},
             "model_validity": MODEL_VALIDITY,
             "verdict": _verdict(replay, problems),
         }
@@ -332,6 +397,11 @@ class LandingAdapter(RocketAdapter):
 
 
 def request_for(policy: str, seed: int, fault: dict | None) -> dict:
-    """A v3 request body; the adapter validates it."""
+    """A v3 request body in the single-fault form; the adapter validates it."""
     return {"schema": REQUEST_SCHEMA_V3, "model": MODEL_ID, "policy": policy, "seed": seed, "fault": fault}
+
+
+def request_for_faults(policy: str, seed: int, faults: list[dict]) -> dict:
+    """A v3 request body with up to MAX_FAULTS faults, in the order the simulator applies them."""
+    return {"schema": REQUEST_SCHEMA_V3, "model": MODEL_ID, "policy": policy, "seed": seed, "faults": list(faults)}
 

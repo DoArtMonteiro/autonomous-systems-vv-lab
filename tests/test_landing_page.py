@@ -398,7 +398,7 @@ class RunTests(Base):
         self.assertEqual(resp.status, 200, body)
         self.assertEqual(json.loads(body)["verdict"]["status"], "verified")
         resp, body = self.call("POST", "/api/run", run_body("robust", 1000, None))
-        self.assertEqual(json.loads(body)["request"]["fault"], None)
+        self.assertEqual(json.loads(body)["request"]["faults"], [])
 
 
 if __name__ == "__main__":

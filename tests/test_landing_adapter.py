@@ -43,7 +43,7 @@ class ValidationTests(unittest.TestCase):
         omitted = {k: v for k, v in dropout.items() if k != "magnitude"}
         self.assertEqual(self.adapter.validate(request(flt=dropout)), self.adapter.validate(request(flt=omitted)))
         # Step-aligned times are stored as the nearest two-decimal float, so 5.26 stays 5.26.
-        self.assertEqual(self.adapter.validate(request(flt=fault("thrust_loss", 0.15, 5.26, 40.0)))["fault"]["start_s"], 5.26)
+        self.assertEqual(self.adapter.validate(request(flt=fault("thrust_loss", 0.15, 5.26, 40.0)))["faults"][0]["start_s"], 5.26)
 
     def test_invalid_requests_are_refused_with_the_field_path(self):
         cases = [
