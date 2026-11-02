@@ -171,3 +171,32 @@ jobs:
       - name: Compare pinned fixture outputs
         run: python scripts/check_platform_artifacts.py --root platform-campaigns --require-m4
         shell: bash
+
+  desktop:
+    # The M11 desktop workspace (platform, domain hosts, studio shell). Windows only: the product
+    # targets Windows 11 and the Tauri shell needs WebView2. The installer itself is built by
+    # desktop/build.ps1, not in CI.
+    name: desktop (windows-latest)
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.99.0"
+          components: clippy, rustfmt
+
+      - name: Build vv-lab for the ground-vehicle host tests
+        run: cargo build --locked --release --bin vv-lab
+
+      - name: Check, lint and test the desktop workspace
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force desktop/target/release/domains | Out-Null
+          cargo fmt --manifest-path desktop/Cargo.toml --all -- --check
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cargo clippy --manifest-path desktop/Cargo.toml --locked --all-targets -- -D warnings
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cargo test --manifest-path desktop/Cargo.toml --locked
