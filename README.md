@@ -2,7 +2,7 @@
 
 A Rust and Python laboratory for repeatable autonomous-mission simulation, fault injection and verification.
 
-**Status:** M9 and M9.1 are integrated in `main`. M10.0 is a design package open for review in [PR #13](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/13); its implementation and campaign have not started.
+**Status:** M9 and M9.1 are integrated in `main`. The M10.0 resilient-navigation design was accepted and merged through [PR #13](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/13). Its implementation is in development in draft [PR #15](https://github.com/DoArtMonteiro/autonomous-systems-vv-lab/pull/15), measured on development seeds only; the final configuration is not frozen and no evaluation seed has been run ([implementation notes](docs/m10-implementation.md)).
 
 The main simulator models a two-dimensional ground vehicle. A separate, idealised six-degree-of-freedom rocket model supports the M8 and M9 research campaigns. Neither model controls real hardware, and the rocket model has no flight-data validation.
 
@@ -82,6 +82,16 @@ cargo run --release --manifest-path crates/vv-rocket/Cargo.toml -- land crates/v
 cargo run --release --manifest-path crates/vv-rocket/Cargo.toml -- replay runs/m9-bias
 ```
 
+To fly the M10 reference navigation (B+) and a small development campaign (development seeds only):
+
+```sh
+cargo run --release --manifest-path crates/vv-rocket/Cargo.toml -- land crates/vv-rocket/landing/m10-nominal.json --seed 4000 --output runs/m10-demo
+cargo run --release --manifest-path crates/vv-rocket/Cargo.toml -- replay runs/m10-demo
+python scripts/m10_campaign.py --seeds 5000-5019 --scenarios nominal,altimeter_stuck,gnss_dropout --arms guarded,m10_b_plus --output-root runs/m10-dev
+```
+
+The campaign script refuses the evaluation seeds (3000 to 3099) and the reserve seeds (6000 to 6099) unless the owner has frozen the configuration.
+
 An expected safety violation can make a `run` command exit with code `2`; that is a simulated finding, not a test harness failure. See the scenario's result and report before interpreting the exit code.
 
 ## Development timeline
@@ -101,7 +111,7 @@ Dates above are commit or merge dates, not operational acceptance dates.
 - The ground-vehicle model is two-dimensional and simulated.
 - The rocket model is idealised; no flight data, physical hardware or landing-leg contact model validates it.
 - Full M9/M9.1 campaign output is not included in the public repository.
-- M10.0 remains a design package in an open PR. Do not treat its proposed resilience work as implemented.
+- M10 resilient navigation is implemented on a development branch and measured on development seeds only. It has not been evaluated; do not read its development numbers as M10 results.
 - Mission Control runs locally and is not an operational service.
 
 Further model contracts and campaign reports are linked from the [repository documentation](docs/architecture.md).

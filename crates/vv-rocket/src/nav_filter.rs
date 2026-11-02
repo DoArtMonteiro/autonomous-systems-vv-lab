@@ -421,7 +421,8 @@ impl NavSystem {
             _ => None,
         };
         let f_b = obs.imu.specific_force_mps2;
-        let imu_ok = finite3(f_b) && n.is_finite();
+        // A specific force beyond 1e4 m/s^2 is not physical for this vehicle: treated as missing.
+        let imu_ok = finite3(f_b) && f_b.iter().all(|x| x.abs() < 1e4) && n.is_finite();
         let z_radar = altimeter.filter(|_| n.is_finite()).map(|a| a + s_cm * n.z);
         if !self.ready {
             if let Some((gp, gv)) = gnss
@@ -600,6 +601,7 @@ impl NavSystem {
         for i in sources {
             self.cusum_pos[i] = 0.0;
             self.cusum_neg[i] = 0.0;
+            self.cusum_zero[i] = self.cycle;
         }
     }
 
@@ -1025,7 +1027,9 @@ impl NavSystem {
                 continue;
             }
             if stale[k] > exclude_after {
+                // Out for missing data: readmission follows the missing-data rule.
                 g.health = GroupHealth::Excluded;
+                g.detector_flag = false;
                 g.good_run = 0;
                 continue;
             }
