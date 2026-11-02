@@ -159,6 +159,9 @@ pub struct NavReport {
     /// Largest CUSUM statistic of each group (B+; zero for A and B).
     pub cusum_radar: f64,
     pub cusum_gnss: f64,
+    /// The rate parity isolated this group at least once (B+).
+    pub isolated_radar: bool,
+    pub isolated_gnss: bool,
 }
 
 /// Per-cycle record for the verifier: the estimate with its full covariance (position, velocity,
@@ -202,6 +205,8 @@ pub struct NavParams {
     /// Readmission after an exclusion: consecutive samples with a normalised residual below this.
     pub readmission_samples: u32,
     pub readmission_sigma: f64,
+    /// Receiver back after missing data: consecutive self-consistent GNSS epochs.
+    pub gnss_readmission_epochs: u32,
     /// Arm B: one-epoch NIS rejection threshold (chi-square, 1 degree of freedom).
     pub nis_reject: f64,
     /// Arm A: voting threshold.
@@ -248,6 +253,7 @@ impl Default for NavParams {
             admission_gate_m: 3.0,
             readmission_samples: 10,
             readmission_sigma: 3.0,
+            gnss_readmission_epochs: 10,
             nis_reject: 15.14,
             vote_threshold_m: 3.0,
             k_ff: 5.33,

@@ -81,6 +81,29 @@ pub struct NavigationReport {
     /// F2: degradations outside every fault window widened by `T_hold` and 1 s.
     pub degradations_outside_fault_windows: u64,
     pub detections: Vec<FaultDetection>,
+    /// F3: the groups the controller isolated, and the verdict against the injected faults:
+    /// `none`, `correct` (every isolated group has an injected fault) or `wrong`.
+    pub isolated: Vec<&'static str>,
+    pub isolation: &'static str,
+}
+
+/// The group of sources a fault corrupts, for the isolation verdict.
+fn fault_group(kind: FaultKind) -> Option<&'static str> {
+    match kind {
+        FaultKind::AltimeterBias
+        | FaultKind::AltimeterBiasLow
+        | FaultKind::AltimeterDropout
+        | FaultKind::AltimeterStuck
+        | FaultKind::AltimeterDelay
+        | FaultKind::AltimeterOutliers
+        | FaultKind::AltimeterDrift => Some("radar"),
+        FaultKind::GnssBias
+        | FaultKind::GnssBiasLow
+        | FaultKind::GnssDropout
+        | FaultKind::GnssHorizontalBias
+        | FaultKind::GnssCoherentRamp => Some("gnss"),
+        _ => None,
+    }
 }
 
 /// True accelerometer bias along `x_B` at `step`, from the configured faults.
@@ -300,6 +323,26 @@ pub fn verify_navigation(
                 .any(|f| t.t_s >= f.spec.start_s && t.t_s <= f.spec.end_s + margin)
         })
         .count() as u64;
+    let last = decls.last().map(|d| d.declaration.report);
+    let mut isolated = Vec::new();
+    if last.is_some_and(|r| r.isolated_radar) {
+        isolated.push("radar");
+    }
+    if last.is_some_and(|r| r.isolated_gnss) {
+        isolated.push("gnss");
+    }
+    let faulted: Vec<&str> = prep
+        .faults
+        .iter()
+        .filter_map(|f| fault_group(f.spec.kind))
+        .collect();
+    let isolation = if isolated.is_empty() {
+        "none"
+    } else if isolated.iter().all(|g| faulted.contains(g)) {
+        "correct"
+    } else {
+        "wrong"
+    };
     NavigationReport {
         source: NAV_NOTE,
         cycles: decls.len() as u64,
@@ -320,5 +363,7 @@ pub fn verify_navigation(
         degradations_outside_fault_windows,
         transitions,
         detections,
+        isolated,
+        isolation,
     }
 }

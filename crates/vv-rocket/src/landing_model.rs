@@ -529,6 +529,7 @@ fn validate_nav(n: &NavParams) -> Result<(), String> {
     for (value, name) in [
         (n.admission_cycles, "admission_cycles"),
         (n.readmission_samples, "readmission_samples"),
+        (n.gnss_readmission_epochs, "gnss_readmission_epochs"),
         (n.n_in_cycles, "n_in_cycles"),
     ] {
         if value == 0 || value > 10_000 {

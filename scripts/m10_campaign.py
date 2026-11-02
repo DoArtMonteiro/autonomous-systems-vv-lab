@@ -304,6 +304,7 @@ def score(run: RunSpec, v: dict[str, Any]) -> dict[str, Any]:
             "transitions_within_bound": nav["transitions_within_bound"],
             "spurious_degradations": nav["degradations_outside_fault_windows"],
             "detections": [d["first_declaration_delay_s"] for d in nav["detections"]],
+            "isolation": nav["isolation"],
         }
     return record
 
@@ -446,6 +447,7 @@ def build_cells(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "nees_mean_of_runs": (sum(nees) / len(nees)) if nees else None,
                 "final_mode_untrusted": sum(1 for x in navs if x["final_mode"] == "untrusted"),
                 "median_vertical_trusted_fraction": _median([x["vertical_trusted_fraction"] for x in navs]),
+                "isolation": {k: sum(1 for x in navs if x["isolation"] == k) for k in ("correct", "wrong", "none")},
             }
         cells.append(cell)
     order = {s: i for i, s in enumerate(SCENARIOS)}
