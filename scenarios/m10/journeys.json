@@ -28,7 +28,7 @@
       ],
       "look_at": [
         "Sensor panel: the radar error against truth ramps while the GNSS error stays flat",
-        "CUSUM: the radar statistic stays below h; the isolation comes from the rate parity, not from the CUSUM alarm",
+        "CUSUM: the first stuck sample is about 13 sigma off, so the radar CUSUM crosses h in that cycle; the rate parity then names the radar and its CUSUM is reset on exclusion. The trace is sampled every 0.1 s, so the peak is not drawn",
         "Declared uncertainty: sigma_z grows while the radar is excluded and falls when it is readmitted",
         "Swimlanes: the radar group going suspect then excluded, and the isolation marker with its verdict",
         "Why this outcome: isolation verdict and time relative to the fault onset, and A's failed requirements"
