@@ -38,7 +38,7 @@
     {
       "id": "bias-plus-gnss-dropout",
       "title": "Two faults: biased altimeter and a GNSS outage",
-      "narrative": "The radar altimeter reads 20 m high for the whole flight and the GNSS delivers nothing from 8 s to 14 s. The radar is never admitted by B+ because its bias is there from the cold start; when the GNSS also drops out, both altitude groups are out, so B+ declares untrusted navigation and, by design, stops chasing the pad laterally. The vehicle keeps braking, but untrusted is a declaration, not a safe state: it drifts off the pad and touches down too fast sideways. robust does not estimate an accelerometer bias and lands. This is the open development regression recorded in docs/m10-implementation.md, shown here as it is.",
+      "narrative": "The radar altimeter reads 20 m high for the whole flight and the GNSS delivers nothing from 8 s to 14 s. The radar is never admitted by B+ because its bias is there from the cold start; when the GNSS also drops out, both altitude groups are out, so B+ declares untrusted navigation and, by design, stops chasing the pad laterally. The vehicle keeps braking, but untrusted is a declaration, not a safe state: it drifts off the pad and touches down too fast sideways. The vertical estimate stays good (final error of a few centimetres): the loss is lateral. robust keeps chasing the pad with its dead-reckoned position and lands. This is the open development regression recorded in docs/m10-implementation.md, shown here as it is; an exploratory lateral policy that keeps the bounded chase in this case (85 of 100 against 41) awaits an owner decision and is not selectable here.",
       "policies": ["m10_b_plus", "robust", "guarded"],
       "seed": 5000,
       "faults": [
