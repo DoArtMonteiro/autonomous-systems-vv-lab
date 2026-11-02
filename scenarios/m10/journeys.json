@@ -12,7 +12,7 @@
       "look_at": [
         "Vertical estimation error: a few decimetres, far inside the alert limit, with the k_ff sigma band around it",
         "CUSUM traces far below the threshold h",
-        "Swimlanes: radar and GNSS healthy, vertical channel trusted, no isolation marker",
+        "Swimlanes: radar and GNSS healthy and the vertical channel trusted after the cold start, no isolation marker",
         "Touchdown inside the 10 m R5 circle on the top view"
       ],
       "expectation": "All three policies land (class R). The M10 arms declare degraded navigation during the cold start before the radar is admitted."

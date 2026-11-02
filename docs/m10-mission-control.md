@@ -75,7 +75,7 @@ As rotas novas têm as mesmas propriedades das existentes:
 ## Verificação
 
 - `tests/test_workbench.py`: validação de várias falhas, guarda das sementes (incluindo que o simulador não é chamado), comparação com recusa prévia de qualquer política inválida, reprodução, conteúdo do zip e hashes do manifesto, reprodução do pacote extraído com `vv-rocket replay`, estrutura dos percursos, ocultação de caminhos, cabeçalho CSP, ausência de `innerHTML` e análise sintática do script com `node --check`. Usa duas execuções reais do simulador e salta se o binário não existir.
-- Navegador real: os três percursos foram corridos em Chrome sem consola com erros, com o tema claro e o escuro, e a 390 px de largura sem deslocamento horizontal (`scrollWidth` igual a `innerWidth`). Capturas em `docs/images/m10-workbench/`.
+- Navegador real: os três percursos foram corridos em Chrome sem interface, controlado pelo protocolo DevTools, sem mensagens de erro na consola, com o tema claro e o escuro. A 390 px de largura não há deslocamento horizontal: `scrollWidth`, `innerWidth` e `clientWidth` valem 390 com os resultados desenhados. A reprodução do passo 5 do `README.txt` de um pacote exportado (`vv-rocket land` sobre o `case.json` extraído) deu os mesmos SHA-256 do manifesto para o traço, a verificação, o manifesto e o caso. Capturas em `docs/images/m10-workbench/`.
 
 ![Percurso 1, tema claro](images/m10-workbench/journey-1-nominal-light.png)
 ![Percurso 2, sensores e CUSUM](images/m10-workbench/journey-2-altimeter-stuck.png)
