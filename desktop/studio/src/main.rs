@@ -424,12 +424,16 @@ fn resolve_paths(app: &tauri::App) -> Paths {
                 .map(|d| d.join("VV Lab Library"))
         })
         .unwrap_or_else(|| PathBuf::from("VV Lab Library"));
-    let config = resolver
-        .app_config_dir()
-        .unwrap_or_else(|_| library.join(".config"));
-    let log = resolver
-        .app_log_dir()
-        .unwrap_or_else(|_| config.clone())
+    // VVLAB_CONFIG puts preferences and the log in one folder, so tests never touch a real profile.
+    let override_config = std::env::var_os("VVLAB_CONFIG").map(PathBuf::from);
+    let config = override_config.clone().unwrap_or_else(|| {
+        resolver
+            .app_config_dir()
+            .unwrap_or_else(|_| library.join(".config"))
+    });
+    let log = override_config
+        .or_else(|| resolver.app_log_dir().ok())
+        .unwrap_or_else(|| config.clone())
         .join("studio.log");
     Paths {
         domains,
