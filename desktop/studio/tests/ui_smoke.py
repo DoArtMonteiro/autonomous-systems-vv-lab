@@ -1,6 +1,8 @@
-"""Automated UI smoke test of V&V Lab Studio, driving the real WebView2 window.
+r"""Automated UI smoke test of V&V Lab Studio, driving the real WebView2 window.
 
-It launches the built studio executable with a fresh library, connects Playwright to the WebView2
+It launches a studio executable with a scratch library and a scratch configuration folder
+(VVLAB_LIBRARY, VVLAB_CONFIG), so it never reads or writes the user's own preferences or library,
+connects Playwright to the WebView2
 DevTools endpoint (no browser download), waits for the platform, runs the product journeys and
 asserts what is visible on screen. Screenshots of each journey (dark and light, and a small window)
 are written to docs/images/m11-studio/.
@@ -9,8 +11,14 @@ Usage (from the repository root, after `cargo build -p vv-studio` in desktop/):
 
     python desktop/studio/tests/ui_smoke.py [--exe PATH] [--domains DIR] [--shots DIR] [--port N]
 
+Against the installed application, using the domain hosts installed next to it:
+
+    python desktop/studio/tests/ui_smoke.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --domains ""
+
+`--domains ""` leaves VVLAB_DOMAINS unset, so the studio uses its own resource directory.
+Window sizes are set on the real window (Tauri setSize); DevTools viewport emulation is used only
+if the window does not reach the requested inner size, and the report says which was used.
 Requires `pip install playwright` (only the Python package; CDP needs no browser download).
-The user preferences file of the studio is saved before the test and restored afterwards.
 """
 
 import argparse
@@ -30,6 +38,7 @@ REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..")
 
 results = []
 console_errors = []
+sizing = []  # (requested, method, inner size reached)
 
 
 def check(name, cond, detail=""):
@@ -64,6 +73,8 @@ class Studio:
 
     def shot(self, name):
         path = os.path.join(self.shots, name + ".png")
+        # Transient notifications from earlier steps would hide part of the documented state.
+        self.page.evaluate("document.querySelectorAll('#toasts .toast').forEach((t) => t.remove())")
         self.page.screenshot(path=path)
         return path
 
@@ -109,6 +120,44 @@ class Studio:
 
     def verdict(self, which):
         return self.page.inner_text(f".verdict[aria-label='{which}'] .verdict-v").strip()
+
+    def resize(self, w, h):
+        """Sets the inner size of the real window; falls back to viewport emulation if it is not reached."""
+        try:
+            self.cdp().send("Emulation.clearDeviceMetricsOverride")
+        except Exception:
+            pass
+        err = None
+        try:
+            self.page.evaluate("([w, h]) => window.__TAURI__.window.getCurrentWindow().setSize(new window.__TAURI__.window.LogicalSize(w, h))", [w, h])
+        except Exception as e:
+            err = str(e)
+        got = None
+        t0 = time.time()
+        while time.time() - t0 < 3:
+            got = self.js("[innerWidth, innerHeight]")
+            if abs(got[0] - w) <= 1 and abs(got[1] - h) <= 1:
+                break
+            time.sleep(0.1)
+        if err is None and abs(got[0] - w) <= 1 and abs(got[1] - h) <= 1:
+            sizing.append((f"{w}x{h}", "real window", f"{got[0]}x{got[1]}"))
+        else:
+            self.page.set_viewport_size({"width": w, "height": h})
+            sizing.append((f"{w}x{h}", "emulation fallback", f"window reached {got[0]}x{got[1]}" + (f"; setSize error {err}" if err else "")))
+        time.sleep(0.6)
+
+    def cdp(self):
+        if not hasattr(self, "_cdp"):
+            self._cdp = self.page.context.new_cdp_session(self.page)
+        return self._cdp
+
+    def no_private_text(self):
+        """True when no visible text shows the user name or the profile folder."""
+        user = os.environ.get("USERNAME", "")
+        profile = os.environ.get("USERPROFILE", "")
+        text = self.js("document.body.innerText")
+        bad = [x for x in (user, profile) if x and x.lower() in text.lower()]
+        return not bad, bad
 
     def no_hscroll(self):
         return self.js("""() => {
@@ -167,6 +216,8 @@ def journeys(s):
     s.wait("document.querySelector('.replay-verdict')", what="replay verdict")
     check("replay verified", "Verified" in p.inner_text(".replay-verdict"), p.inner_text(".replay-verdict"))
     check("replay lists its checks", p.locator(".checks li").count() >= 3)
+    p.evaluate("document.querySelector('.replay-verdict').scrollIntoView({ block: 'start' })")
+    time.sleep(0.2)
     s.shot("replay-verified-dark")
 
     # Matched comparison from the form: the same seed and faults on two controllers.
@@ -349,6 +400,8 @@ def journeys(s):
     check("library search finds the run by its new label", p.locator(".lib-table tbody tr[data-run]").count() == 1)
     p.fill("#lib-search", "")
     time.sleep(0.3)
+    ok, bad = s.no_private_text()
+    check("library shows no user name or profile path", ok, ", ".join(bad))
     s.both("library")
 
     # Keyboard help and the command palette.
@@ -369,7 +422,8 @@ def journeys(s):
 
     # Evidence export through the shell command (the Save dialog itself is not automated).
     exported = s.invoke("export_evidence", {"runId": j2_run, "choose": False})
-    check("evidence package exported to the library", bool(exported) and str(exported).endswith(".zip") and os.path.isfile(exported), str(exported))
+    exported_file = os.path.expandvars(str(exported).replace("%USERPROFILE%", os.environ.get("USERPROFILE", ""))) if exported else ""
+    check("evidence package exported to the library", bool(exported) and str(exported).endswith(".zip") and os.path.isfile(exported_file), str(exported))
 
     # Theme switch.
     s.theme("light")
@@ -399,11 +453,12 @@ def journeys(s):
     s.both("developer-reference-domain")
     s.nav("settings")
     time.sleep(0.3)
+    ok, bad = s.no_private_text()
+    check("settings show no user name or profile path", ok, ", ".join(bad))
     s.shot("settings-dark")
 
     # Minimum window: 1024 x 640 without horizontal page scroll, in every workspace.
-    p.set_viewport_size({"width": 1024, "height": 640})
-    time.sleep(0.6)
+    s.resize(1024, 640)
     ok = True
     for v in ["prepare", "run", "compare", "library", "settings"]:
         s.nav(v)
@@ -434,8 +489,7 @@ def journeys(s):
     check("1024x640: rocket run workspace without horizontal scroll", s.no_hscroll())
     s.shot("small-1024x640-run-dark")
     for w, h in [(1366, 768), (1920, 1080)]:
-        p.set_viewport_size({"width": w, "height": h})
-        time.sleep(0.5)
+        s.resize(w, h)
         check(f"{w}x{h}: no horizontal scroll in the run workspace", s.no_hscroll())
         s.shot(f"run-{w}x{h}-dark")
 
@@ -443,24 +497,31 @@ def journeys(s):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--exe", default=os.path.join(REPO, "desktop", "target", "debug", "vv-studio.exe"))
-    ap.add_argument("--domains", default=os.path.join(REPO, "desktop", "target", "release", "domains"))
+    ap.add_argument("--domains", default=os.path.join(REPO, "desktop", "target", "release", "domains"),
+                    help='domain hosts folder; "" leaves VVLAB_DOMAINS unset (installed resource directory)')
     ap.add_argument("--shots", default=os.path.join(REPO, "docs", "images", "m11-studio"))
     ap.add_argument("--port", type=int, default=9222)
     ap.add_argument("--keep-library", action="store_true")
     a = ap.parse_args()
+    a.exe = os.path.expandvars(a.exe)
     if not os.path.isfile(a.exe):
         print(f"studio executable not found: {a.exe} (build it with `cargo build -p vv-studio` in desktop/)")
         return 2
     os.makedirs(a.shots, exist_ok=True)
     library = tempfile.mkdtemp(prefix="vv-studio-ui-")
+    config = tempfile.mkdtemp(prefix="vv-studio-ui-config-")
     env = dict(os.environ)
-    env["VVLAB_DOMAINS"] = a.domains
+    env.pop("VVLAB_DOMAINS", None)
+    env.pop("VVLAB_EXTRA_DOMAINS", None)
+    if a.domains:
+        env["VVLAB_DOMAINS"] = a.domains
     env["VVLAB_LIBRARY"] = library
+    env["VVLAB_CONFIG"] = config
+    print(f"exe {a.exe}\ndomains {a.domains or '(installed resource directory)'}\nlibrary {library}\nconfig {config}")
     env["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = f"--remote-debugging-port={a.port}"
     # A running instance would swallow the launch (single-instance plugin) and keep its own library.
     subprocess.run(["taskkill", "/F", "/IM", os.path.basename(a.exe)], capture_output=True)
     proc = subprocess.Popen([a.exe], env=env)
-    saved_prefs = None
     page = None
     try:
         for _ in range(120):
@@ -476,11 +537,11 @@ def main():
             page.on("console", lambda m: console_errors.append(m.text) if m.type == "error" else None)
             s = Studio(page, a.shots)
             s.wait("window.__TAURI__ && window.__studio", what="studio script")
-            # Start from default preferences; restore the user's file afterwards.
-            saved_prefs = s.invoke("get_prefs")
+            # Preferences live in the scratch VVLAB_CONFIG folder; start from the defaults plus dark.
+            check("preferences start empty in the scratch configuration", s.invoke("get_prefs") == {})
             try:
                 s.invoke("set_prefs", {"prefs": {"theme": "dark"}})
-                page.set_viewport_size({"width": 1440, "height": 900})
+                s.resize(1440, 900)
                 page.reload()
                 t0 = time.time()
                 s.wait("window.__studio && document.getElementById('startup').hidden", timeout=90, what="platform ready")
@@ -495,18 +556,15 @@ def main():
                     s.shot("failure-state")
                 except Exception:
                     pass
-            finally:
-                # Always give the user back their own preferences file.
-                try:
-                    s.invoke("set_prefs", {"prefs": saved_prefs})
-                except Exception as e:
-                    print(f"warning: could not restore the user preferences: {e}")
             check("no script error in the page", not console_errors, "; ".join(console_errors[:5]))
     finally:
         proc.kill()
         proc.wait(timeout=10)
         if not a.keep_library:
             shutil.rmtree(library, ignore_errors=True)
+            shutil.rmtree(config, ignore_errors=True)
+    for req, method, reached in sizing:
+        print(f"window {req}: {method} ({reached})")
     failed = [r for r in results if not r[1]]
     print(f"\n{len(results) - len(failed)} of {len(results)} checks passed; screenshots in {a.shots}")
     return 1 if failed else 0
