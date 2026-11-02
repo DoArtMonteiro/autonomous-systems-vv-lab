@@ -82,9 +82,19 @@ pub struct NavigationReport {
     pub degradations_outside_fault_windows: u64,
     pub detections: Vec<FaultDetection>,
     /// F3: the groups the controller isolated, and the verdict against the injected faults:
-    /// `none`, `correct` (every isolated group has an injected fault) or `wrong`.
+    /// `none`, `correct` (every isolation names a group with an injected fault that had already
+    /// started) or `wrong` (some isolation names a group without a fault, or precedes its onset).
     pub isolated: Vec<&'static str>,
     pub isolation: &'static str,
+    /// Each isolation with its instant and its own verdict: `correct`, `before_onset` or `wrong`.
+    pub isolation_events: Vec<IsolationEvent>,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq)]
+pub struct IsolationEvent {
+    pub group: &'static str,
+    pub t_s: f64,
+    pub verdict: &'static str,
 }
 
 /// The group of sources a fault corrupts, for the isolation verdict.
@@ -323,22 +333,43 @@ pub fn verify_navigation(
                 .any(|f| t.t_s >= f.spec.start_s && t.t_s <= f.spec.end_s + margin)
         })
         .count() as u64;
-    let last = decls.last().map(|d| d.declaration.report);
-    let mut isolated = Vec::new();
-    if last.is_some_and(|r| r.isolated_radar) {
-        isolated.push("radar");
+    // F3: the first cycle at which each group's isolation flag is set. An isolation is correct
+    // only when a fault of the same group is injected and has started at that cycle; an
+    // isolation of the right group before the onset is not credited.
+    let mut isolation_events = Vec::new();
+    for group in ["radar", "gnss"] {
+        let flagged = decls.iter().find(|d| {
+            let r = &d.declaration.report;
+            if group == "radar" {
+                r.isolated_radar
+            } else {
+                r.isolated_gnss
+            }
+        });
+        let Some(d) = flagged else { continue };
+        let same: Vec<_> = prep
+            .faults
+            .iter()
+            .filter(|f| fault_group(f.spec.kind) == Some(group))
+            .collect();
+        let verdict = if same.is_empty() {
+            "wrong"
+        } else if same.iter().any(|f| f.start_step <= d.step) {
+            "correct"
+        } else {
+            "before_onset"
+        };
+        isolation_events.push(IsolationEvent {
+            group,
+            t_s: d.step as f64 * prep.dt,
+            verdict,
+        });
     }
-    if last.is_some_and(|r| r.isolated_gnss) {
-        isolated.push("gnss");
-    }
-    let faulted: Vec<&str> = prep
-        .faults
-        .iter()
-        .filter_map(|f| fault_group(f.spec.kind))
-        .collect();
-    let isolation = if isolated.is_empty() {
+    isolation_events.sort_by(|a, b| a.t_s.total_cmp(&b.t_s));
+    let isolated: Vec<&'static str> = isolation_events.iter().map(|e| e.group).collect();
+    let isolation = if isolation_events.is_empty() {
         "none"
-    } else if isolated.iter().all(|g| faulted.contains(g)) {
+    } else if isolation_events.iter().all(|e| e.verdict == "correct") {
         "correct"
     } else {
         "wrong"
@@ -365,5 +396,6 @@ pub fn verify_navigation(
         detections,
         isolated,
         isolation,
+        isolation_events,
     }
 }

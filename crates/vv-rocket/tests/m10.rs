@@ -233,8 +233,43 @@ fn the_rate_parity_isolates_a_stuck_radar_and_the_run_lands() {
     assert_eq!(nav["isolated_radar"], true);
     assert_eq!(nav["isolated_gnss"], false);
     assert_eq!(v["navigation"]["isolation"], "correct");
+    let events = v["navigation"]["isolation_events"].as_array().unwrap();
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0]["group"], "radar");
+    assert_eq!(events[0]["verdict"], "correct");
+    assert!(events[0]["t_s"].as_f64().unwrap() >= 9.0);
     assert_eq!(v["navigation"]["vertical"]["alert_failure"], false);
     assert_eq!(v["outcome"], "landed");
+}
+
+#[test]
+fn an_isolation_before_the_fault_onset_is_not_credited() {
+    // F3 accounting: the verdict looks at the instant, not only at the group. The same run is
+    // judged against a configuration whose radar fault starts after the isolation happened.
+    use vv_rocket::landing_model::{LandingCase, prepare_landing};
+    use vv_rocket::landing_sim::simulate_landing;
+    use vv_rocket::landing_verify::verify;
+    use vv_rocket::nav_verify::verify_navigation;
+    let faults =
+        json!([{"kind": "altimeter_stuck", "start_s": 9.0, "end_s": 15.0, "magnitude": 0.0}]);
+    let case: LandingCase = serde_json::from_value(with("m10_b_plus", faults)).unwrap();
+    let prep = prepare_landing(&case, 4000).unwrap();
+    let run = simulate_landing(&prep).unwrap();
+    let v = verify(&prep, &run.log);
+    let nav = verify_navigation(&prep, &run.log, &run.declarations, &v);
+    assert_eq!(nav.isolation, "correct");
+    let at = nav.isolation_events[0].t_s;
+    let mut late = prep.clone();
+    let onset = ((at + 1.0) / prep.dt).round() as u64;
+    late.faults[0].start_step = onset;
+    let nav = verify_navigation(&late, &run.log, &run.declarations, &v);
+    assert_eq!(nav.isolation_events[0].verdict, "before_onset");
+    assert_eq!(nav.isolation, "wrong");
+    // A radar isolation with only a receiver fault injected is wrong.
+    let mut other = prep.clone();
+    other.faults[0].spec.kind = vv_rocket::landing_model::FaultKind::GnssDropout;
+    let nav = verify_navigation(&other, &run.log, &run.declarations, &v);
+    assert_eq!(nav.isolation_events[0].verdict, "wrong");
 }
 
 #[test]
@@ -307,13 +342,13 @@ fn m10_traces_and_verifications_are_bit_identical_on_every_platform() {
             "nominal",
             with("m10_b_plus", json!([])),
             "147a360e9606ef7442054f0642556c0e385c451846317456f8e29c77f563972b",
-            "e74b755f445f17232ad21845c625f9fc880300413eea489e8a2548735e96f4d7",
+            "8a69a357d12fad60ec160421368ab7f4ab681e5d2519bc7fbb7630e9fe382e42",
         ),
         (
             "stuck radar",
             with("m10_b_plus", stuck),
             "38c869aabc4892758b7ac8219987837b1aba37a024f911985ff7c84220845120",
-            "0744c68ab622c35ea4643c5ac6bbe83826e7bb25cfd2532b0609daebd474dd7d",
+            "6e7939ceb1660f20d27277dde046525a1171f83f82e74cecc928eece2d892a64",
         ),
     ] {
         let art = artifacts(&bytes(&case), 4000).unwrap();
