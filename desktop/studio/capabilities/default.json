@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "The main window may call the studio commands, open dialogs and reveal exported files. No shell, no network, no filesystem plugin.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-set-title",
+    "dialog:allow-save",
+    "dialog:allow-open",
+    "dialog:allow-message",
+    "opener:allow-reveal-item-in-dir"
+  ]
+}

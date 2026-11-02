@@ -1,0 +1,1 @@
+{"faults":[{"delay_ticks":4,"id":"mission_control_override","kind":"delayed_movement","probability_permille":1000,"windows":[{"end_tick":2,"start_tick":2}]}],"schema_version":1,"seed":42}

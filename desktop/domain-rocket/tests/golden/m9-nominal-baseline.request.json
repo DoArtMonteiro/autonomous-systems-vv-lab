@@ -1,0 +1,9 @@
+{
+  "schema": "vv-run-request.v1",
+  "domain": "rocket-landing",
+  "scenario": "m9-landing",
+  "controller": "baseline",
+  "seed": 42,
+  "faults": [],
+  "parameters": {}
+}

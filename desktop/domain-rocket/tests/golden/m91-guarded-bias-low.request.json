@@ -1,0 +1,16 @@
+{
+  "schema": "vv-run-request.v1",
+  "domain": "rocket-landing",
+  "scenario": "m91-landing",
+  "controller": "guarded",
+  "seed": 7,
+  "faults": [
+    {
+      "kind": "altimeter_bias_low",
+      "magnitude": 27.5,
+      "start": 10.0,
+      "end": 40.0
+    }
+  ],
+  "parameters": {}
+}

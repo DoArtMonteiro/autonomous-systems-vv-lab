@@ -1,0 +1,20 @@
+{
+  "schema": "vv-domain-manifest.v1",
+  "id": "reference-oscillator",
+  "name": "Reference oscillator",
+  "version": "0.11.0",
+  "description": "Benign reference domain that proves the vv-domain extension contract: a mass on a spring held at zero by a PD controller with a noisy position sensor.",
+  "contract": { "name": "vv-domain", "major": 1, "minor": 0 },
+  "host": { "executable": "vv-domain-reference.exe", "timeout_s": 30, "max_output_bytes": 1048576 },
+  "capabilities": ["run", "replay", "compare", "evidence", "faults"],
+  "visualisations": ["plots", "requirements", "timeline", "events"],
+  "seeds": {
+    "min": 0,
+    "max": 1000000,
+    "protected": [
+      { "start": 900, "end": 999, "reason": "reference protected range, used by the tests to prove the seed guard" }
+    ]
+  },
+  "model_validity": "Toy model for the extension contract; no physical claim.",
+  "user_facing": false
+}

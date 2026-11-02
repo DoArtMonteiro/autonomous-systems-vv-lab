@@ -1,0 +1,305 @@
+//! Scaffolding for domain host executables. A host implements `DomainHost`; `host_main` turns it
+//! into the command-line protocol of the contract:
+//!
+//! `manifest` | `describe` | `validate <request.json>` | `run <request.json> --output <dir>` | `replay <dir>`
+//!
+//! The SDK owns what every host must get right in the same way: generic validation against the
+//! catalog and the seed policy, the artifact list in the record, and a replay that recomputes the
+//! run from its stored request and compares every file byte for byte.
+
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::ExitCode;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+use crate::canonical::{pretty_bytes, sha256_hex};
+use crate::contract::*;
+use crate::validate::normalise;
+
+pub const MAX_REQUEST_BYTES: u64 = 64 * 1024;
+pub const MAX_RECORD_BYTES: u64 = 64 * 1024 * 1024;
+
+pub enum HostError {
+    Invalid(String),
+    Simulation(String),
+}
+
+pub trait DomainHost {
+    fn manifest(&self) -> DomainManifest;
+    fn catalog(&self) -> DomainCatalog;
+    /// Domain rules applied after the generic normalisation; may normalise further.
+    fn check(&self, request: RunRequest) -> Result<RunRequest, String> {
+        Ok(request)
+    }
+    /// Runs the request, writes the native artifacts into the empty directory `out` and returns the
+    /// record. The SDK fills `provenance.artifacts` and writes record.json.
+    fn run(&self, request: &RunRequest, out: &Path) -> Result<RunRecord, HostError>;
+    /// Extra checks by the native simulator on a stored run (for example its own replay command).
+    fn native_replay(&self, _dir: &Path) -> Vec<ReplayCheck> {
+        Vec::new()
+    }
+}
+
+pub fn read_bounded(path: &Path, cap: u64) -> Result<Vec<u8>, String> {
+    let meta = fs::metadata(path).map_err(|e| format!("{}: {e}", file_name(path)))?;
+    if meta.len() > cap {
+        return Err(format!("{} is larger than {cap} bytes", file_name(path)));
+    }
+    fs::read(path).map_err(|e| format!("{}: {e}", file_name(path)))
+}
+
+fn file_name(path: &Path) -> String {
+    path.file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default()
+}
+
+/// Files of a run directory with their hashes, sorted, as relative slash-separated paths.
+/// Platform files (record, request, meta) are excluded: they describe the artifacts.
+pub fn hash_artifacts(dir: &Path) -> Result<Vec<FileHash>, String> {
+    let mut out = Vec::new();
+    walk(dir, dir, &mut out)?;
+    out.retain(|f| ![RECORD_FILE, REQUEST_FILE, META_FILE].contains(&f.path.as_str()));
+    out.sort_by(|a, b| a.path.cmp(&b.path));
+    Ok(out)
+}
+
+fn walk(root: &Path, dir: &Path, out: &mut Vec<FileHash>) -> Result<(), String> {
+    for entry in fs::read_dir(dir).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let path = entry.path();
+        let kind = entry.file_type().map_err(|e| e.to_string())?;
+        if kind.is_symlink() {
+            return Err("a run directory must not contain links".into());
+        }
+        if kind.is_dir() {
+            walk(root, &path, out)?;
+        } else {
+            let bytes = fs::read(&path).map_err(|e| e.to_string())?;
+            let rel = path
+                .strip_prefix(root)
+                .map_err(|e| e.to_string())?
+                .components()
+                .map(|c| c.as_os_str().to_string_lossy().into_owned())
+                .collect::<Vec<_>>()
+                .join("/");
+            out.push(FileHash {
+                path: rel,
+                sha256: sha256_hex(&bytes),
+                bytes: bytes.len() as u64,
+            });
+        }
+    }
+    Ok(())
+}
+
+pub fn validate_request<H: DomainHost>(
+    host: &H,
+    request: &RunRequest,
+) -> Result<RunRequest, String> {
+    let normal = normalise(&host.manifest(), &host.catalog(), request)?;
+    host.check(normal)
+}
+
+fn parse_request(path: &Path) -> Result<RunRequest, String> {
+    let bytes = read_bounded(path, MAX_REQUEST_BYTES)?;
+    serde_json::from_slice(&bytes).map_err(|e| format!("invalid request: {e}"))
+}
+
+/// Runs a validated request into `out` and writes record.json. Used by `run` and by replay.
+pub fn execute<H: DomainHost>(
+    host: &H,
+    request: &RunRequest,
+    out: &Path,
+) -> Result<RunRecord, HostError> {
+    let mut record = host.run(request, out)?;
+    if record.schema != RECORD_SCHEMA {
+        return Err(HostError::Simulation(format!(
+            "record schema must be {RECORD_SCHEMA}"
+        )));
+    }
+    if &record.request != request {
+        return Err(HostError::Simulation(
+            "record.request differs from the validated request".into(),
+        ));
+    }
+    record.provenance.artifacts = hash_artifacts(out).map_err(HostError::Simulation)?;
+    fs::write(out.join(RECORD_FILE), pretty_bytes(&record))
+        .map_err(|e| HostError::Simulation(format!("{RECORD_FILE}: {e}")))?;
+    Ok(record)
+}
+
+static SCRATCH: AtomicU64 = AtomicU64::new(0);
+
+fn scratch_dir() -> PathBuf {
+    let n = SCRATCH.fetch_add(1, Ordering::Relaxed);
+    std::env::temp_dir().join(format!("vv-replay-{}-{n}", std::process::id()))
+}
+
+fn check(name: &str, pass: bool, detail: impl Into<String>) -> ReplayCheck {
+    ReplayCheck {
+        name: name.into(),
+        pass,
+        detail: detail.into(),
+    }
+}
+
+/// Recomputes a stored run from its request and compares every file byte for byte.
+pub fn replay<H: DomainHost>(host: &H, dir: &Path) -> ReplayReport {
+    let mut checks = Vec::new();
+    let parsed: Result<RunRecord, String> = read_bounded(&dir.join(RECORD_FILE), MAX_RECORD_BYTES)
+        .and_then(|b| serde_json::from_slice(&b).map_err(|e| e.to_string()));
+    match parsed {
+        Err(e) => checks.push(check("record.json is a valid run record", false, e)),
+        Ok(record) => {
+            checks.push(check("record.json is a valid run record", true, ""));
+            let name = "stored request is valid and canonical";
+            match validate_request(host, &record.request) {
+                Ok(normal) if normal == record.request => {
+                    checks.push(check(name, true, ""));
+                    replay_files(host, dir, &record, &normal, &mut checks);
+                }
+                Ok(_) => checks.push(check(name, false, "the request is not in canonical form")),
+                Err(e) => checks.push(check(name, false, e)),
+            }
+        }
+    }
+    checks.extend(host.native_replay(dir));
+    let ok = !checks.is_empty() && checks.iter().all(|c| c.pass);
+    ReplayReport {
+        schema: REPLAY_SCHEMA.into(),
+        status: if ok { "verified" } else { "rejected" }.into(),
+        checks,
+    }
+}
+
+fn replay_files<H: DomainHost>(
+    host: &H,
+    dir: &Path,
+    record: &RunRecord,
+    request: &RunRequest,
+    checks: &mut Vec<ReplayCheck>,
+) {
+    let name = "stored artifacts match the hashes in record.json";
+    match hash_artifacts(dir) {
+        Ok(on_disk) if on_disk == record.provenance.artifacts => {
+            checks.push(check(name, true, format!("{} files", on_disk.len())))
+        }
+        Ok(_) => checks.push(check(name, false, "a file was added, removed or changed")),
+        Err(e) => checks.push(check(name, false, e)),
+    }
+    let scratch = scratch_dir();
+    let rerun = fs::create_dir_all(&scratch)
+        .map_err(|e| e.to_string())
+        .and_then(|_| {
+            execute(host, request, &scratch).map_err(|e| match e {
+                HostError::Invalid(m) | HostError::Simulation(m) => m,
+            })
+        });
+    match rerun {
+        Err(e) => checks.push(check("the run is recomputed from its request", false, e)),
+        Ok(_) => {
+            checks.push(check("the run is recomputed from its request", true, ""));
+            let stored = hash_artifacts(dir).unwrap_or_default();
+            let fresh = hash_artifacts(&scratch).unwrap_or_default();
+            let same = stored == fresh;
+            checks.push(check(
+                "recomputed artifacts equal the stored artifacts byte for byte",
+                same,
+                if same {
+                    format!("{} files", fresh.len())
+                } else {
+                    differing(&stored, &fresh)
+                },
+            ));
+            let a = fs::read(dir.join(RECORD_FILE)).unwrap_or_default();
+            let b = fs::read(scratch.join(RECORD_FILE)).unwrap_or_default();
+            checks.push(check(
+                "recomputed record (outcome, requirements, telemetry) equals the stored record",
+                !a.is_empty() && a == b,
+                "",
+            ));
+        }
+    }
+    let _ = fs::remove_dir_all(&scratch);
+}
+
+fn differing(a: &[FileHash], b: &[FileHash]) -> String {
+    let mut names: Vec<&str> = a.iter().chain(b).map(|f| f.path.as_str()).collect();
+    names.sort();
+    names.dedup();
+    let diff: Vec<&str> = names
+        .into_iter()
+        .filter(|n| a.iter().find(|f| f.path == *n) != b.iter().find(|f| f.path == *n))
+        .collect();
+    format!("differs: {}", diff.join(", "))
+}
+
+fn print_json<T: serde::Serialize>(value: &T) {
+    println!(
+        "{}",
+        String::from_utf8_lossy(&pretty_bytes(value)).trim_end()
+    );
+}
+
+fn fail(code: i32, message: &str) -> ExitCode {
+    eprintln!("{message}");
+    ExitCode::from(code as u8)
+}
+
+fn parse_and_validate<H: DomainHost>(host: &H, file: &str) -> Result<RunRequest, String> {
+    parse_request(Path::new(file)).and_then(|r| validate_request(host, &r))
+}
+
+pub fn host_main<H: DomainHost>(host: &H) -> ExitCode {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let args: Vec<&str> = args.iter().map(String::as_str).collect();
+    match args.as_slice() {
+        ["manifest"] => print_json(&host.manifest()),
+        ["describe"] => print_json(&host.catalog()),
+        ["validate", file] => match parse_and_validate(host, file) {
+            Ok(normal) => print_json(&normal),
+            Err(e) => return fail(EXIT_INVALID_REQUEST, &e),
+        },
+        ["run", file, "--output", out] => {
+            let request = match parse_and_validate(host, file) {
+                Ok(r) => r,
+                Err(e) => return fail(EXIT_INVALID_REQUEST, &e),
+            };
+            let out = Path::new(out);
+            let empty = fs::create_dir_all(out).is_ok()
+                && fs::read_dir(out)
+                    .map(|mut d| d.next().is_none())
+                    .unwrap_or(false);
+            if !empty {
+                return fail(
+                    EXIT_INVALID_REQUEST,
+                    "the output directory must be new or empty",
+                );
+            }
+            match execute(host, &request, out) {
+                Ok(record) => print_json(&serde_json::json!({
+                    "status": "ok",
+                    "outcome": record.outcome.code,
+                    "safety": record.safety.status,
+                })),
+                Err(HostError::Invalid(e)) => return fail(EXIT_INVALID_REQUEST, &e),
+                Err(HostError::Simulation(e)) => return fail(EXIT_SIMULATION_ERROR, &e),
+            }
+        }
+        ["replay", dir] => {
+            let report = replay(host, Path::new(dir));
+            print_json(&report);
+            if report.status != "verified" {
+                return ExitCode::from(EXIT_REPLAY_REJECTED as u8);
+            }
+        }
+        _ => {
+            return fail(
+                EXIT_INVALID_REQUEST,
+                "usage: manifest | describe | validate <request.json> | run <request.json> --output <dir> | replay <dir>",
+            );
+        }
+    }
+    ExitCode::SUCCESS
+}
