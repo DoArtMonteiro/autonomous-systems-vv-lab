@@ -181,23 +181,40 @@ LANDING_OUTCOMES = ("landed", "hard_landing", "no_contact")
 # controller-reported flags, which are never a verdict).
 LANDING_VERIFICATION_V1 = "vv-rocket-landing-verification.v1"
 LANDING_VERIFICATION_V2 = "vv-rocket-landing-verification.v2"
+# v3 (M10) is v2 plus the `navigation` block: the controller's navigation declarations compared with the
+# truth. Only the M10 policies produce it, and they produce nothing else; the M9 policies stay on v2.
+LANDING_VERIFICATION_V3 = "vv-rocket-landing-verification.v3"
+LANDING_M10_POLICIES = frozenset({"m10_a", "m10_b", "m10_b_plus"})
+NAV_PHYSICAL_CLASSES = ("R", "T", "U")
 LANDING_FLAGS = ("sensor_disagreement_first", "ascent_abort_first", "altimeter_rejected_first")
 RESULT_CONTRACTS = {RESULT_SCHEMA: (ADAPTER_SCHEMA, RESULT_FIELDS), RESULT_SCHEMA_V2: (ADAPTER_SCHEMA_V2, RESULT_FIELDS_V2),
                     RESULT_SCHEMA_V3: (ADAPTER_SCHEMA_V3, RESULT_FIELDS_V3)}
 
 
-def _check_landing_verification_schema(verification: dict) -> None:
+def _check_landing_verification_schema(verification: dict, policy: Any = None) -> None:
     schema = verification.get("schema")
+    m10 = policy in LANDING_M10_POLICIES
+    if m10 and schema != LANDING_VERIFICATION_V3:
+        raise AdapterError(f"result.verification.schema of an M10 policy must be {LANDING_VERIFICATION_V3}")
     if schema is None or schema == LANDING_VERIFICATION_V1:
         return  # an unversioned or M9 record: S1 to S4, no flags
-    if schema != LANDING_VERIFICATION_V2:
-        raise AdapterError(f"result.verification.schema must be {LANDING_VERIFICATION_V1} or {LANDING_VERIFICATION_V2}")
+    if schema == LANDING_VERIFICATION_V3:
+        if not m10:
+            raise AdapterError(f"result.verification.schema {LANDING_VERIFICATION_V3} belongs to the M10 policies only")
+        navigation = verification.get("navigation")
+        if not isinstance(navigation, dict) or navigation.get("physical_class") not in NAV_PHYSICAL_CLASSES:
+            raise AdapterError("result.verification.navigation (v3) must be an object with physical_class R, T or U")
+        if not isinstance(navigation.get("transitions"), list):
+            raise AdapterError("result.verification.navigation.transitions (v3) must be a list")
+    elif schema != LANDING_VERIFICATION_V2:
+        raise AdapterError(f"result.verification.schema must be {LANDING_VERIFICATION_V1}, {LANDING_VERIFICATION_V2} "
+                           f"or {LANDING_VERIFICATION_V3}")
     ids = [i.get("id", "")[:2] for i in verification["invariants"] if isinstance(i, dict)]
     if ids != ["S1", "S2", "S3", "S4", "S5"]:
-        raise AdapterError("result.verification (v2) must carry the invariants S1 to S5 in order")
+        raise AdapterError("result.verification (v2, v3) must carry the invariants S1 to S5 in order")
     flags = verification.get("controller_flags")
     if not isinstance(flags, dict) or any(name not in flags for name in LANDING_FLAGS):
-        raise AdapterError("result.verification.controller_flags (v2) must carry " + ", ".join(LANDING_FLAGS))
+        raise AdapterError("result.verification.controller_flags (v2, v3) must carry " + ", ".join(LANDING_FLAGS))
     for name in LANDING_FLAGS:
         first = flags[name]
         if first is not None and not (isinstance(first, dict) and isinstance(first.get("step"), int)
@@ -242,7 +259,7 @@ def check_result(result: Any) -> None:
                 or not isinstance(verification.get("invariants"), list)):
             raise AdapterError("result.verification must carry an outcome, requirements and invariants")
         if result["verdict"].get("status") == "verified":
-            _check_landing_verification_schema(verification)
+            _check_landing_verification_schema(verification, result["request"].get("policy"))
     if not RUN_ID.fullmatch(result["run_id"]):
         raise AdapterError("result.run_id is not 16 lowercase hex characters")
     problems = result["integrity"].get("problems")

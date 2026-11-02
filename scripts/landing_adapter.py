@@ -36,6 +36,7 @@ from sim_adapter import (
     REQUEST_SCHEMA_V3,
     RESULT_SCHEMA_V3,
     AdapterError,
+    LANDING_M10_POLICIES,
     _canonical,
     _files,
     _int,
@@ -50,6 +51,10 @@ TEMPLATE = CRATE / "landing" / "nominal.json"
 # baseline and robust cases keep the frozen M9 template byte for byte.
 TEMPLATE_M91 = CRATE / "landing" / "m91-nominal.json"
 M91_POLICIES = frozenset({"guarded", "baseline_guarded"})
+# The M10 arms run on case schema v2 (`controller.nav`) and are judged by verification v3, which adds the
+# `navigation` block; the M9 and M9.1 templates are schema v1 and refuse these policies.
+TEMPLATE_M10 = CRATE / "landing" / "m10-nominal.json"
+M10_POLICIES = LANDING_M10_POLICIES
 PHYSICS = ("closed-loop powered landing of a 22 t rocket stage: the 6-DOF rigid body of the rocket-rigid-body model, "
            "a throttle and thrust-vector actuator, noisy radar altimeter, GNSS and IMU, and a deterministic controller "
            "that sees only the observations; fixed step 0.01 s, control at 50 Hz")
@@ -66,6 +71,12 @@ POLICIES = {
     "guarded": "The robust estimator plus two rules: when altimeter and estimate disagree it guides on the lower altitude "
                "and reports sensor_disagreement, and it cuts the engine when it climbs under power (ascent_abort).",
     "baseline_guarded": "The baseline policy unchanged plus the ascent-abort rule only (M9.1 test of that rule).",
+    "m10_a": "M10 comparison arm A: fixed-gain navigation with 2-of-3 altitude voting. Declares a navigation mode "
+             "and channel integrity (development, not an evaluation).",
+    "m10_b": "M10 comparison arm B: a 7-state Kalman filter that rejects a measurement on one epoch's NIS. Declares a "
+             "navigation mode and channel integrity (development, not an evaluation).",
+    "m10_b_plus": "M10 reference architecture B+: the same filter without rejection, per-source CUSUM, radar and GNSS "
+                  "group health, a mode manager and an independent safety monitor (development, not an evaluation).",
 }
 
 # Pre-registered magnitude and window-length ranges (docs/m9-powered-landing.md, Falhas e gamas pré-registadas)
@@ -99,7 +110,32 @@ FAULTS: dict[str, tuple[str, str, tuple[float, float, str] | None, tuple[float, 
     "gnss_bias_low": (
         "GNSS bias, low reading", "The GNSS position is shifted down by the magnitude along x and z (M9.1).",
         (5.0, 30.0, "m"), None, 17.5, 8.0, 40.0),
+    # M10, case schema v2 only (docs/m10-implementation.md, Esquema v2: falhas novas); M10 policies only.
+    "altimeter_stuck": (
+        "Altimeter stuck (M10)", "The radar altimeter repeats the value it delivered just before the window.",
+        None, (1.0, 10.0), 0.0, 8.0, 12.0),
+    "altimeter_delay": (
+        "Altimeter delay (M10)", "The radar altimeter reports the altitude of the magnitude earlier, in whole control "
+        "cycles.", (0.02, 0.2, "s"), None, 0.1, 6.0, 40.0),
+    "altimeter_outliers": (
+        "Altimeter outliers (M10)", "Each altimeter sample is an outlier of 5 to 50 sigma with probability the magnitude.",
+        (0.001, 0.01, "probability"), None, 0.005, 0.0, 40.0),
+    "altimeter_drift": (
+        "Altimeter drift (M10)", "The radar altimeter reading drifts up at the magnitude from the window start.",
+        (0.03, 0.3, "m/s"), None, 0.15, 6.0, 40.0),
+    "gnss_horizontal_bias": (
+        "GNSS horizontal bias (M10)", "The GNSS position is shifted by the magnitude along x and y (not z).",
+        (5.0, 30.0, "m"), None, 15.0, 8.0, 40.0),
+    "gnss_coherent_ramp": (
+        "GNSS coherent ramp (M10)", "Coherent receiver fault: the GNSS position in x and z grows at the magnitude and "
+        "the velocity in x and z is offset by the same magnitude.", (0.1, 3.0, "m/s"), None, 1.0, 8.0, 40.0),
+    "imu_accel_drift": (
+        "IMU acceleration drift (M10)", "The accelerometer bias along the body axis x_B grows at the magnitude per second.",
+        (0.01, 0.1, "m/s² per s"), None, 0.05, 6.0, 40.0),
 }
+# Faults that exist only in case schema v2; the adapter accepts them only with an M10 policy, as the simulator does.
+M10_FAULTS = frozenset({"altimeter_stuck", "altimeter_delay", "altimeter_outliers", "altimeter_drift",
+                        "gnss_horizontal_bias", "gnss_coherent_ramp", "imu_accel_drift"})
 
 LABELS = {
     "R1_vertical_speed": "Vertical speed at contact", "R2_horizontal_speed": "Horizontal speed at contact",
@@ -128,6 +164,7 @@ class LandingAdapter(RocketAdapter):
         self.lock_timeout = LOCK_TIMEOUT_SECONDS
         self.template = json.loads(TEMPLATE.read_text(encoding="utf-8"))
         self.template_m91 = json.loads(TEMPLATE_M91.read_text(encoding="utf-8"))
+        self.template_m10 = json.loads(TEMPLATE_M10.read_text(encoding="utf-8"))
 
     # ------------------------------------------------------------ contract
 
@@ -146,7 +183,8 @@ class LandingAdapter(RocketAdapter):
                 "faults": [{"kind": k, "label": label, "description": text,
                             "magnitude": None if mag is None else {"min": mag[0], "max": mag[1], "unit": mag[2], "default": dm},
                             "window_length_s": None if win is None else {"min": win[0], "max": win[1]},
-                            "default_start_s": start, "default_end_s": end}
+                            "default_start_s": start, "default_end_s": end,
+                            "policies": sorted(M10_POLICIES) if k in M10_FAULTS else None}
                            for k, (label, text, mag, win, dm, start, end) in FAULTS.items()],
                 "seed": {"min": 0, "max": MAX_SEED,
                          "note": "0 is the nominal case without dispersions; sensor noise stays on. Other seeds also disperse "
@@ -171,8 +209,12 @@ class LandingAdapter(RocketAdapter):
             raise AdapterError(f"model must be {MODEL_ID}")
         if req.get("policy") not in POLICIES:
             raise AdapterError(f"policy must be one of {sorted(POLICIES)}")
-        return {"schema": REQUEST_SCHEMA_V3, "model": MODEL_ID, "policy": req["policy"],
-                "seed": _int(req.get("seed"), "seed", 0, MAX_SEED), "fault": self._fault(req.get("fault"))}
+        seed = _int(req.get("seed"), "seed", 0, MAX_SEED)
+        fault = self._fault(req.get("fault"))
+        if fault is not None and fault["kind"] in M10_FAULTS and req["policy"] not in M10_POLICIES:
+            raise AdapterError(f"fault.kind {fault['kind']} exists only in case schema v2 and needs an M10 policy "
+                               f"({', '.join(sorted(M10_POLICIES))})")
+        return {"schema": REQUEST_SCHEMA_V3, "model": MODEL_ID, "policy": req["policy"], "seed": seed, "fault": fault}
 
     @staticmethod
     def _fault(value: Any) -> dict[str, Any] | None:
@@ -198,7 +240,10 @@ class LandingAdapter(RocketAdapter):
         return {"kind": kind, "magnitude": size, "start_s": start / 100, "end_s": end / 100}
 
     def case_for(self, req: dict) -> dict:
-        case = json.loads(json.dumps(self.template_m91 if req["policy"] in M91_POLICIES else self.template))
+        policy = req["policy"]
+        template = (self.template_m10 if policy in M10_POLICIES else self.template_m91 if policy in M91_POLICIES
+                    else self.template)
+        case = json.loads(json.dumps(template))
         fault = req["fault"]
         case["controller"]["policy"] = req["policy"]
         case["faults"] = [] if fault is None else [dict(fault)]

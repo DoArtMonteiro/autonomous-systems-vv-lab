@@ -100,6 +100,57 @@ class ValidationTests(unittest.TestCase):
             with self.subTest(kind=kind, magnitude=magnitude, start=start, end=end):
                 self.adapter.validate(request(flt=fault(kind, magnitude, start, end)))
 
+    def test_m10_request_builds_a_v2_case_from_the_m10_template(self):
+        template = json.loads((TEMPLATES / "m10-nominal.json").read_text(encoding="utf-8"))
+        stuck = fault("altimeter_stuck", 0, 8.0, 12.0)
+        for policy in ("m10_a", "m10_b", "m10_b_plus"):
+            with self.subTest(policy=policy):
+                case = self.adapter.case_for(self.adapter.validate(request(policy, 4000, stuck)))
+                self.assertEqual(case["schema"], "vv-rocket-landing.v2")
+                self.assertEqual(case["controller"]["policy"], policy)
+                self.assertEqual(case["controller"]["nav"], template["controller"]["nav"])
+                self.assertEqual(case["faults"], [{**stuck, "magnitude": 0.0}])
+                self.assertLessEqual(len(case["name"]), 80)
+                same = lambda c: {k: v for k, v in c.items() if k not in ("name", "faults")} | {"controller": {
+                    **c["controller"], "policy": None}}
+                self.assertEqual(same(case), same(template))
+        # The M9 faults are valid for the M10 policies too; the M9 and M9.1 policies keep their v1 templates.
+        self.assertEqual(self.adapter.case_for(self.adapter.validate(request("m10_b", 1, fault())))["schema"], "vv-rocket-landing.v2")
+        for policy in ("baseline", "robust", "guarded", "baseline_guarded"):
+            case = self.adapter.case_for(self.adapter.validate(request(policy, 1, None)))
+            self.assertEqual(case["schema"], "vv-rocket-landing.v1")
+            self.assertNotIn("nav", case["controller"])
+
+    def test_m10_faults_are_refused_for_the_m9_policies_and_outside_their_ranges(self):
+        valid = [("altimeter_stuck", 0, 8.0, 9.0), ("altimeter_stuck", 0, 8.0, 18.0),
+                 ("altimeter_delay", 0.02, 6.0, 40.0), ("altimeter_delay", 0.2, 6.0, 40.0),
+                 ("altimeter_outliers", 0.001, 0.0, 40.0), ("altimeter_outliers", 0.01, 0.0, 40.0),
+                 ("altimeter_drift", 0.03, 6.0, 40.0), ("altimeter_drift", 0.3, 6.0, 40.0),
+                 ("gnss_horizontal_bias", 5.0, 0.0, 40.0), ("gnss_horizontal_bias", 30.0, 0.0, 40.0),
+                 ("gnss_coherent_ramp", 0.1, 8.0, 40.0), ("gnss_coherent_ramp", 3.0, 8.0, 40.0),
+                 ("imu_accel_drift", 0.01, 6.0, 40.0), ("imu_accel_drift", 0.1, 6.0, 40.0)]
+        for kind, magnitude, start, end in valid:
+            with self.subTest(kind=kind, magnitude=magnitude, end=end):
+                self.adapter.validate(request("m10_b_plus", 1, fault(kind, magnitude, start, end)))
+                for policy in ("baseline", "robust", "guarded", "baseline_guarded"):
+                    with self.assertRaisesRegex(sa.AdapterError, f"fault.kind {kind} exists only in case schema v2"):
+                        self.adapter.validate(request(policy, 1, fault(kind, magnitude, start, end)))
+        invalid = [(fault("altimeter_delay", 0.019, 6.0, 40.0), "fault.magnitude must be in"),
+                   (fault("altimeter_delay", 0.21, 6.0, 40.0), "fault.magnitude must be in"),
+                   (fault("altimeter_outliers", 0.0009, 0.0, 40.0), "fault.magnitude must be in"),
+                   (fault("altimeter_outliers", 0.011, 0.0, 40.0), "fault.magnitude must be in"),
+                   (fault("altimeter_drift", 0.31, 6.0, 40.0), "fault.magnitude must be in"),
+                   (fault("gnss_horizontal_bias", 4.99, 0.0, 40.0), "fault.magnitude must be in"),
+                   (fault("gnss_coherent_ramp", 3.01, 8.0, 40.0), "fault.magnitude must be in"),
+                   (fault("imu_accel_drift", 0.0, 6.0, 40.0), "fault.magnitude must be in"),
+                   (fault("imu_accel_drift", "0.05", 6.0, 40.0), "fault.magnitude must be a number"),
+                   (fault("altimeter_stuck", 1.0, 8.0, 12.0), "fault.magnitude does not apply to altimeter_stuck"),
+                   (fault("altimeter_stuck", 0, 8.0, 8.99), "fault.end_s must make the altimeter_stuck window last"),
+                   (fault("altimeter_stuck", 0, 8.0, 18.01), "fault.end_s must make the altimeter_stuck window last")]
+        for body, message in invalid:
+            with self.subTest(fault=body), self.assertRaisesRegex(sa.AdapterError, message.replace(".", r"\.")):
+                self.adapter.validate(request("m10_b_plus", 1, body))
+
     def test_case_differs_from_the_nominal_template_only_in_name_policy_and_faults(self):
         template = json.loads((TEMPLATES / "nominal.json").read_text(encoding="utf-8"))
         case = self.adapter.case_for(self.adapter.validate(request("robust", 7, fault("thrust_loss", 0.2, 5.26, 40))))
@@ -118,7 +169,8 @@ class ValidationTests(unittest.TestCase):
             for policy, suffix in (("baseline", ""), ("robust", "-robust")):
                 name = entry["kind"].replace("_", "-") + suffix
                 if not (TEMPLATES / f"{name}.json").exists():
-                    self.assertIn(entry["kind"], ("altimeter_bias_low", "gnss_bias_low"))  # M9.1 faults: guarded demos only
+                    # M9.1 faults: guarded demos only; M10 faults: no demonstration case, M10 policies only.
+                    self.assertIn(entry["kind"], ("altimeter_bias_low", "gnss_bias_low", *la.M10_FAULTS))
                     continue
                 with self.subTest(case=name):
                     stored = json.loads((TEMPLATES / f"{name}.json").read_text(encoding="utf-8"))
@@ -152,9 +204,9 @@ class ValidationTests(unittest.TestCase):
 
     def test_m91_policies_and_faults_are_declared_with_their_ranges(self):
         caps = self.adapter.describe()["capabilities"]
-        self.assertEqual([p["id"] for p in caps["policies"]], ["baseline", "robust", "guarded", "baseline_guarded"])
+        self.assertEqual([p["id"] for p in caps["policies"]], ["baseline", "robust", "guarded", "baseline_guarded", "m10_a", "m10_b", "m10_b_plus"])
         faults = {f["kind"]: f for f in caps["faults"]}
-        self.assertEqual(list(faults)[-2:], ["altimeter_bias_low", "gnss_bias_low"])
+        self.assertEqual([k for k in faults if k not in la.M10_FAULTS][-2:], ["altimeter_bias_low", "gnss_bias_low"])
         low = faults["altimeter_bias_low"]["magnitude"]
         self.assertEqual((low["min"], low["max"]), (5.0, 50.0))
         low = faults["gnss_bias_low"]["magnitude"]
@@ -178,13 +230,33 @@ class ValidationTests(unittest.TestCase):
             with self.subTest(change=change), self.assertRaises(sa.AdapterError):
                 sa._check_landing_verification_schema({**ok, **change})
 
+    def test_v3_verification_contract_binds_the_m10_policies(self):
+        flags = {"source": "x", "sensor_disagreement_first": None, "ascent_abort_first": None, "altimeter_rejected_first": None}
+        nav = {"physical_class": "R", "transitions": [], "vertical": {"alert_failure": False}}
+        ok = {"schema": sa.LANDING_VERIFICATION_V3, "outcome": "landed", "requirements": [],
+              "invariants": [{"id": f"S{i}_x"} for i in range(1, 6)], "controller_flags": flags, "navigation": nav}
+        for policy in ("m10_a", "m10_b", "m10_b_plus"):
+            self.assertIsNone(sa._check_landing_verification_schema(ok, policy))
+        v2 = {k: v for k, v in ok.items() if k != "navigation"} | {"schema": sa.LANDING_VERIFICATION_V2}
+        self.assertIsNone(sa._check_landing_verification_schema(v2, "guarded"))
+        bad = [(ok, "guarded"), (ok, "baseline"), (ok, None), (v2, "m10_b_plus"),
+               ({**ok, "navigation": None}, "m10_b_plus"), ({**ok, "navigation": {**nav, "physical_class": "X"}}, "m10_b_plus"),
+               ({**ok, "navigation": {**nav, "transitions": None}}, "m10_b_plus"),
+               ({**ok, "invariants": ok["invariants"][:4]}, "m10_b_plus"), ({**ok, "controller_flags": None}, "m10_b_plus"),
+               ({k: v for k, v in ok.items() if k != "schema"}, "m10_b")]
+        for verification, policy in bad:
+            with self.subTest(policy=policy, verification=verification), self.assertRaises(sa.AdapterError):
+                sa._check_landing_verification_schema(verification, policy)
+
     def test_describe_declares_policies_faults_and_limits(self):
         d = self.adapter.describe()
         self.assertEqual(d["schema"], sa.ADAPTER_SCHEMA_V3)
         self.assertEqual(d["model"]["id"], la.MODEL_ID)
         caps = d["capabilities"]
-        self.assertEqual([p["id"] for p in caps["policies"]], ["baseline", "robust", "guarded", "baseline_guarded"])
-        self.assertEqual(len(caps["faults"]), 10)
+        self.assertEqual([p["id"] for p in caps["policies"]], ["baseline", "robust", "guarded", "baseline_guarded", "m10_a", "m10_b", "m10_b_plus"])
+        self.assertEqual(len(caps["faults"]), 17)
+        self.assertEqual([f["kind"] for f in caps["faults"] if f["policies"]], sorted(la.M10_FAULTS, key=list(la.FAULTS).index))
+        self.assertTrue(all(f["policies"] == ["m10_a", "m10_b", "m10_b_plus"] for f in caps["faults"] if f["policies"]))
         bias = next(f for f in caps["faults"] if f["kind"] == "altimeter_bias")
         self.assertEqual((bias["magnitude"]["min"], bias["magnitude"]["max"]), (5.0, 50.0))
         gimbal = next(f for f in caps["faults"] if f["kind"] == "gimbal_stuck")
@@ -271,6 +343,21 @@ class RunTests(unittest.TestCase):
         self.assertEqual(v["outcome"], "hard_landing")
         self.assertTrue(v["invariants_pass"])
 
+    def test_m10_run_is_verified_and_carries_navigation_declarations(self):
+        result = self.run_view(request("m10_b_plus", 4000, fault("altimeter_stuck", 0, 8.0, 12.0)))
+        self.assertEqual(result["verdict"], {"status": "verified", "reasons": []})
+        v = result["verification"]
+        self.assertEqual(v["schema"], sa.LANDING_VERIFICATION_V3)
+        self.assertIn(v["navigation"]["physical_class"], sa.NAV_PHYSICAL_CLASSES)
+        self.assertIn("controller declarations", v["navigation"]["source"])
+        self.assertTrue(all("nav" in s["estimate"] for s in result["states"]))
+        self.assertEqual(self.adapter.verify(self.tmp / result["run_id"])["verdict"]["status"], "verified")
+        # An M9 policy on the same seed keeps verification v2 and has no navigation declarations.
+        m9 = self.run_view(request("robust", 4000, None))
+        self.assertEqual(m9["verification"]["schema"], sa.LANDING_VERIFICATION_V2)
+        self.assertNotIn("navigation", m9["verification"])
+        self.assertFalse(any("nav" in s["estimate"] for s in m9["states"]))
+
     def test_exit_code_2_is_a_result_not_an_error(self):
         # The pre-registered flagship: a +20 m altimeter bias makes the baseline policy hit the ground at about 20 m/s.
         baseline = self.run_view(request("baseline"))
@@ -305,6 +392,24 @@ class RunTests(unittest.TestCase):
                 self.assertEqual(result["verdict"]["status"], "verified")
                 self.assertIn(result["verification"]["outcome"], sa.LANDING_OUTCOMES)
         self.assertEqual(len(list(self.tmp.glob("*/run.json"))), len(edges))
+
+    def test_every_m10_range_edge_and_default_is_accepted_by_the_simulator_too(self):
+        edges = [("altimeter_stuck", 0, 8.0, 9.0), ("altimeter_stuck", 0, 8.0, 18.0),
+                 ("altimeter_delay", 0.02, 6.0, 40.0), ("altimeter_delay", 0.2, 6.0, 40.0),
+                 ("altimeter_delay", 0.05, 6.0, 40.0),  # between whole control cycles
+                 ("altimeter_outliers", 0.001, 0.0, 40.0), ("altimeter_outliers", 0.01, 0.0, 40.0),
+                 ("altimeter_drift", 0.03, 6.0, 40.0), ("altimeter_drift", 0.3, 6.0, 40.0),
+                 ("gnss_horizontal_bias", 5.0, 0.0, 40.0), ("gnss_horizontal_bias", 30.0, 0.0, 40.0),
+                 ("gnss_coherent_ramp", 0.1, 8.0, 40.0), ("gnss_coherent_ramp", 3.0, 8.0, 40.0),
+                 ("imu_accel_drift", 0.01, 6.0, 40.0), ("imu_accel_drift", 0.1, 6.0, 40.0)]
+        edges += [(e["kind"], (e["magnitude"] or {"default": 0.0})["default"], e["default_start_s"], e["default_end_s"])
+                  for e in self.adapter.describe()["capabilities"]["faults"] if e["policies"]]
+        for kind, magnitude, start, end in edges:
+            with self.subTest(kind=kind, magnitude=magnitude, start=start, end=end):
+                result = self.run_view(request("m10_b_plus", 1, fault(kind, magnitude, start, end)))
+                self.assertEqual(result["verdict"]["status"], "verified")
+                self.assertIn(result["verification"]["outcome"], sa.LANDING_OUTCOMES)
+                self.assertIn(result["verification"]["navigation"]["physical_class"], sa.NAV_PHYSICAL_CLASSES)
 
     def test_seed_changes_the_run_and_seed_zero_is_the_nominal_dispersion(self):
         zero = self.run_view(request("baseline", 0, None))
