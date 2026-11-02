@@ -241,6 +241,8 @@ function describeFault(fl) {
   const info = faultOf(fl.kind), unit = info && info.magnitude ? ' ' + info.magnitude.unit : '';
   return `${info ? info.label : words(fl.kind)}${info && info.magnitude ? ' ' + g3(fl.magnitude) + unit : ''}, ${f(fl.start_s, 2)} s to ${f(fl.end_s, 2)} s`;
 }
+// A validated request names its faults as a list (up to two); this page sends at most one.
+const requestFaults = req => (req.faults && req.faults.length ? req.faults.map(describeFault).join(' + ') : describeFault(null));
 function formRequest(policy) {
   const num = id => { const v = $(id).value.trim(); return v === '' ? null : Number(v); };
   const seed = num('ln-seed');
@@ -727,7 +729,7 @@ function readout(r) {
 
 // ---------------------------------------------------------------- result
 function describeRun(r) {
-  return `${r.request.policy} policy · ${describeFault(r.request.fault)} · seed ${r.request.seed} · run ${r.run_id}`;
+  return `${r.request.policy} policy · ${requestFaults(r.request)} · seed ${r.request.seed} · run ${r.run_id}`;
 }
 function setTime(t) { state.t = Math.max(0, Math.min(endAll(), t)); renderLive(); }
 function timeControls() {
@@ -816,7 +818,7 @@ function drawCompare() {
   const detail = p => el('button', {onclick: () => { state.mode = 'single'; state.single = state.pair[p]; state.note = null; state.t = endAll(); drawResult(); drawResearch(); $('result-heading').focus(); }}, `Open ${p} in detail`);
   fill($('result'), 
     el('h2', {id: 'result-heading', tabindex: '-1'}, 'Comparison of the two policies'),
-    el('p', {class: 'meta'}, `Same case for both: ${describeFault(req.fault)} · seed ${req.seed}. baseline run ${b.run_id}, robust run ${r.run_id}.`), noteBox(),
+    el('p', {class: 'meta'}, `Same case for both: ${requestFaults(req)} · seed ${req.seed}. baseline run ${b.run_id}, robust run ${r.run_id}.`), noteBox(),
     summary, actedNote(b),
     el('div', {class: 'grid2'}, POLICY_NAMES.map(p => el('div', {class: 'panel'}, el('h3', {}, p), ...statements(state.pair[p]), detail(p)))),
     el('h3', {}, 'Requirement and invariant verdicts side by side'), table,
