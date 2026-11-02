@@ -1,0 +1,1108 @@
+{
+  "schema": "vv-m10-tuning.v1",
+  "protocol": "docs/m10-resilient-navigation.md 10.4: F1 dev cells, mean recovery, nominal spurious <= 2/100",
+  "arm": "m10_b",
+  "budget": 30,
+  "search_seed": 10,
+  "generator": "random.Random(10 * 1000 + 1).sample over the grid",
+  "space": {
+    "gnss_readmission_epochs": [
+      2,
+      3,
+      5,
+      10
+    ],
+    "readmission_samples": [
+      5,
+      10,
+      20
+    ],
+    "t_hold_s": [
+      1.0,
+      2.0,
+      3.0
+    ],
+    "bias_walk_sigma_mps2_per_sqrt_s": [
+      0.002,
+      0.01,
+      0.03,
+      0.1
+    ],
+    "accel_process_sigma_mps2": [
+      0.05,
+      0.1,
+      0.2
+    ],
+    "nis_reject": [
+      10.83,
+      15.14,
+      19.51,
+      23.93
+    ]
+  },
+  "parameters_tuned": 6,
+  "seeds": "5000-5099",
+  "binary_sha256": "a82ca967ea539f5cf2d0f32c2855ad0d43ccbbe5078a0e8875086f4925690481",
+  "start_template_sha256": "c28a258c94a17b6ce1e8eb5a1442d977b4c951a0913375661ec3dddf8d05784a",
+  "machine": "Windows-11-10.0.26300-SP0; AMD64 Family 25 Model 97 Stepping 2, AuthenticAMD; Python 3.14.6",
+  "duration_s": 290.6,
+  "command": "python scripts/m10_tune.py --arm m10_b --output-root runs/tune-m10_b",
+  "evaluations": [
+    {
+      "index": 0,
+      "params": {
+        "accel_process_sigma_mps2": 0.1,
+        "bias_walk_sigma_mps2_per_sqrt_s": 0.03,
+        "gnss_readmission_epochs": 10,
+        "nis_reject": 15.14,
+        "readmission_samples": 10,
+        "t_hold_s": 2.0
+      },
+      "mean_recovery": 0.7427272727272727,
+      "nominal_spurious_runs": 0,
+      "feasible": true,
+      "recovered_per_cell": {
+        "nominal": 94,
+        "thrust_loss": 88,
+        "ignition_delay": 80,
+        "gimbal_stuck": 92,
+        "altimeter_bias": 94,
+        "altimeter_dropout": 94,
+        "gnss_dropout": 92,
+        "gnss_bias": 0,
+        "imu_accel_bias": 89,
+        "altimeter_bias_low": 94,
+        "gnss_bias_low": 0
+      },
+      "template_sha256": "c28a258c94a17b6ce1e8eb5a1442d977b4c951a0913375661ec3dddf8d05784a",
+      "replay": {
+        "replayed": 11,
+        "verified": 11,
+        "failed": []
+      }
+    },
+    {
+      "index": 1,
+      "params": {
+        "accel_process_sigma_mps2": 0.1,
+        "bias_walk_sigma_mps2_per_sqrt_s": 0.01,
+        "gnss_readmission_epochs": 2,
+        "nis_reject": 15.14,
+        "readmission_samples": 5,
+        "t_hold_s": 1.0
+      },
+      "mean_recovery": 0.7400000000000001,
+      "nominal_spurious_runs": 0,
+      "feasible": true,
+      "recovered_per_cell": {
+        "nominal": 94,
+        "thrust_loss": 88,
+        "ignition_delay": 79,
+        "gimbal_stuck": 92,
+        "altimeter_bias": 94,
+        "altimeter_dropout": 94,
+        "gnss_dropout": 90,
+        "gnss_bias": 0,
+        "imu_accel_bias": 89,
+        "altimeter_bias_low": 94,
+        "gnss_bias_low": 0
+      },
+      "template_sha256": "dff7cc78332b2ce44a298af467d61925477328be43329623f1a8edfea4da6666",
+      "replay": {
+        "replayed": 11,
+        "verified": 11,
+        "failed": []
+      }
+    },
+    {
+      "index": 2,
+      "params": {
+        "accel_process_sigma_mps2": 0.05,
+        "bias_walk_sigma_mps2_per_sqrt_s": 0.002,
+        "gnss_readmission_epochs": 10,
+        "nis_reject": 19.51,
+        "readmission_samples": 5,
+        "t_hold_s": 3.0
+      },
+      "mean_recovery": 0.7454545454545454,
+      "nominal_spurious_runs": 0,
+      "feasible": true,
+      "recovered_per_cell": {
+        "nominal": 94,
+        "thrust_loss": 88,
+        "ignition_delay": 83,
+        "gimbal_stuck": 92,
+        "altimeter_bias": 94,
+        "altimeter_dropout": 94,
+        "gnss_dropout": 92,
+        "gnss_bias": 0,
+        "imu_accel_bias": 89,
+        "altimeter_bias_low": 94,
+        "gnss_bias_low": 0
+      },
+      "template_sha256": "4e8f06b2a911584d79544fde76177a99ba7435b05262f7d123e8568c2b696722",
+      "replay": {
+        "replayed": 11,
+        "verified": 11,
+        "failed": []
+      }
+    },
+    {
+      "index": 3,
+      "params": {
+        "accel_process_sigma_mps2": 0.2,
+        "bias_walk_sigma_mps2_per_sqrt_s": 0.1,
+        "gnss_readmission_epochs": 5,
+        "nis_reject": 23.93,
+        "readmission_samples": 20,
+        "t_hold_s": 2.0
+      },
+      "mean_recovery": 0.7400000000000001,
+      "nominal_spurious_runs": 0,
+      "feasible": true,
+      "recovered_per_cell": {
+        "nominal": 94,
+        "thrust_loss": 88,
+        "ignition_delay": 81,
+        "gimbal_stuck": 91,
+        "altimeter_bias": 93,
+        "altimeter_dropout": 94,
+        "gnss_dropout": 91,
+        "gnss_bias": 0,
+        "imu_accel_bias": 89,
+        "altimeter_bias_low": 93,
+        "gnss_bias_low": 0
+      },
+      "template_sha256": "84b3ddbed80c484c96437559f734d8592f0dd7bff9b5d441152cf2b4844f3d53",
+      "replay": {
+        "replayed": 11,
+        "verified": 11,
+        "failed": []
+      }
+    },
+    {
+      "index": 4,
+      "params": {
+        "accel_process_sigma_mps2": 0.05,
+        "bias_walk_sigma_mps2_per_sqrt_s": 0.01,
+        "gnss_readmission_epochs": 5,
+        "nis_reject": 23.93,
+        "readmission_samples": 5,
+        "t_hold_s": 2.0
+      },
+      "mean_recovery": 0.7445454545454545,
+      "nominal_spurious_runs": 0,
+      "feasible": true,
+      "recovered_per_cell": {
+        "nominal": 94,
+        "thrust_loss": 88,
+        "ignition_delay": 82,
+        "gimbal_stuck": 92,
+        "altimeter_bias": 94,
+        "altimeter_dropout": 94,
+        "gnss_dropout": 92,
+        "gnss_bias": 0,
+        "imu_accel_bias": 89,
+        "altimeter_bias_low": 94,
+        "gnss_bias_low": 0
+      },
+      "template_sha256": "0d2b846d4f5d8bad22c1c0bcd8b2db0630f426b2237b442bc3083c909302bb38",
+      "replay": {
+        "replayed": 11,
+        "verified": 11,
+        "failed": []
+      }
+    },
+    {
+      "index": 5,
+      "params": {
+        "accel_process_sigma_mps2": 0.1,
+        "bias_walk_sigma_mps2_per_sqrt_s": 0.01,
+        "gnss_readmission_epochs": 10,
+        "nis_reject": 23.93,
+        "readmission_samples": 20,
+        "t_hold_s": 2.0
+      },
+      "mean_recovery": 0.7436363636363637,
+      "nominal_spurious_runs": 0,
+      "feasible": true,
+      "recovered_per_cell": {
+        "nominal": 94,
+        "thrust_loss": 88,
+        "ignition_delay": 81,
+        "gimbal_stuck": 92,
+        "altimeter_bias": 94,
+        "altimeter_dropout": 94,
+        "gnss_dropout": 92,
+        "gnss_bias": 0,
+        "imu_accel_bias": 89,
+        "altimeter_bias_low": 94,
+        "gnss_bias_low": 0
+      },
+      "template_sha256": "8be494e60c661b0352e085d8f7280ea626f0b740339333c760171d930e2abda7",
+      "replay": {
+        "replayed": 11,
+        "verified": 11,
+        "failed": []
+      }
+    },
+    {
+      "index": 6,
+      "params": {
+        "accel_process_sigma_mps2": 0.2,
+        "bias_walk_sigma_mps2_per_sqrt_s": 0.002,
+        "gnss_readmission_epochs": 3,
+        "nis_reject": 10.83,
+        "readmission_samples": 5,
+        "t_hold_s": 3.0
+      },
+      "mean_recovery": 0.729090909090909,
+      "nominal_spurious_runs": 3,
+      "feasible": false,
+      "recovered_per_cell": {
+        "nominal": 93,
+        "thrust_loss": 88,
+        "ignition_delay": 77,
+        "gimbal_stuck": 91,
+        "altimeter_bias": 91,
+        "altimeter_dropout": 92,
+        "gnss_dropout": 90,
+        "gnss_bias": 0,
+        "imu_accel_bias": 89,
+        "altimeter_bias_low": 91,
+        "gnss_bias_low": 0
+      },
+      "template_sha256": "fcd1297cf3cfe5dc54850c20372ee177b30e28a535a4d1401ce4c11ea6c40e05",
+      "replay": {
+        "replayed": 11,
+        "verified": 11,
+        "failed": []
+      }
+    },
+    {
+      "index": 7,
+      "params": {
+        "accel_process_sigma_mps2": 0.1,
+        "bias_walk_sigma_mps2_per_sqrt_s": 0.01,
+        "gnss_readmission_epochs": 10,
+        "nis_reject": 15.14,
+        "readmission_samples": 20,
+        "t_hold_s": 3.0
+      },
+      "mean_recovery": 0.7436363636363637,
+      "nominal_spurious_runs": 0,
+      "feasible": true,
+      "recovered_per_cell": {
+        "nominal": 94,
+        "thrust_loss": 88,
+        "ignition_delay": 81,
+        "gimbal_stuck": 92,
+        "altimeter_bias": 94,
+        "altimeter_dropout": 94,
+        "gnss_dropout": 92,
+        "gnss_bias": 0,
+        "imu_accel_bias": 89,
+        "altimeter_bias_low": 94,
+        "gnss_bias_low": 0
+      },
+      "template_sha256": "02df2c12eb1095196243d88143eccca0a272af6659c950114384235135cd8805",
+      "replay": {
+        "replayed": 11,
+        "verified": 11,
+        "failed": []
+      }
+    },
+    {
+      "index": 8,
+      "params": {
+        "accel_process_sigma_mps2": 0.2,
+        "bias_walk_sigma_mps2_per_sqrt_s": 0.01,
+        "gnss_readmission_epochs": 2,
+        "nis_reject": 19.51,
+        "readmission_samples": 10,
+        "t_hold_s": 3.0
+      },
+      "mean_recovery": 0.7372727272727272,
+      "nominal_spurious_runs": 0,
+      "feasible": true,
+      "recovered_per_cell": {
+        "nominal": 94,
+        "thrust_loss": 88,
+        "ignition_delay": 81,
+        "gimbal_stuck": 91,
+        "altimeter_bias": 92,
+        "altimeter_dropout": 94,
+        "gnss_dropout": 90,
+        "gnss_bias": 0,
+        "imu_accel_bias": 89,
+        "altimeter_bias_low": 92,
+        "gnss_bias_low": 0
+      },
+      "template_sha256": "3e46a5a45c566c8c502635fab355fd6034a09a58ace657f4a3f819c8cdac05bf",
+      "replay": {
+        "replayed": 11,
+        "verified": 11,
+        "failed": []
+      }
+    },
+    {
+      "index": 9,
+      "params": {
+        "accel_process_sigma_mps2": 0.05,
+        "bias_walk_sigma_mps2_per_sqrt_s": 0.01,
+        "gnss_readmission_epochs": 2,
+        "nis_reject": 10.83,
+        "readmission_samples": 5,
+        "t_hold_s": 2.0
+      },
+      "mean_recovery": 0.7327272727272728,
+      "nominal_spurious_runs": 3,
+      "feasible": false,
+      "recovered_per_cell": {
+        "nominal": 94,
+        "thrust_loss": 87,
+        "ignition_delay": 73,
+        "gimbal_stuck": 92,
+        "altimeter_bias": 93,
+        "altimeter_dropout": 93,
+        "gnss_dropout": 92,
+        "gnss_bias": 0,
+        "imu_accel_bias": 89,
+        "altimeter_bias_low": 93,
+        "gnss_bias_low": 0
+      },
+      "template_sha256": "8a8c350d0870c1d0f1c3e62c3cab361fe8bbf8bed26bc21e481e0551d372875a",
+      "replay": {
+        "replayed": 11,
+        "verified": 11,
+        "failed": []
+      }
+    },
+    {
+      "index": 10,
+      "params": {
+        "accel_process_sigma_mps2": 0.1,
+        "bias_walk_sigma_mps2_per_sqrt_s": 0.1,
+        "gnss_readmission_epochs": 10,
+        "nis_reject": 19.51,
+        "readmission_samples": 20,
+        "t_hold_s": 1.0
+      },
+      "mean_recovery": 0.7436363636363637,
+      "nominal_spurious_runs": 0,
+      "feasible": true,
+      "recovered_per_cell": {
+        "nominal": 94,
+        "thrust_loss": 88,
+        "ignition_delay": 81,
+        "gimbal_stuck": 92,
+        "altimeter_bias": 94,
+        "altimeter_dropout": 94,
+        "gnss_dropout": 92,
+        "gnss_bias": 0,
+        "imu_accel_bias": 89,
+        "altimeter_bias_low": 94,
+        "gnss_bias_low": 0
+      },
+      "template_sha256": "95788485ce5160daaa9414dd97c550f4f677017e3d0ded2e626ce485039afba2",
+      "replay": {
+        "replayed": 11,
+        "verified": 11,
+        "failed": []
+      }
+    },
+    {
+      "index": 11,
+      "params": {
+        "accel_process_sigma_mps2": 0.05,
+        "bias_walk_sigma_mps2_per_sqrt_s": 0.1,
+        "gnss_readmission_epochs": 10,
+        "nis_reject": 15.14,
+        "readmission_samples": 5,
+        "t_hold_s": 1.0
+      },
+      "mean_recovery": 0.7445454545454545,
+      "nominal_spurious_runs": 0,
+      "feasible": true,
+      "recovered_per_cell": {
+        "nominal": 94,
+        "thrust_loss": 88,
+        "ignition_delay": 82,
+        "gimbal_stuck": 92,
+        "altimeter_bias": 94,
+        "altimeter_dropout": 94,
+        "gnss_dropout": 92,
+        "gnss_bias": 0,
+        "imu_accel_bias": 89,
+        "altimeter_bias_low": 94,
+        "gnss_bias_low": 0
+      },
+      "template_sha256": "acef6b70b9aeca5b212b7475727375e394d1fd644630603126fcb6bb397837bb",
+      "replay": {
+        "replayed": 11,
+        "verified": 11,
+        "failed": []
+      }
+    },
+    {
+      "index": 12,
+      "params": {
+        "accel_process_sigma_mps2": 0.05,
+        "bias_walk_sigma_mps2_per_sqrt_s": 0.01,
+        "gnss_readmission_epochs": 10,
+        "nis_reject": 19.51,
+        "readmission_samples": 10,
+        "t_hold_s": 2.0
+      },
+      "mean_recovery": 0.7436363636363637,
+      "nominal_spurious_runs": 0,
+      "feasible": true,
+      "recovered_per_cell": {
+        "nominal": 94,
+        "thrust_loss": 88,
+        "ignition_delay": 81,
+        "gimbal_stuck": 92,
+        "altimeter_bias": 94,
+        "altimeter_dropout": 94,
+        "gnss_dropout": 92,
+        "gnss_bias": 0,
+        "imu_accel_bias": 89,
+        "altimeter_bias_low": 94,
+        "gnss_bias_low": 0
+      },
+      "template_sha256": "d775f651177c71f24a65ef28086b850e78971160741a9783192b541a72610536",
+      "replay": {
+        "replayed": 11,
+        "verified": 11,
+        "failed": []
+      }
+    },
+    {
+      "index": 13,
+      "params": {
+        "accel_process_sigma_mps2": 0.05,
+        "bias_walk_sigma_mps2_per_sqrt_s": 0.002,
+        "gnss_readmission_epochs": 10,
+        "nis_reject": 19.51,
+        "readmission_samples": 10,
+        "t_hold_s": 2.0
+      },
+      "mean_recovery": 0.7436363636363637,
+      "nominal_spurious_runs": 0,
+      "feasible": true,
+      "recovered_per_cell": {
+        "nominal": 94,
+        "thrust_loss": 88,
+        "ignition_delay": 81,
+        "gimbal_stuck": 92,
+        "altimeter_bias": 94,
+        "altimeter_dropout": 94,
+        "gnss_dropout": 92,
+        "gnss_bias": 0,
+        "imu_accel_bias": 89,
+        "altimeter_bias_low": 94,
+        "gnss_bias_low": 0
+      },
+      "template_sha256": "1222196be0a1dbcbcd4d37e99ee6690c1a587613131db6ba8108f9277faf2d5a",
+      "replay": {
+        "replayed": 11,
+        "verified": 11,
+        "failed": []
+      }
+    },
+    {
+      "index": 14,
+      "params": {
+        "accel_process_sigma_mps2": 0.05,
+        "bias_walk_sigma_mps2_per_sqrt_s": 0.1,
+        "gnss_readmission_epochs": 10,
+        "nis_reject": 23.93,
+        "readmission_samples": 10,
+        "t_hold_s": 3.0
+      },
+      "mean_recovery": 0.7454545454545454,
+      "nominal_spurious_runs": 0,
+      "feasible": true,
+      "recovered_per_cell": {
+        "nominal": 94,
+        "thrust_loss": 88,
+        "ignition_delay": 83,
+        "gimbal_stuck": 92,
+        "altimeter_bias": 94,
+        "altimeter_dropout": 94,
+        "gnss_dropout": 92,
+        "gnss_bias": 0,
+        "imu_accel_bias": 89,
+        "altimeter_bias_low": 94,
+        "gnss_bias_low": 0
+      },
+      "template_sha256": "eeb702f023d316d1cbe4a0643591c51381309bf1f7c404f40bb2b8455f710e97",
+      "replay": {
+        "replayed": 11,
+        "verified": 11,
+        "failed": []
+      }
+    },
+    {
+      "index": 15,
+      "params": {
+        "accel_process_sigma_mps2": 0.05,
+        "bias_walk_sigma_mps2_per_sqrt_s": 0.002,
+        "gnss_readmission_epochs": 3,
+        "nis_reject": 10.83,
+        "readmission_samples": 20,
+        "t_hold_s": 2.0
+      },
+      "mean_recovery": 0.7354545454545455,
+      "nominal_spurious_runs": 2,
+      "feasible": true,
+      "recovered_per_cell": {
+        "nominal": 94,
+        "thrust_loss": 87,
+        "ignition_delay": 74,
+        "gimbal_stuck": 92,
+        "altimeter_bias": 94,
+        "altimeter_dropout": 94,
+        "gnss_dropout": 91,
+        "gnss_bias": 0,
+        "imu_accel_bias": 89,
+        "altimeter_bias_low": 94,
+        "gnss_bias_low": 0
+      },
+      "template_sha256": "ed369c0a2bdb98694ef5dd008d882676acc69643ff627ad0302d0d7e73374670",
+      "replay": {
+        "replayed": 11,
+        "verified": 11,
+        "failed": []
+      }
+    },
+    {
+      "index": 16,
+      "params": {
+        "accel_process_sigma_mps2": 0.1,
+        "bias_walk_sigma_mps2_per_sqrt_s": 0.1,
+        "gnss_readmission_epochs": 2,
+        "nis_reject": 15.14,
+        "readmission_samples": 10,
+        "t_hold_s": 3.0
+      },
+      "mean_recovery": 0.7418181818181818,
+      "nominal_spurious_runs": 0,
+      "feasible": true,
+      "recovered_per_cell": {
+        "nominal": 94,
+        "thrust_loss": 88,
+        "ignition_delay": 81,
+        "gimbal_stuck": 92,
+        "altimeter_bias": 94,
+        "altimeter_dropout": 94,
+        "gnss_dropout": 90,
+        "gnss_bias": 0,
+        "imu_accel_bias": 89,
+        "altimeter_bias_low": 94,
+        "gnss_bias_low": 0
+      },
+      "template_sha256": "91c1488731b3389b4da60183a1b3a6f85b9bbbed813d20eb9c5115d122bda9ee",
+      "replay": {
+        "replayed": 11,
+        "verified": 11,
+        "failed": []
+      }
+    },
+    {
+      "index": 17,
+      "params": {
+        "accel_process_sigma_mps2": 0.1,
+        "bias_walk_sigma_mps2_per_sqrt_s": 0.002,
+        "gnss_readmission_epochs": 3,
+        "nis_reject": 15.14,
+        "readmission_samples": 10,
+        "t_hold_s": 2.0
+      },
+      "mean_recovery": 0.7400000000000001,
+      "nominal_spurious_runs": 0,
+      "feasible": true,
+      "recovered_per_cell": {
+        "nominal": 94,
+        "thrust_loss": 88,
+        "ignition_delay": 79,
+        "gimbal_stuck": 92,
+        "altimeter_bias": 94,
+        "altimeter_dropout": 94,
+        "gnss_dropout": 90,
+        "gnss_bias": 0,
+        "imu_accel_bias": 89,
+        "altimeter_bias_low": 94,
+        "gnss_bias_low": 0
+      },
+      "template_sha256": "06f6a48c7a749c7fdeb9951e96173659737d97b48b4e6905c3b1ca17a272dbe7",
+      "replay": {
+        "replayed": 11,
+        "verified": 11,
+        "failed": []
+      }
+    },
+    {
+      "index": 18,
+      "params": {
+        "accel_process_sigma_mps2": 0.05,
+        "bias_walk_sigma_mps2_per_sqrt_s": 0.03,
+        "gnss_readmission_epochs": 3,
+        "nis_reject": 23.93,
+        "readmission_samples": 10,
+        "t_hold_s": 1.0
+      },
+      "mean_recovery": 0.7436363636363637,
+      "nominal_spurious_runs": 0,
+      "feasible": true,
+      "recovered_per_cell": {
+        "nominal": 94,
+        "thrust_loss": 88,
+        "ignition_delay": 82,
+        "gimbal_stuck": 92,
+        "altimeter_bias": 94,
+        "altimeter_dropout": 94,
+        "gnss_dropout": 91,
+        "gnss_bias": 0,
+        "imu_accel_bias": 89,
+        "altimeter_bias_low": 94,
+        "gnss_bias_low": 0
+      },
+      "template_sha256": "dcbe449052442d2c9e1cd3b80ae66ab6db091e55d39f3ef7ddec4ccb4b31d982",
+      "replay": {
+        "replayed": 11,
+        "verified": 11,
+        "failed": []
+      }
+    },
+    {
+      "index": 19,
+      "params": {
+        "accel_process_sigma_mps2": 0.05,
+        "bias_walk_sigma_mps2_per_sqrt_s": 0.1,
+        "gnss_readmission_epochs": 3,
+        "nis_reject": 19.51,
+        "readmission_samples": 10,
+        "t_hold_s": 1.0
+      },
+      "mean_recovery": 0.7445454545454545,
+      "nominal_spurious_runs": 0,
+      "feasible": true,
+      "recovered_per_cell": {
+        "nominal": 94,
+        "thrust_loss": 88,
+        "ignition_delay": 83,
+        "gimbal_stuck": 92,
+        "altimeter_bias": 94,
+        "altimeter_dropout": 94,
+        "gnss_dropout": 91,
+        "gnss_bias": 0,
+        "imu_accel_bias": 89,
+        "altimeter_bias_low": 94,
+        "gnss_bias_low": 0
+      },
+      "template_sha256": "5d91dfdf26cd2665cc05349c73fca34fef1583f4aebee524883431f20988e5ea",
+      "replay": {
+        "replayed": 11,
+        "verified": 11,
+        "failed": []
+      }
+    },
+    {
+      "index": 20,
+      "params": {
+        "accel_process_sigma_mps2": 0.1,
+        "bias_walk_sigma_mps2_per_sqrt_s": 0.002,
+        "gnss_readmission_epochs": 5,
+        "nis_reject": 15.14,
+        "readmission_samples": 10,
+        "t_hold_s": 2.0
+      },
+      "mean_recovery": 0.740909090909091,
+      "nominal_spurious_runs": 0,
+      "feasible": true,
+      "recovered_per_cell": {
+        "nominal": 94,
+        "thrust_loss": 88,
+        "ignition_delay": 79,
+        "gimbal_stuck": 92,
+        "altimeter_bias": 94,
+        "altimeter_dropout": 94,
+        "gnss_dropout": 91,
+        "gnss_bias": 0,
+        "imu_accel_bias": 89,
+        "altimeter_bias_low": 94,
+        "gnss_bias_low": 0
+      },
+      "template_sha256": "c51770e68a5e9f3e8a4eaf1a1ee01d3428ac3935594ad59dcc42d70b202ea7b4",
+      "replay": {
+        "replayed": 11,
+        "verified": 11,
+        "failed": []
+      }
+    },
+    {
+      "index": 21,
+      "params": {
+        "accel_process_sigma_mps2": 0.2,
+        "bias_walk_sigma_mps2_per_sqrt_s": 0.002,
+        "gnss_readmission_epochs": 3,
+        "nis_reject": 10.83,
+        "readmission_samples": 20,
+        "t_hold_s": 2.0
+      },
+      "mean_recovery": 0.7272727272727273,
+      "nominal_spurious_runs": 3,
+      "feasible": false,
+      "recovered_per_cell": {
+        "nominal": 93,
+        "thrust_loss": 87,
+        "ignition_delay": 76,
+        "gimbal_stuck": 91,
+        "altimeter_bias": 91,
+        "altimeter_dropout": 92,
+        "gnss_dropout": 90,
+        "gnss_bias": 0,
+        "imu_accel_bias": 89,
+        "altimeter_bias_low": 91,
+        "gnss_bias_low": 0
+      },
+      "template_sha256": "ca06bca33cdf0d92d658daa47c37e6a810a1b993a741859831498c288261f420",
+      "replay": {
+        "replayed": 11,
+        "verified": 11,
+        "failed": []
+      }
+    },
+    {
+      "index": 22,
+      "params": {
+        "accel_process_sigma_mps2": 0.2,
+        "bias_walk_sigma_mps2_per_sqrt_s": 0.03,
+        "gnss_readmission_epochs": 10,
+        "nis_reject": 10.83,
+        "readmission_samples": 10,
+        "t_hold_s": 3.0
+      },
+      "mean_recovery": 0.7263636363636364,
+      "nominal_spurious_runs": 5,
+      "feasible": false,
+      "recovered_per_cell": {
+        "nominal": 92,
+        "thrust_loss": 87,
+        "ignition_delay": 78,
+        "gimbal_stuck": 89,
+        "altimeter_bias": 91,
+        "altimeter_dropout": 92,
+        "gnss_dropout": 91,
+        "gnss_bias": 0,
+        "imu_accel_bias": 88,
+        "altimeter_bias_low": 91,
+        "gnss_bias_low": 0
+      },
+      "template_sha256": "412d5bdaf1fedce8a76a00073e884b62c46a8e59e487d75922c3366841cde8f4",
+      "replay": {
+        "replayed": 11,
+        "verified": 11,
+        "failed": []
+      }
+    },
+    {
+      "index": 23,
+      "params": {
+        "accel_process_sigma_mps2": 0.1,
+        "bias_walk_sigma_mps2_per_sqrt_s": 0.002,
+        "gnss_readmission_epochs": 3,
+        "nis_reject": 10.83,
+        "readmission_samples": 20,
+        "t_hold_s": 2.0
+      },
+      "mean_recovery": 0.7281818181818182,
+      "nominal_spurious_runs": 3,
+      "feasible": false,
+      "recovered_per_cell": {
+        "nominal": 93,
+        "thrust_loss": 86,
+        "ignition_delay": 73,
+        "gimbal_stuck": 91,
+        "altimeter_bias": 93,
+        "altimeter_dropout": 93,
+        "gnss_dropout": 90,
+        "gnss_bias": 0,
+        "imu_accel_bias": 89,
+        "altimeter_bias_low": 93,
+        "gnss_bias_low": 0
+      },
+      "template_sha256": "190b6a78da5905091f0f2d875a78afe9d85d493cdc58eb2e83ba59719d872752",
+      "replay": {
+        "replayed": 11,
+        "verified": 11,
+        "failed": []
+      }
+    },
+    {
+      "index": 24,
+      "params": {
+        "accel_process_sigma_mps2": 0.1,
+        "bias_walk_sigma_mps2_per_sqrt_s": 0.01,
+        "gnss_readmission_epochs": 3,
+        "nis_reject": 15.14,
+        "readmission_samples": 10,
+        "t_hold_s": 3.0
+      },
+      "mean_recovery": 0.7418181818181818,
+      "nominal_spurious_runs": 0,
+      "feasible": true,
+      "recovered_per_cell": {
+        "nominal": 94,
+        "thrust_loss": 88,
+        "ignition_delay": 81,
+        "gimbal_stuck": 92,
+        "altimeter_bias": 94,
+        "altimeter_dropout": 94,
+        "gnss_dropout": 90,
+        "gnss_bias": 0,
+        "imu_accel_bias": 89,
+        "altimeter_bias_low": 94,
+        "gnss_bias_low": 0
+      },
+      "template_sha256": "20300110a3dbae05c967bc0742799170a140bab0c158f50af8d761ad975caee9",
+      "replay": {
+        "replayed": 11,
+        "verified": 11,
+        "failed": []
+      }
+    },
+    {
+      "index": 25,
+      "params": {
+        "accel_process_sigma_mps2": 0.1,
+        "bias_walk_sigma_mps2_per_sqrt_s": 0.03,
+        "gnss_readmission_epochs": 3,
+        "nis_reject": 10.83,
+        "readmission_samples": 10,
+        "t_hold_s": 1.0
+      },
+      "mean_recovery": 0.7300000000000001,
+      "nominal_spurious_runs": 6,
+      "feasible": false,
+      "recovered_per_cell": {
+        "nominal": 93,
+        "thrust_loss": 85,
+        "ignition_delay": 78,
+        "gimbal_stuck": 90,
+        "altimeter_bias": 93,
+        "altimeter_dropout": 93,
+        "gnss_dropout": 90,
+        "gnss_bias": 0,
+        "imu_accel_bias": 88,
+        "altimeter_bias_low": 93,
+        "gnss_bias_low": 0
+      },
+      "template_sha256": "253f5440abc6ed862122a2df501f3b408a7ab473594eda94eaaf079b3483f5d3",
+      "replay": {
+        "replayed": 11,
+        "verified": 11,
+        "failed": []
+      }
+    },
+    {
+      "index": 26,
+      "params": {
+        "accel_process_sigma_mps2": 0.2,
+        "bias_walk_sigma_mps2_per_sqrt_s": 0.1,
+        "gnss_readmission_epochs": 3,
+        "nis_reject": 23.93,
+        "readmission_samples": 20,
+        "t_hold_s": 2.0
+      },
+      "mean_recovery": 0.7390909090909091,
+      "nominal_spurious_runs": 0,
+      "feasible": true,
+      "recovered_per_cell": {
+        "nominal": 94,
+        "thrust_loss": 88,
+        "ignition_delay": 81,
+        "gimbal_stuck": 91,
+        "altimeter_bias": 93,
+        "altimeter_dropout": 94,
+        "gnss_dropout": 90,
+        "gnss_bias": 0,
+        "imu_accel_bias": 89,
+        "altimeter_bias_low": 93,
+        "gnss_bias_low": 0
+      },
+      "template_sha256": "9b0c7cc931293ae31494f7b63cedd1730886cd2279798e91144375141ac9dc01",
+      "replay": {
+        "replayed": 11,
+        "verified": 11,
+        "failed": []
+      }
+    },
+    {
+      "index": 27,
+      "params": {
+        "accel_process_sigma_mps2": 0.2,
+        "bias_walk_sigma_mps2_per_sqrt_s": 0.03,
+        "gnss_readmission_epochs": 10,
+        "nis_reject": 19.51,
+        "readmission_samples": 20,
+        "t_hold_s": 2.0
+      },
+      "mean_recovery": 0.7381818181818183,
+      "nominal_spurious_runs": 0,
+      "feasible": true,
+      "recovered_per_cell": {
+        "nominal": 94,
+        "thrust_loss": 88,
+        "ignition_delay": 81,
+        "gimbal_stuck": 91,
+        "altimeter_bias": 92,
+        "altimeter_dropout": 94,
+        "gnss_dropout": 91,
+        "gnss_bias": 0,
+        "imu_accel_bias": 89,
+        "altimeter_bias_low": 92,
+        "gnss_bias_low": 0
+      },
+      "template_sha256": "9e296778dff3f8d856fc6917ff3c3674607d0ab0d829f5cf1f11599bb4a4c4fc",
+      "replay": {
+        "replayed": 11,
+        "verified": 11,
+        "failed": []
+      }
+    },
+    {
+      "index": 28,
+      "params": {
+        "accel_process_sigma_mps2": 0.2,
+        "bias_walk_sigma_mps2_per_sqrt_s": 0.002,
+        "gnss_readmission_epochs": 10,
+        "nis_reject": 19.51,
+        "readmission_samples": 20,
+        "t_hold_s": 3.0
+      },
+      "mean_recovery": 0.7381818181818183,
+      "nominal_spurious_runs": 0,
+      "feasible": true,
+      "recovered_per_cell": {
+        "nominal": 94,
+        "thrust_loss": 88,
+        "ignition_delay": 81,
+        "gimbal_stuck": 91,
+        "altimeter_bias": 92,
+        "altimeter_dropout": 94,
+        "gnss_dropout": 91,
+        "gnss_bias": 0,
+        "imu_accel_bias": 89,
+        "altimeter_bias_low": 92,
+        "gnss_bias_low": 0
+      },
+      "template_sha256": "9ece24d7b1e3d4c5bd6a33623cce8cf1cff3bd489a81cca56d87023777c69454",
+      "replay": {
+        "replayed": 11,
+        "verified": 11,
+        "failed": []
+      }
+    },
+    {
+      "index": 29,
+      "params": {
+        "accel_process_sigma_mps2": 0.1,
+        "bias_walk_sigma_mps2_per_sqrt_s": 0.01,
+        "gnss_readmission_epochs": 2,
+        "nis_reject": 23.93,
+        "readmission_samples": 10,
+        "t_hold_s": 2.0
+      },
+      "mean_recovery": 0.7418181818181818,
+      "nominal_spurious_runs": 0,
+      "feasible": true,
+      "recovered_per_cell": {
+        "nominal": 94,
+        "thrust_loss": 88,
+        "ignition_delay": 81,
+        "gimbal_stuck": 92,
+        "altimeter_bias": 94,
+        "altimeter_dropout": 94,
+        "gnss_dropout": 90,
+        "gnss_bias": 0,
+        "imu_accel_bias": 89,
+        "altimeter_bias_low": 94,
+        "gnss_bias_low": 0
+      },
+      "template_sha256": "3a4cc8d5c9c2dc9fe394bbd62e536db291363d9ab6cc7a4dd0c2034c30aef1a8",
+      "replay": {
+        "replayed": 11,
+        "verified": 11,
+        "failed": []
+      }
+    }
+  ],
+  "best": {
+    "index": 2,
+    "params": {
+      "accel_process_sigma_mps2": 0.05,
+      "bias_walk_sigma_mps2_per_sqrt_s": 0.002,
+      "gnss_readmission_epochs": 10,
+      "nis_reject": 19.51,
+      "readmission_samples": 5,
+      "t_hold_s": 3.0
+    },
+    "mean_recovery": 0.7454545454545454,
+    "nominal_spurious_runs": 0,
+    "feasible": true,
+    "recovered_per_cell": {
+      "nominal": 94,
+      "thrust_loss": 88,
+      "ignition_delay": 83,
+      "gimbal_stuck": 92,
+      "altimeter_bias": 94,
+      "altimeter_dropout": 94,
+      "gnss_dropout": 92,
+      "gnss_bias": 0,
+      "imu_accel_bias": 89,
+      "altimeter_bias_low": 94,
+      "gnss_bias_low": 0
+    },
+    "template_sha256": "4e8f06b2a911584d79544fde76177a99ba7435b05262f7d123e8568c2b696722",
+    "replay": {
+      "replayed": 11,
+      "verified": 11,
+      "failed": []
+    }
+  },
+  "start": {
+    "index": 0,
+    "params": {
+      "accel_process_sigma_mps2": 0.1,
+      "bias_walk_sigma_mps2_per_sqrt_s": 0.03,
+      "gnss_readmission_epochs": 10,
+      "nis_reject": 15.14,
+      "readmission_samples": 10,
+      "t_hold_s": 2.0
+    },
+    "mean_recovery": 0.7427272727272727,
+    "nominal_spurious_runs": 0,
+    "feasible": true,
+    "recovered_per_cell": {
+      "nominal": 94,
+      "thrust_loss": 88,
+      "ignition_delay": 80,
+      "gimbal_stuck": 92,
+      "altimeter_bias": 94,
+      "altimeter_dropout": 94,
+      "gnss_dropout": 92,
+      "gnss_bias": 0,
+      "imu_accel_bias": 89,
+      "altimeter_bias_low": 94,
+      "gnss_bias_low": 0
+    },
+    "template_sha256": "c28a258c94a17b6ce1e8eb5a1442d977b4c951a0913375661ec3dddf8d05784a",
+    "replay": {
+      "replayed": 11,
+      "verified": 11,
+      "failed": []
+    }
+  }
+}

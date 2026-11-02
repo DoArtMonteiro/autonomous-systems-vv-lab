@@ -235,6 +235,12 @@ pub struct NavParams {
     /// Safety monitor: complementary gains towards the GNSS vertical velocity and the radar slope.
     pub monitor_gnss_gain: f64,
     pub monitor_radar_gain: f64,
+    /// Rate parity: anchor the IMU witness at the GNSS epoch before the change point instead of
+    /// the 0.5 s window (M10.3 development; `false` keeps the PR 15 behaviour).
+    pub anchored_imu_witness: bool,
+    /// Exploratory policy, not accepted (owner decision): under `untrusted`, keep chasing the pad
+    /// while the horizontal dead-reckoning bound allows it, instead of damping only.
+    pub bounded_chase_when_untrusted: bool,
 }
 
 impl Default for NavParams {
@@ -273,6 +279,8 @@ impl Default for NavParams {
             exclude_after_s: 0.5,
             monitor_gnss_gain: 0.25,
             monitor_radar_gain: 0.1,
+            anchored_imu_witness: false,
+            bounded_chase_when_untrusted: false,
         }
     }
 }

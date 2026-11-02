@@ -282,6 +282,73 @@ fn a_coherent_receiver_ramp_is_isolated_as_the_receiver() {
     assert_eq!(v["navigation"]["isolation"], "correct");
 }
 
+fn with_nav(policy: &str, faults: Value, key: &str, value: Value) -> Value {
+    let mut c = with(policy, faults);
+    c["controller"]["nav"][key] = value;
+    c
+}
+
+#[test]
+fn the_anchored_imu_witness_stops_blaming_the_radar_for_a_coherent_receiver_ramp() {
+    // Development seed 5019 of the gnss_coherent_ramp cell: with the 0.5 s IMU witness, the window
+    // falls after the onset, misses the velocity step and the parity blames the radar; anchored
+    // before the change point, the witness sees the step and the receiver is isolated.
+    let ramp = json!([{"kind": "gnss_coherent_ramp", "start_s": 8.01, "end_s": 40.0, "magnitude": 1.2249029073726267}]);
+    let window = with_nav(
+        "m10_b_plus",
+        ramp.clone(),
+        "anchored_imu_witness",
+        json!(false),
+    );
+    let (nav, v) = final_nav(&window, 5019);
+    assert_eq!(nav["isolated_radar"], true);
+    assert_eq!(v["navigation"]["isolation"], "wrong");
+    let anchored = with_nav("m10_b_plus", ramp, "anchored_imu_witness", json!(true));
+    let (nav, v) = final_nav(&anchored, 5019);
+    assert_eq!(nav["isolated_radar"], false);
+    assert_eq!(nav["isolated_gnss"], true);
+    assert_eq!(v["navigation"]["isolation"], "correct");
+}
+
+#[test]
+fn the_exploratory_bounded_chase_keeps_the_pad_when_untrusted_comes_from_missing_data() {
+    // Development seed 5004 of pair_altimeter_bias+gnss_dropout: the radar is never admitted and
+    // the receiver drops out, so the navigation is untrusted. The approved law damps the lateral
+    // velocity only and lands off the pad; the exploratory variant chases the pad with the
+    // dead-reckoned position while its drift bound allows it.
+    let pair = json!([
+        {"kind": "altimeter_bias", "start_s": 0.0, "end_s": 40.0, "magnitude": 28.55595175366114},
+        {"kind": "gnss_dropout", "start_s": 12.59, "end_s": 17.38, "magnitude": 0.0}
+    ]);
+    let r5 = |v: &Value| {
+        v["requirements"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["id"] == "R5_position")
+            .unwrap()["pass"]
+            .clone()
+    };
+    let approved = with_nav(
+        "m10_b_plus",
+        pair.clone(),
+        "bounded_chase_when_untrusted",
+        json!(false),
+    );
+    let v = verification(&approved, 5004);
+    assert_eq!(r5(&v), false);
+    assert_eq!(v["navigation"]["physical_class"], "T");
+    let variant = with_nav(
+        "m10_b_plus",
+        pair,
+        "bounded_chase_when_untrusted",
+        json!(true),
+    );
+    let v = verification(&variant, 5004);
+    assert_eq!(r5(&v), true);
+    assert_eq!(v["navigation"]["physical_class"], "R");
+}
+
 #[test]
 fn constant_biases_and_accelerometer_drift_are_never_isolated() {
     // A constant offset changes no rate (sections 3.3 and 3.4); an accelerometer drift is not a

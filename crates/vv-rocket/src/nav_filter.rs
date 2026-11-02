@@ -53,6 +53,10 @@ const ISOLATION_WINDOW_S: f64 = 1.0;
 const CONSISTENCY_SIGMA: f64 = 4.0;
 /// GNSS epochs in the rate window (0.5 s at 10 Hz).
 const GNSS_WINDOW: usize = 5;
+/// GNSS epochs kept for the anchored IMU witness (4 s at 10 Hz).
+const GNSS_HISTORY: usize = 40;
+/// The anchored IMU witness starts at the last epoch at least this long before the change point.
+const ANCHOR_MARGIN_S: f64 = 0.2;
 /// Validation: an altimeter sample outside this range is treated as missing.
 const ALTIMETER_RANGE_M: (f64, f64) = (-100.0, 100_000.0);
 
@@ -196,6 +200,10 @@ struct RateWindow {
     imu_dv: f64,
     imu_cycles: [u32; GNSS_WINDOW],
     since_epoch: u32,
+    /// (time, vz, IMU vertical velocity integral, cycles since the epoch before) of the last
+    /// GNSS epochs, for the IMU witness anchored before the change point.
+    history: [(f64, f64, f64, u32); GNSS_HISTORY],
+    history_len: usize,
 }
 
 impl RateWindow {
@@ -209,6 +217,8 @@ impl RateWindow {
             imu_dv: 0.0,
             imu_cycles: [0; GNSS_WINDOW],
             since_epoch: 0,
+            history: [(0.0, 0.0, 0.0, 0); GNSS_HISTORY],
+            history_len: 0,
         }
     }
 }
@@ -353,7 +363,14 @@ impl NavSystem {
     /// there is no vertical canary of the receiver (it needs a third altitude source), so the
     /// receiver health decides alone.
     pub fn chase_pad(&self, distance_m: f64) -> bool {
-        if self.mode == NavMode::Untrusted {
+        // Approved semantics (8.3): `untrusted` damps the lateral velocity only. The exploratory
+        // variant keeps the bounded chase when `untrusted` comes from missing or never-admitted
+        // altitude sources, never while a disagreement or a detector flag implicates the receiver.
+        if self.mode == NavMode::Untrusted
+            && (!self.prm.bounded_chase_when_untrusted
+                || self.ambiguous_cycles > 0
+                || self.gnss.detector_flag)
+        {
             return false;
         }
         match self.gnss.health {
@@ -807,9 +824,16 @@ impl NavSystem {
             w.gnss[w.gnss_len] = (t, gp[2], gv[2], w.imu_dv);
             w.imu_cycles[w.gnss_len] = w.since_epoch;
             w.gnss_len += 1;
+            if w.history_len == GNSS_HISTORY {
+                w.history.rotate_left(1);
+                w.history_len -= 1;
+            }
+            w.history[w.history_len] = (t, gv[2], w.imu_dv, w.since_epoch);
+            w.history_len += 1;
             w.since_epoch = 0;
         } else if w.since_epoch > 10 {
             w.gnss_len = 0;
+            w.history_len = 0;
         }
     }
 
@@ -818,7 +842,7 @@ impl NavSystem {
     /// GNSS velocity change over the window. Under the single-fault hypothesis the faulty source is
     /// the one inconsistent with both others; every other pattern is "not isolated". A constant
     /// bias changes no rate, so it is never isolated here (sections 3.3 and 3.4).
-    fn rate_pattern(&self) -> Option<Odd> {
+    fn rate_pattern(&self, change_t: f64) -> Option<Odd> {
         let w = &self.rates;
         if w.radar_len < SLOPE_WINDOW || w.gnss_len < GNSS_WINDOW {
             return None;
@@ -850,11 +874,15 @@ impl NavSystem {
         let var_v = sv * sv / m;
         let d_rg = (s_r - v_g).abs() / (self.radar_r() / den_r + var_v).sqrt();
         let d_gg = (s_g - v_g).abs() / (sp * sp / den_g + var_v).sqrt();
-        let (first, last) = (g[0], g[GNSS_WINDOW - 1]);
-        let k: u32 = w.imu_cycles[1..].iter().sum();
-        let sa = self.prm.accel_process_sigma_mps2 * self.dt;
-        let var_i = 2.0 * sv * sv + sa * sa * f64::from(k);
-        let d_ig = ((last.3 - first.3) - (last.2 - first.2)).abs() / var_i.sqrt();
+        let d_ig = if self.prm.anchored_imu_witness {
+            self.anchored_imu_witness(change_t)?
+        } else {
+            let (first, last) = (g[0], g[GNSS_WINDOW - 1]);
+            let k: u32 = w.imu_cycles[1..].iter().sum();
+            let sa = self.prm.accel_process_sigma_mps2 * self.dt;
+            let var_i = 2.0 * sv * sv + sa * sa * f64::from(k);
+            ((last.3 - first.3) - (last.2 - first.2)).abs() / var_i.sqrt()
+        };
         let bad = |d: f64| d > RATE_BAD;
         let ok = |d: f64| d < RATE_OK;
         if bad(d_rg) && ok(d_gg) && ok(d_ig) {
@@ -864,6 +892,32 @@ impl NavSystem {
         } else {
             None
         }
+    }
+
+    /// IMU witness anchored before the change point: the GNSS vertical velocity change since the
+    /// last epoch at least `ANCHOR_MARGIN_S` before `change_t`, against the IMU integral over the
+    /// same span. A window that only covers time after the onset cannot see a velocity step that
+    /// is already in the GNSS velocity (a coherent receiver fault); the anchored one can. The
+    /// variance adds the integrated process noise and the bias uncertainty over the span.
+    fn anchored_imu_witness(&self, change_t: f64) -> Option<f64> {
+        let w = &self.rates;
+        if w.history_len < 2 {
+            return None;
+        }
+        let hist = &w.history[..w.history_len];
+        let last = hist[hist.len() - 1];
+        let anchor = hist[..hist.len() - 1]
+            .iter()
+            .rposition(|e| e.0 <= change_t - ANCHOR_MARGIN_S)
+            .unwrap_or(0);
+        let k: u32 = hist[anchor + 1..].iter().map(|e| e.3).sum();
+        let span = last.0 - hist[anchor].0;
+        let sv = self.prm.gnss_velocity_sigma_mps;
+        let sa = self.prm.accel_process_sigma_mps2 * self.dt;
+        let sb = self.p.0[BIAS][BIAS].max(0.0).sqrt() * span;
+        let var = 2.0 * sv * sv + sa * sa * f64::from(k) + sb * sb;
+        let d = (last.2 - hist[anchor].2) - (last.1 - hist[anchor].1);
+        Some(d.abs() / var.sqrt())
     }
 
     /// Sections 6.3 and 6.4: within `ISOLATION_WINDOW_S` of the first alarm with both altitude
@@ -887,7 +941,15 @@ impl NavSystem {
         if (self.cycle - since) as f64 * self.dt > ISOLATION_WINDOW_S {
             return;
         }
-        let Some(odd) = self.rate_pattern() else {
+        // Change point of the vertical channel: the earliest last-zero cycle of the vertical
+        // sources whose CUSUM moved.
+        let moved = [RADAR, GNSS_Z, GNSS_VZ]
+            .iter()
+            .filter(|&&i| self.cusum_pos[i].max(self.cusum_neg[i]) > h / 4.0)
+            .map(|&i| self.cusum_zero[i])
+            .min()
+            .unwrap_or(since);
+        let Some(odd) = self.rate_pattern(moved as f64 * self.dt) else {
             return;
         };
         let sources = match odd {

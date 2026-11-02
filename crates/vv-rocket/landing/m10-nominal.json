@@ -149,7 +149,9 @@
       "suspect_after_s": 0.2,
       "exclude_after_s": 0.5,
       "monitor_gnss_gain": 0.25,
-      "monitor_radar_gain": 0.1
+      "monitor_radar_gain": 0.1,
+      "anchored_imu_witness": true,
+      "bounded_chase_when_untrusted": false
     }
   },
   "requirements": {
