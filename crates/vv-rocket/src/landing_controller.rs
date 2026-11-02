@@ -6,9 +6,12 @@
 //! `guarded` and `baseline_guarded` add the M9.1 rules (docs/m9-powered-landing.md).
 //! Arithmetic: `+ - * /` and `sqrt` only.
 
-use crate::landing_types::{Command, ControllerConfig, Estimate, Observation, Policy};
+use crate::landing_types::{
+    Command, ControllerConfig, Estimate, NavDeclaration, Observation, Policy,
+};
 use crate::math::{Quat, Vec3};
 use crate::model::G0;
+use crate::nav_filter::NavSystem;
 
 const X_B: Vec3 = Vec3::new(1.0, 0.0, 0.0);
 
@@ -31,10 +34,27 @@ struct Navigator {
     last_gnss_v: Option<Vec3>,
     exceed_cycles: u32,
     rejected: bool,
+    /// M10 arms: the navigation system of `nav_filter`.
+    m10: Option<NavSystem>,
 }
 
 impl Navigator {
-    fn new() -> Self {
+    fn new(cfg: &ControllerConfig) -> Self {
+        let g = &cfg.gains;
+        let m10 = cfg.policy.is_m10().then(|| {
+            NavSystem::new(
+                cfg.policy,
+                cfg.nav.clone(),
+                cfg.dt_s * cfg.control_period_steps as f64,
+                cfg.gravity_mps2,
+                [
+                    g.gnss_position_gain,
+                    g.gnss_velocity_gain,
+                    g.altimeter_position_gain,
+                    g.altimeter_velocity_gain,
+                ],
+            )
+        });
         Navigator {
             p: Vec3::ZERO,
             v: Vec3::ZERO,
@@ -44,6 +64,7 @@ impl Navigator {
             last_gnss_v: None,
             exceed_cycles: 0,
             rejected: false,
+            m10,
         }
     }
 
@@ -67,6 +88,7 @@ impl Navigator {
         match cfg.policy {
             Policy::Baseline | Policy::BaselineGuarded => self.update_baseline(nz, s_cm),
             Policy::Robust | Policy::Guarded => self.update_robust(cfg, obs, q, s_cm),
+            Policy::M10A | Policy::M10B | Policy::M10BPlus => self.update_m10(obs, q, s_cm),
         }
         Estimate {
             position_m: self.p.to_array(),
@@ -76,7 +98,21 @@ impl Navigator {
             // (and no residual has been accepted since): the same condition as rule 1.
             sensor_disagreement: cfg.policy.handles_disagreement().then_some(self.rejected),
             ascent_abort: None,
+            nav: self.m10.as_ref().and_then(NavSystem::report),
         }
+    }
+
+    fn update_m10(&mut self, obs: &Observation, q: Quat, s_cm: f64) {
+        let Some(sys) = self.m10.as_mut() else {
+            return;
+        };
+        sys.update(obs, q, s_cm);
+        if sys.ready() {
+            self.p = sys.position();
+            self.v = sys.velocity();
+            self.ready = true;
+        }
+        self.rejected = sys.radar_out();
     }
 
     fn update_baseline(&mut self, nz: f64, s_cm: f64) {
@@ -152,9 +188,10 @@ pub struct Controller {
 impl Controller {
     pub fn new(cfg: ControllerConfig) -> Self {
         let propellant_est = cfg.propellant_mass_kg;
+        let nav = Navigator::new(&cfg);
         Controller {
             cfg,
-            nav: Navigator::new(),
+            nav,
             phase: Phase::Coast,
             u_model: 0.0,
             propellant_est,
@@ -165,6 +202,11 @@ impl Controller {
 
     pub fn config(&self) -> &ControllerConfig {
         &self.cfg
+    }
+
+    /// M10 arms: what the navigation declared in the last cycle, with its covariance.
+    pub fn declaration(&self) -> Option<NavDeclaration> {
+        self.nav.m10.as_ref().and_then(NavSystem::declaration)
     }
 
     /// One control cycle: observations in, command and navigation estimate out.
@@ -224,7 +266,12 @@ impl Controller {
 
         // Rule 2: a sustained estimated rise with the engine lit cuts it, irreversibly.
         if cfg.policy.cuts_on_ascent() {
-            if self.nav.v.z > g.ascent_abort_vz_mps {
+            // M10 arms: the independent monitor velocity, never the estimator's (8.6).
+            let (vz_rule, limit) = match &self.nav.m10 {
+                Some(sys) => sys.monitor_vz(g.ascent_abort_vz_mps),
+                None => (self.nav.v.z, g.ascent_abort_vz_mps),
+            };
+            if vz_rule > limit {
                 self.rising_cycles = self.rising_cycles.saturating_add(1);
             } else {
                 self.rising_cycles = 0;
@@ -254,10 +301,15 @@ impl Controller {
         let t_raw = 2.0 * h_base.max(0.0) / (descent.max(0.0) + vt);
         // Close to the ground the position term fades out: only the lateral velocity is damped.
         let fade = (t_raw / g.lateral_fade_time_s).min(1.0);
+        // M10 degraded lateral law (8.2): without a healthy receiver, damp the lateral velocity
+        // only and never chase the pad with a suspect position.
+        let distance = (rel.x * rel.x + rel.y * rel.y).sqrt();
+        let chase = self.nav.m10.as_ref().is_none_or(|s| s.chase_pad(distance));
+        let position_gain = if chase { g.lateral_position_gain } else { 0.0 };
         // Velocity wanted at this offset: proportional to it, never above the braking curve.
         let want = |offset: f64| {
             let limit = (2.0 * g.lateral_braking_mps2 * offset.abs()).sqrt();
-            let v = g.lateral_position_gain * fade * offset;
+            let v = position_gain * fade * offset;
             -v.clamp(-limit, limit)
         };
         let v_des = Vec3::new(want(rel.x), want(rel.y), 0.0);
@@ -374,6 +426,7 @@ mod tests {
             target_vertical_speed_mps: -1.5,
             axial_load_limit_mps2: 3.0 * G0,
             gains: gains(),
+            nav: crate::landing_types::NavParams::default(),
         }
     }
 
@@ -597,6 +650,7 @@ mod tests {
                     altimeter_rejected: false,
                     sensor_disagreement: None,
                     ascent_abort: None,
+                    nav: None,
                 },
             };
             let start = obs(start_m, -100.0, 0.0, 0.0);

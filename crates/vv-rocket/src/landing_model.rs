@@ -9,7 +9,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::landing_types::{ControllerConfig, Gains, Policy};
+use crate::landing_types::{ControllerConfig, Gains, NavParams, Policy};
 use crate::math::Vec3;
 use crate::model::{
     CASE_SCHEMA, Case, Environment, Initial, Prepared, Vehicle, finite, prepare, steps_of, within,
@@ -17,6 +17,9 @@ use crate::model::{
 use crate::prng::{SplitMix64, source};
 
 pub const LANDING_SCHEMA: &str = "vv-rocket-landing.v1";
+/// M10: `v1` plus the M10 policies, `controller.nav` and the new sensor faults
+/// (docs/m10-resilient-navigation.md, section "Esquema v2"). A `v1` file keeps its meaning.
+pub const LANDING_SCHEMA_V2: &str = "vv-rocket-landing.v2";
 pub const CONTROL_PERIOD_STEPS: u64 = 2;
 pub const GNSS_PERIOD_CYCLES: u64 = 5;
 pub const MAX_FAULTS: usize = 10;
@@ -131,6 +134,9 @@ pub struct ControllerSpec {
     pub policy: Policy,
     pub target_vertical_speed_mps: f64,
     pub gains: Gains,
+    /// M10 navigation parameters (schema v2 only).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nav: Option<NavParams>,
 }
 
 /// Limits of the requirements and invariants; fixed by the specification.
@@ -212,6 +218,21 @@ pub enum FaultKind {
     AltimeterBiasLow,
     /// M9.1: subtracts the magnitude from the GNSS position in x and z.
     GnssBiasLow,
+    /// M10 (v2): the altimeter repeats the value it delivered just before the window.
+    AltimeterStuck,
+    /// M10 (v2): the altimeter reports the altitude of `magnitude` seconds earlier (whole cycles).
+    AltimeterDelay,
+    /// M10 (v2): each altimeter sample is an outlier with probability `magnitude`.
+    AltimeterOutliers,
+    /// M10 (v2): the altimeter drifts up at `magnitude` m/s from the window start.
+    AltimeterDrift,
+    /// M10 (v2): adds the magnitude to the GNSS position in x and y (not z).
+    GnssHorizontalBias,
+    /// M10 (v2): coherent receiver fault: position grows at `magnitude` m/s in x and z and the
+    /// velocity is offset by the same `magnitude`.
+    GnssCoherentRamp,
+    /// M10 (v2): the accelerometer bias along `x_B` grows at `magnitude` m/s^2 per second.
+    ImuAccelDrift,
 }
 
 impl FaultKind {
@@ -227,7 +248,28 @@ impl FaultKind {
             FaultKind::ImuAccelBias => "imu_accel_bias",
             FaultKind::AltimeterBiasLow => "altimeter_bias_low",
             FaultKind::GnssBiasLow => "gnss_bias_low",
+            FaultKind::AltimeterStuck => "altimeter_stuck",
+            FaultKind::AltimeterDelay => "altimeter_delay",
+            FaultKind::AltimeterOutliers => "altimeter_outliers",
+            FaultKind::AltimeterDrift => "altimeter_drift",
+            FaultKind::GnssHorizontalBias => "gnss_horizontal_bias",
+            FaultKind::GnssCoherentRamp => "gnss_coherent_ramp",
+            FaultKind::ImuAccelDrift => "imu_accel_drift",
         }
+    }
+
+    /// Faults that exist only in schema v2.
+    pub fn is_v2(self) -> bool {
+        matches!(
+            self,
+            FaultKind::AltimeterStuck
+                | FaultKind::AltimeterDelay
+                | FaultKind::AltimeterOutliers
+                | FaultKind::AltimeterDrift
+                | FaultKind::GnssHorizontalBias
+                | FaultKind::GnssCoherentRamp
+                | FaultKind::ImuAccelDrift
+        )
     }
 
     /// Pre-registered magnitude range, or `None` for faults without magnitude.
@@ -240,7 +282,16 @@ impl FaultKind {
             FaultKind::ImuAccelBias => Some((0.05, 0.5)),
             FaultKind::AltimeterBiasLow => Some((5.0, 50.0)),
             FaultKind::GnssBiasLow => Some((5.0, 30.0)),
-            FaultKind::GimbalStuck | FaultKind::AltimeterDropout | FaultKind::GnssDropout => None,
+            FaultKind::AltimeterDelay => Some((0.02, 0.2)),
+            FaultKind::AltimeterOutliers => Some((0.001, 0.01)),
+            FaultKind::AltimeterDrift => Some((0.03, 0.3)),
+            FaultKind::GnssHorizontalBias => Some((5.0, 30.0)),
+            FaultKind::GnssCoherentRamp => Some((0.1, 3.0)),
+            FaultKind::ImuAccelDrift => Some((0.01, 0.1)),
+            FaultKind::GimbalStuck
+            | FaultKind::AltimeterDropout
+            | FaultKind::GnssDropout
+            | FaultKind::AltimeterStuck => None,
         }
     }
 
@@ -249,6 +300,7 @@ impl FaultKind {
         match self {
             FaultKind::GimbalStuck => Some((0.5, 3.0)),
             FaultKind::AltimeterDropout | FaultKind::GnssDropout => Some((2.0, 10.0)),
+            FaultKind::AltimeterStuck => Some((1.0, 10.0)),
             _ => None,
         }
     }
@@ -426,6 +478,66 @@ fn validate_gains(g: &Gains) -> Result<(), String> {
     Ok(())
 }
 
+/// Every M10 parameter finite and inside a physically meaningful range.
+fn validate_nav(n: &NavParams) -> Result<(), String> {
+    let positive = [
+        (n.radar_sigma_m, "radar_sigma_m", 10.0),
+        (n.gnss_position_sigma_m, "gnss_position_sigma_m", 100.0),
+        (n.gnss_velocity_sigma_mps, "gnss_velocity_sigma_mps", 10.0),
+        (n.accel_process_sigma_mps2, "accel_process_sigma_mps2", 10.0),
+        (n.bias_prior_sigma_mps2, "bias_prior_sigma_mps2", 10.0),
+        (n.cusum_h, "cusum_h", 1000.0),
+        (n.admission_gate_m, "admission_gate_m", 1000.0),
+        (n.readmission_sigma, "readmission_sigma", 100.0),
+        (n.nis_reject, "nis_reject", 1000.0),
+        (n.vote_threshold_m, "vote_threshold_m", 1000.0),
+        (n.k_ff, "k_ff", 100.0),
+        (n.al_v_floor_m, "al_v_floor_m", 1000.0),
+        (n.al_hv_mps, "al_hv_mps", 100.0),
+        (n.al_h_m, "al_h_m", 1000.0),
+        (n.t_hold_s, "t_hold_s", 60.0),
+        (n.t_max_s, "t_max_s", 60.0),
+        (n.t_safe_s, "t_safe_s", 60.0),
+        (n.suspect_after_s, "suspect_after_s", 60.0),
+        (n.exclude_after_s, "exclude_after_s", 60.0),
+    ];
+    for (value, name, high) in positive {
+        within(value, &format!("controller.nav.{name}"), 1e-9, high)?;
+    }
+    let non_negative = [
+        (n.radar_lever_sigma_m, "radar_lever_sigma_m", 10.0),
+        (
+            n.bias_walk_sigma_mps2_per_sqrt_s,
+            "bias_walk_sigma_mps2_per_sqrt_s",
+            10.0,
+        ),
+        (n.cusum_k, "cusum_k", 10.0),
+        (n.al_v_fraction, "al_v_fraction", 1.0),
+        (n.b_h_m, "b_h_m", 1000.0),
+        (n.h_commit_m, "h_commit_m", 3000.0),
+        (n.monitor_gnss_gain, "monitor_gnss_gain", 1.0),
+        (n.monitor_radar_gain, "monitor_radar_gain", 1.0),
+        (n.suspect_cusum_fraction, "suspect_cusum_fraction", 2.0),
+        (n.dead_reckoning_tilt, "dead_reckoning_tilt", 1.0),
+    ];
+    for (value, name, high) in non_negative {
+        within(value, &format!("controller.nav.{name}"), 0.0, high)?;
+    }
+    if n.exclude_after_s < n.suspect_after_s {
+        return Err("controller.nav.exclude_after_s must not be below suspect_after_s".into());
+    }
+    for (value, name) in [
+        (n.admission_cycles, "admission_cycles"),
+        (n.readmission_samples, "readmission_samples"),
+        (n.n_in_cycles, "n_in_cycles"),
+    ] {
+        if value == 0 || value > 10_000 {
+            return Err(format!("controller.nav.{name} must be in [1, 10000]"));
+        }
+    }
+    Ok(())
+}
+
 fn validate_faults(case: &LandingCase, dt: f64) -> Result<Vec<Fault>, String> {
     if case.faults.len() > MAX_FAULTS {
         return Err(format!("faults has more than {MAX_FAULTS} entries"));
@@ -589,8 +701,32 @@ fn check_registered(case: &LandingCase) -> Result<(), String> {
 /// the simulation use it to run scenarios the registered case cannot express (an empty tank, a
 /// start close to the ground); the public entry point is `prepare_landing`.
 pub(crate) fn prepare_unpinned(case: &LandingCase, seed: u64) -> Result<PreparedLanding, String> {
-    if case.schema != LANDING_SCHEMA {
-        return Err(format!("schema must be {LANDING_SCHEMA}"));
+    let v2 = case.schema == LANDING_SCHEMA_V2;
+    if case.schema != LANDING_SCHEMA && !v2 {
+        return Err(format!(
+            "schema must be {LANDING_SCHEMA} or {LANDING_SCHEMA_V2}"
+        ));
+    }
+    if !v2 {
+        // A v1 file keeps the M9 meaning: no M10 policy, parameter block or fault.
+        if case.controller.policy.is_m10() {
+            return Err(format!(
+                "controller.policy {} needs schema {LANDING_SCHEMA_V2}",
+                case.controller.policy.as_str()
+            ));
+        }
+        if case.controller.nav.is_some() {
+            return Err(format!("controller.nav needs schema {LANDING_SCHEMA_V2}"));
+        }
+        if let Some(f) = case.faults.iter().find(|f| f.kind.is_v2()) {
+            return Err(format!(
+                "fault {} needs schema {LANDING_SCHEMA_V2}",
+                f.kind.as_str()
+            ));
+        }
+    }
+    if let Some(nav) = &case.controller.nav {
+        validate_nav(nav)?;
     }
     if case.record_every == 0 || !case.record_every.is_multiple_of(CONTROL_PERIOD_STEPS) {
         return Err(format!(
@@ -684,6 +820,7 @@ pub(crate) fn prepare_unpinned(case: &LandingCase, seed: u64) -> Result<Prepared
         target_vertical_speed_mps: ctl.target_vertical_speed_mps,
         axial_load_limit_mps2: case.requirements.s3_axial_load_g0 * crate::model::G0,
         gains: ctl.gains.clone(),
+        nav: ctl.nav.clone().unwrap_or_default(),
     };
     Ok(PreparedLanding {
         name: case.name.clone(),

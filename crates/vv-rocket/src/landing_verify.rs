@@ -83,6 +83,9 @@ pub struct Verification {
     pub faults: Vec<FaultReport>,
     pub controller_flags: ControllerReport,
     pub disclaimer: &'static str,
+    /// M10 navigation comparison (schema v3); absent for the M9 policies, whose bytes stay v2.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub navigation: Option<crate::nav_verify::NavigationReport>,
 }
 
 /// First instants at which the controller raised its flags, copied from the run. They are the
@@ -542,6 +545,26 @@ fn fault_reports(prep: &PreparedLanding, log: &TruthLog) -> Vec<FaultReport> {
                     any(&|s| active(s) && gnss_cycle(s) && !masked_by(FaultKind::GnssDropout, s))
                 }
                 FaultKind::ImuAccelBias => any(&|s| active(s) && control_cycle(s)),
+                // M10 (v2): a control cycle (GNSS cycle) inside the window, not hidden by a dropout
+                // of the same sensor. For outliers this says the window was open, not that a draw
+                // produced an outlier; a drift needs one cycle after its start.
+                FaultKind::AltimeterStuck
+                | FaultKind::AltimeterDelay
+                | FaultKind::AltimeterOutliers => any(&|s| {
+                    active(s) && control_cycle(s) && !masked_by(FaultKind::AltimeterDropout, s)
+                }),
+                FaultKind::AltimeterDrift => any(&|s| {
+                    active(s)
+                        && control_cycle(s)
+                        && s.step > f.start_step
+                        && !masked_by(FaultKind::AltimeterDropout, s)
+                }),
+                FaultKind::GnssHorizontalBias | FaultKind::GnssCoherentRamp => {
+                    any(&|s| active(s) && gnss_cycle(s) && !masked_by(FaultKind::GnssDropout, s))
+                }
+                FaultKind::ImuAccelDrift => {
+                    any(&|s| active(s) && control_cycle(s) && s.step > f.start_step)
+                }
             };
             FaultReport {
                 spec: f.spec,
@@ -575,6 +598,7 @@ pub fn verify(prep: &PreparedLanding, log: &TruthLog) -> Verification {
             flags: ControllerFlags::default(),
         },
         disclaimer: DISCLAIMER,
+        navigation: None,
     }
 }
 

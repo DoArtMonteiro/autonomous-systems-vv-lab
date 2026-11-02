@@ -21,7 +21,19 @@ pub struct SensorFaults {
     pub gnss_dropout: bool,
     pub gnss_bias_m: f64,
     pub imu_accel_bias_mps2: f64,
+    /// M10 (schema v2) effects; all zero or false for an M9 case.
+    pub altimeter_stuck: bool,
+    /// Delay of the altimeter in control cycles.
+    pub altimeter_delay_cycles: u64,
+    pub altimeter_outlier_probability: f64,
+    pub gnss_horizontal_bias_m: f64,
+    /// Coherent receiver fault: position offset (x and z) and velocity offset (x and z).
+    pub gnss_ramp_position_m: f64,
+    pub gnss_ramp_velocity_mps: f64,
 }
+
+/// Longest altimeter delay in control cycles (0.2 s at 0.02 s).
+pub const MAX_DELAY_CYCLES: usize = 10;
 
 #[derive(Clone, Debug)]
 pub struct SensorStreams {
@@ -31,6 +43,14 @@ pub struct SensorStreams {
     imu_attitude: SplitMix64,
     imu_rate: SplitMix64,
     imu_acceleration: SplitMix64,
+    /// M10: outlier draws, a stream of its own so that no other stream moves.
+    altimeter_outlier: SplitMix64,
+    /// M10: true nozzle-plane altitude of the last control cycles (newest last), for the delay.
+    base_history: [f64; MAX_DELAY_CYCLES + 1],
+    history_len: usize,
+    /// M10: last value the altimeter delivered, and the value held while it is stuck.
+    last_altimeter: Option<f64>,
+    stuck_value: Option<f64>,
 }
 
 impl SensorStreams {
@@ -42,6 +62,11 @@ impl SensorStreams {
             imu_attitude: SplitMix64::stream(seed, source::IMU_ATTITUDE),
             imu_rate: SplitMix64::stream(seed, source::IMU_RATE),
             imu_acceleration: SplitMix64::stream(seed, source::IMU_ACCELERATION),
+            altimeter_outlier: SplitMix64::stream(seed, source::ALTIMETER_OUTLIER),
+            base_history: [0.0; MAX_DELAY_CYCLES + 1],
+            history_len: 0,
+            last_altimeter: None,
+            stuck_value: None,
         }
     }
 
@@ -64,21 +89,64 @@ impl SensorStreams {
     ) -> Observation {
         let q = s.q.normalized();
         let alt_noise = self.altimeter.noise(sensors.altimeter_sigma_m);
+        let (base, _) = base_kinematics(&truth.vehicle, s);
+        // History of the true altitude, shifted every control cycle whatever the faults.
+        if self.history_len == self.base_history.len() {
+            self.base_history.rotate_left(1);
+            self.history_len -= 1;
+        }
+        self.base_history[self.history_len] = base.z;
+        self.history_len += 1;
+        let mut outlier = 0.0;
+        if faults.altimeter_outlier_probability > 0.0 {
+            // Always three draws while the fault is open: occurrence, amplitude, sign.
+            let (u, a, sign) = (
+                self.altimeter_outlier.uniform(),
+                self.altimeter_outlier.uniform(),
+                self.altimeter_outlier.uniform(),
+            );
+            if u < faults.altimeter_outlier_probability {
+                let amplitude = (5.0 + 45.0 * a) * sensors.altimeter_sigma_m;
+                outlier = if sign < 0.5 { -amplitude } else { amplitude };
+            }
+        }
         let altimeter_m = if faults.altimeter_dropout {
             None
+        } else if faults.altimeter_stuck {
+            if self.stuck_value.is_none() {
+                self.stuck_value = self.last_altimeter;
+            }
+            self.stuck_value
         } else {
-            let (base, _) = base_kinematics(&truth.vehicle, s);
-            Some(base.z + alt_noise + faults.altimeter_bias_m)
+            let lag = (faults.altimeter_delay_cycles as usize).min(self.history_len - 1);
+            let z = self.base_history[self.history_len - 1 - lag];
+            Some(z + alt_noise + faults.altimeter_bias_m + outlier)
         };
+        if !faults.altimeter_stuck {
+            self.stuck_value = None;
+        }
+        if altimeter_m.is_some() {
+            self.last_altimeter = altimeter_m;
+        }
 
         let (mut gnss_position_m, mut gnss_velocity_mps) = (None, None);
         if gnss_cycle {
             let np = Self::vec3(&mut self.gnss_position, sensors.gnss_position_sigma_m);
             let nv = Self::vec3(&mut self.gnss_velocity, sensors.gnss_velocity_sigma_mps);
             if !faults.gnss_dropout {
-                let bias = Vec3::new(faults.gnss_bias_m, 0.0, faults.gnss_bias_m);
+                let ramp = faults.gnss_ramp_position_m;
+                let bias = Vec3::new(
+                    faults.gnss_bias_m + faults.gnss_horizontal_bias_m + ramp,
+                    faults.gnss_horizontal_bias_m,
+                    faults.gnss_bias_m + ramp,
+                );
+                let dv = faults.gnss_ramp_velocity_mps;
                 gnss_position_m = Some((s.r + np + bias).to_array());
-                gnss_velocity_mps = Some((s.v + nv).to_array());
+                let mut v = s.v + nv;
+                if dv != 0.0 {
+                    v = v + Vec3::new(dv, 0.0, dv);
+                }
+                gnss_velocity_mps = Some(v.to_array());
             }
         }
 
@@ -222,5 +290,121 @@ mod tests {
         let o = g.observe(&t, &zero, &s, Some(&seg), &SensorFaults::default(), false);
         assert!((o.imu.specific_force_mps2[0] - 20.0).abs() < 1e-9);
         assert!(o.gnss_position_m.is_none());
+    }
+
+    fn quiet() -> Sensors {
+        let mut zero = sensors();
+        zero.altimeter_sigma_m = 0.0;
+        zero.gnss_position_sigma_m = 0.0;
+        zero.gnss_velocity_sigma_mps = 0.0;
+        zero.imu_accel_sigma_mps2 = 0.0;
+        zero.imu_attitude_sigma_rad = 0.0;
+        zero.imu_rate_sigma_radps = 0.0;
+        zero
+    }
+
+    #[test]
+    fn m10_stuck_altimeter_repeats_its_last_value_and_releases_after_the_window() {
+        let t = truth();
+        let mut s = state();
+        let mut g = SensorStreams::new(2);
+        let clean = SensorFaults::default();
+        let stuck = SensorFaults {
+            altimeter_stuck: true,
+            ..SensorFaults::default()
+        };
+        let before = g
+            .observe(&t, &quiet(), &s, None, &clean, false)
+            .altimeter_m
+            .unwrap();
+        s.r.z -= 10.0;
+        let held = g
+            .observe(&t, &quiet(), &s, None, &stuck, false)
+            .altimeter_m
+            .unwrap();
+        assert_eq!(held, before, "stuck at the last delivered value");
+        s.r.z -= 10.0;
+        let after = g
+            .observe(&t, &quiet(), &s, None, &clean, false)
+            .altimeter_m
+            .unwrap();
+        assert!(
+            (before - after - 20.0).abs() < 1e-9,
+            "the window closed: true value again"
+        );
+    }
+
+    #[test]
+    fn m10_delay_reports_an_older_altitude_and_zero_delay_is_the_present() {
+        let t = truth();
+        let mut s = state();
+        let mut g = SensorStreams::new(2);
+        let delayed = SensorFaults {
+            altimeter_delay_cycles: 3,
+            ..SensorFaults::default()
+        };
+        let mut seen = Vec::new();
+        for _ in 0..5 {
+            seen.push(
+                g.observe(&t, &quiet(), &s, None, &delayed, false)
+                    .altimeter_m
+                    .unwrap(),
+            );
+            s.r.z -= 1.0;
+        }
+        // Cycle 4 reports the altitude of cycle 1; the history is shorter at the start.
+        assert!((seen[4] - seen[0] + 1.0).abs() < 1e-9, "{seen:?}");
+        let now = g.observe(&t, &quiet(), &s, None, &SensorFaults::default(), false);
+        assert!((now.altimeter_m.unwrap() - (seen[0] - 5.0)).abs() < 1e-9);
+    }
+
+    #[test]
+    fn m10_outliers_draw_from_their_own_stream_and_stay_in_their_amplitude_range() {
+        let t = truth();
+        let s = state();
+        let always = SensorFaults {
+            altimeter_outlier_probability: 1.0,
+            ..SensorFaults::default()
+        };
+        let mut a = SensorStreams::new(9);
+        let mut b = SensorStreams::new(9);
+        for _ in 0..200 {
+            let o = a.observe(&t, &sensors(), &s, None, &always, true);
+            let c = b.observe(&t, &sensors(), &s, None, &SensorFaults::default(), true);
+            let jump = (o.altimeter_m.unwrap() - c.altimeter_m.unwrap()).abs();
+            assert!((0.5 - 1e-9..=5.0 + 1e-9).contains(&jump), "{jump}");
+            // Every other stream is untouched.
+            assert_eq!((o.gnss_position_m, o.imu), (c.gnss_position_m, c.imu));
+        }
+        let mut c = SensorStreams::new(9);
+        let never = SensorFaults {
+            altimeter_outlier_probability: 0.0,
+            ..SensorFaults::default()
+        };
+        let mut d = SensorStreams::new(9);
+        for _ in 0..20 {
+            assert_eq!(
+                c.observe(&t, &sensors(), &s, None, &never, false),
+                d.observe(&t, &sensors(), &s, None, &SensorFaults::default(), false)
+            );
+        }
+    }
+
+    #[test]
+    fn m10_horizontal_bias_and_coherent_ramp_move_only_their_axes() {
+        let t = truth();
+        let s = state();
+        let mut g = SensorStreams::new(1);
+        let f = SensorFaults {
+            gnss_horizontal_bias_m: 7.0,
+            gnss_ramp_position_m: 2.0,
+            gnss_ramp_velocity_mps: 0.5,
+            ..SensorFaults::default()
+        };
+        let o = g.observe(&t, &quiet(), &s, None, &f, true);
+        let p = o.gnss_position_m.unwrap();
+        let v = o.gnss_velocity_mps.unwrap();
+        assert_eq!(p, [1.0 + 7.0 + 2.0, 2.0 + 7.0, 100.0 + 2.0]);
+        assert_eq!(v, [0.5, 0.0, -20.0 + 0.5]);
     }
 }

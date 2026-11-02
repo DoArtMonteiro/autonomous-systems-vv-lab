@@ -155,6 +155,137 @@ impl Quat {
     }
 }
 
+/// Fixed-size square matrix for the M10 navigation filter (docs/m10-resilient-navigation.md).
+/// Row-major, no allocation, `+ - * /` and `sqrt` only.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Mat<const N: usize>(pub [[f64; N]; N]);
+
+// Index loops mirror the matrix formulas; iterator rewrites would obscure them.
+#[allow(clippy::needless_range_loop)]
+impl<const N: usize> Mat<N> {
+    pub const ZERO: Mat<N> = Mat([[0.0; N]; N]);
+
+    pub fn identity() -> Self {
+        let mut m = Self::ZERO;
+        for i in 0..N {
+            m.0[i][i] = 1.0;
+        }
+        m
+    }
+
+    pub fn diag(d: [f64; N]) -> Self {
+        let mut m = Self::ZERO;
+        for i in 0..N {
+            m.0[i][i] = d[i];
+        }
+        m
+    }
+
+    pub fn mul(&self, o: &Mat<N>) -> Mat<N> {
+        let mut m = Self::ZERO;
+        for i in 0..N {
+            for k in 0..N {
+                let a = self.0[i][k];
+                if a == 0.0 {
+                    continue;
+                }
+                for j in 0..N {
+                    m.0[i][j] += a * o.0[k][j];
+                }
+            }
+        }
+        m
+    }
+
+    pub fn transpose(&self) -> Mat<N> {
+        let mut m = Self::ZERO;
+        for i in 0..N {
+            for j in 0..N {
+                m.0[i][j] = self.0[j][i];
+            }
+        }
+        m
+    }
+
+    pub fn add(&self, o: &Mat<N>) -> Mat<N> {
+        let mut m = *self;
+        for i in 0..N {
+            for j in 0..N {
+                m.0[i][j] += o.0[i][j];
+            }
+        }
+        m
+    }
+
+    /// `A P A^T`.
+    pub fn congruence(&self, p: &Mat<N>) -> Mat<N> {
+        self.mul(p).mul(&self.transpose())
+    }
+
+    pub fn mul_vec(&self, v: &[f64; N]) -> [f64; N] {
+        let mut out = [0.0; N];
+        for (i, row) in self.0.iter().enumerate() {
+            out[i] = row.iter().zip(v).map(|(a, b)| a * b).sum();
+        }
+        out
+    }
+
+    /// `(P + P^T) / 2`.
+    pub fn symmetrized(&self) -> Mat<N> {
+        let mut m = *self;
+        for i in 0..N {
+            for j in (i + 1)..N {
+                let s = 0.5 * (self.0[i][j] + self.0[j][i]);
+                m.0[i][j] = s;
+                m.0[j][i] = s;
+            }
+        }
+        m
+    }
+
+    pub fn is_finite(&self) -> bool {
+        self.0.iter().flatten().all(|x| x.is_finite())
+    }
+
+    /// Solves `P x = b` for a symmetric positive definite `P` by Cholesky; `None` if `P` is not.
+    pub fn cholesky_solve(&self, b: &[f64; N]) -> Option<[f64; N]> {
+        let mut l = Self::ZERO;
+        for i in 0..N {
+            for j in 0..=i {
+                let mut s = self.0[i][j];
+                for k in 0..j {
+                    s -= l.0[i][k] * l.0[j][k];
+                }
+                if i == j {
+                    if s <= 0.0 || !s.is_finite() {
+                        return None;
+                    }
+                    l.0[i][i] = s.sqrt();
+                } else {
+                    l.0[i][j] = s / l.0[j][j];
+                }
+            }
+        }
+        let mut y = [0.0; N];
+        for i in 0..N {
+            let mut s = b[i];
+            for k in 0..i {
+                s -= l.0[i][k] * y[k];
+            }
+            y[i] = s / l.0[i][i];
+        }
+        let mut x = [0.0; N];
+        for i in (0..N).rev() {
+            let mut s = y[i];
+            for k in (i + 1)..N {
+                s -= l.0[k][i] * x[k];
+            }
+            x[i] = s / l.0[i][i];
+        }
+        Some(x)
+    }
+}
+
 // fdlibm's split of ln 2: the low 21 bits of LN2_HI are zero, so k * LN2_HI is exact for |k| < 2^21.
 const LN2_HI: f64 = f64::from_bits(0x3fe6_2e42_fee0_0000);
 const LN2_LO: f64 = f64::from_bits(0x3dea_39ef_3579_3c76);
@@ -204,6 +335,30 @@ fn pow2(k: i32) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn matrix_products_transpose_and_cholesky_solve() {
+        let a = Mat([[2.0, 1.0, 0.0], [1.0, 3.0, 1.0], [0.0, 1.0, 4.0]]);
+        assert_eq!(a.mul(&Mat::identity()), a);
+        assert_eq!(a.transpose(), a);
+        let b = Mat([[1.0, 2.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]);
+        assert_eq!(b.mul(&b).0[0][1], 4.0);
+        assert_eq!(b.congruence(&Mat::identity()), b.mul(&b.transpose()));
+        let x = a.cholesky_solve(&[1.0, 2.0, 3.0]).unwrap();
+        let back = a.mul_vec(&x);
+        for (got, want) in back.iter().zip([1.0, 2.0, 3.0]) {
+            assert!((got - want).abs() < 1e-12);
+        }
+        // Not positive definite: no solution, never a panic.
+        assert!(
+            Mat([[1.0, 2.0], [2.0, 1.0]])
+                .cholesky_solve(&[1.0, 1.0])
+                .is_none()
+        );
+        let s = Mat([[1.0, 2.0], [0.0, 1.0]]).symmetrized();
+        assert_eq!(s.0[0][1], s.0[1][0]);
+        assert!(!Mat([[f64::NAN]]).is_finite());
+    }
 
     #[test]
     fn exp_matches_the_platform_within_the_documented_tolerance() {

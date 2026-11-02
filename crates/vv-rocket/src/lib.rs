@@ -14,6 +14,8 @@ pub mod landing_types;
 pub mod landing_verify;
 pub mod math;
 pub mod model;
+pub mod nav_filter;
+pub mod nav_verify;
 pub mod prng;
 pub mod run;
 pub mod sim;
@@ -46,6 +48,8 @@ pub fn source_sha256() -> String {
         ("src/main.rs", include_str!("main.rs")),
         ("src/math.rs", include_str!("math.rs")),
         ("src/model.rs", include_str!("model.rs")),
+        ("src/nav_filter.rs", include_str!("nav_filter.rs")),
+        ("src/nav_verify.rs", include_str!("nav_verify.rs")),
         ("src/prng.rs", include_str!("prng.rs")),
         ("src/run.rs", include_str!("run.rs")),
         ("src/sim.rs", include_str!("sim.rs")),
