@@ -87,6 +87,18 @@ fn log_line(path: &Path, message: &str) {
     }
 }
 
+/// A path for display: the user profile folder becomes %USERPROFILE%, so screenshots and shared
+/// screens do not carry the account name. Commands keep using the real path.
+fn display_path(path: &Path) -> String {
+    let text = path.display().to_string();
+    match std::env::var("USERPROFILE") {
+        Ok(home) if !home.is_empty() && text.to_lowercase().starts_with(&home.to_lowercase()) => {
+            format!("%USERPROFILE%{}", &text[home.len()..])
+        }
+        _ => text,
+    }
+}
+
 fn start_platform(paths: &Paths) -> Result<(Platform, StartReport), String> {
     Platform::start(&paths.domains, &paths.library, VERSION)
 }
@@ -141,7 +153,7 @@ fn app_info(state: State<AppState>) -> AppInfo {
     AppInfo {
         version: VERSION.into(),
         contract: format!("vv-domain {CONTRACT_MAJOR}.{CONTRACT_MINOR}"),
-        library: state.paths.library.display().to_string(),
+        library: display_path(&state.paths.library),
         ready: matches!(start, Some(Ok(_))),
         start_error: start.as_ref().and_then(|s| s.as_ref().err().cloned()),
         start: start.and_then(Result::ok),
