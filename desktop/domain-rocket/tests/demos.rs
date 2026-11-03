@@ -87,6 +87,37 @@ fn demos_show_what_their_expectation_says() {
                 ("guarded", "landed", "safe", &[]),
             ],
         ),
+        (
+            "altimeter-reads-high",
+            &[
+                (
+                    "baseline",
+                    "hard_landing",
+                    "safe",
+                    &["R1_vertical_speed", "R2_horizontal_speed"],
+                ),
+                ("robust", "landed", "safe", &[]),
+            ],
+        ),
+        (
+            "late-gnss-bias",
+            &[
+                ("guarded", "hard_landing", "safe", &["R5_position"]),
+                ("guarded", "hard_landing", "safe", &["R1_vertical_speed"]),
+            ],
+        ),
+        (
+            "threshold-trade-off",
+            &[
+                (
+                    "guarded",
+                    "hard_landing",
+                    "unsafe",
+                    &["R1_vertical_speed", "S5_no_powered_ascent"],
+                ),
+                ("guarded", "hard_landing", "safe", &["R5_position"]),
+            ],
+        ),
     ];
     let c = catalog();
     assert_eq!(c.demos.len(), expected.len());
@@ -213,4 +244,46 @@ fn the_unsafe_demo_explains_the_violation_in_plain_terms() {
             .explanation
             .contains("did not reach the ground")
     );
+}
+
+#[test]
+fn the_showcase_demos_show_their_look_at_values() {
+    let c = catalog();
+    let demo = |id: &str| c.demos.iter().find(|d| d.id == id).unwrap().clone();
+    let d = demo("altimeter-reads-high");
+    let baseline = run(&d.requests[0], "high-baseline");
+    let robust = run(&d.requests[1], "high-robust");
+    assert_eq!(first_event(&baseline, "altimeter_rejected"), None);
+    assert_eq!(first_event(&robust, "altimeter_rejected"), Some(0.1));
+    let vz = metric(&baseline, "touchdown_vertical_speed").unwrap();
+    assert!((32.0..34.0).contains(&vz), "{vz}");
+    let d = demo("late-gnss-bias");
+    let registered = run(&d.requests[0], "late-registered");
+    let late = run(&d.requests[1], "late-late");
+    assert_eq!(first_event(&registered, "altimeter_rejected"), Some(0.1));
+    assert_eq!(first_event(&late, "altimeter_rejected"), None);
+    let (a, b) = (
+        metric(&registered, "touchdown_vertical_speed").unwrap(),
+        metric(&late, "touchdown_vertical_speed").unwrap(),
+    );
+    assert!(a < 3.0 && (16.0..18.0).contains(&b), "{a} {b}");
+    let pad = metric(&registered, "touchdown_pad_distance").unwrap();
+    assert!((13.0..16.0).contains(&pad), "{pad}");
+    let d = demo("threshold-trade-off");
+    let default = run(&d.requests[0], "trade-default");
+    let lowered = run(&d.requests[1], "trade-lowered");
+    assert_eq!(first_event(&default, "altimeter_rejected"), None);
+    assert_eq!(first_event(&lowered, "altimeter_rejected"), Some(0.18));
+    let vz = metric(&default, "touchdown_vertical_speed").unwrap();
+    assert!((23.0..25.5).contains(&vz), "{vz}");
+    let pad = metric(&lowered, "touchdown_pad_distance").unwrap();
+    assert!((12.0..14.0).contains(&pad), "{pad}");
+}
+
+#[test]
+fn the_confirmation_reserve_is_refused() {
+    for seed in [44_000, 44_500, 44_999] {
+        let r = vv_domain_rocket::catalog::request("m91-landing", "guarded", seed, vec![]);
+        assert!(validate_request(&Host, &r).is_err(), "seed {seed}");
+    }
 }

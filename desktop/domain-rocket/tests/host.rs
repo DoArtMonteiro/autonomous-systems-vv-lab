@@ -56,7 +56,7 @@ fn manifest_is_the_shipped_file_and_valid() {
     assert_eq!(m.id, "rocket-landing");
     assert_eq!((m.seeds.min, m.seeds.max), (0, u64::from(u32::MAX)));
     let ranges: Vec<(u64, u64)> = m.seeds.protected.iter().map(|r| (r.start, r.end)).collect();
-    assert_eq!(ranges, vec![(3000, 3099), (6000, 6099)]);
+    assert_eq!(ranges, vec![(3000, 3099), (6000, 6099), (44000, 44999)]);
     assert!(m.seeds.protected.iter().all(|r| !r.reason.is_empty()));
 }
 

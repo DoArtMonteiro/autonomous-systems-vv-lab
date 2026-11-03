@@ -16,6 +16,8 @@ pub const ACTUATOR_FAULTS: [&str; 3] = ["continued_movement", "delayed_movement"
 pub const PARAM_STALL_WINDOW: &str = "stall_window_ticks";
 pub const PARAM_MIN_PROGRESS: &str = "min_progress_mm";
 pub const PARAM_CLEAR_BUILTIN: &str = "clear_builtin_faults";
+pub const PARAM_GPS_NOISE: &str = "gps_noise_mm";
+pub const PARAM_ARRIVAL_RADIUS: &str = "arrival_radius_mm";
 pub const DEFAULT_STALL_WINDOW: f64 = 8.0;
 pub const DEFAULT_MIN_PROGRESS: f64 = 1.0;
 pub const MAX_STEPS: f64 = 200.0;
@@ -202,6 +204,10 @@ fn scenario(mission: &Mission) -> ScenarioSpec {
     if mission.has_builtin_faults() {
         parameters.push(PARAM_CLEAR_BUILTIN.to_owned());
     }
+    if mission.has_sensor_parameters() {
+        parameters.push(PARAM_GPS_NOISE.to_owned());
+        parameters.push(PARAM_ARRIVAL_RADIUS.to_owned());
+    }
     ScenarioSpec {
         id: mission.id.into(),
         label: mission.label.into(),
@@ -231,7 +237,11 @@ fn parameter(
         unit: unit.into(),
         group: group.into(),
         advanced: true,
-        min: if id == PARAM_CLEAR_BUILTIN { 0.0 } else { 1.0 },
+        min: if [PARAM_CLEAR_BUILTIN, PARAM_GPS_NOISE, PARAM_ARRIVAL_RADIUS].contains(&id) {
+            0.0
+        } else {
+            1.0
+        },
         max,
         step: 1.0,
         default,
@@ -269,6 +279,26 @@ fn parameters() -> Vec<ParameterSpec> {
             "flag",
             "Faults",
             1.0,
+            0.0,
+            true,
+        ),
+        parameter(
+            PARAM_GPS_NOISE,
+            "GPS noise",
+            "Largest error of each GPS sample per axis, drawn uniformly by the seed. The corridor mission is              registered with ideal sensors (0 mm).",
+            "mm",
+            "Sensors",
+            20.0,
+            0.0,
+            true,
+        ),
+        parameter(
+            PARAM_ARRIVAL_RADIUS,
+            "Arrival radius",
+            "Distance from the waypoint at which the mission counts it as reached. The corridor mission is              registered with 0 mm, so the vehicle must hit the waypoint exactly.",
+            "mm",
+            "Mission policy",
+            1000.0,
             0.0,
             true,
         ),
@@ -430,6 +460,29 @@ fn demos() -> Vec<Demo> {
             ],
             look_at: vec!["fallback".into(), "command_mm".into(), "moved_mm".into(), "events".into()],
             expectation: "With the built-in faults: mission incomplete, safety unsafe. The invariant safe_fallback                           fails at tick 7, the contracts command_resolution and command_applied fail at tick 6 and                           no_motion_in_fallback fails at tick 7; fallback_response and stop_response pass. Without                           them: mission incomplete (1500 mm from the goal), safety safe, no fallback, only                           mission_completion fails and mission_lifecycle is not evaluated."
+                .into(),
+        },
+        Demo {
+            id: "corridor-gps-noise".into(),
+            title: "One millimetre of GPS noise and a restricted zone".into(),
+            narrative: "The vehicle drives east along a corridor to a waypoint 250 mm above the corner of a restricted                         zone, in steps of 250 mm. With exact GPS it stops on the waypoint. With 1 mm of noise it                         never reads the waypoint exactly; the arrival radius of 0 mm makes it keep correcting by                         whole steps, it oscillates around the waypoint and at tick 21 steps south onto the edge of                         the zone. An arrival radius of one step, 250 mm, lets it stop. Same seed in all three runs.                         The scenario variant is a candidate fix studied in the M13 investigation, not a validated                         design change."
+                .into(),
+            requests: vec![
+                request("zone_corridor", "dominant_axis", 5002, vec![]),
+                RunRequest {
+                    parameters: BTreeMap::from([(PARAM_GPS_NOISE.to_owned(), 1.0)]),
+                    ..request("zone_corridor", "dominant_axis", 5002, vec![])
+                },
+                RunRequest {
+                    parameters: BTreeMap::from([
+                        (PARAM_GPS_NOISE.to_owned(), 1.0),
+                        (PARAM_ARRIVAL_RADIUS.to_owned(), 250.0),
+                    ]),
+                    ..request("zone_corridor", "dominant_axis", 5002, vec![])
+                },
+            ],
+            look_at: vec!["scene".into(), "truth_y_mm".into(), "requirements".into(), "events".into()],
+            expectation: "Exact GPS: mission completed at tick 17, safe. 1 mm of noise: mission incomplete, unsafe,                           the invariant restricted_zone fails at tick 21. 1 mm of noise with a 250 mm arrival                           radius: completed at tick 16, safe."
                 .into(),
         },
     ]

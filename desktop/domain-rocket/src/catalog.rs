@@ -62,7 +62,7 @@ struct Param {
 // Defaults equal the values of the two templates (a test checks it). The initial state, the vehicle
 // and the atmosphere are not parameters: the simulator pins them to the pre-registered case and the
 // seed disperses the initial state.
-const PARAMS: [Param; 5] = [
+const PARAMS: [Param; 6] = [
     Param {
         id: "ignition_fraction",
         label: "Ignition point",
@@ -112,6 +112,16 @@ const PARAMS: [Param; 5] = [
         max: 0.2,
         step: 0.01,
         default: 0.2,
+    },
+    Param {
+        id: "altimeter_residual_threshold_m",
+        label: "Altimeter rejection threshold",
+        unit: "m",
+        description: "The robust and guarded estimators reject the radar altimeter after its reading disagrees with their own altitude by more than this for several control cycles in a row. Lower rejects a biased altimeter sooner and also rejects a healthy one more easily. The baseline policy ignores it. Not part of the pre-registered tuning when changed.",
+        min: 0.5,
+        max: 10.0,
+        step: 0.5,
+        default: 3.0,
     },
 ];
 
@@ -278,6 +288,7 @@ pub fn catalog() -> DomainCatalog {
         "cutoff_altitude_m",
         "lateral_position_gain",
         "tilt_max_tan",
+        "altimeter_residual_threshold_m",
     ];
     let scenario = |id: &str,
                     label: &str,
