@@ -1,0 +1,1164 @@
+{
+  "schema": "vv-exec-report.v1",
+  "equivalence_status": "verified",
+  "equivalence_reason": "equivalence gate passed on 25 sampled runs",
+  "experiment": "m12-dev-throughput",
+  "domain": "rocket-landing",
+  "plan_sha256": "b311889a0616409183bffc20308c0bbe011464d604984ab3cd2b8bff7bc41d8f",
+  "source_sha256": "304625f9b000c3e990710a3306f16246fe7a6dd146511ee818bb0ba2e3df8826",
+  "confidence": 0.95,
+  "runs": 14400,
+  "errors": 0,
+  "in_envelope_fraction": 1.0,
+  "extrapolated_runs": 0,
+  "metric": "summary.propellant_used_kg",
+  "arms": [
+    {
+      "name": "nominal",
+      "runs": 2400,
+      "errors": 0,
+      "in_envelope_runs": 2400,
+      "outcomes": {
+        "hard_landing": 70,
+        "landed": 2330
+      },
+      "all_pass": {
+        "successes": 2330,
+        "trials": 2400,
+        "rate": 0.9708333333333333,
+        "wilson": [
+          0.9633121318368908,
+          0.9768497044195298
+        ],
+        "clopper_pearson": [
+          0.9632918868352902,
+          0.9771941314529418
+        ]
+      },
+      "invariants_pass": {
+        "successes": 2400,
+        "trials": 2400,
+        "rate": 1.0,
+        "wilson": [
+          0.9984019500068183,
+          0.9999999999999999
+        ],
+        "clopper_pearson": [
+          0.9984641475245362,
+          1.0
+        ]
+      },
+      "metric": {
+        "n": 2400,
+        "mean": 3631.4878714347537,
+        "sd": 47.04861489448122,
+        "min": 3511.017208913984,
+        "q05": 3557.195592633692,
+        "median": 3631.567251307577,
+        "q95": 3708.200614147319,
+        "max": 3756.2585436328673
+      }
+    },
+    {
+      "name": "gnss-bias",
+      "runs": 2400,
+      "errors": 0,
+      "in_envelope_runs": 2400,
+      "outcomes": {
+        "hard_landing": 618,
+        "landed": 1782
+      },
+      "all_pass": {
+        "successes": 1782,
+        "trials": 2400,
+        "rate": 0.7425,
+        "wilson": [
+          0.7246285560341605,
+          0.7595963897191464
+        ],
+        "clopper_pearson": [
+          0.7245088198555156,
+          0.7598974623814778
+        ]
+      },
+      "invariants_pass": {
+        "successes": 2399,
+        "trials": 2400,
+        "rate": 0.9995833333333334,
+        "wilson": [
+          0.9976435040665108,
+          0.9999264443153018
+        ],
+        "clopper_pearson": [
+          0.9976806917872305,
+          0.9999894509689813
+        ]
+      },
+      "metric": {
+        "n": 2400,
+        "mean": 3631.051547214076,
+        "sd": 47.0301793142262,
+        "min": 3509.0927071662827,
+        "q05": 3557.292658424031,
+        "median": 3631.1602002084032,
+        "q95": 3707.814474643985,
+        "max": 3757.431391093527
+      }
+    },
+    {
+      "name": "altimeter-bias",
+      "runs": 2400,
+      "errors": 0,
+      "in_envelope_runs": 2400,
+      "outcomes": {
+        "hard_landing": 112,
+        "landed": 2288
+      },
+      "all_pass": {
+        "successes": 2288,
+        "trials": 2400,
+        "rate": 0.9533333333333334,
+        "wilson": [
+          0.9441460065126839,
+          0.961071761493498
+        ],
+        "clopper_pearson": [
+          0.9441164171830667,
+          0.9614222305320472
+        ]
+      },
+      "invariants_pass": {
+        "successes": 2400,
+        "trials": 2400,
+        "rate": 1.0,
+        "wilson": [
+          0.9984019500068183,
+          0.9999999999999999
+        ],
+        "clopper_pearson": [
+          0.9984641475245362,
+          1.0
+        ]
+      },
+      "metric": {
+        "n": 2400,
+        "mean": 3625.5457674446866,
+        "sd": 64.5474931600967,
+        "min": 3209.790931602478,
+        "q05": 3551.846709824195,
+        "median": 3629.683153354046,
+        "q95": 3708.5393503720948,
+        "max": 3756.8701694854058
+      }
+    },
+    {
+      "name": "thrust-loss",
+      "runs": 2400,
+      "errors": 0,
+      "in_envelope_runs": 2400,
+      "outcomes": {
+        "hard_landing": 111,
+        "landed": 2289
+      },
+      "all_pass": {
+        "successes": 2289,
+        "trials": 2400,
+        "rate": 0.95375,
+        "wilson": [
+          0.944597709998268,
+          0.9614520596329196
+        ],
+        "clopper_pearson": [
+          0.9445683298302763,
+          0.9618024660726852
+        ]
+      },
+      "invariants_pass": {
+        "successes": 2400,
+        "trials": 2400,
+        "rate": 1.0,
+        "wilson": [
+          0.9984019500068183,
+          0.9999999999999999
+        ],
+        "clopper_pearson": [
+          0.9984641475245362,
+          1.0
+        ]
+      },
+      "metric": {
+        "n": 2400,
+        "mean": 3632.2664160378717,
+        "sd": 47.06492687560072,
+        "min": 3510.72272824429,
+        "q05": 3557.934959992216,
+        "median": 3632.309096743902,
+        "q95": 3708.905525304166,
+        "max": 3757.429549647574
+      }
+    },
+    {
+      "name": "imu-accel-bias",
+      "runs": 2400,
+      "errors": 0,
+      "in_envelope_runs": 2400,
+      "outcomes": {
+        "hard_landing": 298,
+        "landed": 2102
+      },
+      "all_pass": {
+        "successes": 2102,
+        "trials": 2400,
+        "rate": 0.8758333333333334,
+        "wilson": [
+          0.8620362353153667,
+          0.8884292304397584
+        ],
+        "clopper_pearson": [
+          0.8619715302218809,
+          0.8887703865841485
+        ]
+      },
+      "invariants_pass": {
+        "successes": 2400,
+        "trials": 2400,
+        "rate": 1.0,
+        "wilson": [
+          0.9984019500068183,
+          0.9999999999999999
+        ],
+        "clopper_pearson": [
+          0.9984641475245362,
+          1.0
+        ]
+      },
+      "metric": {
+        "n": 2400,
+        "mean": 3595.6215468781443,
+        "sd": 47.39681855502638,
+        "min": 3481.662569326678,
+        "q05": 3521.0217458982474,
+        "median": 3595.399365817399,
+        "q95": 3672.266720613045,
+        "max": 3721.337835246035
+      }
+    },
+    {
+      "name": "gimbal-stuck",
+      "runs": 2400,
+      "errors": 0,
+      "in_envelope_runs": 2400,
+      "outcomes": {
+        "hard_landing": 35,
+        "landed": 2365
+      },
+      "all_pass": {
+        "successes": 2365,
+        "trials": 2400,
+        "rate": 0.9854166666666667,
+        "wilson": [
+          0.9797863843460018,
+          0.9894955087856178
+        ],
+        "clopper_pearson": [
+          0.9797759938305197,
+          0.9898217083382663
+        ]
+      },
+      "invariants_pass": {
+        "successes": 2400,
+        "trials": 2400,
+        "rate": 1.0,
+        "wilson": [
+          0.9984019500068183,
+          0.9999999999999999
+        ],
+        "clopper_pearson": [
+          0.9984641475245362,
+          1.0
+        ]
+      },
+      "metric": {
+        "n": 2400,
+        "mean": 3632.7721371335056,
+        "sd": 46.89814573184444,
+        "min": 3511.165898684212,
+        "q05": 3558.989086169017,
+        "median": 3632.912184793301,
+        "q95": 3709.438292718138,
+        "max": 3757.740921040325
+      }
+    }
+  ],
+  "comparisons": [
+    {
+      "baseline": "nominal",
+      "arm": "gnss-bias",
+      "pairs": 2400,
+      "both_pass": 1782,
+      "baseline_only": 548,
+      "arm_only": 0,
+      "neither": 70,
+      "p_value": 2.1706628412934792e-165,
+      "p_holm": 1.0853314206467396e-164
+    },
+    {
+      "baseline": "nominal",
+      "arm": "altimeter-bias",
+      "pairs": 2400,
+      "both_pass": 2287,
+      "baseline_only": 43,
+      "arm_only": 1,
+      "neither": 69,
+      "p_value": 5.11590769747268e-12,
+      "p_holm": 1.023181539494536e-11
+    },
+    {
+      "baseline": "nominal",
+      "arm": "thrust-loss",
+      "pairs": 2400,
+      "both_pass": 2289,
+      "baseline_only": 41,
+      "arm_only": 0,
+      "neither": 70,
+      "p_value": 9.094947017729259e-13,
+      "p_holm": 2.728484105318778e-12
+    },
+    {
+      "baseline": "nominal",
+      "arm": "imu-accel-bias",
+      "pairs": 2400,
+      "both_pass": 2101,
+      "baseline_only": 229,
+      "arm_only": 1,
+      "neither": 69,
+      "p_value": 2.6775831900279132e-67,
+      "p_holm": 1.0710332760111653e-66
+    },
+    {
+      "baseline": "nominal",
+      "arm": "gimbal-stuck",
+      "pairs": 2400,
+      "both_pass": 2330,
+      "baseline_only": 0,
+      "arm_only": 35,
+      "neither": 35,
+      "p_value": 5.82076609134675e-11,
+      "p_holm": 5.82076609134675e-11
+    }
+  ],
+  "cells": null,
+  "sensitivity": [],
+  "convergence": [],
+  "equivalence": {
+    "cases": [
+      {
+        "cli_exit": 0,
+        "files": [
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "case.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "trace.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "verification.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "run.json"
+          }
+        ],
+        "index": 0,
+        "problems": [],
+        "recomputed": true,
+        "record_matches": true,
+        "replay_verified": true,
+        "seed": 7000,
+        "variant": 0
+      },
+      {
+        "cli_exit": 2,
+        "files": [
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "case.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "trace.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "verification.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "run.json"
+          }
+        ],
+        "index": 107,
+        "problems": [],
+        "recomputed": true,
+        "record_matches": true,
+        "replay_verified": true,
+        "seed": 7107,
+        "variant": 0
+      },
+      {
+        "cli_exit": 2,
+        "files": [
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "case.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "trace.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "verification.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "run.json"
+          }
+        ],
+        "index": 626,
+        "problems": [],
+        "recomputed": true,
+        "record_matches": true,
+        "replay_verified": true,
+        "seed": 7626,
+        "variant": 0
+      },
+      {
+        "cli_exit": 0,
+        "files": [
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "case.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "trace.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "verification.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "run.json"
+          }
+        ],
+        "index": 1252,
+        "problems": [],
+        "recomputed": true,
+        "record_matches": true,
+        "replay_verified": true,
+        "seed": 8252,
+        "variant": 0
+      },
+      {
+        "cli_exit": 0,
+        "files": [
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "case.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "trace.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "verification.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "run.json"
+          }
+        ],
+        "index": 1878,
+        "problems": [],
+        "recomputed": true,
+        "record_matches": true,
+        "replay_verified": true,
+        "seed": 8878,
+        "variant": 0
+      },
+      {
+        "cli_exit": 0,
+        "files": [
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "case.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "trace.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "verification.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "run.json"
+          }
+        ],
+        "index": 2504,
+        "problems": [],
+        "recomputed": true,
+        "record_matches": true,
+        "replay_verified": true,
+        "seed": 7104,
+        "variant": 1
+      },
+      {
+        "cli_exit": 0,
+        "files": [
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "case.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "trace.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "verification.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "run.json"
+          }
+        ],
+        "index": 3130,
+        "problems": [],
+        "recomputed": true,
+        "record_matches": true,
+        "replay_verified": true,
+        "seed": 7730,
+        "variant": 1
+      },
+      {
+        "cli_exit": 0,
+        "files": [
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "case.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "trace.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "verification.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "run.json"
+          }
+        ],
+        "index": 3756,
+        "problems": [],
+        "recomputed": true,
+        "record_matches": true,
+        "replay_verified": true,
+        "seed": 8356,
+        "variant": 1
+      },
+      {
+        "cli_exit": 2,
+        "files": [
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "case.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "trace.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "verification.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "run.json"
+          }
+        ],
+        "index": 4382,
+        "problems": [],
+        "recomputed": true,
+        "record_matches": true,
+        "replay_verified": true,
+        "seed": 8982,
+        "variant": 1
+      },
+      {
+        "cli_exit": 0,
+        "files": [
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "case.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "trace.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "verification.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "run.json"
+          }
+        ],
+        "index": 5008,
+        "problems": [],
+        "recomputed": true,
+        "record_matches": true,
+        "replay_verified": true,
+        "seed": 7208,
+        "variant": 2
+      },
+      {
+        "cli_exit": 0,
+        "files": [
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "case.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "trace.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "verification.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "run.json"
+          }
+        ],
+        "index": 5634,
+        "problems": [],
+        "recomputed": true,
+        "record_matches": true,
+        "replay_verified": true,
+        "seed": 7834,
+        "variant": 2
+      },
+      {
+        "cli_exit": 0,
+        "files": [
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "case.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "trace.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "verification.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "run.json"
+          }
+        ],
+        "index": 6260,
+        "problems": [],
+        "recomputed": true,
+        "record_matches": true,
+        "replay_verified": true,
+        "seed": 8460,
+        "variant": 2
+      },
+      {
+        "cli_exit": 0,
+        "files": [
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "case.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "trace.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "verification.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "run.json"
+          }
+        ],
+        "index": 6886,
+        "problems": [],
+        "recomputed": true,
+        "record_matches": true,
+        "replay_verified": true,
+        "seed": 9086,
+        "variant": 2
+      },
+      {
+        "cli_exit": 0,
+        "files": [
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "case.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "trace.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "verification.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "run.json"
+          }
+        ],
+        "index": 7512,
+        "problems": [],
+        "recomputed": true,
+        "record_matches": true,
+        "replay_verified": true,
+        "seed": 7312,
+        "variant": 3
+      },
+      {
+        "cli_exit": 0,
+        "files": [
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "case.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "trace.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "verification.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "run.json"
+          }
+        ],
+        "index": 8138,
+        "problems": [],
+        "recomputed": true,
+        "record_matches": true,
+        "replay_verified": true,
+        "seed": 7938,
+        "variant": 3
+      },
+      {
+        "cli_exit": 0,
+        "files": [
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "case.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "trace.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "verification.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "run.json"
+          }
+        ],
+        "index": 8764,
+        "problems": [],
+        "recomputed": true,
+        "record_matches": true,
+        "replay_verified": true,
+        "seed": 8564,
+        "variant": 3
+      },
+      {
+        "cli_exit": 0,
+        "files": [
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "case.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "trace.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "verification.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "run.json"
+          }
+        ],
+        "index": 9390,
+        "problems": [],
+        "recomputed": true,
+        "record_matches": true,
+        "replay_verified": true,
+        "seed": 9190,
+        "variant": 3
+      },
+      {
+        "cli_exit": 0,
+        "files": [
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "case.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "trace.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "verification.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "run.json"
+          }
+        ],
+        "index": 10016,
+        "problems": [],
+        "recomputed": true,
+        "record_matches": true,
+        "replay_verified": true,
+        "seed": 7416,
+        "variant": 4
+      },
+      {
+        "cli_exit": 0,
+        "files": [
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "case.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "trace.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "verification.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "run.json"
+          }
+        ],
+        "index": 10642,
+        "problems": [],
+        "recomputed": true,
+        "record_matches": true,
+        "replay_verified": true,
+        "seed": 8042,
+        "variant": 4
+      },
+      {
+        "cli_exit": 0,
+        "files": [
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "case.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "trace.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "verification.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "run.json"
+          }
+        ],
+        "index": 11268,
+        "problems": [],
+        "recomputed": true,
+        "record_matches": true,
+        "replay_verified": true,
+        "seed": 8668,
+        "variant": 4
+      },
+      {
+        "cli_exit": 0,
+        "files": [
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "case.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "trace.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "verification.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "run.json"
+          }
+        ],
+        "index": 11894,
+        "problems": [],
+        "recomputed": true,
+        "record_matches": true,
+        "replay_verified": true,
+        "seed": 9294,
+        "variant": 4
+      },
+      {
+        "cli_exit": 0,
+        "files": [
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "case.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "trace.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "verification.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "run.json"
+          }
+        ],
+        "index": 12520,
+        "problems": [],
+        "recomputed": true,
+        "record_matches": true,
+        "replay_verified": true,
+        "seed": 7520,
+        "variant": 5
+      },
+      {
+        "cli_exit": 0,
+        "files": [
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "case.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "trace.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "verification.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "run.json"
+          }
+        ],
+        "index": 13146,
+        "problems": [],
+        "recomputed": true,
+        "record_matches": true,
+        "replay_verified": true,
+        "seed": 8146,
+        "variant": 5
+      },
+      {
+        "cli_exit": 0,
+        "files": [
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "case.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "trace.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "verification.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "run.json"
+          }
+        ],
+        "index": 13772,
+        "problems": [],
+        "recomputed": true,
+        "record_matches": true,
+        "replay_verified": true,
+        "seed": 8772,
+        "variant": 5
+      },
+      {
+        "cli_exit": 0,
+        "files": [
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "case.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "trace.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "verification.json"
+          },
+          {
+            "equal": true,
+            "first_difference": null,
+            "name": "run.json"
+          }
+        ],
+        "index": 14399,
+        "problems": [],
+        "recomputed": true,
+        "record_matches": true,
+        "replay_verified": true,
+        "seed": 9399,
+        "variant": 5
+      }
+    ],
+    "cli_source_sha256": "304625f9b000c3e990710a3306f16246fe7a6dd146511ee818bb0ba2e3df8826",
+    "differences": 0,
+    "library_source_sha256": "304625f9b000c3e990710a3306f16246fe7a6dd146511ee818bb0ba2e3df8826",
+    "pass": true,
+    "plan_sha256": "b311889a0616409183bffc20308c0bbe011464d604984ab3cd2b8bff7bc41d8f",
+    "schema": "vv-exec-equivalence.v1",
+    "source_sha256_match": true
+  }
+}

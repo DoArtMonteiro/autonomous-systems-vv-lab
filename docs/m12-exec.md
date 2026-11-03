@@ -1,0 +1,127 @@
+# Motor de experiências `vv-exec` (M12)
+
+Estado: **em desenvolvimento**, no ramo `feat/m12-vv-exec`, sobre a auditoria do M12 (PR 17). Nada foi integrado em `main`. Este documento descreve o que está implementado e medido. Não altera o modelo, as sementes protegidas, as configurações aprovadas nem as evidências do M6 e do M10.
+
+## O que existe
+
+`exec/` é um espaço de trabalho Rust separado, como `crates/vv-rocket` e `desktop/`. Liga `vv-rocket` como biblioteca e chama só as suas funções públicas, as mesmas que a linha de comandos usa. O pacote raiz, o seu `Cargo.lock`, os hashes do M1 e o `source_sha256` de `vv-rocket` não mudam.
+
+| Componente | Ficheiro | Função |
+|---|---|---|
+| Especificação `vv-experiment.v1` | `exec/src/spec.rs` | Esquema com `deny_unknown_fields`; validação de nomes, unidades, intervalos, sementes e limites antes de qualquer execução |
+| Sementes | `exec/src/seeds.rs` | Lista, intervalo ou derivação SplitMix64 a partir da identidade da experiência; recusa a experiência inteira se uma semente tocar 3000 a 3099 ou 6000 a 6099 |
+| Planeador | `exec/src/plan.rs` | Desenhos único, fatorial, hipercubo latino e Saltelli; braços como substituições de ponteiros JSON; validação canónica de cada caso; ordem total e `plan_sha256` |
+| Motor | `exec/src/engine.rs` | Execução em processo, registo `log.jsonl` com hash por linha, retoma, `records.jsonl` ordenado por índice, retenção por política |
+| Agendador | `exec/src/sched.rs` | Número de trabalhadores em função da memória disponível, dos processadores e dos limites; reavaliado durante a execução |
+| Portão de equivalência | `exec/src/equiv.rs` | Amostra fixa reescrita pela linha de comandos canónica e pelo escritor em processo; bytes iguais exigidos |
+| Estatística | `exec/src/stats.rs` | Wilson, Clopper-Pearson, McNemar exato, Holm, momentos e índices de Sobol com intervalos por bootstrap |
+| Convergência | `exec/src/converge.rs` | Passo a metade, ordem observada e estimativa de Richardson |
+| Relatório | `exec/src/report.rs` | Recalculado dos registos; resultado da missão separado dos invariantes; fração dentro do envelope |
+
+Domínios em processo: `rocket-landing` (M9 e M10, `vv-rocket land`) e `rocket-rigid-body` (M8, `vv-rocket run`). O domínio terrestre ainda não tem caminho em processo.
+
+## Comandos
+
+```sh
+cargo build --release --manifest-path exec/Cargo.toml
+exec/target/release/vv-exec plan exec/examples/m12-dev-throughput.json
+exec/target/release/vv-exec run exec/examples/m12-dev-throughput.json --output exec/target/m12-dev/throughput --threads 16
+cargo build --release --manifest-path crates/vv-rocket/Cargo.toml --target-dir exec/target/vv-rocket-cli
+exec/target/release/vv-exec equiv exec/target/m12-dev/throughput --cli exec/target/vv-rocket-cli/release/vv-rocket --sample 24
+exec/target/release/vv-exec report exec/target/m12-dev/throughput
+exec/target/release/vv-exec converge crates/vv-rocket/cases/propulsive_descent.json --levels 4 --tolerance-m 0.001
+```
+
+Estado de saída: 0 concluído; 1 portão ou verificação falhou; 3 entrada recusada; 5 execução interrompida (repetir o mesmo comando retoma). O motor recusa qualquer saída dentro de um diretório chamado `runs`, onde estão as execuções históricas do laboratório.
+
+## Especificação `vv-experiment.v1`
+
+Um ficheiro define a experiência: domínio, caso base, braços, parâmetros, desenho, sementes, envelope, retenção, limites e análise. Exemplo: `exec/examples/m12-dev-throughput.json`.
+
+Validação na fronteira:
+
+- Campos desconhecidos, esquema errado e nomes inválidos são recusados.
+- A unidade declarada de um parâmetro tem de coincidir com o sufixo do campo (`_n` N, `_kg` kg, `_m` m, `_mps2` m/s^2, `_s` s, entre outros). Um campo sem unidade no nome, como `faults/0/magnitude`, exige `"unit": "model"`: a unidade e o intervalo são os do modelo.
+- Cada caso que o plano vai executar é construído e passa pela validação canónica do domínio (`prepare_landing` ou `model::prepare`) antes de qualquer simulação. A mensagem identifica o braço, a célula, o parâmetro e o campo recusado.
+- Tetos fixos: 2 000 000 execuções, 200 000 células, 20 000 diretórios retidos, 16 GiB de artefactos e 24 h. A especificação declara limites iguais ou menores; um desenho com mais execuções do que `limits.max_runs` é recusado.
+
+## Determinismo e retoma
+
+- A ordem total é (braço, célula, réplica). Os trabalhadores tiram trabalho de um contador atómico; cada registo leva o seu índice.
+- `log.jsonl` guarda uma linha por execução concluída, na ordem de conclusão: `<sha256> <registo JSON>`, com o hash calculado sobre os bytes do registo. Uma linha final cortada é descartada e executada de novo. Uma linha alterada, repetida ou fora do plano recusa a retoma.
+- `records.jsonl` é escrito quando o registo está completo, com as mesmas linhas copiadas por ordem de índice. Os bytes não dependem do número de trabalhadores, de interrupções nem de retomas. Os testes verificam isto com 1, 3, 4 e 8 trabalhadores, com interrupção a meio e com uma linha cortada.
+- Uma saída existente só aceita o mesmo `plan_sha256`. O plano inclui o hash da especificação, do caso base, do `source_sha256` do domínio e de cada caso e semente.
+- Os valores reais são lidos pelo `serde_json` sem `float_roundtrip`. Essa funcionalidade tem de ficar desligada: ligada, mudaria a forma como o `vv-rocket` lê os casos neste binário. Por isso, a comparação de um registo recalculado aceita um desvio relativo de 1e-15 nas métricas e exige igualdade exata em hashes, veredictos e erros.
+
+## Agendamento adaptativo
+
+Trabalhadores = mínimo de (processadores lógicos, `--threads`, `limits.max_threads`, (memória disponível menos 1024 MB) a dividir por 40 MB), no mínimo 1. A memória disponível é a menor de física e de compromisso (`GlobalMemoryStatusEx` no Windows, `MemAvailable` no Linux), limitada por `limits.memory_budget_mb`. O primeiro trabalhador reavalia o valor a cada 256 execuções; os trabalhadores acima do valor ficam parados até a memória voltar. O teste `memory_pressure_parks_workers_without_changing_records` reduz a memória a meio da execução e confirma que os registos não mudam.
+
+## Retenção
+
+Todas as execuções ficam com hashes, veredictos e métricas em `records.jsonl`. Os artefactos completos só ficam para a política declarada (`failures`, `sample`, `failures_and_sample`). A seleção corre depois de todas as execuções, por ordem de índice, até `max_retained` ou `max_artifact_bytes`, e usa o escritor canónico (`write_landing` ou `write_run`). O hash do traço escrito tem de coincidir com o do registo. Um diretório que ultrapassaria o limite de bytes não chega a ser criado.
+
+## Portão de equivalência
+
+A linha de comandos de cada domínio continua a ser a referência. Para uma amostra fixa (pontas, pontos espaçados e a primeira falha), o portão:
+
+1. escreve os artefactos pela linha de comandos canónica e pelo escritor em processo;
+2. compara cada ficheiro byte a byte e indica o primeiro deslocamento diferente;
+3. confirma que o registo coincide com os artefactos e que uma nova execução em processo o reproduz;
+4. pede à linha de comandos `replay` do diretório em processo e exige `verified`;
+5. exige que o `source_sha256` da linha de comandos seja o da biblioteca ligada.
+
+Uma diferença falha o portão. O relatório indica `equivalence_status`: `verified`, `failed`, `not_run` ou `other_plan`. `verified` significa paridade de bytes com a linha de comandos na amostra. Não é uma aceitação científica.
+
+## Estatística verificada de forma independente
+
+- `scripts/m12_stats_reference.py` calcula os valores de referência só com a biblioteca padrão de Python e com algoritmos diferentes dos do motor: Clopper-Pearson por bisseção sobre somas exatas das caudas binomiais, Wilson com o quantil de `statistics.NormalDist`, McNemar com aritmética racional exata e Holm pela definição.
+- `exec/tests/stats_reference.rs` compara o motor com esses valores: 39 intervalos de Clopper-Pearson até 1e-10, 39 de Wilson até 1e-8 (limite da aproximação de Acklam), funções de distribuição e McNemar até 1e-12 relativo, Holm até 1e-15.
+- `tests/test_m12_stats_reference.py` confirma que o ficheiro de referência é exatamente o que o script produz e que a referência coincide com `scripts/m10_stats.py`, escrito antes e em separado.
+- Índices de Sobol: o teste `sobol_indices_recover_the_analytic_ishigami_solution` usa o desenho Saltelli do próprio planeador com N = 16 384 e recupera os seis índices analíticos da função de Ishigami (a = 7, b = 0,1) com erro menor que 0,03. Os valores analíticos vêm das fórmulas fechadas e são confirmados contra os valores publicados (0,3139, 0,4424, 0, 0,5576, 0,4424, 0,2437).
+
+Comparações emparelhadas: mesma célula, mesma réplica e, por isso, mesma semente em dois braços; McNemar exato e correção de Holm sobre todas as comparações do relatório. Não há paragem sequencial.
+
+## Envelopes de validade e convergência
+
+- O envelope declarado é uma lista de intervalos por ponteiro, cada um com a sua origem (`basis`). Cada caso é avaliado no planeamento; as execuções fora do envelope são marcadas e o relatório indica `in_envelope_fraction` e `extrapolated_runs`.
+- Convergência por passo a metade no modelo de corpo rígido: o mesmo caso com dt, dt/2, dt/4 e dt/8, estado comparado no último passo grosso comum. No caso acoplado do estudo de convergência do M8 (dt = 0,04 s), as ordens observadas ficam entre 3,5 e 4,5, como se espera do RK4. No caso `propulsive_descent.json`, as diferenças estão ao nível do arredondamento (abaixo de 1e-12 vezes a posição) e não se calcula ordem; passa pelo limite de erro.
+- Com `analysis.convergence_tolerance_m`, o relatório verifica até quatro variantes do plano.
+
+## Resultados medidos
+
+Máquina, sistema e carga externa como na auditoria (`docs/m12-performance-audit.md`): Ryzen 7 7800X3D, 16 fios, 32 GB, Windows 11 Pro 10.0.26300, Rust 1.99.0, sessão de trabalho normal com cerca de 5 GB de memória física livre. Medição com `spikes/m12-perf/jobrun.py`, teto de 4096 MB por job, 3 de novembro de 2026.
+
+Comando: `python spikes/m12-perf/jobrun.py --label vv-exec-14400-t16 --cap-mb 4096 --out exec/target/m12-dev/jobrun-t16.json -- <repo>/exec/target/release/vv-exec.exe run <repo>/exec/examples/m12-dev-throughput.json --output <repo>/exec/target/m12-dev/throughput --threads 16`, e o mesmo com `--threads 1` e `--threads 8`.
+
+Experiência: `m10-nominal.json` (B+) sob seis condições de falha, sementes de desenvolvimento 7000 a 9399, 14 400 execuções; retenção de falhas e de uma amostra, até 200 diretórios.
+
+| Trabalhadores | Ponta a ponta | CPU | Pico de memória | Execuções/s (ponta a ponta) |
+|---:|---:|---:|---:|---:|
+| 1 | 55,5 s | 54,5 s | 61 MB | 259 |
+| 8 | 11,7 s | 67,3 s | 64 MB | 1 226 |
+| 16 | 8,4 s | 72,0 s | 67 MB | 1 712 |
+
+- «Ponta a ponta» inclui planeamento e validação dos casos, escrita de `records.jsonl` e retenção de 200 diretórios pelo escritor canónico. Com 16 trabalhadores, a fase de execução mediu 5,6 s (2 567 execuções/s), segundo o resumo do próprio motor.
+- A campanha atual pela linha de comandos mediu 117 execuções/s com 16 trabalhadores na auditoria; o motor em processo faz cerca de 15 vezes mais, de ponta a ponta.
+- `records.jsonl` tem o mesmo SHA-256 com 1, 8 e 16 trabalhadores (`docs/evidence/m12-exec/records-sha256.txt`).
+- Portão de equivalência: 25 execuções da amostra, incluindo execuções com veredicto falhado (código de saída 2 da linha de comandos), 0 diferenças, `source_sha256` igual, `replay` verificado (`docs/evidence/m12-exec/equivalence.json`).
+- Critério do roteiro (frente 1): campanha de 14 400 execuções em 6 braços em menos de 30 s, com pico abaixo de 1 GB, e amostra de equivalência sem diferenças. Cumprido nesta máquina. A comparação dos agregados com `m10_campaign.py` nas mesmas sementes não foi feita: o script usa as suas grelhas e sementes do M10, que este trabalho não executa.
+
+**Os veredictos em `docs/evidence/m12-exec/report.json` são evidência de paridade do motor em sementes de desenvolvimento. Não são resultados do M10 e não implicam qualquer aceitação.** A decisão sobre o M10 (PR 15) continua com o responsável.
+
+## Limitações materiais
+
+- **O modelo de aterragem fixa o veículo, o ambiente, as condições iniciais, a dispersão, os sensores, os requisitos e dt.** `prepare_landing` recusa qualquer outro valor. Varreduras físicas (massa, empuxo, atmosfera, condições iniciais) só são possíveis no modelo de corpo rígido. No modelo de aterragem, os parâmetros livres são as falhas (tipo, magnitude, início, duração), a política, os ganhos e a navegação. Varrer parâmetros físicos da aterragem exige uma estratégia de compatibilidade validada à parte, que mude o modelo sem invalidar as execuções guardadas do M10.
+- **A convergência só se aplica ao corpo rígido.** O passo da aterragem é um valor registado; o relatório indica «não aplicável» e a razão.
+- O domínio terrestre ainda não tem caminho em processo.
+- Desenho Saltelli com amostragem pseudoaleatória (SplitMix64), não com uma sequência de Sobol de baixa discrepância.
+- O cancelamento pela linha de comandos é feito pelo limite de tempo da especificação e pela retoma; não há tratamento de Ctrl+C.
+- Uma máquina e uma sessão com outras aplicações abertas; os tempos absolutos variam com a carga.
+
+## Portões científicos preservados
+
+- Nenhuma semente de avaliação (3000 a 3099) ou de reserva (6000 a 6099) do M10 foi executada; o motor recusa-as no planeamento.
+- O desvio declarado na auditoria (sementes 100 a 129 do ciclo de cronometragem terrestre, que incluem as reservadas 101 a 112 do M6) continua em aberto. Este trabalho não executa o domínio terrestre.
+- `crates/vv-rocket`, o pacote raiz, os casos e as evidências do M6 e do M10 não foram alterados. Os testes do pacote raiz, a campanha do M1 e os testes Python passam.
+- As saídas do motor ficam em `exec/target/` (ignorado pelo Git); nada é escrito em `runs/`.

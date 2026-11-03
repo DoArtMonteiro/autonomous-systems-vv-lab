@@ -1,0 +1,23 @@
+{
+  "arms": [
+    "nominal",
+    "gnss-bias",
+    "altimeter-bias",
+    "thrust-loss",
+    "imu-accel-bias",
+    "gimbal-stuck"
+  ],
+  "base_case_sha256": "c28a258c94a17b6ce1e8eb5a1442d977b4c951a0913375661ec3dddf8d05784a",
+  "cells": 1,
+  "domain": "rocket-landing",
+  "engine": "vv-exec 0.12.0",
+  "experiment": "m12-dev-throughput",
+  "in_envelope_variants": 6,
+  "parameters": [],
+  "plan_sha256": "b311889a0616409183bffc20308c0bbe011464d604984ab3cd2b8bff7bc41d8f",
+  "runs": 14400,
+  "schema": "vv-exec-plan.v1",
+  "source_sha256": "304625f9b000c3e990710a3306f16246fe7a6dd146511ee818bb0ba2e3df8826",
+  "spec_sha256": "a5c86366d74c9dfa7598e085def38cd23dc765292f34b284b4e462019d7ff947",
+  "variants": 6
+}

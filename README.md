@@ -113,6 +113,17 @@ powershell -ExecutionPolicy Bypass -File desktop\build.ps1   # builds the NSIS i
 
 See [docs/m11-desktop.md](docs/m11-desktop.md) for the architecture and how to add a domain, and [docs/m11-acceptance.md](docs/m11-acceptance.md) for installation and acceptance. The developer CLI and the browser Mission Control above remain supported.
 
+### vv-exec experiment engine (M12, in development)
+
+An in-process engine that runs `vv-experiment.v1` specifications (arms, fault grids, Latin hypercube and Saltelli designs) through the canonical `vv-rocket` library, with adaptive scheduling, hashed resumable records, retention by policy, an equivalence gate against the canonical command line and recomputed statistics. On development seeds it ran 14,400 landings in 8.4 s end to end with a 67 MB peak; the records are byte-identical for any worker count.
+
+```sh
+cargo build --release --manifest-path exec/Cargo.toml
+exec/target/release/vv-exec run exec/examples/m12-dev-throughput.json --output exec/target/m12-dev/throughput
+```
+
+See [docs/m12-exec.md](docs/m12-exec.md). Its development-seed verdicts are engine parity evidence, not M10 results.
+
 An expected safety violation can make a `run` command exit with code `2`; that is a simulated finding, not a test harness failure. See the scenario's result and report before interpreting the exit code.
 
 ## Development timeline
