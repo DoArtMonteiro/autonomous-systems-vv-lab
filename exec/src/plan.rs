@@ -187,6 +187,18 @@ fn set(doc: &mut Value, pointer: &str, value: Value, numeric: Numeric) -> Result
     Ok(())
 }
 
+/// A parameter value as written into a case: rounded for an integer field, snapped to the
+/// declared quantum otherwise.
+pub fn snap(p: &Parameter, v: f64) -> f64 {
+    if p.integer {
+        v.round()
+    } else if let Some(q) = p.quantum {
+        (v / q).round() * q
+    } else {
+        v
+    }
+}
+
 /// Sets each parameter value in `doc` and returns the case bytes as the planner writes them:
 /// pretty JSON and a final newline. Integer parameters are rounded to the nearest integer.
 pub fn apply_parameters(
@@ -195,8 +207,9 @@ pub fn apply_parameters(
     values: &[f64],
 ) -> Result<Vec<u8>, String> {
     for (p, &v) in parameters.iter().zip(values) {
+        let v = snap(p, v);
         let (value, kind) = if p.integer {
-            (Value::from(v.round() as i64), Numeric::Integer)
+            (Value::from(v as i64), Numeric::Integer)
         } else {
             let n = serde_json::Number::from_f64(v).ok_or("non-finite parameter value")?;
             (Value::Number(n), Numeric::Float)
@@ -492,6 +505,7 @@ mod tests {
             high: 100.0,
             scale: Scale::Log,
             integer: false,
+            quantum: None,
         };
         assert!((scale(&p, 0.0) - 1.0).abs() < 1e-12);
         assert!((scale(&p, 0.5) - 10.0).abs() < 1e-9);

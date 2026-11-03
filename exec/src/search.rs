@@ -8,7 +8,9 @@
 //! - `extremes`: every corner of the box and the centre first, then uniform points, the classic
 //!   worst-case testing heuristic;
 //! - `adaptive`: robustness-guided local search with restarts, a (1+1) evolution strategy on the
-//!   objective metric, in the family of S-TaLiRo and Breach falsification.
+//!   objective metric, in the family of S-TaLiRo and Breach falsification;
+//! - `grid`: every point of a full factorial with every listed seed, the exhaustive reference the
+//!   benchmark compares the others with.
 //!
 //! Points live on an integer lattice, `q / 2^32` per unit coordinate, so a logged point is read
 //! back exactly: `serde_json` here runs without `float_roundtrip` and may round a float by one unit
@@ -28,7 +30,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::domain::{Domain, by_id};
-use crate::plan::{apply_parameters, read_capped, scale, sha256_hex};
+use crate::plan::{apply_parameters, read_capped, scale, sha256_hex, snap};
 use crate::prng::{SplitMix64, mix};
 use crate::spec::{MAX_THREADS, Parameter, validate_parameters};
 
@@ -80,6 +82,11 @@ pub enum Strategy {
     Random,
     Halton,
     Extremes,
+    /// Full factorial, `levels` per parameter with both ends, each point with every seed.
+    Grid {
+        levels: u32,
+        seeds: Vec<u64>,
+    },
     Adaptive {
         /// Uniform points drawn at the start of each episode.
         initial: u32,
@@ -202,6 +209,22 @@ impl SearchSpec {
             }
             if initial == 0 || patience == 0 || !(sigma > 0.0 && sigma <= 1.0) {
                 return Err("adaptive needs initial > 0, patience > 0 and sigma in (0, 1]".into());
+            }
+        }
+        if let Strategy::Grid { levels, seeds } = &self.strategy {
+            if !(2..=1000).contains(levels) || seeds.is_empty() || seeds.len() > 1000 {
+                return Err("grid needs levels in [2, 1000] and 1 to 1000 seeds".into());
+            }
+            for &seed in seeds {
+                if !(self.seed_pool.low..=self.seed_pool.high).contains(&seed) {
+                    return Err(format!("grid seed {seed} is outside seed_pool"));
+                }
+            }
+            let cells = u64::from(*levels)
+                .checked_pow(self.parameters.len() as u32)
+                .ok_or("grid is too large")?;
+            if cells.checked_mul(seeds.len() as u64) != Some(u64::from(self.budget)) {
+                return Err("grid budget must equal levels^parameters x seeds".into());
             }
         }
         if let Strategy::Extremes = self.strategy
@@ -357,10 +380,7 @@ impl Context<'_> {
             .parameters
             .iter()
             .zip(to_u(q))
-            .map(|(p, x)| {
-                let v = scale(p, x);
-                if p.integer { v.round() } else { v }
-            })
+            .map(|(p, x)| snap(p, scale(p, x)))
             .collect()
     }
 
@@ -503,6 +523,26 @@ impl Rep<'_> {
                     let s = self.seed();
                     self.eval(u, s);
                     i += 1;
+                }
+            }
+            Strategy::Grid { levels, seeds } => {
+                let l = u64::from(levels);
+                let cells = l.pow(d as u32);
+                for cell in 0..cells {
+                    let mut rest = cell;
+                    let q: Vec<u64> = (0..d)
+                        .map(|_| {
+                            let i = rest % l;
+                            rest /= l;
+                            (u128::from(i) * u128::from(Q) / u128::from(l - 1)) as u64
+                        })
+                        .collect();
+                    for &s in &seeds {
+                        if !self.budget_left() {
+                            return;
+                        }
+                        self.eval(q.clone(), s);
+                    }
                 }
             }
             Strategy::Extremes => {
@@ -991,6 +1031,16 @@ mod tests {
         assert_eq!(radical_inverse(1, 2), 0.5);
         assert_eq!(radical_inverse(3, 2), 0.75);
         assert!((radical_inverse(5, 3) - (2.0 / 3.0 + 1.0 / 9.0)).abs() < 1e-15);
+    }
+
+    #[test]
+    fn grid_points_include_both_ends() {
+        let i = [0u64, 1, 2];
+        let q: Vec<u64> = i
+            .iter()
+            .map(|&i| (u128::from(i) * u128::from(Q) / 2) as u64)
+            .collect();
+        assert_eq!(q, vec![0, Q / 2, Q]);
     }
 
     #[test]

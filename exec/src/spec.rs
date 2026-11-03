@@ -88,6 +88,10 @@ pub struct Parameter {
     /// be integers. Absent means a floating-point field, as before M14.
     #[serde(default, skip_serializing_if = "is_false")]
     pub integer: bool,
+    /// For a field the model only accepts on a lattice, such as a time that must be a whole number
+    /// of steps: values are rounded to the nearest multiple of `quantum`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quantum: Option<f64>,
 }
 
 fn is_false(b: &bool) -> bool {
@@ -256,6 +260,13 @@ pub fn validate_parameters(parameters: &[Parameter]) -> Result<(), String> {
         if p.integer && (p.low.fract() != 0.0 || p.high.fract() != 0.0) {
             return Err(format!(
                 "{at}: an integer parameter needs integer low and high"
+            ));
+        }
+        if let Some(q) = p.quantum
+            && (p.integer || !(q.is_finite() && q > 0.0 && q <= p.high - p.low))
+        {
+            return Err(format!(
+                "{at}: quantum must be positive, at most high - low, and not combined with integer"
             ));
         }
         if p.integer && (p.low.abs() > 9.0e15 || p.high.abs() > 9.0e15) {
