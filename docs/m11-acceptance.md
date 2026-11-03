@@ -4,7 +4,7 @@ Para o dono do projeto. Descreve como instalar o V&V Lab Studio, o que verificar
 
 ## Instalar
 
-1. Obter o instalador `VV Lab Studio_0.11.0_x64-setup.exe` (construído por `desktop\build.ps1`, em `desktop\target\release\bundle\nsis\`; 5 697 742 bytes). O instalador não é assinado: o SmartScreen mostra "O Windows protegeu o computador"; escolher "Mais informações" e "Executar mesmo assim".
+1. Obter o instalador `VV Lab Studio_0.11.0_x64-setup.exe`: o artefacto `vv-lab-studio-installer` do job `installer` da CI, com o ficheiro `.sha256` ao lado, ou uma construção local com `desktop\build.ps1` (em `desktop\target\release\bundle\nsis\`). Duas construções da mesma fonte não são iguais byte a byte (o NSIS e o empacotamento incluem datas); comparar o SHA-256 com o do artefacto que se instala. O instalador não é assinado: o SmartScreen mostra "O Windows protegeu o computador"; escolher "Mais informações" e "Executar mesmo assim".
 2. Correr o instalador. A instalação é por utilizador (sem pedido de administrador) em `%LOCALAPPDATA%\VV Lab Studio\`, com atalho no menu Iniciar e no ambiente de trabalho. O WebView2 já vem no Windows 11; se faltar, o instalador traz o instalador de arranque do WebView2.
 3. Abrir "VV Lab Studio" no menu Iniciar. Não abre nenhuma consola.
 
@@ -26,22 +26,35 @@ Instalação silenciosa: `"VV Lab Studio_0.11.0_x64-setup.exe" /S`. Desinstalaç
 
 ## O que foi verificado
 
+### Verificação num checkout limpo (CI, 03/11/2026)
+
+Job `installer (windows-latest)` do workflow `verification`, no PR #16, sobre o commit `b815bb5`: checkout limpo, Rust 1.99.0, Node 22, `desktop\build.ps1`, instalação silenciosa, verificação dos ficheiros instalados e de `VCRUNTIME140.dll`, `vv-studio.exe --self-test` instalado e desinstalação silenciosa. Resultado do instalador: `VV Lab Studio_0.11.0_x64-setup.exe`, 5 697 238 bytes, SHA-256 `f3ac143685963d4a9b0ff1a73651b9afc853f211f6173259b3b7a57906ee2e82`. Os jobs `ubuntu-latest`, `windows-latest` (verificações da raiz) e `desktop (windows-latest)` passaram no mesmo run.
+
+No runner, o teste de interface não corre: a aplicação arranca e fica em execução, com WebView2 156.0.4314.50, mas o WebView2 não abre o endpoint de depuração. Por isso esse passo é informativo na CI, e o teste de interface foi feito nesta máquina contra o artefacto da CI:
+
+- SHA-256 do artefacto descarregado igual ao registado no job;
+- instalação silenciosa com código 0, nove ficheiros instalados, nenhum executável importa `VCRUNTIME140.dll`;
+- `--self-test` com `PATH=C:\Windows\System32;C:\Windows`: código 0, quatro verificações aprovadas;
+- `python desktop/studio/tests/ui_smoke.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --domains ""`: 66 de 66 verificações aprovadas, com a janela real a 1024x640, 1366x768, 1440x900 e 1920x1080.
+
+### Verificação local (02/11/2026, antes das correções da revisão de aceitação)
+
 Máquina: Windows 11 Pro 10.0.26300, x64, 16 processadores lógicos, 32 GB, WebView2 156.0.4314.58. Data: 02/11/2026.
 
 | Verificação | Comando ou método | Resultado |
 | --- | --- | --- |
 | Verificações da raiz (AGENTS.md) | `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`, `python -m unittest discover -s tests -p "test_*.py"`, `cargo build --release`, `python scripts/run_campaign.py --seeds 42,1337,2026 --output-root runs/campaign` | 138 testes Rust e 400 testes Python (3 ignorados) passam; campanha `passed` (87 casos, 324 invocações) |
-| Espaço de trabalho `desktop/` | `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` | limpo; 44 testes passam |
+| Espaço de trabalho `desktop/` | `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` | limpo; 44 testes passam (47 depois das correções de 03/11/2026, também na CI) |
 | Paridade com o CLI | anfitrião do foguetão contra `vv-rocket land` (altímetro preso, B+, semente 5000); anfitrião terrestre contra `vv-lab run-m4` (`delayed_after_fallback`) | `case`, `trace`, `verification` e `run` iguais byte a byte; as cinco saídas terrestres iguais |
 | Instalação silenciosa | `setup.exe /S` | código 0; executáveis, domínios, atalhos no menu Iniciar e no ambiente de trabalho e entrada de desinstalação em HKCU |
 | Sem ambientes de desenvolvimento | `vv-studio.exe --self-test` instalado, com `PATH=C:\Windows\System32;C:\Windows` e sem variáveis de Rust, Python ou Node, observando os processos filhos | passa (veículo terrestre e foguetão correm e reproduzem como "verified"); processos filhos: só os anfitriões, `vv-lab.exe` e `conhost.exe` |
 | Dependências nativas | procura de `VCRUNTIME140.dll` nos executáveis instalados | nenhum o importa; só a UCRT do sistema (`api-ms-win-crt-*`) |
 | Desinstalação | `uninstall.exe /S` | aplicação, atalhos e entrada de desinstalação removidos; ficheiro de teste na biblioteca mantido |
-| Interface real | `python desktop/studio/tests/ui_smoke.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --domains ""` contra a aplicação instalada (instalador SHA-256 `d3404ebb4e33cdea2cc44274cf3064f85061d7e17995cd33ca9b96520f6b6e0c`), com biblioteca e preferências em pastas temporárias | 66 de 66 verificações passam: os cinco percursos de demonstração, semente protegida recusada, clique num requisito falhado move o cursor, reprodução verificada, comparação, pesquisa na biblioteca, cenário e comparação guardados e reabertos, exportação de evidência, tema, domínio de referência escondido por omissão e utilizável quando ativado, ausência de nome de utilizador no ecrã, e janela real redimensionada para 1024x640, 1366x768, 1440x900 e 1920x1080 sem deslocamento horizontal |
+| Interface real | `python desktop/studio/tests/ui_smoke.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --domains ""` contra a aplicação instalada (instalador local de 02/11/2026; repetido a 03/11/2026 contra o instalador da CI, acima), com biblioteca e preferências em pastas temporárias | 66 de 66 verificações passam: os cinco percursos de demonstração, semente protegida recusada, clique num requisito falhado move o cursor, reprodução verificada, comparação, pesquisa na biblioteca, cenário e comparação guardados e reabertos, exportação de evidência, tema, domínio de referência escondido por omissão e utilizável quando ativado, ausência de nome de utilizador no ecrã, e janela real redimensionada para 1024x640, 1366x768, 1440x900 e 1920x1080 sem deslocamento horizontal |
 
 ## Limites destas verificações
 
-- **Não foi testado num computador limpo.** Não há Windows Sandbox nem máquina virtual nesta máquina. A aproximação foi a aplicação instalada, com o `PATH` reduzido às pastas do Windows, a observação dos processos filhos e a procura de dependências do runtime de Visual C++. Uma máquina sem WebView2 ou com políticas de grupo restritivas não foi testada.
+- **Computador limpo: só o runner da CI.** O runner é uma máquina virtual nova, onde a construção, a instalação e o auto-teste passam, mas tem ferramentas de desenvolvimento instaladas e o teste de interface não corre lá. Não há Windows Sandbox nem máquina virtual nesta máquina. Aqui, a aproximação foi a aplicação instalada, com o `PATH` reduzido às pastas do Windows, a observação dos processos filhos e a procura de dependências do runtime de Visual C++. Uma máquina sem WebView2 ou com políticas de grupo restritivas não foi testada.
 - O instalador não é assinado; não foi testado com SmartScreen num computador sem histórico.
 - A janela "Guardar como" do Windows e o "Show in Explorer" não fazem parte do teste automático.
 
