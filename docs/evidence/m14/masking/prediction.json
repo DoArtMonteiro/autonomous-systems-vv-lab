@@ -1,0 +1,82 @@
+{
+  "schema": "vv-m14-masking-prediction.v1",
+  "case": "exec/cases/m13/g3-registered.json",
+  "case_sha256": "4f30b68094f4b7ff30039509b4362b47d513063c7e4b87c1348fdfeb87bc88f7",
+  "model": "vertical estimator error only; perfect IMU; no noise, vehicle or guidance (see model())",
+  "gains": {
+    "gnss_position_gain": 0.15,
+    "gnss_velocity_gain": 0.25,
+    "altimeter_position_gain": 0.1,
+    "altimeter_velocity_gain": 0.004,
+    "altimeter_residual_threshold_m": 3.0,
+    "altimeter_rejection_cycles": 5
+  },
+  "control_cycle_s": 0.02,
+  "gnss_every_cycles": 5,
+  "P1": {
+    "statement": "With the bias starting at 5.0 s, the altimeter is rejected, and R1 holds again, only above b* m.",
+    "b_star_m": 11.988676443422214,
+    "criterion": "the simulator magnitude b50 at which R1 holds in half the runs lies within 1.0 m of b*"
+  },
+  "P2": {
+    "statement": "With a bias of 8.0 m, the altimeter is rejected only when the bias is present at the first GNSS fix (onset 0 s).",
+    "rejected_by_onset": {
+      "0.0": true,
+      "0.01": false,
+      "0.02": false,
+      "0.1": false,
+      "1.0": false,
+      "5.0": false,
+      "10.0": false,
+      "20.0": false
+    },
+    "criterion": "R1 holds in at least 90% of runs where the model predicts rejection and fails in at least 90% where it predicts masking"
+  },
+  "steady_state_at_8m": {
+    "max_residual_m": 2.0018890419857813,
+    "rejected_cycles": 0,
+    "final_e_m": 0.748508153046425,
+    "final_v_mps": -5.087486614032482
+  },
+  "test": {
+    "seeds": [
+      47000,
+      47019
+    ],
+    "magnitudes_m": [
+      10.0,
+      10.25,
+      10.5,
+      10.75,
+      11.0,
+      11.25,
+      11.5,
+      11.75,
+      12.0,
+      12.25,
+      12.5,
+      12.75,
+      13.0,
+      13.25,
+      13.5,
+      13.75,
+      14.0,
+      14.25,
+      14.5,
+      14.75,
+      15.0
+    ],
+    "late_onset_s": 5.0,
+    "onsets_s": [
+      0.0,
+      0.01,
+      0.02,
+      0.1,
+      1.0,
+      5.0,
+      10.0,
+      20.0
+    ],
+    "onset_magnitude_m": 8.0
+  }
+}
