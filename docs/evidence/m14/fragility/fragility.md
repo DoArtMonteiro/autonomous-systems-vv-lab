@@ -5,7 +5,7 @@ Cada nível corre 100 sementes de desenvolvimento (32000 a 32099). Veredicto por
 ## F1: ruído GPS
 
 Alegação: Corredor junto à zona: o veículo não viola a segurança, com probabilidade de pelo menos 0.95. Caso `exec/cases/m14/ground-zone-corridor.json`. Recalculado: sim.
-Margem: último nível que se mantém 0 mm; primeiro refutado 1 mm. Não monótona: sim.
+Margem: último nível que se mantém 0 mm; primeiro refutado 1 mm. Não monótona: não.
 
 | ruído GPS (mm) | Passam | Limite inferior | Limite superior | Veredicto |
 | --- | --- | --- | --- | --- |
@@ -85,7 +85,7 @@ Margem: último nível que se mantém None model; primeiro refutado None model. 
 ## F6: viés GNSS a partir de 5 s
 
 Alegação: M9.1 guarded: aterra e cumpre todos os requisitos, com probabilidade de pelo menos 0.95. Caso `exec/cases/m14/rocket-gnss-bias.json`. Recalculado: sim.
-Margem: último nível que se mantém None model; primeiro refutado 5.0 model. Não monótona: sim.
+Margem: último nível que se mantém None model; primeiro refutado 5.0 model. Não monótona: não.
 
 | viés GNSS a partir de 5 s (model) | Passam | Limite inferior | Limite superior | Veredicto |
 | --- | --- | --- | --- | --- |

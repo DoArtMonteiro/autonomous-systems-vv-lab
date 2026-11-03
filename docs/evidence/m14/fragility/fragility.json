@@ -119,7 +119,7 @@
         "first_refuted_value": 1
       },
       "nominal_holds": true,
-      "non_monotone": true,
+      "non_monotone": false,
       "plan_sha256": "0be60e226127d6d2ec241974c7509368ac09ccb94386c5b1fc8d8ba429c744ad",
       "verified": true
     },
@@ -569,7 +569,7 @@
         "first_refuted_value": 5.0
       },
       "nominal_holds": false,
-      "non_monotone": true,
+      "non_monotone": false,
       "plan_sha256": "5f373be9d20bfc5841d9a2c732e5acaba1dcc08350abe58e0a6d16b16e5b2899",
       "verified": true
     },

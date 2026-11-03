@@ -165,3 +165,28 @@ fn the_adaptive_strategy_needs_an_objective() {
     let err = search::SearchSpec::parse(&serde_json::to_vec(&v).unwrap()).expect_err("refused");
     assert!(err.contains("objective"), "{err}");
 }
+
+#[test]
+fn a_truncated_log_with_rewritten_hashes_fails_verification() {
+    // Independent review, M14: deleting rows and recomputing the stored log hash and count used
+    // to pass, because only the summaries were rebuilt. The fresh log must now match byte for byte.
+    let s = spec(json!({"kind": "random"}), json!({}));
+    let out = scratch("search-truncate");
+    search::execute(&s, &base(), &out, 2).expect("search");
+    let text = fs::read_to_string(out.join("evaluations.jsonl")).unwrap();
+    let kept: String = text.lines().skip(10).map(|l| format!("{l}\n")).collect();
+    fs::write(out.join("evaluations.jsonl"), &kept).unwrap();
+    let mut stored: Value =
+        serde_json::from_slice(&fs::read(out.join("search.json")).unwrap()).unwrap();
+    stored["log_sha256"] = json!(vv_exec::plan::sha256_hex(kept.as_bytes()));
+    stored["total_evaluations"] = json!(kept.lines().count());
+    fs::write(
+        out.join("search.json"),
+        serde_json::to_vec_pretty(&stored).unwrap(),
+    )
+    .unwrap();
+    let v = search::verify(&out, 2).expect("verify runs");
+    assert!(v.hashes_match, "the forger kept the hashes consistent");
+    assert!(!v.log_reproduced);
+    assert!(!v.pass);
+}
