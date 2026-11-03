@@ -30,19 +30,26 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+import workbench as wb
 from landing_adapter import MODEL_ID as LANDING_MODEL_ID
 from landing_adapter import LandingAdapter
 from landing_view import LANDING_JS, landing_page, load_campaign, load_m91_campaign
+from workbench_view import WORKBENCH_JS, workbench_page
 from m6_report import CSS
 from rocket_adapter import RocketAdapter
 from rocket_view import ROCKET_JS, rocket_page
-from sim_adapter import ADAPTER_SCHEMA_V2, MODEL_ID, AdapterError, GroundVehicleAdapter, check_result
+from sim_adapter import ADAPTER_SCHEMA_V2, MODEL_ID, AdapterError, GroundVehicleAdapter, _only, check_result
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CAMPAIGN_SUMMARY = ROOT / "runs" / "m9-campaign" / "summary.json"
 DEFAULT_M91_SUMMARY = ROOT / "runs" / "m91-campaign" / "summary.json"
 MAX_BODY_BYTES = 16 * 1024
 BUSY_WAIT_SECONDS = 5
+EVIDENCE_PATH = re.compile(r"/api/workbench/evidence/([0-9a-f]{16})")
+
+
+class ContractBroken(Exception):
+    """A run finished but its result breaks the response contract; answered as a server error, never as a success."""
 
 
 class ExclusiveServer(ThreadingHTTPServer):
@@ -57,23 +64,37 @@ class ExclusiveServer(ThreadingHTTPServer):
 
 
 def make_server(port: int, output_root: Path, adapter: Any, campaign_summary: Path | None = None,
-                m91_summary: Path | None = None) -> ThreadingHTTPServer:
+                m91_summary: Path | None = None, journeys: Path | None = None) -> ThreadingHTTPServer:
     """`adapter` is one ground-vehicle adapter or a map from model id to adapter; runs dispatch on `model`.
 
     `campaign_summary` is the M9 campaign summary the landing page may read (GET /api/campaign);
-    `m91_summary` is the M9.1 acceptance campaign summary (GET /api/campaign-m91).
+    `m91_summary` is the M9.1 acceptance campaign summary (GET /api/campaign-m91); `journeys` is the
+    workbench journeys file (GET /api/workbench). The workbench routes exist only with a landing adapter.
     """
     campaign_summary = DEFAULT_CAMPAIGN_SUMMARY if campaign_summary is None else Path(campaign_summary)
     m91_summary = DEFAULT_M91_SUMMARY if m91_summary is None else Path(m91_summary)
+    journeys = wb.JOURNEYS if journeys is None else Path(journeys)
     output_root = Path(output_root).resolve()
     output_root.mkdir(parents=True, exist_ok=True)
     lock = threading.Lock()
     adapters = dict(adapter) if isinstance(adapter, dict) else {MODEL_ID: adapter}
     ground = adapters.get(MODEL_ID)
+    landing = adapters.get(LANDING_MODEL_ID)
     # Longest paths first, so a run directory inside the repository becomes <runs>.
     hidden = [(output_root, "<runs>")] + [(a.binary, f"<{m}-binary>") for m, a in adapters.items()]
     hidden += [(a.root, "<repo>") for a in adapters.values()]
     hidden.sort(key=lambda item: -len(str(Path(item[0]).resolve())) if item[0] is not None else 0)
+
+    def scrub(text: str) -> str:
+        """Never leak where runs, the binary or the repository live on this machine."""
+        for place, label in hidden:
+            if place is None:
+                continue
+            place = Path(place).resolve()
+            for path in (str(place).replace("\\", "\\\\"), str(place), place.as_posix()):
+                # Windows paths are case-insensitive; simulator stderr may change the case.
+                text = re.sub(re.escape(path), label, text, flags=re.IGNORECASE if sys.platform == "win32" else 0)
+        return text
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "MissionControl/1"
@@ -88,10 +109,12 @@ def make_server(port: int, output_root: Path, adapter: Any, campaign_summary: Pa
             origin = self.headers.get("Origin")
             return self.headers.get("Host") in hosts and (origin is None or origin in {f"http://{h}" for h in hosts})
 
-        def _send(self, status: int, body: bytes, content_type: str) -> None:
+        def _send(self, status: int, body: bytes, content_type: str, extra: dict[str, str] | None = None) -> None:
             self.send_response(status)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))
+            for name, value in (extra or {}).items():
+                self.send_header(name, value)
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("Referrer-Policy", "no-referrer")
             self.send_header("Cache-Control", "no-store")
@@ -104,16 +127,95 @@ def make_server(port: int, output_root: Path, adapter: Any, campaign_summary: Pa
             self.wfile.write(body)
 
         def _json(self, status: int, value: Any) -> None:
-            text = json.dumps(value, sort_keys=True)
-            # Never leak where runs, the binary or the repository live on this machine.
-            for place, label in hidden:
-                if place is None:
-                    continue
-                place = Path(place).resolve()
-                for path in (str(place).replace("\\", "\\\\"), str(place), place.as_posix()):
-                    # Windows paths are case-insensitive; simulator stderr may change the case.
-                    text = re.sub(re.escape(path), label, text, flags=re.IGNORECASE if sys.platform == "win32" else 0)
+            text = scrub(json.dumps(value, sort_keys=True))
             self._send(status, text.encode("utf-8"), "application/json; charset=utf-8")
+
+        def _body(self) -> Any:
+            """The JSON body of a POST, or None after answering the error (media type, length, size, syntax)."""
+            if not (self.headers.get("Content-Type") or "").startswith("application/json"):
+                self._json(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, {"error": "send application/json"})
+                return None
+            try:
+                length = int(self.headers.get("Content-Length") or "-1")
+            except ValueError:
+                length = -1
+            if length < 0:
+                self._json(HTTPStatus.LENGTH_REQUIRED, {"error": "Content-Length required"})
+                return None
+            if length > MAX_BODY_BYTES:
+                self._json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": f"body over {MAX_BODY_BYTES} bytes"})
+                return None
+            try:
+                value = json.loads(self.rfile.read(length).decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                self._json(HTTPStatus.BAD_REQUEST, {"error": "body is not valid JSON"})
+                return None
+            return {"value": value}
+
+        def _checked(self, result: dict[str, Any]) -> dict[str, Any]:
+            result.pop("run_dir", None)
+            try:
+                check_result(result)
+            except AdapterError as error:
+                raise ContractBroken(str(error)) from error
+            return result
+
+        def _workbench_describe(self) -> None:
+            try:
+                journeys_data = wb.load_journeys(landing, journeys)
+            except (OSError, ValueError) as error:  # AdapterError and JSONDecodeError are ValueErrors
+                return self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": f"journeys file refused: {error}"})
+            return self._json(HTTPStatus.OK, {"schema": "vv-workbench.v1", "landing": landing.describe(),
+                                              "compare_max": wb.MAX_COMPARE, "compare_schema": wb.COMPARE_SCHEMA,
+                                              "journeys": journeys_data["journeys"]})
+
+        def _workbench_evidence(self, run_id: str) -> None:
+            if not lock.acquire(timeout=BUSY_WAIT_SECONDS):
+                return self._json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "another simulation is running; try again shortly"})
+            try:
+                run_dir, request = wb.stored_run(output_root, run_id, landing)
+                data, name = wb.evidence_zip(run_dir, request, landing, scrub)
+            except FileNotFoundError:
+                return self._json(HTTPStatus.NOT_FOUND, {"error": f"no stored run {run_id}"})
+            except AdapterError as error:
+                return self._json(HTTPStatus.BAD_REQUEST, {"error": str(error)})
+            except Exception:  # noqa: BLE001 - report without internals
+                return self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "evidence export failed unexpectedly"})
+            finally:
+                lock.release()
+            self._send(HTTPStatus.OK, data, "application/zip",
+                       {"Content-Disposition": f'attachment; filename="{name}"'})
+
+        def _workbench_post(self, request: Any) -> None:
+            try:
+                if self.path == "/api/workbench/compare":
+                    requests = wb.compare_requests(request, landing)  # seed guard and every policy, before any run
+                else:
+                    obj = _only(request, {"run_id"}, "request")
+                    run_id = obj.get("run_id")
+            except AdapterError as error:
+                return self._json(HTTPStatus.BAD_REQUEST, {"error": str(error)})
+            if not lock.acquire(timeout=BUSY_WAIT_SECONDS):
+                return self._json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "another simulation is running; try again shortly"})
+            try:
+                if self.path == "/api/workbench/compare":
+                    # Sequential under the one lock: the same seed and faults, one policy after the other.
+                    runs = [self._checked(landing.run(r, output_root, reuse=True)) for r in requests]
+                    answer: dict[str, Any] = {"schema": wb.COMPARE_SCHEMA, "runs": runs}
+                else:
+                    run_dir, _ = wb.stored_run(output_root, run_id, landing)
+                    answer = wb.replay_run(run_dir, landing)
+            except FileNotFoundError:
+                return self._json(HTTPStatus.NOT_FOUND, {"error": f"no stored run {run_id}"})
+            except ContractBroken as error:
+                return self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": f"result failed the contract check: {error}"})
+            except AdapterError as error:
+                return self._json(HTTPStatus.BAD_REQUEST, {"error": str(error)})
+            except Exception:  # noqa: BLE001 - report without internals
+                return self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "simulation failed unexpectedly"})
+            finally:
+                lock.release()
+            return self._json(HTTPStatus.OK, answer)
 
         def do_GET(self) -> None:  # noqa: N802
             if not self._allowed():
@@ -139,30 +241,40 @@ def make_server(port: int, output_root: Path, adapter: Any, campaign_summary: Pa
                 return self._json(HTTPStatus.OK, load_campaign(campaign_summary))
             if self.path == "/api/campaign-m91":
                 return self._json(HTTPStatus.OK, load_m91_campaign(m91_summary))
+            if self.path == "/favicon.ico":  # no icon; answer without a 404 in the browser console
+                return self._send(HTTPStatus.NO_CONTENT, b"", "image/x-icon")
+            if landing is not None:
+                if self.path == "/workbench":
+                    return self._send(HTTPStatus.OK, workbench_page(CSS).encode("utf-8"), "text/html; charset=utf-8")
+                if self.path == "/workbench.js":
+                    return self._send(HTTPStatus.OK, WORKBENCH_JS.encode("utf-8"), "text/javascript; charset=utf-8")
+                if self.path == "/api/workbench":
+                    return self._workbench_describe()
+                match = EVIDENCE_PATH.fullmatch(self.path)
+                if match:
+                    return self._workbench_evidence(match.group(1))
             return self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})
 
         def do_POST(self) -> None:  # noqa: N802
             if not self._allowed():
                 return self._json(HTTPStatus.FORBIDDEN, {"error": "requests must come from this local page"})
-            if self.path != "/api/run":
+            workbench_route = landing is not None and self.path in ("/api/workbench/compare", "/api/workbench/replay")
+            if self.path != "/api/run" and not workbench_route:
                 return self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})
-            if not (self.headers.get("Content-Type") or "").startswith("application/json"):
-                return self._json(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, {"error": "send application/json"})
-            try:
-                length = int(self.headers.get("Content-Length") or "-1")
-            except ValueError:
-                length = -1
-            if length < 0:
-                return self._json(HTTPStatus.LENGTH_REQUIRED, {"error": "Content-Length required"})
-            if length > MAX_BODY_BYTES:
-                return self._json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": f"body over {MAX_BODY_BYTES} bytes"})
-            try:
-                request = json.loads(self.rfile.read(length).decode("utf-8"))
-            except (UnicodeDecodeError, json.JSONDecodeError):
-                return self._json(HTTPStatus.BAD_REQUEST, {"error": "body is not valid JSON"})
+            body = self._body()
+            if body is None:
+                return None
+            request = body["value"]
+            if workbench_route:
+                return self._workbench_post(request)
             model = request.get("model") if isinstance(request, dict) else None
             if not isinstance(model, str) or model not in adapters:
                 return self._json(HTTPStatus.BAD_REQUEST, {"error": f"model must be one of {sorted(adapters)}"})
+            if model == LANDING_MODEL_ID:
+                try:
+                    wb.guard_seed(request.get("seed"))  # before the lock, the adapter and the simulator
+                except AdapterError as error:
+                    return self._json(HTTPStatus.BAD_REQUEST, {"error": str(error)})
             if not lock.acquire(timeout=BUSY_WAIT_SECONDS):
                 return self._json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "another simulation is running; try again shortly"})
             try:
@@ -230,7 +342,7 @@ pre{{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.4 ui-monospace,Cons
 [hidden]{{display:none!important}}
 </style></head>
 <body><main>
-<p class="meta">V&amp;V lab · Mission Control · local simulator runs on this computer · Ground vehicle (2D) · <a href="/rocket">Rocket stage (6-DOF)</a> · <a href="/landing">Powered landing</a></p>
+<p class="meta">V&amp;V lab · Mission Control · local simulator runs on this computer · Ground vehicle (2D) · <a href="/rocket">Rocket stage (6-DOF)</a> · <a href="/landing">Powered landing</a> · <a href="/workbench">M10 navigation workbench</a></p>
 <h1>Mission Control</h1>
 <p class="physics" id="physics"><b>Ground vehicle, 2D kinematic model.</b> Positions are integer millimetres on a plane,
 time advances in fixed ticks, and there are no dynamics or environment model. This is not a 3D or 6-DOF simulation.</p>

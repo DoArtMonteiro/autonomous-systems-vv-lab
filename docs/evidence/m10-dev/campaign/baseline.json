@@ -1,0 +1,592 @@
+{
+  "schema": "vv-m10-campaign.v1",
+  "command": "python scripts/m10_campaign.py --seeds 5000-5099 --scenarios F1,F2,F3 --arms baseline --jobs 8 --output-root runs/m10-dev/baseline",
+  "machine": "Windows-11-10.0.26300-SP0; AMD64 Family 25 Model 97 Stepping 2, AuthenticAMD; Python 3.14.6",
+  "duration_s": 17.3,
+  "binary_sha256": "a82ca967ea539f5cf2d0f32c2855ad0d43ccbbe5078a0e8875086f4925690481",
+  "template_sha256": "c28a258c94a17b6ce1e8eb5a1442d977b4c951a0913375661ec3dddf8d05784a",
+  "evaluation": false,
+  "freeze": null,
+  "seed_block": "desenvolvimento (5000 a 5099)",
+  "seeds": [
+    5000,
+    5001,
+    5002,
+    5003,
+    5004,
+    5005,
+    5006,
+    5007,
+    5008,
+    5009,
+    5010,
+    5011,
+    5012,
+    5013,
+    5014,
+    5015,
+    5016,
+    5017,
+    5018,
+    5019,
+    5020,
+    5021,
+    5022,
+    5023,
+    5024,
+    5025,
+    5026,
+    5027,
+    5028,
+    5029,
+    5030,
+    5031,
+    5032,
+    5033,
+    5034,
+    5035,
+    5036,
+    5037,
+    5038,
+    5039,
+    5040,
+    5041,
+    5042,
+    5043,
+    5044,
+    5045,
+    5046,
+    5047,
+    5048,
+    5049,
+    5050,
+    5051,
+    5052,
+    5053,
+    5054,
+    5055,
+    5056,
+    5057,
+    5058,
+    5059,
+    5060,
+    5061,
+    5062,
+    5063,
+    5064,
+    5065,
+    5066,
+    5067,
+    5068,
+    5069,
+    5070,
+    5071,
+    5072,
+    5073,
+    5074,
+    5075,
+    5076,
+    5077,
+    5078,
+    5079,
+    5080,
+    5081,
+    5082,
+    5083,
+    5084,
+    5085,
+    5086,
+    5087,
+    5088,
+    5089,
+    5090,
+    5091,
+    5092,
+    5093,
+    5094,
+    5095,
+    5096,
+    5097,
+    5098,
+    5099
+  ],
+  "total_runs": 2400,
+  "mean_trace_bytes": 386871,
+  "replay": {
+    "replayed": 24,
+    "verified": 24,
+    "failed": []
+  },
+  "cells": [
+    {
+      "scenario": "nominal",
+      "arm": "baseline",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 96,
+      "recovered_ci95": [
+        0.9007,
+        0.989
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 96,
+        "T": 0,
+        "U": 4
+      },
+      "hard_landings": 4,
+      "no_contact": 0
+    },
+    {
+      "scenario": "thrust_loss",
+      "arm": "baseline",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 89,
+      "recovered_ci95": [
+        0.8117,
+        0.9438
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 89,
+        "T": 0,
+        "U": 11
+      },
+      "hard_landings": 11,
+      "no_contact": 0
+    },
+    {
+      "scenario": "ignition_delay",
+      "arm": "baseline",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 85,
+      "recovered_ci95": [
+        0.7647,
+        0.9135
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 85,
+        "T": 0,
+        "U": 15
+      },
+      "hard_landings": 15,
+      "no_contact": 0
+    },
+    {
+      "scenario": "gimbal_stuck",
+      "arm": "baseline",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 89,
+      "recovered_ci95": [
+        0.8117,
+        0.9438
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 89,
+        "T": 0,
+        "U": 11
+      },
+      "hard_landings": 11,
+      "no_contact": 0
+    },
+    {
+      "scenario": "altimeter_bias",
+      "arm": "baseline",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 0,
+      "recovered_ci95": [
+        0.0,
+        0.0362
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 0,
+        "T": 0,
+        "U": 100
+      },
+      "hard_landings": 100,
+      "no_contact": 0
+    },
+    {
+      "scenario": "altimeter_dropout",
+      "arm": "baseline",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 34,
+      "recovered_ci95": [
+        0.2482,
+        0.4415
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 34,
+        "T": 0,
+        "U": 66
+      },
+      "hard_landings": 66,
+      "no_contact": 0
+    },
+    {
+      "scenario": "gnss_dropout",
+      "arm": "baseline",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 26,
+      "recovered_ci95": [
+        0.1774,
+        0.3573
+      ],
+      "contained": 37,
+      "classes": {
+        "R": 26,
+        "T": 2,
+        "U": 72
+      },
+      "hard_landings": 13,
+      "no_contact": 61
+    },
+    {
+      "scenario": "gnss_bias",
+      "arm": "baseline",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 21,
+      "recovered_ci95": [
+        0.1349,
+        0.3029
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 21,
+        "T": 79,
+        "U": 0
+      },
+      "hard_landings": 79,
+      "no_contact": 0
+    },
+    {
+      "scenario": "imu_accel_bias",
+      "arm": "baseline",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 89,
+      "recovered_ci95": [
+        0.8117,
+        0.9438
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 89,
+        "T": 0,
+        "U": 11
+      },
+      "hard_landings": 11,
+      "no_contact": 0
+    },
+    {
+      "scenario": "altimeter_bias_low",
+      "arm": "baseline",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 0,
+      "recovered_ci95": [
+        0.0,
+        0.0362
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 0,
+        "T": 0,
+        "U": 100
+      },
+      "hard_landings": 100,
+      "no_contact": 0
+    },
+    {
+      "scenario": "gnss_bias_low",
+      "arm": "baseline",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 23,
+      "recovered_ci95": [
+        0.1517,
+        0.3249
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 23,
+        "T": 62,
+        "U": 15
+      },
+      "hard_landings": 77,
+      "no_contact": 0
+    },
+    {
+      "scenario": "altimeter_stuck",
+      "arm": "baseline",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 40,
+      "recovered_ci95": [
+        0.3033,
+        0.5028
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 40,
+        "T": 0,
+        "U": 60
+      },
+      "hard_landings": 60,
+      "no_contact": 0
+    },
+    {
+      "scenario": "altimeter_delay",
+      "arm": "baseline",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 19,
+      "recovered_ci95": [
+        0.1184,
+        0.2807
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 19,
+        "T": 0,
+        "U": 81
+      },
+      "hard_landings": 81,
+      "no_contact": 0
+    },
+    {
+      "scenario": "altimeter_outliers",
+      "arm": "baseline",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 96,
+      "recovered_ci95": [
+        0.9007,
+        0.989
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 96,
+        "T": 0,
+        "U": 4
+      },
+      "hard_landings": 4,
+      "no_contact": 0
+    },
+    {
+      "scenario": "gnss_horizontal_bias_t0",
+      "arm": "baseline",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 7,
+      "recovered_ci95": [
+        0.0286,
+        0.1389
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 7,
+        "T": 92,
+        "U": 1
+      },
+      "hard_landings": 93,
+      "no_contact": 0
+    },
+    {
+      "scenario": "gnss_horizontal_bias",
+      "arm": "baseline",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 9,
+      "recovered_ci95": [
+        0.042,
+        0.164
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 9,
+        "T": 77,
+        "U": 14
+      },
+      "hard_landings": 91,
+      "no_contact": 0
+    },
+    {
+      "scenario": "gnss_coherent_ramp",
+      "arm": "baseline",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 14,
+      "recovered_ci95": [
+        0.0787,
+        0.2237
+      ],
+      "contained": 99,
+      "classes": {
+        "R": 14,
+        "T": 5,
+        "U": 81
+      },
+      "hard_landings": 86,
+      "no_contact": 0
+    },
+    {
+      "scenario": "imu_accel_drift",
+      "arm": "baseline",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 91,
+      "recovered_ci95": [
+        0.836,
+        0.958
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 91,
+        "T": 0,
+        "U": 9
+      },
+      "hard_landings": 9,
+      "no_contact": 0
+    },
+    {
+      "scenario": "pair_altimeter_bias+gnss_dropout",
+      "arm": "baseline",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 1,
+      "recovered_ci95": [
+        0.0003,
+        0.0545
+      ],
+      "contained": 41,
+      "classes": {
+        "R": 1,
+        "T": 0,
+        "U": 99
+      },
+      "hard_landings": 43,
+      "no_contact": 56
+    },
+    {
+      "scenario": "pair_altimeter_bias_low+gnss_dropout",
+      "arm": "baseline",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 0,
+      "recovered_ci95": [
+        0.0,
+        0.0362
+      ],
+      "contained": 37,
+      "classes": {
+        "R": 0,
+        "T": 0,
+        "U": 100
+      },
+      "hard_landings": 38,
+      "no_contact": 62
+    },
+    {
+      "scenario": "pair_gnss_bias+altimeter_dropout",
+      "arm": "baseline",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 11,
+      "recovered_ci95": [
+        0.0562,
+        0.1883
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 11,
+        "T": 29,
+        "U": 60
+      },
+      "hard_landings": 89,
+      "no_contact": 0
+    },
+    {
+      "scenario": "pair_altimeter_bias\u00b1+imu_accel_bias",
+      "arm": "baseline",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 0,
+      "recovered_ci95": [
+        0.0,
+        0.0362
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 0,
+        "T": 0,
+        "U": 100
+      },
+      "hard_landings": 100,
+      "no_contact": 0
+    },
+    {
+      "scenario": "pair_gnss_bias_low+imu_accel_bias",
+      "arm": "baseline",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 21,
+      "recovered_ci95": [
+        0.1349,
+        0.3029
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 21,
+        "T": 60,
+        "U": 19
+      },
+      "hard_landings": 79,
+      "no_contact": 0
+    },
+    {
+      "scenario": "pair_altimeter_bias\u00b1+gnss_bias\u00b1",
+      "arm": "baseline",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 0,
+      "recovered_ci95": [
+        0.0,
+        0.0362
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 0,
+        "T": 0,
+        "U": 100
+      },
+      "hard_landings": 100,
+      "no_contact": 0
+    }
+  ],
+  "pairs": [],
+  "global": [
+    {
+      "arm": "baseline",
+      "runs": 2400,
+      "R": 861,
+      "T": 406,
+      "U": 1133,
+      "U_ci95": [
+        0.4519,
+        0.4923
+      ]
+    }
+  ]
+}

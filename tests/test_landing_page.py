@@ -56,6 +56,46 @@ def FIXTURE_CAMPAIGN() -> dict:
     }
 
 
+# A minimal DOM for node: enough of document, Node and the element API for landing.js to build its result
+# view, so that the test reads the text a browser would show. It is not a browser; layout is not checked.
+DOM_SHIM = r"""
+const fs = require('fs'), vm = require('vm');
+const [script, resultPath, capsPath] = process.argv.slice(2);
+const ids = new Map();
+class Node {
+  constructor(tag) { this.tag = tag; this.kids = []; this.attrs = {}; this.text = null; this.className = ''; }
+  setAttribute(k, v) { this.attrs[k] = String(v); if (k === 'id') ids.set(String(v), this); }
+  getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; }
+  removeAttribute(k) { delete this.attrs[k]; }
+  addEventListener() {}
+  append(...xs) { for (const x of xs) this.kids.push(x instanceof Node ? x : new Text(String(x))); }
+  after() {} remove() {} focus() {} closest() { return null; }
+  replaceChildren(...xs) { this.kids = []; this.append(...xs); }
+  set textContent(v) { this.kids = [new Text(String(v))]; }
+  get textContent() { return this.kids.map(k => k.textContent).join(''); }
+  getBoundingClientRect() { return {left: 0, width: 100}; }
+  get dataset() { return {}; }
+  set hidden(v) { this.attrs.hidden = v; }
+}
+class Text extends Node { constructor(t) { super('#text'); this.t = t; } get textContent() { return this.t; } }
+const walk = (n, out) => { out.push(n); for (const k of n.kids) walk(k, out); return out; };
+const node = id => { if (!ids.has(id)) { const n = new Node('div'); n.attrs.id = id; ids.set(id, n); } return ids.get(id); };
+const document = {getElementById: node, createElement: t => new Node(t), createElementNS: (_, t) => new Node(t),
+  querySelectorAll: () => []};
+const ctx = vm.createContext({document, Node, console, fetch: () => new Promise(() => {}), Number, Math, JSON, Object, Array, String});
+vm.runInContext(fs.readFileSync(script, 'utf8'), ctx);
+ctx.RESULT = JSON.parse(fs.readFileSync(resultPath, 'utf8'));
+ctx.CAPS = JSON.parse(fs.readFileSync(capsPath, 'utf8'));
+vm.runInContext("state.caps = CAPS; state.mode = 'single'; state.single = RESULT; state.t = endT(RESULT); drawSingle();", ctx);
+const all = walk(node('result'), []);
+console.log(JSON.stringify({
+  text: node('result').textContent,
+  labels: all.map(n => n.attrs['aria-label']).filter(Boolean),
+  classes: all.map(n => n.className || n.attrs.class || '').filter(Boolean),
+}));
+"""
+
+
 class Base(unittest.TestCase):
     summary: Path | None = None
 
@@ -119,6 +159,11 @@ class PageTests(Base):
             "estimate minus truth", "Gaps are sensor dropouts", "The fault never acted",
             "/api/campaign-m91", "M9.1 acceptance campaign", "Contained (S1 to S5 hold)", "Recovered (landed, R1 to R6, S1 to S5)",
             "Three separate statements", "compositionText9",
+            # M10 navigation declarations: shown only when the trace has them, labelled as declarations.
+            "Navigation declarations (M10: what the controller declares, compared with the truth)",
+            "These are controller declarations, compared with the truth by the verifier", "it is not a safe state",
+            "Declarations, not verdicts. ", "Physical class (true state only)", "Vertical alert failure", "NEES mean",
+            "Isolation verdict", "if (!hasNav(r)) return null;", "exists only for the M10 policies",
         ):
             self.assertIn(marker, text)
 
@@ -234,6 +279,63 @@ class CampaignTests(Base):
         self.assertEqual(mc.DEFAULT_CAMPAIGN_SUMMARY, ROOT / "runs" / "m9-campaign" / "summary.json")
 
 
+@unittest.skipUnless(ROCKET.exists() and shutil.which("node"), "needs the release vv-rocket binary and node")
+class NavigationPanelTests(Base):
+    """The navigation panel is built by landing.js from a run recorded through the server, in node with a DOM shim."""
+
+    def render(self, body):
+        resp, out = self.call("POST", "/api/run", body)
+        self.assertEqual(resp.status, 200, out)
+        result = json.loads(out)
+        sa.check_result(result)
+        self.assertEqual(result["verdict"]["status"], "verified")
+        caps = json.loads(self.call("GET", "/api/models")[1])["models"][la.MODEL_ID]["capabilities"]
+        files = {"landing.js": self.call("GET", "/landing.js")[1], "result.json": out, "caps.json": json.dumps(caps).encode(),
+                 "shim.js": DOM_SHIM.encode()}
+        for name, data in files.items():
+            (self.tmp / name).write_bytes(data)
+        done = subprocess.run(["node", str(self.tmp / "shim.js"), *(str(self.tmp / n) for n in ("landing.js", "result.json", "caps.json"))],
+                              capture_output=True, text=True, encoding="utf-8", timeout=60)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        return result, json.loads(done.stdout)
+
+    def test_the_panel_renders_from_a_recorded_m10_run(self):
+        stuck = {"kind": "altimeter_stuck", "magnitude": 0, "start_s": 8.0, "end_s": 12.0}
+        result, page = self.render(run_body("m10_b_plus", 4000, stuck))
+        nav = result["verification"]["navigation"]
+        text = page["text"]
+        for phrase in ("Navigation declarations (M10: what the controller declares, compared with the truth)",
+                       "These are controller declarations, compared with the truth by the verifier",
+                       '"untrusted" is a declaration by the controller', "it is not a safe state",
+                       "Physical class (true state only)", "Vertical alert failure", "NEES mean", "Isolation verdict",
+                       "Declared navigation mode, vertical channel and sensor-group health over time",
+                       "sensor groups (declared)", "Mission outcome", "Safety invariants"):
+            self.assertIn(phrase, text)
+        self.assertIn(f"{nav['physical_class']}: ", text)
+        self.assertIn(f"{len(nav['transitions'])} (bound {nav['transition_bound']}", text)
+        for tr in nav["transitions"]:
+            self.assertIn(f"declared mode {tr['from'].replace('_', ' ')} to {tr['to'].replace('_', ' ')}", text)
+        self.assertIn(nav["isolation"], text)
+        timeline = [x for x in page["labels"] if x.startswith("Navigation declarations over time")]
+        self.assertEqual(len(timeline), 1)
+        for lane in ("mode: ", "vertical channel: ", "radar group: ", "GNSS group: "):
+            self.assertIn(lane, timeline[0])
+        self.assertTrue(any(c.startswith("nvseg") for c in page["classes"]))
+
+    def test_the_panel_is_absent_for_an_m9_run(self):
+        result, page = self.render(run_body("robust", 4000, None))
+        self.assertNotIn("navigation", result["verification"])
+        self.assertIn("Mission outcome", page["text"])
+        self.assertNotIn("Navigation declarations", page["text"])
+        self.assertFalse(any(x.startswith("Navigation declarations") for x in page["labels"]))
+
+    def test_an_m10_fault_with_an_m9_policy_is_a_400_on_the_fault_kind(self):
+        stuck = {"kind": "altimeter_stuck", "magnitude": 0, "start_s": 8.0, "end_s": 12.0}
+        resp, out = self.call("POST", "/api/run", run_body("baseline", 1, stuck))
+        self.assertEqual(resp.status, 400)
+        self.assertTrue(json.loads(out)["error"].startswith("fault.kind altimeter_stuck exists only"), out)
+
+
 @unittest.skipUnless(ROCKET.exists(), "release vv-rocket binary not built")
 class RunTests(Base):
     def test_flagship_altimeter_bias_baseline_hits_hard_and_robust_lands(self):
@@ -296,7 +398,7 @@ class RunTests(Base):
         self.assertEqual(resp.status, 200, body)
         self.assertEqual(json.loads(body)["verdict"]["status"], "verified")
         resp, body = self.call("POST", "/api/run", run_body("robust", 1000, None))
-        self.assertEqual(json.loads(body)["request"]["fault"], None)
+        self.assertEqual(json.loads(body)["request"]["faults"], [])
 
 
 if __name__ == "__main__":

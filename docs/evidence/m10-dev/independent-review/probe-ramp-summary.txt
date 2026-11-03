@@ -1,0 +1,5 @@
+('approved', 'm10_b_plus', 'ramp0.1') {'n': 100, 'T': 49, 'R': 51}
+('approved', 'm10_b_plus', 'ramp0.2') {'n': 100, 'U': 99, 'invariant_failures': 3, 'T': 1}
+('approved', 'm10_b_plus', 'ramp0.3') {'n': 100, 'U': 100, 'wrong_isolation': 4, 'invariant_failures': 4}
+('approved', 'm10_b_plus', 'ramp0.5') {'n': 100, 'U': 91, 'wrong_isolation': 14, 'af_hv': 8, 'invariant_failures': 4, 'R': 5, 'T': 4}
+('approved', 'm10_b_plus', 'ramp0.8') {'n': 100, 'T': 26, 'wrong_isolation': 2, 'af_hv': 1, 'R': 68, 'U': 6}

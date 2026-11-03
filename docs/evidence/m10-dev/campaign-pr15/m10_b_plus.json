@@ -1,0 +1,1144 @@
+{
+  "schema": "vv-m10-campaign.v1",
+  "command": "python scripts/m10_campaign.py --seeds 5000-5099 --scenarios F1,F2,F3 --arms m10_b_plus --jobs 8 --max-runs 2500 --output-root runs/m10-dev-pr15/m10_b_plus",
+  "machine": "Windows-11-10.0.26300-SP0; AMD64 Family 25 Model 97 Stepping 2, AuthenticAMD; Python 3.14.6",
+  "duration_s": 16.2,
+  "binary_sha256": "e7165ec1bb8a3b34c52ec4345d5e8ac0bc29f738001f04a48e8c7801f1fef29a",
+  "template_sha256": "86417497572048c2e45b84750a26e63e5c0d83a4feb80cc425e3086f6ec9f461",
+  "evaluation": false,
+  "freeze": null,
+  "seed_block": "desenvolvimento (5000 a 5099)",
+  "seeds": [
+    5000,
+    5001,
+    5002,
+    5003,
+    5004,
+    5005,
+    5006,
+    5007,
+    5008,
+    5009,
+    5010,
+    5011,
+    5012,
+    5013,
+    5014,
+    5015,
+    5016,
+    5017,
+    5018,
+    5019,
+    5020,
+    5021,
+    5022,
+    5023,
+    5024,
+    5025,
+    5026,
+    5027,
+    5028,
+    5029,
+    5030,
+    5031,
+    5032,
+    5033,
+    5034,
+    5035,
+    5036,
+    5037,
+    5038,
+    5039,
+    5040,
+    5041,
+    5042,
+    5043,
+    5044,
+    5045,
+    5046,
+    5047,
+    5048,
+    5049,
+    5050,
+    5051,
+    5052,
+    5053,
+    5054,
+    5055,
+    5056,
+    5057,
+    5058,
+    5059,
+    5060,
+    5061,
+    5062,
+    5063,
+    5064,
+    5065,
+    5066,
+    5067,
+    5068,
+    5069,
+    5070,
+    5071,
+    5072,
+    5073,
+    5074,
+    5075,
+    5076,
+    5077,
+    5078,
+    5079,
+    5080,
+    5081,
+    5082,
+    5083,
+    5084,
+    5085,
+    5086,
+    5087,
+    5088,
+    5089,
+    5090,
+    5091,
+    5092,
+    5093,
+    5094,
+    5095,
+    5096,
+    5097,
+    5098,
+    5099
+  ],
+  "total_runs": 2400,
+  "mean_trace_bytes": 483995,
+  "replay": {
+    "replayed": 24,
+    "verified": 24,
+    "failed": []
+  },
+  "cells": [
+    {
+      "scenario": "nominal",
+      "arm": "m10_b_plus",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 94,
+      "recovered_ci95": [
+        0.874,
+        0.9777
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 94,
+        "T": 0,
+        "U": 6
+      },
+      "hard_landings": 6,
+      "no_contact": 0,
+      "navigation": {
+        "vertical_alert_failures": 0,
+        "vertical_alert_failures_ci95": [
+          0.0,
+          0.0362
+        ],
+        "hv_alert_failures": 0,
+        "hp_alert_failures": 0,
+        "vertical_declaration_applicable": 0,
+        "runs_declared_in_every_window": 0,
+        "median_declaration_delay_s": null,
+        "spurious_degradation_runs": 1,
+        "unsafe_transitions": 0,
+        "transition_bound_violations": 0,
+        "nees_mean_of_runs": 6.567411899580671,
+        "final_mode_untrusted": 0,
+        "median_vertical_trusted_fraction": 0.9957007738607051,
+        "isolation": {
+          "correct": 0,
+          "wrong": 0,
+          "none": 100
+        }
+      }
+    },
+    {
+      "scenario": "thrust_loss",
+      "arm": "m10_b_plus",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 88,
+      "recovered_ci95": [
+        0.7998,
+        0.9364
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 88,
+        "T": 0,
+        "U": 12
+      },
+      "hard_landings": 12,
+      "no_contact": 0,
+      "navigation": {
+        "vertical_alert_failures": 0,
+        "vertical_alert_failures_ci95": [
+          0.0,
+          0.0362
+        ],
+        "hv_alert_failures": 0,
+        "hp_alert_failures": 0,
+        "vertical_declaration_applicable": 0,
+        "runs_declared_in_every_window": 2,
+        "median_declaration_delay_s": 9.86,
+        "spurious_degradation_runs": 0,
+        "unsafe_transitions": 0,
+        "transition_bound_violations": 0,
+        "nees_mean_of_runs": 48.760903452369064,
+        "final_mode_untrusted": 0,
+        "median_vertical_trusted_fraction": 0.995697074010327,
+        "isolation": {
+          "correct": 0,
+          "wrong": 0,
+          "none": 100
+        }
+      }
+    },
+    {
+      "scenario": "ignition_delay",
+      "arm": "m10_b_plus",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 82,
+      "recovered_ci95": [
+        0.7305,
+        0.8897
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 82,
+        "T": 0,
+        "U": 18
+      },
+      "hard_landings": 18,
+      "no_contact": 0,
+      "navigation": {
+        "vertical_alert_failures": 0,
+        "vertical_alert_failures_ci95": [
+          0.0,
+          0.0362
+        ],
+        "hv_alert_failures": 0,
+        "hp_alert_failures": 0,
+        "vertical_declaration_applicable": 0,
+        "runs_declared_in_every_window": 100,
+        "median_declaration_delay_s": 0.0,
+        "spurious_degradation_runs": 0,
+        "unsafe_transitions": 0,
+        "transition_bound_violations": 0,
+        "nees_mean_of_runs": 13.087619772722574,
+        "final_mode_untrusted": 0,
+        "median_vertical_trusted_fraction": 0.9955985915492958,
+        "isolation": {
+          "correct": 0,
+          "wrong": 0,
+          "none": 100
+        }
+      }
+    },
+    {
+      "scenario": "gimbal_stuck",
+      "arm": "m10_b_plus",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 92,
+      "recovered_ci95": [
+        0.8484,
+        0.9648
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 92,
+        "T": 0,
+        "U": 8
+      },
+      "hard_landings": 8,
+      "no_contact": 0,
+      "navigation": {
+        "vertical_alert_failures": 0,
+        "vertical_alert_failures_ci95": [
+          0.0,
+          0.0362
+        ],
+        "hv_alert_failures": 0,
+        "hp_alert_failures": 0,
+        "vertical_declaration_applicable": 0,
+        "runs_declared_in_every_window": 0,
+        "median_declaration_delay_s": null,
+        "spurious_degradation_runs": 1,
+        "unsafe_transitions": 0,
+        "transition_bound_violations": 0,
+        "nees_mean_of_runs": 6.595429075951897,
+        "final_mode_untrusted": 0,
+        "median_vertical_trusted_fraction": 0.9957007738607051,
+        "isolation": {
+          "correct": 0,
+          "wrong": 0,
+          "none": 100
+        }
+      }
+    },
+    {
+      "scenario": "altimeter_bias",
+      "arm": "m10_b_plus",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 94,
+      "recovered_ci95": [
+        0.874,
+        0.9777
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 94,
+        "T": 0,
+        "U": 6
+      },
+      "hard_landings": 6,
+      "no_contact": 0,
+      "navigation": {
+        "vertical_alert_failures": 0,
+        "vertical_alert_failures_ci95": [
+          0.0,
+          0.0362
+        ],
+        "hv_alert_failures": 0,
+        "hp_alert_failures": 0,
+        "vertical_declaration_applicable": 0,
+        "runs_declared_in_every_window": 100,
+        "median_declaration_delay_s": 0.0,
+        "spurious_degradation_runs": 0,
+        "unsafe_transitions": 0,
+        "transition_bound_violations": 0,
+        "nees_mean_of_runs": 5.206789884888476,
+        "final_mode_untrusted": 0,
+        "median_vertical_trusted_fraction": 0.0,
+        "isolation": {
+          "correct": 0,
+          "wrong": 0,
+          "none": 100
+        }
+      }
+    },
+    {
+      "scenario": "altimeter_dropout",
+      "arm": "m10_b_plus",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 94,
+      "recovered_ci95": [
+        0.874,
+        0.9777
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 94,
+        "T": 0,
+        "U": 6
+      },
+      "hard_landings": 6,
+      "no_contact": 0,
+      "navigation": {
+        "vertical_alert_failures": 0,
+        "vertical_alert_failures_ci95": [
+          0.0,
+          0.0362
+        ],
+        "hv_alert_failures": 0,
+        "hp_alert_failures": 0,
+        "vertical_declaration_applicable": 0,
+        "runs_declared_in_every_window": 100,
+        "median_declaration_delay_s": 0.21,
+        "spurious_degradation_runs": 1,
+        "unsafe_transitions": 0,
+        "transition_bound_violations": 0,
+        "nees_mean_of_runs": 6.119457546583034,
+        "final_mode_untrusted": 0,
+        "median_vertical_trusted_fraction": 0.7532412268582481,
+        "isolation": {
+          "correct": 0,
+          "wrong": 0,
+          "none": 100
+        }
+      }
+    },
+    {
+      "scenario": "gnss_dropout",
+      "arm": "m10_b_plus",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 92,
+      "recovered_ci95": [
+        0.8484,
+        0.9648
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 92,
+        "T": 0,
+        "U": 8
+      },
+      "hard_landings": 8,
+      "no_contact": 0,
+      "navigation": {
+        "vertical_alert_failures": 0,
+        "vertical_alert_failures_ci95": [
+          0.0,
+          0.0362
+        ],
+        "hv_alert_failures": 0,
+        "hp_alert_failures": 0,
+        "vertical_declaration_applicable": 0,
+        "runs_declared_in_every_window": 100,
+        "median_declaration_delay_s": 0.17,
+        "spurious_degradation_runs": 1,
+        "unsafe_transitions": 0,
+        "transition_bound_violations": 0,
+        "nees_mean_of_runs": 6.074117371703391,
+        "final_mode_untrusted": 0,
+        "median_vertical_trusted_fraction": 0.7244502907534598,
+        "isolation": {
+          "correct": 0,
+          "wrong": 0,
+          "none": 100
+        }
+      }
+    },
+    {
+      "scenario": "gnss_bias",
+      "arm": "m10_b_plus",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 0,
+      "recovered_ci95": [
+        0.0,
+        0.0362
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 0,
+        "T": 0,
+        "U": 100
+      },
+      "hard_landings": 100,
+      "no_contact": 0,
+      "navigation": {
+        "vertical_alert_failures": 0,
+        "vertical_alert_failures_ci95": [
+          0.0,
+          0.0362
+        ],
+        "hv_alert_failures": 0,
+        "hp_alert_failures": 0,
+        "vertical_declaration_applicable": 100,
+        "runs_declared_in_every_window": 100,
+        "median_declaration_delay_s": 0.0,
+        "spurious_degradation_runs": 0,
+        "unsafe_transitions": 0,
+        "transition_bound_violations": 0,
+        "nees_mean_of_runs": 210260.3577252927,
+        "final_mode_untrusted": 0,
+        "median_vertical_trusted_fraction": 0.0,
+        "isolation": {
+          "correct": 0,
+          "wrong": 0,
+          "none": 100
+        }
+      }
+    },
+    {
+      "scenario": "imu_accel_bias",
+      "arm": "m10_b_plus",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 89,
+      "recovered_ci95": [
+        0.8117,
+        0.9438
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 89,
+        "T": 0,
+        "U": 11
+      },
+      "hard_landings": 11,
+      "no_contact": 0,
+      "navigation": {
+        "vertical_alert_failures": 0,
+        "vertical_alert_failures_ci95": [
+          0.0,
+          0.0362
+        ],
+        "hv_alert_failures": 0,
+        "hp_alert_failures": 0,
+        "vertical_declaration_applicable": 0,
+        "runs_declared_in_every_window": 100,
+        "median_declaration_delay_s": 0.0,
+        "spurious_degradation_runs": 0,
+        "unsafe_transitions": 0,
+        "transition_bound_violations": 0,
+        "nees_mean_of_runs": 6.555237316106242,
+        "final_mode_untrusted": 0,
+        "median_vertical_trusted_fraction": 0.9956255468066492,
+        "isolation": {
+          "correct": 0,
+          "wrong": 0,
+          "none": 100
+        }
+      }
+    },
+    {
+      "scenario": "altimeter_bias_low",
+      "arm": "m10_b_plus",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 94,
+      "recovered_ci95": [
+        0.874,
+        0.9777
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 94,
+        "T": 0,
+        "U": 6
+      },
+      "hard_landings": 6,
+      "no_contact": 0,
+      "navigation": {
+        "vertical_alert_failures": 0,
+        "vertical_alert_failures_ci95": [
+          0.0,
+          0.0362
+        ],
+        "hv_alert_failures": 0,
+        "hp_alert_failures": 0,
+        "vertical_declaration_applicable": 0,
+        "runs_declared_in_every_window": 100,
+        "median_declaration_delay_s": 0.0,
+        "spurious_degradation_runs": 0,
+        "unsafe_transitions": 0,
+        "transition_bound_violations": 0,
+        "nees_mean_of_runs": 5.206789884888476,
+        "final_mode_untrusted": 0,
+        "median_vertical_trusted_fraction": 0.0,
+        "isolation": {
+          "correct": 0,
+          "wrong": 0,
+          "none": 100
+        }
+      }
+    },
+    {
+      "scenario": "gnss_bias_low",
+      "arm": "m10_b_plus",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 0,
+      "recovered_ci95": [
+        0.0,
+        0.0362
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 0,
+        "T": 0,
+        "U": 100
+      },
+      "hard_landings": 100,
+      "no_contact": 0,
+      "navigation": {
+        "vertical_alert_failures": 0,
+        "vertical_alert_failures_ci95": [
+          0.0,
+          0.0362
+        ],
+        "hv_alert_failures": 0,
+        "hp_alert_failures": 0,
+        "vertical_declaration_applicable": 100,
+        "runs_declared_in_every_window": 100,
+        "median_declaration_delay_s": 0.0,
+        "spurious_degradation_runs": 0,
+        "unsafe_transitions": 0,
+        "transition_bound_violations": 0,
+        "nees_mean_of_runs": 221047.10933725108,
+        "final_mode_untrusted": 0,
+        "median_vertical_trusted_fraction": 0.0,
+        "isolation": {
+          "correct": 0,
+          "wrong": 0,
+          "none": 100
+        }
+      }
+    },
+    {
+      "scenario": "altimeter_stuck",
+      "arm": "m10_b_plus",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 92,
+      "recovered_ci95": [
+        0.8484,
+        0.9648
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 92,
+        "T": 2,
+        "U": 6
+      },
+      "hard_landings": 8,
+      "no_contact": 0,
+      "navigation": {
+        "vertical_alert_failures": 0,
+        "vertical_alert_failures_ci95": [
+          0.0,
+          0.0362
+        ],
+        "hv_alert_failures": 0,
+        "hp_alert_failures": 0,
+        "vertical_declaration_applicable": 0,
+        "runs_declared_in_every_window": 100,
+        "median_declaration_delay_s": 0.01,
+        "spurious_degradation_runs": 1,
+        "unsafe_transitions": 0,
+        "transition_bound_violations": 0,
+        "nees_mean_of_runs": 7.2999395102350375,
+        "final_mode_untrusted": 0,
+        "median_vertical_trusted_fraction": 0.713918210256952,
+        "isolation": {
+          "correct": 100,
+          "wrong": 0,
+          "none": 0
+        }
+      }
+    },
+    {
+      "scenario": "altimeter_delay",
+      "arm": "m10_b_plus",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 79,
+      "recovered_ci95": [
+        0.6971,
+        0.8651
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 79,
+        "T": 4,
+        "U": 17
+      },
+      "hard_landings": 21,
+      "no_contact": 0,
+      "navigation": {
+        "vertical_alert_failures": 0,
+        "vertical_alert_failures_ci95": [
+          0.0,
+          0.0362
+        ],
+        "hv_alert_failures": 0,
+        "hp_alert_failures": 0,
+        "vertical_declaration_applicable": 0,
+        "runs_declared_in_every_window": 100,
+        "median_declaration_delay_s": 0.0,
+        "spurious_degradation_runs": 0,
+        "unsafe_transitions": 0,
+        "transition_bound_violations": 0,
+        "nees_mean_of_runs": 12.507841774097985,
+        "final_mode_untrusted": 0,
+        "median_vertical_trusted_fraction": 0.3195985123105419,
+        "isolation": {
+          "correct": 100,
+          "wrong": 0,
+          "none": 0
+        }
+      }
+    },
+    {
+      "scenario": "altimeter_outliers",
+      "arm": "m10_b_plus",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 94,
+      "recovered_ci95": [
+        0.874,
+        0.9777
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 94,
+        "T": 0,
+        "U": 6
+      },
+      "hard_landings": 6,
+      "no_contact": 0,
+      "navigation": {
+        "vertical_alert_failures": 0,
+        "vertical_alert_failures_ci95": [
+          0.0,
+          0.0362
+        ],
+        "hv_alert_failures": 0,
+        "hp_alert_failures": 0,
+        "vertical_declaration_applicable": 0,
+        "runs_declared_in_every_window": 100,
+        "median_declaration_delay_s": 0.0,
+        "spurious_degradation_runs": 0,
+        "unsafe_transitions": 0,
+        "transition_bound_violations": 0,
+        "nees_mean_of_runs": 6.427012426102611,
+        "final_mode_untrusted": 0,
+        "median_vertical_trusted_fraction": 0.6569396274297064,
+        "isolation": {
+          "correct": 96,
+          "wrong": 1,
+          "none": 3
+        }
+      }
+    },
+    {
+      "scenario": "gnss_horizontal_bias_t0",
+      "arm": "m10_b_plus",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 7,
+      "recovered_ci95": [
+        0.0286,
+        0.1389
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 7,
+        "T": 91,
+        "U": 2
+      },
+      "hard_landings": 93,
+      "no_contact": 0,
+      "navigation": {
+        "vertical_alert_failures": 0,
+        "vertical_alert_failures_ci95": [
+          0.0,
+          0.0362
+        ],
+        "hv_alert_failures": 0,
+        "hp_alert_failures": 0,
+        "vertical_declaration_applicable": 0,
+        "runs_declared_in_every_window": 100,
+        "median_declaration_delay_s": 0.0,
+        "spurious_degradation_runs": 0,
+        "unsafe_transitions": 0,
+        "transition_bound_violations": 0,
+        "nees_mean_of_runs": 217347.63395747784,
+        "final_mode_untrusted": 0,
+        "median_vertical_trusted_fraction": 0.9957007738607051,
+        "isolation": {
+          "correct": 0,
+          "wrong": 0,
+          "none": 100
+        }
+      }
+    },
+    {
+      "scenario": "gnss_horizontal_bias",
+      "arm": "m10_b_plus",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 15,
+      "recovered_ci95": [
+        0.0865,
+        0.2353
+      ],
+      "contained": 97,
+      "classes": {
+        "R": 15,
+        "T": 82,
+        "U": 3
+      },
+      "hard_landings": 85,
+      "no_contact": 0,
+      "navigation": {
+        "vertical_alert_failures": 0,
+        "vertical_alert_failures_ci95": [
+          0.0,
+          0.0362
+        ],
+        "hv_alert_failures": 0,
+        "hp_alert_failures": 0,
+        "vertical_declaration_applicable": 0,
+        "runs_declared_in_every_window": 100,
+        "median_declaration_delay_s": 0.05,
+        "spurious_degradation_runs": 0,
+        "unsafe_transitions": 0,
+        "transition_bound_violations": 0,
+        "nees_mean_of_runs": 75350.62896005239,
+        "final_mode_untrusted": 0,
+        "median_vertical_trusted_fraction": 0.3405182536214436,
+        "isolation": {
+          "correct": 0,
+          "wrong": 0,
+          "none": 100
+        }
+      }
+    },
+    {
+      "scenario": "gnss_coherent_ramp",
+      "arm": "m10_b_plus",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 53,
+      "recovered_ci95": [
+        0.4276,
+        0.6306
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 53,
+        "T": 26,
+        "U": 21
+      },
+      "hard_landings": 47,
+      "no_contact": 0,
+      "navigation": {
+        "vertical_alert_failures": 0,
+        "vertical_alert_failures_ci95": [
+          0.0,
+          0.0362
+        ],
+        "hv_alert_failures": 7,
+        "hp_alert_failures": 0,
+        "vertical_declaration_applicable": 8,
+        "runs_declared_in_every_window": 100,
+        "median_declaration_delay_s": 0.05,
+        "spurious_degradation_runs": 0,
+        "unsafe_transitions": 0,
+        "transition_bound_violations": 0,
+        "nees_mean_of_runs": 2407.1798652279745,
+        "final_mode_untrusted": 15,
+        "median_vertical_trusted_fraction": 0.3535580047676822,
+        "isolation": {
+          "correct": 77,
+          "wrong": 8,
+          "none": 15
+        }
+      }
+    },
+    {
+      "scenario": "imu_accel_drift",
+      "arm": "m10_b_plus",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 74,
+      "recovered_ci95": [
+        0.6427,
+        0.8226
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 74,
+        "T": 8,
+        "U": 18
+      },
+      "hard_landings": 26,
+      "no_contact": 0,
+      "navigation": {
+        "vertical_alert_failures": 0,
+        "vertical_alert_failures_ci95": [
+          0.0,
+          0.0362
+        ],
+        "hv_alert_failures": 0,
+        "hp_alert_failures": 0,
+        "vertical_declaration_applicable": 0,
+        "runs_declared_in_every_window": 43,
+        "median_declaration_delay_s": 6.04,
+        "spurious_degradation_runs": 0,
+        "unsafe_transitions": 0,
+        "transition_bound_violations": 0,
+        "nees_mean_of_runs": 8.944659787802134,
+        "final_mode_untrusted": 0,
+        "median_vertical_trusted_fraction": 0.9955908254954489,
+        "isolation": {
+          "correct": 0,
+          "wrong": 0,
+          "none": 100
+        }
+      }
+    },
+    {
+      "scenario": "pair_altimeter_bias+gnss_dropout",
+      "arm": "m10_b_plus",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 41,
+      "recovered_ci95": [
+        0.3126,
+        0.5129
+      ],
+      "contained": 98,
+      "classes": {
+        "R": 41,
+        "T": 32,
+        "U": 27
+      },
+      "hard_landings": 59,
+      "no_contact": 0,
+      "navigation": {
+        "vertical_alert_failures": 0,
+        "vertical_alert_failures_ci95": [
+          0.0,
+          0.0362
+        ],
+        "hv_alert_failures": 0,
+        "hp_alert_failures": 0,
+        "vertical_declaration_applicable": 3,
+        "runs_declared_in_every_window": 100,
+        "median_declaration_delay_s": 0.0,
+        "spurious_degradation_runs": 0,
+        "unsafe_transitions": 0,
+        "transition_bound_violations": 0,
+        "nees_mean_of_runs": 4.707554695089415,
+        "final_mode_untrusted": 76,
+        "median_vertical_trusted_fraction": 0.0,
+        "isolation": {
+          "correct": 0,
+          "wrong": 0,
+          "none": 100
+        }
+      }
+    },
+    {
+      "scenario": "pair_altimeter_bias_low+gnss_dropout",
+      "arm": "m10_b_plus",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 41,
+      "recovered_ci95": [
+        0.3126,
+        0.5129
+      ],
+      "contained": 98,
+      "classes": {
+        "R": 41,
+        "T": 32,
+        "U": 27
+      },
+      "hard_landings": 59,
+      "no_contact": 0,
+      "navigation": {
+        "vertical_alert_failures": 0,
+        "vertical_alert_failures_ci95": [
+          0.0,
+          0.0362
+        ],
+        "hv_alert_failures": 0,
+        "hp_alert_failures": 0,
+        "vertical_declaration_applicable": 3,
+        "runs_declared_in_every_window": 100,
+        "median_declaration_delay_s": 0.0,
+        "spurious_degradation_runs": 0,
+        "unsafe_transitions": 0,
+        "transition_bound_violations": 0,
+        "nees_mean_of_runs": 4.707554695089415,
+        "final_mode_untrusted": 76,
+        "median_vertical_trusted_fraction": 0.0,
+        "isolation": {
+          "correct": 0,
+          "wrong": 0,
+          "none": 100
+        }
+      }
+    },
+    {
+      "scenario": "pair_gnss_bias+altimeter_dropout",
+      "arm": "m10_b_plus",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 0,
+      "recovered_ci95": [
+        0.0,
+        0.0362
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 0,
+        "T": 0,
+        "U": 100
+      },
+      "hard_landings": 100,
+      "no_contact": 0,
+      "navigation": {
+        "vertical_alert_failures": 0,
+        "vertical_alert_failures_ci95": [
+          0.0,
+          0.0362
+        ],
+        "hv_alert_failures": 0,
+        "hp_alert_failures": 0,
+        "vertical_declaration_applicable": 100,
+        "runs_declared_in_every_window": 100,
+        "median_declaration_delay_s": 0.0,
+        "spurious_degradation_runs": 0,
+        "unsafe_transitions": 0,
+        "transition_bound_violations": 0,
+        "nees_mean_of_runs": 210260.3577252927,
+        "final_mode_untrusted": 0,
+        "median_vertical_trusted_fraction": 0.0,
+        "isolation": {
+          "correct": 0,
+          "wrong": 0,
+          "none": 100
+        }
+      }
+    },
+    {
+      "scenario": "pair_altimeter_bias\u00b1+imu_accel_bias",
+      "arm": "m10_b_plus",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 89,
+      "recovered_ci95": [
+        0.8117,
+        0.9438
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 89,
+        "T": 0,
+        "U": 11
+      },
+      "hard_landings": 11,
+      "no_contact": 0,
+      "navigation": {
+        "vertical_alert_failures": 0,
+        "vertical_alert_failures_ci95": [
+          0.0,
+          0.0362
+        ],
+        "hv_alert_failures": 0,
+        "hp_alert_failures": 0,
+        "vertical_declaration_applicable": 0,
+        "runs_declared_in_every_window": 100,
+        "median_declaration_delay_s": 0.0,
+        "spurious_degradation_runs": 0,
+        "unsafe_transitions": 0,
+        "transition_bound_violations": 0,
+        "nees_mean_of_runs": 5.224341238538198,
+        "final_mode_untrusted": 0,
+        "median_vertical_trusted_fraction": 0.0,
+        "isolation": {
+          "correct": 0,
+          "wrong": 0,
+          "none": 100
+        }
+      }
+    },
+    {
+      "scenario": "pair_gnss_bias_low+imu_accel_bias",
+      "arm": "m10_b_plus",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 0,
+      "recovered_ci95": [
+        0.0,
+        0.0362
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 0,
+        "T": 0,
+        "U": 100
+      },
+      "hard_landings": 100,
+      "no_contact": 0,
+      "navigation": {
+        "vertical_alert_failures": 0,
+        "vertical_alert_failures_ci95": [
+          0.0,
+          0.0362
+        ],
+        "hv_alert_failures": 0,
+        "hp_alert_failures": 0,
+        "vertical_declaration_applicable": 100,
+        "runs_declared_in_every_window": 100,
+        "median_declaration_delay_s": 0.0,
+        "spurious_degradation_runs": 0,
+        "unsafe_transitions": 0,
+        "transition_bound_violations": 0,
+        "nees_mean_of_runs": 219541.60910460088,
+        "final_mode_untrusted": 0,
+        "median_vertical_trusted_fraction": 0.0,
+        "isolation": {
+          "correct": 0,
+          "wrong": 0,
+          "none": 100
+        }
+      }
+    },
+    {
+      "scenario": "pair_altimeter_bias\u00b1+gnss_bias\u00b1",
+      "arm": "m10_b_plus",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 0,
+      "recovered_ci95": [
+        0.0,
+        0.0362
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 0,
+        "T": 0,
+        "U": 100
+      },
+      "hard_landings": 100,
+      "no_contact": 0,
+      "navigation": {
+        "vertical_alert_failures": 1,
+        "vertical_alert_failures_ci95": [
+          0.0003,
+          0.0545
+        ],
+        "hv_alert_failures": 0,
+        "hp_alert_failures": 0,
+        "vertical_declaration_applicable": 100,
+        "runs_declared_in_every_window": 100,
+        "median_declaration_delay_s": 0.0,
+        "spurious_degradation_runs": 0,
+        "unsafe_transitions": 0,
+        "transition_bound_violations": 0,
+        "nees_mean_of_runs": 256232.74135465675,
+        "final_mode_untrusted": 3,
+        "median_vertical_trusted_fraction": 0.0,
+        "isolation": {
+          "correct": 0,
+          "wrong": 0,
+          "none": 100
+        }
+      }
+    }
+  ],
+  "pairs": [],
+  "global": [
+    {
+      "arm": "m10_b_plus",
+      "runs": 2400,
+      "R": 1404,
+      "T": 277,
+      "U": 719,
+      "U_ci95": [
+        0.2813,
+        0.3184
+      ]
+    }
+  ]
+}

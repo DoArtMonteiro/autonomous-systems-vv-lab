@@ -1,0 +1,28 @@
+('approved', 'guarded', 'altstep15.0') {'n': 60, 'R': 54, 'U': 6}
+('approved', 'guarded', 'altstep5.0') {'n': 60, 'R': 54, 'U': 6}
+('approved', 'guarded', 'drift0.03') {'n': 60, 'U': 58, 'R': 2}
+('approved', 'guarded', 'drift0.1') {'n': 60, 'U': 60}
+('approved', 'guarded', 'drift0.3') {'n': 60, 'U': 60}
+('approved', 'guarded', 'gnssstep15.0') {'n': 60, 'T': 53, 'U': 2, 'R': 5}
+('approved', 'guarded', 'gnssstep5.0') {'n': 60, 'U': 60}
+('approved', 'm10_b', 'altstep15.0') {'n': 60, 'R': 54, 'U': 6}
+('approved', 'm10_b', 'altstep5.0') {'n': 60, 'R': 54, 'U': 6}
+('approved', 'm10_b', 'drift0.03') {'n': 60, 'U': 43, 'R': 17}
+('approved', 'm10_b', 'drift0.1') {'n': 60, 'U': 60, 'af_v': 21}
+('approved', 'm10_b', 'drift0.3') {'n': 60, 'U': 60}
+('approved', 'm10_b', 'gnssstep15.0') {'n': 60, 'T': 38, 'invariant_failures': 1, 'R': 21, 'U': 1}
+('approved', 'm10_b', 'gnssstep5.0') {'n': 60, 'T': 38, 'invariant_failures': 1, 'R': 21, 'U': 1}
+('approved', 'm10_b_plus', 'altstep15.0') {'n': 60, 'R': 51, 'U': 9}
+('approved', 'm10_b_plus', 'altstep5.0') {'n': 60, 'R': 53, 'U': 7}
+('approved', 'm10_b_plus', 'drift0.03') {'n': 60, 'U': 43, 'R': 17}
+('approved', 'm10_b_plus', 'drift0.1') {'n': 60, 'U': 60}
+('approved', 'm10_b_plus', 'drift0.3') {'n': 60, 'U': 58, 'invariant_failures': 1, 'R': 2}
+('approved', 'm10_b_plus', 'gnssstep15.0') {'n': 60, 'T': 9, 'R': 51}
+('approved', 'm10_b_plus', 'gnssstep5.0') {'n': 60, 'T': 9, 'R': 51}
+('approved', 'robust', 'altstep15.0') {'n': 60, 'R': 54, 'U': 6}
+('approved', 'robust', 'altstep5.0') {'n': 60, 'R': 54, 'U': 6}
+('approved', 'robust', 'drift0.03') {'n': 60, 'U': 58, 'R': 2}
+('approved', 'robust', 'drift0.1') {'n': 60, 'U': 60}
+('approved', 'robust', 'drift0.3') {'n': 60, 'U': 60}
+('approved', 'robust', 'gnssstep15.0') {'n': 60, 'U': 60}
+('approved', 'robust', 'gnssstep5.0') {'n': 60, 'U': 60}

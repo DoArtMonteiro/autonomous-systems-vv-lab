@@ -1,0 +1,5 @@
+('approved', 'm10_b_plus', 'delay0.1') {'n': 1020, 'R': 801, 'U': 219}
+('approved', 'm10_b_plus', 'delay0.2') {'n': 1020, 'R': 762, 'U': 251, 'T': 7}
+('approved', 'm10_b_plus', 'ramp0.5') {'n': 1020, 'U': 773, 'wrong_isolation': 186, 'af_hv': 186, 'invariant_failures': 63, 'T': 131, 'R': 116}
+('approved', 'm10_b_plus', 'ramp2') {'n': 1020, 'T': 558, 'invariant_failures': 6, 'R': 407, 'U': 55}
+('approved', 'm10_b_plus', 'stuck') {'n': 1020, 'R': 892, 'U': 103, 'T': 25}

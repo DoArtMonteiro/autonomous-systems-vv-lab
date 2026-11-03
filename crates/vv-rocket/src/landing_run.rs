@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::landing_model::{LandingCase, prepare_landing};
 use crate::landing_sim::simulate_landing;
 use crate::landing_verify::verify;
+use crate::nav_verify::{VERIFICATION_SCHEMA_V3, verify_navigation};
 use crate::run::{
     Check, FileRef, MAX_ARTIFACT_BYTES, ReplayReport, check, read_bounded, read_capped, report_of,
 };
@@ -99,6 +100,11 @@ pub fn artifacts(case_bytes: &[u8], seed: u64) -> Result<LandingArtifacts, LandE
     let run = simulate_landing(&prepared).map_err(LandError::Simulation)?;
     let mut verification = verify(&prepared, &run.log);
     verification.controller_flags.flags = run.controller_flags;
+    if prepared.controller.policy.is_m10() {
+        let nav = verify_navigation(&prepared, &run.log, &run.declarations, &verification);
+        verification.navigation = Some(nav);
+        verification.schema = VERIFICATION_SCHEMA_V3;
+    }
     Ok(LandingArtifacts {
         trace: json_line(&run.trace).map_err(LandError::Simulation)?,
         verification: json_line(&verification).map_err(LandError::Simulation)?,

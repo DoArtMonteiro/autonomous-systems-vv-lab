@@ -15,7 +15,9 @@ use crate::landing_sensors::{SensorFaults, SensorStreams};
 use crate::landing_truth::{
     Ignition, Touchdown, TruthExcerpt, TruthLog, TruthStep, contact, excerpt,
 };
-use crate::landing_types::{Command, ControllerFlags, Estimate, FlagInstant, Observation};
+use crate::landing_types::{
+    Command, ControllerFlags, Estimate, FlagInstant, NavDeclaration, Observation,
+};
 use crate::model::Segment;
 
 pub const TRACE_SCHEMA: &str = "vv-rocket-landing-trace.v1";
@@ -82,6 +84,16 @@ pub struct LandingRun {
     pub log: TruthLog,
     /// What the controller reported, for the verification record; no verdict reads it.
     pub controller_flags: ControllerFlags,
+    /// M10: what the controller declared at every control cycle (empty for the M9 policies). The
+    /// navigation verifier compares it with the truth; no requirement or invariant reads it.
+    pub declarations: Vec<CycleDeclaration>,
+}
+
+/// An M10 declaration and the step of its control cycle.
+#[derive(Clone, Copy, Debug)]
+pub struct CycleDeclaration {
+    pub step: u64,
+    pub declaration: NavDeclaration,
 }
 
 fn kinds_of(active: &[FaultKind]) -> Vec<&'static str> {
@@ -136,6 +148,7 @@ pub fn simulate_landing(prep: &PreparedLanding) -> Result<LandingRun, String> {
     let mut ignition: Option<Ignition> = None;
     let mut last_active: Vec<FaultKind> = Vec::new();
     let mut flags = ControllerFlags::default();
+    let mut declarations: Vec<CycleDeclaration> = Vec::new();
     let mut end_state = s;
     let mut step = 0;
 
@@ -168,6 +181,8 @@ pub fn simulate_landing(prep: &PreparedLanding) -> Result<LandingRun, String> {
         let mut active: Vec<FaultKind> = Vec::new();
         let mut sensor_faults = SensorFaults::default();
         let mut actuator_faults = ActuatorFaults::default();
+        // Time since a window opened, from whole steps.
+        let elapsed = |start: u64| (step - start) as f64 * dt;
         for f in &prep.faults {
             if f.start_step == step {
                 events.push(Event {
@@ -201,7 +216,24 @@ pub fn simulate_landing(prep: &PreparedLanding) -> Result<LandingRun, String> {
                     FaultKind::GnssDropout => sensor_faults.gnss_dropout = true,
                     FaultKind::GnssBias => sensor_faults.gnss_bias_m += m,
                     FaultKind::GnssBiasLow => sensor_faults.gnss_bias_m -= m,
-                    FaultKind::ImuAccelBias => sensor_faults.imu_accel_bias_mps2 = m,
+                    FaultKind::ImuAccelBias => sensor_faults.imu_accel_bias_mps2 += m,
+                    FaultKind::AltimeterStuck => sensor_faults.altimeter_stuck = true,
+                    FaultKind::AltimeterDelay => {
+                        sensor_faults.altimeter_delay_cycles =
+                            ((m / (dt * period as f64)).round() as u64).max(1)
+                    }
+                    FaultKind::AltimeterOutliers => sensor_faults.altimeter_outlier_probability = m,
+                    FaultKind::AltimeterDrift => {
+                        sensor_faults.altimeter_bias_m += m * elapsed(f.start_step)
+                    }
+                    FaultKind::GnssHorizontalBias => sensor_faults.gnss_horizontal_bias_m += m,
+                    FaultKind::GnssCoherentRamp => {
+                        sensor_faults.gnss_ramp_position_m += m * elapsed(f.start_step);
+                        sensor_faults.gnss_ramp_velocity_mps += m;
+                    }
+                    FaultKind::ImuAccelDrift => {
+                        sensor_faults.imu_accel_bias_mps2 += m * elapsed(f.start_step)
+                    }
                 }
             }
         }
@@ -218,6 +250,12 @@ pub fn simulate_landing(prep: &PreparedLanding) -> Result<LandingRun, String> {
                 gnss_cycle,
             );
             let (command, estimate) = controller.step(&observation);
+            if let Some(d) = controller.declaration() {
+                declarations.push(CycleDeclaration {
+                    step,
+                    declaration: d,
+                });
+            }
             let at = FlagInstant { step, t_s };
             if estimate.altimeter_rejected {
                 flags.altimeter_rejected_first.get_or_insert(at);
@@ -421,6 +459,7 @@ pub fn simulate_landing(prep: &PreparedLanding) -> Result<LandingRun, String> {
             ignition,
         },
         controller_flags: flags,
+        declarations,
     })
 }
 

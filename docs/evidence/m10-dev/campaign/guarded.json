@@ -1,0 +1,592 @@
+{
+  "schema": "vv-m10-campaign.v1",
+  "command": "python scripts/m10_campaign.py --seeds 5000-5099 --scenarios F1,F2,F3 --arms guarded --jobs 8 --output-root runs/m10-dev/guarded",
+  "machine": "Windows-11-10.0.26300-SP0; AMD64 Family 25 Model 97 Stepping 2, AuthenticAMD; Python 3.14.6",
+  "duration_s": 15.2,
+  "binary_sha256": "a82ca967ea539f5cf2d0f32c2855ad0d43ccbbe5078a0e8875086f4925690481",
+  "template_sha256": "c28a258c94a17b6ce1e8eb5a1442d977b4c951a0913375661ec3dddf8d05784a",
+  "evaluation": false,
+  "freeze": null,
+  "seed_block": "desenvolvimento (5000 a 5099)",
+  "seeds": [
+    5000,
+    5001,
+    5002,
+    5003,
+    5004,
+    5005,
+    5006,
+    5007,
+    5008,
+    5009,
+    5010,
+    5011,
+    5012,
+    5013,
+    5014,
+    5015,
+    5016,
+    5017,
+    5018,
+    5019,
+    5020,
+    5021,
+    5022,
+    5023,
+    5024,
+    5025,
+    5026,
+    5027,
+    5028,
+    5029,
+    5030,
+    5031,
+    5032,
+    5033,
+    5034,
+    5035,
+    5036,
+    5037,
+    5038,
+    5039,
+    5040,
+    5041,
+    5042,
+    5043,
+    5044,
+    5045,
+    5046,
+    5047,
+    5048,
+    5049,
+    5050,
+    5051,
+    5052,
+    5053,
+    5054,
+    5055,
+    5056,
+    5057,
+    5058,
+    5059,
+    5060,
+    5061,
+    5062,
+    5063,
+    5064,
+    5065,
+    5066,
+    5067,
+    5068,
+    5069,
+    5070,
+    5071,
+    5072,
+    5073,
+    5074,
+    5075,
+    5076,
+    5077,
+    5078,
+    5079,
+    5080,
+    5081,
+    5082,
+    5083,
+    5084,
+    5085,
+    5086,
+    5087,
+    5088,
+    5089,
+    5090,
+    5091,
+    5092,
+    5093,
+    5094,
+    5095,
+    5096,
+    5097,
+    5098,
+    5099
+  ],
+  "total_runs": 2400,
+  "mean_trace_bytes": 385696,
+  "replay": {
+    "replayed": 24,
+    "verified": 24,
+    "failed": []
+  },
+  "cells": [
+    {
+      "scenario": "nominal",
+      "arm": "guarded",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 94,
+      "recovered_ci95": [
+        0.874,
+        0.9777
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 94,
+        "T": 0,
+        "U": 6
+      },
+      "hard_landings": 6,
+      "no_contact": 0
+    },
+    {
+      "scenario": "thrust_loss",
+      "arm": "guarded",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 87,
+      "recovered_ci95": [
+        0.788,
+        0.9289
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 87,
+        "T": 0,
+        "U": 13
+      },
+      "hard_landings": 13,
+      "no_contact": 0
+    },
+    {
+      "scenario": "ignition_delay",
+      "arm": "guarded",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 81,
+      "recovered_ci95": [
+        0.7193,
+        0.8816
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 81,
+        "T": 0,
+        "U": 19
+      },
+      "hard_landings": 19,
+      "no_contact": 0
+    },
+    {
+      "scenario": "gimbal_stuck",
+      "arm": "guarded",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 90,
+      "recovered_ci95": [
+        0.8238,
+        0.951
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 90,
+        "T": 0,
+        "U": 10
+      },
+      "hard_landings": 10,
+      "no_contact": 0
+    },
+    {
+      "scenario": "altimeter_bias",
+      "arm": "guarded",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 92,
+      "recovered_ci95": [
+        0.8484,
+        0.9648
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 92,
+        "T": 0,
+        "U": 8
+      },
+      "hard_landings": 8,
+      "no_contact": 0
+    },
+    {
+      "scenario": "altimeter_dropout",
+      "arm": "guarded",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 94,
+      "recovered_ci95": [
+        0.874,
+        0.9777
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 94,
+        "T": 0,
+        "U": 6
+      },
+      "hard_landings": 6,
+      "no_contact": 0
+    },
+    {
+      "scenario": "gnss_dropout",
+      "arm": "guarded",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 93,
+      "recovered_ci95": [
+        0.8611,
+        0.9714
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 93,
+        "T": 0,
+        "U": 7
+      },
+      "hard_landings": 7,
+      "no_contact": 0
+    },
+    {
+      "scenario": "gnss_bias",
+      "arm": "guarded",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 21,
+      "recovered_ci95": [
+        0.1349,
+        0.3029
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 21,
+        "T": 78,
+        "U": 1
+      },
+      "hard_landings": 79,
+      "no_contact": 0
+    },
+    {
+      "scenario": "imu_accel_bias",
+      "arm": "guarded",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 89,
+      "recovered_ci95": [
+        0.8117,
+        0.9438
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 89,
+        "T": 0,
+        "U": 11
+      },
+      "hard_landings": 11,
+      "no_contact": 0
+    },
+    {
+      "scenario": "altimeter_bias_low",
+      "arm": "guarded",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 0,
+      "recovered_ci95": [
+        0.0,
+        0.0362
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 0,
+        "T": 0,
+        "U": 100
+      },
+      "hard_landings": 100,
+      "no_contact": 0
+    },
+    {
+      "scenario": "gnss_bias_low",
+      "arm": "guarded",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 0,
+      "recovered_ci95": [
+        0.0,
+        0.0362
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 0,
+        "T": 0,
+        "U": 100
+      },
+      "hard_landings": 100,
+      "no_contact": 0
+    },
+    {
+      "scenario": "altimeter_stuck",
+      "arm": "guarded",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 94,
+      "recovered_ci95": [
+        0.874,
+        0.9777
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 94,
+        "T": 0,
+        "U": 6
+      },
+      "hard_landings": 6,
+      "no_contact": 0
+    },
+    {
+      "scenario": "altimeter_delay",
+      "arm": "guarded",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 1,
+      "recovered_ci95": [
+        0.0003,
+        0.0545
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 1,
+        "T": 0,
+        "U": 99
+      },
+      "hard_landings": 99,
+      "no_contact": 0
+    },
+    {
+      "scenario": "altimeter_outliers",
+      "arm": "guarded",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 93,
+      "recovered_ci95": [
+        0.8611,
+        0.9714
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 93,
+        "T": 0,
+        "U": 7
+      },
+      "hard_landings": 7,
+      "no_contact": 0
+    },
+    {
+      "scenario": "gnss_horizontal_bias_t0",
+      "arm": "guarded",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 6,
+      "recovered_ci95": [
+        0.0223,
+        0.126
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 6,
+        "T": 92,
+        "U": 2
+      },
+      "hard_landings": 94,
+      "no_contact": 0
+    },
+    {
+      "scenario": "gnss_horizontal_bias",
+      "arm": "guarded",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 10,
+      "recovered_ci95": [
+        0.049,
+        0.1762
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 10,
+        "T": 75,
+        "U": 15
+      },
+      "hard_landings": 90,
+      "no_contact": 0
+    },
+    {
+      "scenario": "gnss_coherent_ramp",
+      "arm": "guarded",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 2,
+      "recovered_ci95": [
+        0.0024,
+        0.0704
+      ],
+      "contained": 97,
+      "classes": {
+        "R": 2,
+        "T": 0,
+        "U": 98
+      },
+      "hard_landings": 98,
+      "no_contact": 0
+    },
+    {
+      "scenario": "imu_accel_drift",
+      "arm": "guarded",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 58,
+      "recovered_ci95": [
+        0.4771,
+        0.678
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 58,
+        "T": 0,
+        "U": 42
+      },
+      "hard_landings": 42,
+      "no_contact": 0
+    },
+    {
+      "scenario": "pair_altimeter_bias+gnss_dropout",
+      "arm": "guarded",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 92,
+      "recovered_ci95": [
+        0.8484,
+        0.9648
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 92,
+        "T": 0,
+        "U": 8
+      },
+      "hard_landings": 8,
+      "no_contact": 0
+    },
+    {
+      "scenario": "pair_altimeter_bias_low+gnss_dropout",
+      "arm": "guarded",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 0,
+      "recovered_ci95": [
+        0.0,
+        0.0362
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 0,
+        "T": 0,
+        "U": 100
+      },
+      "hard_landings": 100,
+      "no_contact": 0
+    },
+    {
+      "scenario": "pair_gnss_bias+altimeter_dropout",
+      "arm": "guarded",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 19,
+      "recovered_ci95": [
+        0.1184,
+        0.2807
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 19,
+        "T": 67,
+        "U": 14
+      },
+      "hard_landings": 81,
+      "no_contact": 0
+    },
+    {
+      "scenario": "pair_altimeter_bias\u00b1+imu_accel_bias",
+      "arm": "guarded",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 31,
+      "recovered_ci95": [
+        0.2213,
+        0.4103
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 31,
+        "T": 0,
+        "U": 69
+      },
+      "hard_landings": 69,
+      "no_contact": 0
+    },
+    {
+      "scenario": "pair_gnss_bias_low+imu_accel_bias",
+      "arm": "guarded",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 0,
+      "recovered_ci95": [
+        0.0,
+        0.0362
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 0,
+        "T": 0,
+        "U": 100
+      },
+      "hard_landings": 100,
+      "no_contact": 0
+    },
+    {
+      "scenario": "pair_altimeter_bias\u00b1+gnss_bias\u00b1",
+      "arm": "guarded",
+      "runs": 100,
+      "not_acted": 0,
+      "recovered": 0,
+      "recovered_ci95": [
+        0.0,
+        0.0362
+      ],
+      "contained": 100,
+      "classes": {
+        "R": 0,
+        "T": 0,
+        "U": 100
+      },
+      "hard_landings": 100,
+      "no_contact": 0
+    }
+  ],
+  "pairs": [],
+  "global": [
+    {
+      "arm": "guarded",
+      "runs": 2400,
+      "R": 1147,
+      "T": 312,
+      "U": 941,
+      "U_ci95": [
+        0.3725,
+        0.4119
+      ]
+    }
+  ]
+}

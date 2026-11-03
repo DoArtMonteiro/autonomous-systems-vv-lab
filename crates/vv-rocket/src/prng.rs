@@ -20,6 +20,8 @@ pub mod source {
     pub const IMU_ATTITUDE: u64 = 10;
     pub const IMU_RATE: u64 = 11;
     pub const IMU_ACCELERATION: u64 = 12;
+    /// M10: altimeter outliers (schema v2).
+    pub const ALTIMETER_OUTLIER: u64 = 13;
 }
 
 #[derive(Clone, Debug)]

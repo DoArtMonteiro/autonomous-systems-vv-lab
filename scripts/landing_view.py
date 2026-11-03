@@ -156,6 +156,9 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.4 ui-monospace,Conso
 .sub{display:block;font-size:12px;color:var(--muted);font-weight:400}
 .cols3{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
 .cols3>*{min-width:0}
+.nvseg{fill-opacity:.5}.nv0{fill:var(--s1)}.nv1{fill:var(--s2)}.nv2{fill:var(--s3)}.nv3{fill:var(--muted)}.nvx{fill:var(--line)}
+.nvtext{fill:var(--text);font-size:11px;pointer-events:none}
+.legend svg.sw{width:12px;height:12px}
 [hidden]{display:none!important}
 </style></head>
 <body><main>
@@ -238,6 +241,8 @@ function describeFault(fl) {
   const info = faultOf(fl.kind), unit = info && info.magnitude ? ' ' + info.magnitude.unit : '';
   return `${info ? info.label : words(fl.kind)}${info && info.magnitude ? ' ' + g3(fl.magnitude) + unit : ''}, ${f(fl.start_s, 2)} s to ${f(fl.end_s, 2)} s`;
 }
+// A validated request names its faults as a list (up to two); this page sends at most one.
+const requestFaults = req => (req.faults && req.faults.length ? req.faults.map(describeFault).join(' + ') : describeFault(null));
 function formRequest(policy) {
   const num = id => { const v = $(id).value.trim(); return v === '' ? null : Number(v); };
   const seed = num('ln-seed');
@@ -285,8 +290,14 @@ async function runBodies(bodies, note) {
     document.querySelectorAll('button.primary').forEach(b => { b.disabled = false; b.removeAttribute('aria-busy'); });
   }
 }
-const runOne = () => runBodies([formRequest(state.policy)]);
-const runCompare = () => runBodies(POLICY_NAMES.map(formRequest));
+// A fault of case schema v2 exists only for the M10 policies; say so here instead of sending a request the adapter refuses.
+function policyRefusal(policies) {
+  const x = state.kind === 'nominal' ? null : faultOf(state.kind);
+  const bad = x && x.policies ? policies.filter(p => !x.policies.includes(p)) : [];
+  return bad.length ? `${x.label} exists only for the M10 policies (${x.policies.join(', ')}); ${bad.join(' and ')} cannot run it. Choose an M10 policy in step 3, or another scenario.` : null;
+}
+function runOne() { const no = policyRefusal([state.policy]); if (no) { setError(no); return false; } return runBodies([formRequest(state.policy)]); }
+function runCompare() { const no = policyRefusal(POLICY_NAMES); if (no) { setError(no); return false; } return runBodies(POLICY_NAMES.map(formRequest)); }
 
 // ---------------------------------------------------------------- tabs
 const TABS = ['run', 'campaign', 'campaign91', 'claims', 'research'];
@@ -318,7 +329,7 @@ function wireTabs() {
 function drawRun() {
   const caps = state.caps;
   const scenarios = [{kind: 'nominal', label: 'Nominal', description: 'No fault. Sensor noise is on; with seed 0 the initial state and the vehicle are exactly nominal.', range: ''}]
-    .concat(caps.faults.map(x => ({kind: x.kind, label: x.label, description: x.description, range: rangeText(x)})));
+    .concat(caps.faults.map(x => ({kind: x.kind, label: x.label, description: x.description + (x.policies ? ` Only with the M10 policies (${x.policies.join(', ')}).` : ''), range: rangeText(x)})));
   const pick = el('fieldset', {}, el('legend', {}, '1. Choose a scenario'),
     el('div', {class: 'choices'}, scenarios.map(s => el('label', {class: 'choice'},
       el('input', {type: 'radio', name: 'scenario', value: s.kind, checked: s.kind === state.kind, onchange: () => { state.kind = s.kind; drawParams(); }}),
@@ -473,6 +484,99 @@ function flagsBox(r) {
     el('div', {class: 'scroll'}, el('table', {class: 'narrow'}, el('thead', {}, el('tr', {}, ['Flag', 'Reported'].map(h => el('th', {}, h)))), el('tbody', {}, rows))),
     el('p', {class: 'meta'}, 'Copied from the controller log. The verifier never reads these flags: a flag that appears does not mean the vehicle was safe, and no flag does not mean it was unsafe. Detection, containment (S1 to S5) and recovery (R1 to R6 at contact) are three separate statements.'));
 }
+// ---------------------------------------------------------------- M10 navigation declarations
+// Written only by the M10 policies: estimate.nav in every sample and verification.navigation (verification v3).
+// They are what the controller declares about its own navigation. The verifier compares them with the truth;
+// no requirement or invariant verdict reads them, and the controller never reads the comparison.
+const navOf = s => s.estimate && s.estimate.nav && typeof s.estimate.nav === 'object' ? s.estimate.nav : null;
+const hasNav = r => r.states.some(navOf);
+const NAV_LANES = [
+  {key: 'mode', label: 'mode', values: ['nominal', 'degraded_nav', 'untrusted']},
+  {key: 'vertical', label: 'vertical channel', values: ['trusted', 'degraded', 'untrusted']},
+  {key: 'radar', label: 'radar group', values: ['healthy', 'suspect', 'probation', 'excluded']},
+  {key: 'gnss', label: 'GNSS group', values: ['healthy', 'suspect', 'probation', 'excluded']}];
+const NAV_NOTE = 'These are controller declarations, compared with the truth by the verifier. No requirement or invariant verdict reads them. "untrusted" is a declaration by the controller that it cannot vouch for its estimate; it is not a safe state.';
+// Runs of one declared value over the recorded samples (every 0.1 s); a run ends at the first sample that differs.
+function navSegments(r, key) {
+  const out = [];
+  for (const s of r.states) {
+    const n = navOf(s), v = n ? String(n[key]) : 'not recorded', last = out[out.length - 1];
+    if (last) last.to = s.t_s;
+    if (!last || last.v !== v) out.push({v, from: s.t_s, to: s.t_s});
+  }
+  return out;
+}
+function navTimeline(r) {
+  const W = 480, L = 104, R = 12, T = 8, LANE = 22, GAP = 6, B = 30, H = T + NAV_LANES.length * (LANE + GAP) + B, [x0, x1] = window_(), t = state.t;
+  const xr = niceTicks(x0, x1, 5), X = x => L + (x - xr.lo) / (xr.hi - xr.lo) * (W - L - R);
+  const lanes = NAV_LANES.map(l => ({...l, segs: navSegments(r, l.key).map(sg => ({...sg, a: Math.max(sg.from, x0), b: Math.min(sg.to, x1)})).filter(sg => sg.b >= sg.a)}));
+  const summary = lanes.map(l => `${l.label}: ` + l.segs.map(sg => `${words(sg.v)} from ${f(sg.a, 1)} to ${f(sg.b, 1)} s`).join(', ')).join('; ');
+  const svg = sv('svg', {viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': `Navigation declarations over time, as recorded every 0.1 s. ${summary}.`});
+  const bottom = H - B;
+  for (const v of xr.ticks) { svg.append(sv('line', {class: 'grid', x1: X(v), x2: X(v), y1: T, y2: bottom})); svg.append(sv('text', {class: 'axis', x: X(v), y: bottom + 16, 'text-anchor': 'middle'}, String(v))); }
+  svg.append(sv('text', {class: 'axis', x: W - R, y: H - 4, 'text-anchor': 'end'}, 'time (s)'));
+  lanes.forEach((l, i) => {
+    const y = T + i * (LANE + GAP);
+    svg.append(sv('text', {class: 'axis', x: L - 6, y: y + LANE / 2 + 4, 'text-anchor': 'end'}, l.label));
+    for (const sg of l.segs) {
+      const k = l.values.indexOf(sg.v), w = Math.max(1, X(sg.b) - X(sg.a));
+      svg.append(sv('rect', {class: `nvseg ${k < 0 ? 'nvx' : 'nv' + k}`, x: X(sg.a), y, width: w, height: LANE}, sv('title', {}, `${l.label}: ${words(sg.v)}, ${f(sg.a, 2)} s to ${f(sg.b, 2)} s (recorded samples)`)));
+      if (w > 7 * words(sg.v).length + 6) svg.append(sv('text', {class: 'nvtext', x: X(sg.a) + 4, y: y + LANE / 2 + 4}, words(sg.v)));
+    }
+  });
+  for (const sp of faultSpans(r)) {
+    const a = Math.max(sp.from, xr.lo), b = Math.min(sp.to, xr.hi);
+    if (b > a) svg.append(sv('rect', {class: 'span', x: X(a), y: T, width: Math.max(1, X(b) - X(a)), height: bottom - T}, sv('title', {}, `active fault: ${sp.name}`)));
+  }
+  for (const m of eventMarks(r)) if (m.t >= xr.lo && m.t <= xr.hi) svg.append(sv('line', {class: 'evt', x1: X(m.t), x2: X(m.t), y1: T, y2: bottom}, sv('title', {}, `${m.name} at ${f(m.t, 2)} s`)));
+  if (t >= xr.lo && t <= xr.hi) svg.append(sv('line', {class: 'cursor', x1: X(t), x2: X(t), y1: T, y2: bottom}));
+  const hit = sv('rect', {x: L, y: T, width: W - L - R, height: bottom - T, fill: 'transparent'});
+  const pick = e => { const box = svg.getBoundingClientRect(); setTime(xr.lo + ((e.clientX - box.left) * W / box.width - L) / (W - L - R) * (xr.hi - xr.lo)); };
+  hit.addEventListener('pointermove', pick); hit.addEventListener('pointerdown', pick);
+  svg.append(hit);
+  const key = NAV_LANES.map(l => el('span', {}, el('b', {}, l.label + ': '), l.values.map((v, k) => el('span', {},
+    sv('svg', {class: 'sw', viewBox: '0 0 12 12', 'aria-hidden': 'true'}, sv('rect', {class: `nvseg nv${k}`, x: 0, y: 0, width: 12, height: 12})), ' ' + words(v) + ' '))));
+  return el('div', {class: 'panel'}, el('p', {class: 'chart-title'}, 'Declared navigation mode, vertical channel and sensor-group health over time'), svg,
+    el('div', {class: 'legend meta'}, key),
+    el('p', {class: 'meta'}, 'Each lane is a declaration copied from the trace, sampled every 0.1 s; exact transition times are in the list below. Colours separate the declared values; they do not grade safety. Shaded: an active fault. Dotted lines: ignition, cutoff, flameout, touchdown.'));
+}
+function navCursor(r) {
+  const n = navOf(r.states[nearest(r, state.t)]);
+  if (!n) return el('p', {class: 'meta'}, 'No navigation declaration recorded at the cursor.');
+  return el('dl', {class: 'kv'},
+    el('dt', {}, 'declared at the cursor'), el('dd', {}, `mode ${words(n.mode)}; vertical ${words(n.vertical)}; horizontal velocity ${words(n.horizontal_velocity)}; horizontal position ${words(n.horizontal_position)}${n.ambiguous ? '; ambiguous' : ''}`),
+    el('dt', {}, 'sensor groups (declared)'), el('dd', {}, `radar ${words(n.radar)}${n.isolated_radar ? ' (isolation flag set)' : ''}; GNSS ${words(n.gnss)}${n.isolated_gnss ? ' (isolation flag set)' : ''}`),
+    el('dt', {}, 'declared 1-sigma'), el('dd', {}, `altitude ${g3(n.sigma_z_m)} m, vertical speed ${g3(n.sigma_vz_mps)} m/s, horizontal ${g3(n.sigma_h_m)} m and ${g3(n.sigma_vh_mps)} m/s`));
+}
+const NAV_CLASS = {R: 'R: recovered (landed on the pad; R1 to R6 and S1 to S5 met)', T: 'T: intact touchdown off the pad (every requirement but R5 met, invariants hold)', U: 'U: unsafe or no contact'};
+function navTable(r) {
+  const n = r.verification.navigation;
+  if (!n || typeof n !== 'object') return el('p', {class: 'meta'}, 'This run carries no navigation block in its verification.');
+  const v = n.vertical || {}, tr = Array.isArray(n.transitions) ? n.transitions : [];
+  const row = (name, value, cls) => el('tr', {}, el('td', {}, name), el('td', {class: cls || ''}, value));
+  const rows = [
+    row('Physical class (true state only)', NAV_CLASS[n.physical_class] || String(n.physical_class)),
+    row(el('span', {}, 'Vertical alert failure', el('span', {class: 'sub'}, `declared trusted while the true error stayed above the alert limit for 0.5 s or more; alert limit ${v.alert_limit || 'n/a'}`)),
+      v.alert_failure === true ? `yes, at t = ${f(v.alert_failure_t_s, 2)} s` : v.alert_failure === false ? 'no' : 'n/a', v.alert_failure === true ? 'bad' : ''),
+    row(el('span', {}, 'NEES mean', el('span', {class: 'sub'}, 'normalized estimation error squared, 7 states; its expected value is 7 when the declared covariance matches the true error')),
+      Number.isFinite(n.nees_mean) ? `${g3(n.nees_mean)} over ${n.nees_cycles} cycles` : 'n/a (this arm declares no covariance)'),
+    row('Mode transitions', `${tr.length} (bound ${n.transition_bound}, ${n.transitions_within_bound ? 'within it' : 'ABOVE it'}); improvements at or below the commit altitude: ${n.unsafe_transitions}`,
+      n.transitions_within_bound === false || n.unsafe_transitions > 0 ? 'bad' : ''),
+    row('Isolation verdict', `${words(n.isolation)}${Array.isArray(n.isolated) && n.isolated.length ? ' (isolated: ' + n.isolated.map(x => x === 'gnss' ? 'GNSS' : x).join(', ') + ')' : ' (no group isolated)'}`,
+      n.isolation === 'wrong' ? 'bad' : '')];
+  return el('div', {},
+    el('div', {class: 'scroll'}, el('table', {class: 'narrow'}, el('thead', {}, el('tr', {}, ['Verifier comparison', 'Value'].map(h => el('th', {}, h)))), el('tbody', {}, rows))),
+    tr.length ? el('ol', {}, tr.map(x => el('li', {}, `t = ${f(x.t_s, 2)} s: declared mode ${words(x.from)} to ${words(x.to)} (estimated altitude ${f(x.h_est_m, 0)} m)`))) : el('p', {class: 'meta'}, 'No mode transition was declared.'));
+}
+function navPanel(r) {
+  if (!hasNav(r)) return null;
+  const head = el('h3', {}, 'Navigation declarations (M10: what the controller declares, compared with the truth)');
+  if (!verified(r)) return el('div', {}, head, el('p', {class: 'meta'}, WITHHELD + '.'));
+  return el('section', {class: 'panel', 'aria-label': 'Navigation declarations'}, head,
+    el('p', {class: 'statement warn'}, el('b', {}, 'Declarations, not verdicts. '), NAV_NOTE),
+    el('div', {id: 'nav-live'}), navTable(r),
+    el('p', {class: 'meta'}, 'The physical class is computed from the true state alone, like the mission outcome; the other rows compare the declarations with the truth. vv-rocket replay recomputes all of them. One run is development evidence, not the M10 evaluation.'));
+}
 function touchdownCard(r) {
   const td = r.verification.touchdown;
   if (!td) return el('p', {class: 'meta'}, 'No touchdown in this run.');
@@ -625,7 +729,7 @@ function readout(r) {
 
 // ---------------------------------------------------------------- result
 function describeRun(r) {
-  return `${r.request.policy} policy · ${describeFault(r.request.fault)} · seed ${r.request.seed} · run ${r.run_id}`;
+  return `${r.request.policy} policy · ${requestFaults(r.request)} · seed ${r.request.seed} · run ${r.run_id}`;
 }
 function setTime(t) { state.t = Math.max(0, Math.min(endAll(), t)); renderLive(); }
 function timeControls() {
@@ -646,6 +750,8 @@ function renderLive() {
   for (const b of document.querySelectorAll('[data-zoom]')) b.setAttribute('aria-pressed', b.dataset.zoom === state.zoom ? 'true' : 'false');
   fill(box, el('div', {class: 'charts'}, charts(runs)),
     el('div', {class: runs.length > 1 ? 'grid2' : ''}, runs.map(x => el('div', {class: 'panel'}, el('h4', {}, runs.length > 1 ? `${x.name}: values at the cursor` : 'Values at the cursor'), readout(x.r)))));
+  const nav = $('nav-live');
+  if (nav && state.mode === 'single') fill(nav, navTimeline(state.single), navCursor(state.single));
 }
 function liveRuns() {
   if (state.mode === 'compare') return POLICY_NAMES.filter(p => verified(state.pair[p])).map((p, i) => ({r: state.pair[p], name: p, n: p === 'baseline' ? 1 : 2, style: p === 'robust' ? 'dash' : ''}));
@@ -667,7 +773,7 @@ function drawSingle() {
   if (!r.states.length) { fill($('result'), el('p', {class: 'bad'}, 'The run produced no recorded samples.')); return; }
   const details = [
     el('h3', {}, 'Requirements at contact (R1 to R6)'), reqTable(r),
-    el('h3', {}, `Safety invariants (${invRange(r)})`), invTable(r), flagsBox(r),
+    el('h3', {}, `Safety invariants (${invRange(r)})`), invTable(r), flagsBox(r), navPanel(r),
     el('h3', {}, 'Touchdown state (true state, interpolated to the contact instant)'), touchdownCard(r),
     ...liveSection(),
     el('h3', {}, 'Events'), eventList(r)];
@@ -712,7 +818,7 @@ function drawCompare() {
   const detail = p => el('button', {onclick: () => { state.mode = 'single'; state.single = state.pair[p]; state.note = null; state.t = endAll(); drawResult(); drawResearch(); $('result-heading').focus(); }}, `Open ${p} in detail`);
   fill($('result'), 
     el('h2', {id: 'result-heading', tabindex: '-1'}, 'Comparison of the two policies'),
-    el('p', {class: 'meta'}, `Same case for both: ${describeFault(req.fault)} · seed ${req.seed}. baseline run ${b.run_id}, robust run ${r.run_id}.`), noteBox(),
+    el('p', {class: 'meta'}, `Same case for both: ${requestFaults(req)} · seed ${req.seed}. baseline run ${b.run_id}, robust run ${r.run_id}.`), noteBox(),
     summary, actedNote(b),
     el('div', {class: 'grid2'}, POLICY_NAMES.map(p => el('div', {class: 'panel'}, el('h3', {}, p), ...statements(state.pair[p]), detail(p)))),
     el('h3', {}, 'Requirement and invariant verdicts side by side'), table,
@@ -886,7 +992,8 @@ function drawClaims() {
         'Contact dynamics: touchdown is the instant the nozzle exit plane reaches the ground. There are no legs, no tipping, no bounce and no landing-site model.',
         'A reliability or success probability: a count over 30 seeds with assumed dispersions is not an estimate for a real vehicle.',
         'That either controller is optimal or adequate for flight, or that it handles combined faults or faults outside the pre-registered ranges.',
-        'Wind, aerodynamic moments, reaction-control thrusters or Earth rotation.'])))
+        'Wind, aerodynamic moments, reaction-control thrusters or Earth rotation.',
+        'For the M10 policies (m10_a, m10_b, m10_b_plus): that a single run shown here evaluates them. The M10 evaluation needs the frozen campaign of docs/m10-resilient-navigation.md, and a declared "untrusted" mode is not a safe state.'])))
   );
 }
 

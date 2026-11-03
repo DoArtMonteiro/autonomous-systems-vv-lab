@@ -1,6 +1,6 @@
 # M10: navegação resiliente e decisão tolerante a falhas (desenho)
 
-Estado: **rascunho de desenho para revisão independente e decisão do proprietário. Não há implementação do M10.** Este documento não altera código, casos, campanhas nem resultados do M9 e do M9.1. As afirmações marcadas "(suposto)" ou "(incerto)" não foram verificadas no repositório nem em dados externos e têm de ser confirmadas ou refutadas antes de serem usadas como requisito.
+Estado: **desenho aceite pelo proprietário (PR #13, 02/11/2026); a implementação está em curso e é descrita em `docs/m10-implementation.md`.** O texto abaixo é o desenho aceite; os desvios de implementação estão registados nesse documento. Redação original do estado: rascunho de desenho para revisão independente e decisão do proprietário, sem implementação do M10. Este documento não altera código, casos, campanhas nem resultados do M9 e do M9.1. As afirmações marcadas "(suposto)" ou "(incerto)" não foram verificadas no repositório nem em dados externos e têm de ser confirmadas ou refutadas antes de serem usadas como requisito.
 
 Nomes fixos: braços **A**, **B**, **B+**, **C** (secção 6.1); conjuntos de sensores **`E0`** (só os sensores existentes), **`E1`** (`E0` mais barómetro) e **`E2`** (`E1` mais Doppler), para não colidirem com os invariantes `S1` a `S5`; modos `Nominal`, `DegradedNav` e `Untrusted` (secção 8).
 

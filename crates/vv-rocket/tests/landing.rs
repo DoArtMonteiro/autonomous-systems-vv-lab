@@ -200,25 +200,49 @@ fn dispersions_follow_the_registered_ranges_and_seed_zero_has_none() {
 
 #[test]
 fn the_controller_sees_only_observations_and_its_configuration() {
-    // The unit tests at the end of the controller module may import more; the code above them may not.
-    let controller = include_str!("../src/landing_controller.rs")
-        .split("#[cfg(test)]")
-        .next()
-        .unwrap();
+    // The unit tests at the end of each controller-side module may import more; the code above
+    // them may not. M10 (MD3): the navigation module `nav_filter` is under the same rule.
+    let code = |src: &'static str| src.split("#[cfg(test)]").next().unwrap();
+    let controller = code(include_str!("../src/landing_controller.rs"));
+    let nav = code(include_str!("../src/nav_filter.rs"));
     let types = include_str!("../src/landing_types.rs");
-    // Exactly these crate imports: no truth state, vehicle, simulation or sensor internals.
+    // Exactly these crate imports (a `use` may span lines): no truth state, vehicle, simulation or
+    // sensor internals.
     let imports = |src: &str| -> Vec<String> {
-        src.lines()
-            .filter(|l| l.trim_start().starts_with("use "))
-            .map(|l| l.trim().to_string())
-            .collect()
+        let mut out = Vec::new();
+        let mut current: Option<String> = None;
+        for line in src.lines() {
+            let t = line.trim();
+            if current.is_none() && t.starts_with("use ") {
+                current = Some(String::new());
+            }
+            if let Some(c) = current.as_mut() {
+                if !c.is_empty() && !c.ends_with('{') {
+                    c.push(' ');
+                }
+                c.push_str(t);
+                if t.ends_with(';') {
+                    out.push(c.replace("{ ", "{").replace(", }", "}").replace(",}", "}"));
+                    current = None;
+                }
+            }
+        }
+        out
     };
     assert_eq!(
         imports(controller),
         [
-            "use crate::landing_types::{Command, ControllerConfig, Estimate, Observation, Policy};",
+            "use crate::landing_types::{Command, ControllerConfig, Estimate, NavDeclaration, Observation, Policy};",
             "use crate::math::{Quat, Vec3};",
             "use crate::model::G0;",
+            "use crate::nav_filter::NavSystem;",
+        ]
+    );
+    assert_eq!(
+        imports(nav),
+        [
+            "use crate::landing_types::{ChannelStatus, GroupHealth, NavDeclaration, NavMode, NavParams, NavReport, Observation, Policy};",
+            "use crate::math::{Mat, Quat, Vec3};",
         ]
     );
     assert_eq!(imports(types), ["use serde::{Deserialize, Serialize};"]);
@@ -229,11 +253,14 @@ fn the_controller_sees_only_observations_and_its_configuration() {
         "Vehicle",
         "landing_truth",
         "landing_sim",
+        "landing_sensors",
+        "nav_verify",
     ] {
         assert!(
             !controller.contains(forbidden),
             "controller mentions {forbidden}"
         );
+        assert!(!nav.contains(forbidden), "nav_filter mentions {forbidden}");
         assert!(!types.contains(forbidden), "types mention {forbidden}");
     }
     // Its entry point takes an observation and returns a command.
@@ -263,6 +290,9 @@ fn artifact_paths_use_only_correctly_rounded_arithmetic() {
         ("landing_truth", include_str!("../src/landing_truth.rs")),
         ("landing_types", include_str!("../src/landing_types.rs")),
         ("landing_verify", include_str!("../src/landing_verify.rs")),
+        ("nav_filter", include_str!("../src/nav_filter.rs")),
+        ("nav_verify", include_str!("../src/nav_verify.rs")),
+        ("math", include_str!("../src/math.rs")),
     ];
     for (name, src) in sources {
         let code = src.split("#[cfg(test)]").next().unwrap();
