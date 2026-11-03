@@ -1,0 +1,18 @@
+# Bundled executables must run on a clean Windows 11 without the Visual C++ redistributable.
+# Link the VC runtime statically and keep the Universal CRT dynamic (it ships with Windows 10 and
+# later), the same split the Tauri shell uses. The maths functions come from the system UCRT, as in
+# the developer CLI builds, so simulation outputs do not change.
+[target.x86_64-pc-windows-msvc]
+rustflags = [
+    "-C", "link-arg=/NODEFAULTLIB:libvcruntimed.lib",
+    "-C", "link-arg=/NODEFAULTLIB:vcruntime.lib",
+    "-C", "link-arg=/NODEFAULTLIB:vcruntimed.lib",
+    "-C", "link-arg=/NODEFAULTLIB:libcmtd.lib",
+    "-C", "link-arg=/NODEFAULTLIB:msvcrt.lib",
+    "-C", "link-arg=/NODEFAULTLIB:msvcrtd.lib",
+    "-C", "link-arg=/NODEFAULTLIB:libucrt.lib",
+    "-C", "link-arg=/NODEFAULTLIB:libucrtd.lib",
+    "-C", "link-arg=/DEFAULTLIB:libcmt.lib",
+    "-C", "link-arg=/DEFAULTLIB:libvcruntime.lib",
+    "-C", "link-arg=/DEFAULTLIB:ucrt.lib",
+]

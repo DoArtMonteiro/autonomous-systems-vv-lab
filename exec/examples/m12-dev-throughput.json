@@ -1,0 +1,20 @@
+{
+  "schema": "vv-experiment.v1",
+  "id": "m12-dev-throughput",
+  "description": "Engine throughput and equivalence on development seeds: the M9.1 guarded controller under six fault conditions. Seeds 7000 to 9399 are development seeds; no protected seed is used.",
+  "domain": "rocket-landing",
+  "base_case": "../../crates/vv-rocket/landing/m91-nominal.json",
+  "arms": [
+    {"name": "nominal"},
+    {"name": "gnss-bias", "overrides": [{"pointer": "/faults", "value": [{"kind": "gnss_bias", "start_s": 8.0, "end_s": 40.0, "magnitude": 15.0}]}]},
+    {"name": "altimeter-bias", "overrides": [{"pointer": "/faults", "value": [{"kind": "altimeter_bias", "start_s": 10.0, "end_s": 40.0, "magnitude": 20.0}]}]},
+    {"name": "thrust-loss", "overrides": [{"pointer": "/faults", "value": [{"kind": "thrust_loss", "start_s": 5.26, "end_s": 40.0, "magnitude": 0.15}]}]},
+    {"name": "imu-accel-bias", "overrides": [{"pointer": "/faults", "value": [{"kind": "imu_accel_bias", "start_s": 5.0, "end_s": 40.0, "magnitude": 0.25}]}]},
+    {"name": "gimbal-stuck", "overrides": [{"pointer": "/faults", "value": [{"kind": "gimbal_stuck", "start_s": 10.0, "end_s": 12.0, "magnitude": 0.0}]}]}
+  ],
+  "design": {"kind": "single"},
+  "seeds": {"mode": "range", "first": 7000, "count": 2400},
+  "retention": {"policy": "failures_and_sample", "sample_every": 1000},
+  "limits": {"max_runs": 14400, "max_retained": 200, "max_artifact_bytes": 500000000, "max_wall_s": 600},
+  "analysis": {"metric": "summary.propellant_used_kg"}
+}

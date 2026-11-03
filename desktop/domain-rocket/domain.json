@@ -1,0 +1,37 @@
+{
+  "schema": "vv-domain-manifest.v1",
+  "id": "rocket-landing",
+  "name": "Rocket powered landing",
+  "version": "0.11.0",
+  "description": "Closed-loop powered landing of a 22 t rocket stage in a 6-DOF rigid-body model with a throttle and thrust-vector actuator, a noisy radar altimeter, GNSS and IMU, and four controller policies, up to two injected faults and the R1 to R6 requirements and S1 to S5 safety invariants judged on the true state.",
+  "contract": {
+    "name": "vv-domain",
+    "major": 1,
+    "minor": 0
+  },
+  "host": {
+    "executable": "vv-domain-rocket.exe",
+    "timeout_s": 120,
+    "max_output_bytes": 1048576
+  },
+  "capabilities": ["run", "replay", "compare", "evidence", "faults"],
+  "visualisations": ["scene.rocket-3d", "plots", "requirements", "timeline", "events"],
+  "seeds": {
+    "min": 0,
+    "max": 4294967295,
+    "protected": [
+      {
+        "start": 3000,
+        "end": 3099,
+        "reason": "M10 evaluation seeds; never run before the owner freezes the evaluation configuration. Use a development seed such as 5000 to 5099."
+      },
+      {
+        "start": 6000,
+        "end": 6099,
+        "reason": "M10 reserve seeds; never run before the owner freezes the evaluation configuration. Use a development seed such as 5000 to 5099."
+      }
+    ]
+  },
+  "model_validity": "Idealised demonstrator; not flight software and not validated against flight data. No contact dynamics: touchdown is the instant the nozzle exit plane reaches the ground. Requirements, dispersions and sensor noise are assumed values, not those of a real vehicle.",
+  "user_facing": true
+}
