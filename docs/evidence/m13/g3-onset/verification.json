@@ -1,0 +1,73 @@
+{
+  "schema": "vv-investigation-verification.v1",
+  "claim_id": "g3-onset",
+  "probes_recomputed": 9149,
+  "checks": [
+    {
+      "id": "manifest",
+      "pass": true,
+      "detail": "49 files; missing [], unlisted [], changed []"
+    },
+    {
+      "id": "inputs",
+      "pass": true,
+      "detail": "claim, base case and family cases match the hashes the package states"
+    },
+    {
+      "id": "evidence_grade",
+      "pass": true,
+      "detail": "stated Exploratory; the claim and its preregistration allow Exploratory"
+    },
+    {
+      "id": "source",
+      "pass": true,
+      "detail": "package 12b276cb182b62ee3ecda602fe5f82edec2f40163afddaa12513fdc54edcbc05, this build 12b276cb182b62ee3ecda602fe5f82edec2f40163afddaa12513fdc54edcbc05"
+    },
+    {
+      "id": "challenge",
+      "pass": true,
+      "detail": "502 search evaluations recomputed; log reproduced true; specification derived from the claim true"
+    },
+    {
+      "id": "rechallenge:threshold-1m",
+      "pass": true,
+      "detail": "400 search evaluations recomputed; derived from the claim and the mitigation true"
+    },
+    {
+      "id": "rechallenge:threshold-2m",
+      "pass": true,
+      "detail": "400 search evaluations recomputed; derived from the claim and the mitigation true"
+    },
+    {
+      "id": "probes",
+      "pass": true,
+      "detail": "9149 logged, 9149 recomputed, 0 differ, 0 repeated keys"
+    },
+    {
+      "id": "probe_count",
+      "pass": true,
+      "detail": "stated 9149 probes, recomputed 9149; log hash as stated true"
+    },
+    {
+      "id": "artifacts",
+      "pass": true,
+      "detail": "5 runs rewritten by the canonical writer and compared with the package"
+    },
+    {
+      "id": "file_set",
+      "pass": true,
+      "detail": "49 files expected; not written by the engine []; missing []"
+    },
+    {
+      "id": "findings",
+      "pass": true,
+      "detail": "every number and verdict recomputed from the probes"
+    },
+    {
+      "id": "statement",
+      "pass": true,
+      "detail": "the claim, envelope and rules the package states are those of claim.json and this engine"
+    }
+  ],
+  "pass": true
+}

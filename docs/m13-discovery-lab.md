@@ -38,7 +38,7 @@ Regras do motor (constantes em `investigate.rs`, gravadas em cada pacote):
 
 **Alegação** (`exec/claims/m13/g3-onset.json`). «O controlador `guarded` do M9.1 toca no solo dentro de R1 (velocidade vertical até 3 m/s) com um viés GNSS de 5 a 30 m, sempre que o viés comece nos primeiros 20 s do voo.» O critério G3 do M9.1 foi registado e suportado só com o viés presente desde 0 s. Esta alegação é uma hipótese nova; não altera o G3. O M14 já tinha mostrado que inícios de 2, 5 e 10 s falham a 5 e 10 m.
 
-**Resultados** (pacote recalculado; 7885 simulações; sementes 42000 a 43999):
+**Resultados** (pacote recalculado, `docs/evidence/m13/g3-onset/`; 9149 simulações; sementes 42000 a 43999):
 
 | Etapa | Resultado |
 | --- | --- |
@@ -94,7 +94,9 @@ Uma alegação declarada confirmatória sem um protocolo que a congele é recusa
 
 O espaço de trabalho «Discover» é o primeiro do Studio. Mostra a alegação (enunciado, origem, envelope com o valor registado, hipóteses e mitigações declaradas antes da execução, sementes e regras), corre a investigação com progresso por etapa e cancelamento, e abre o pacote como um caderno de sete secções: pesquisa, contraexemplo, envelope, causa, mitigação, limites e evidência. As séries do contraexemplo mostram lado a lado o estado verdadeiro, o acreditado e o observado, contra o gémeo contrafactual ou uma execução mitigada, com o cursor sincronizado.
 
-Imagens em `docs/images/m13-discovery/`, produzidas pelo teste de interface com a aplicação real.
+Imagens em `docs/images/m13-discovery/`, produzidas pelo teste de interface com a aplicação instalada.
+
+**Verificado em 3/11/2026**, na máquina de desenvolvimento (AMD Ryzen 7 7800X3D, Windows 11): instalador construído por `desktop/build.ps1` (sha256 `643f928e...`), instalado em silêncio; autoteste `vv-studio --self-test` aprovado (domínios e as duas alegações); nenhum executável instalado importa `VCRUNTIME140.dll`; `desktop/studio/tests/ui_smoke.py` contra a aplicação instalada: 79 de 79 verificações, incluindo as duas investigações feitas e recalculadas na aplicação e um pacote adulterado cujos veredictos ficam retirados. O CI do GitHub ainda não correu este ramo. Não houve teste numa máquina limpa.
 
 ## Como reproduzir
 
@@ -112,7 +114,7 @@ No Studio: instalar com `desktop/build.ps1`, abrir «Discover», escolher a aleg
 - **Exploratório.** As hipóteses de mecanismo e as mitigações foram escritas depois de execuções manuais com as sementes 41000 a 41009. A investigação registada usa sementes novas, mas isso não a torna confirmatória. O protocolo de confirmação está em `docs/m14-g3-onset-protocol-draft.md`, por aprovar.
 - **Hipóteses humanas.** A plataforma testa hipóteses e mitigações declaradas; não as inventa. A atribuição e o mapa do envelope são automáticos.
 - **Um ponto reduzido.** A intervenção é testada no contraexemplo reduzido e depois no envelope. O teste no envelope é o que separou o mecanismo geral do local; sem ele, a hipótese rival teria parecido apoiada.
-- **Regressão limitada ao que se declarou.** Oito famílias com 60 pontos cada (limite superior a 95 % de cerca de 6 % por família, sem agregação); duas estão saturadas (já falham sem a mitigação) e só mostram nomes de violação novos. Não foram testados: viés do altímetro de 1 a 3 m, ruído do altímetro maior, erros combinados de GNSS e altímetro, dispersões maiores, nem rejeições falsas em transitórios. «Sem regressão observada» não é «sem regressão».
+- **Regressão limitada ao que se declarou.** Oito famílias com 60 pontos cada (limite superior a 95 % de cerca de 6 % por família, sem agregação); duas estão saturadas: com viés GNSS baixo e com viés do altímetro baixo, R1 já falha em 60 de 60 sem a mitigação e continua a falhar com ela, por isso só mostram nomes de violação novos. Não foram testados: viés do altímetro de 1 a 3 m, ruído do altímetro maior, erros combinados de GNSS e altímetro, dispersões maiores, nem rejeições falsas em transitórios. «Sem regressão observada» não é «sem regressão».
 - **Grau confirmatório.** Este motor nunca classifica evidência como confirmatória: não consegue mostrar que um protocolo foi congelado antes da execução. A revisão de código independente mostrou que um pacote exploratório podia ser reclassificado; a correção foi recusar o grau.
 - **Mapa do envelope** só sobre os dois primeiros pressupostos, à resolução da grelha.
 - **Revisão.** O código, a metodologia e a interface foram revistos por agentes independentes, não por pessoas. Não houve revisão humana externa.

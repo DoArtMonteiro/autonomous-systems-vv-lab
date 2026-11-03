@@ -13,6 +13,26 @@ O M13 ficou como proposta (`docs/m13-proposal.md`); não havia uma capacidade de
 - **Uma conclusão sem margem.** No corredor junto à zona restrita (`scenarios/m2/f-zone-nominal.json`), a segurança mantém-se com ruído GPS de 0 mm (100 de 100) e cai para 61 de 100 com 1 mm. A causa está identificada no código e num traço.
 - **Uma conclusão publicada com âmbito mais estreito do que parece.** O critério G3 do M9.1 («`guarded` cumpre R1 com `gnss_bias` em pelo menos 27 de 30») foi registado com o viés presente desde 0 s. Com o mesmo viés de 5 ou 10 m a começar em 2, 5 ou 10 s, R1 falha em 30 de 30. Isto não refuta o G3 como foi registado; mostra que depende de um pressuposto sobre o instante da falha que ninguém tinha posto à prova.
 
+## Teste quantitativo do mecanismo de mascaramento
+
+A investigação M13 da alegação `g3-onset` (`docs/m13-discovery-lab.md`) apoiou um mecanismo: depois de um início tardio do viés GNSS, o resíduo do altímetro fica abaixo do limiar de rejeição e a regra 1 do `guarded` nunca atua. Se for assim, um sistema muito mais simples tem de prever onde o mecanismo acaba.
+
+`scripts/m14_masking_model.py` modela só o erro vertical do estimador, com os ganhos do caso M9.1, sem ruído, sem veículo e sem parâmetros ajustados. Previu (commit `73c9ff5`, antes de qualquer execução do teste):
+
+- P1: com o viés a começar em 5 s, R1 volta a cumprir-se acima de b* = 11,99 m. Critério: o ponto b50 do simulador a menos de 1 m.
+- P2: a 8 m, só um início na primeira medida GNSS (0 s) evita o mascaramento; inícios de 0,01 a 20 s mascaram.
+
+Resultado, com as sementes novas 47000 a 47019 (`docs/evidence/m14/masking/test.json`): **b50 = 11,89 m**, a 0,1 m da previsão; P2 verificada em todos os 8 inícios. Em todas as 29 células, R1 cumpre-se exatamente nas execuções em que o altímetro foi rejeitado. O mesmo modelo dá o fim da faixa mascarada em cerca de 4 vezes o limiar (8,0 m com 2 m e 4,0 m com 1 m), o que a investigação M13 confirma no envelope e numa família de viés líquido pequeno.
+
+Limites: exploratório. O autor tinha visto a transição grosseira entre 10 e 15 m antes de escrever o modelo. A confirmação exige um protocolo aprovado (`docs/m14-g3-onset-protocol-draft.md`).
+
+## O que o M14 conclui sobre a própria plataforma
+
+- **A pesquisa não é o que encontra estas falhas; é a declaração dos pressupostos.** O benchmark pré-registado não mostrou vantagem da pesquisa adaptativa, e no G3 a pesquisa Halton encontrou a primeira violação na avaliação 2 porque o início do viés passou a ser variável. Uma campanha que fixa o pressuposto (o G3 registado) nunca a encontra.
+- **Intervenções no ponto enganam.** Uma hipótese rival pareceu apoiada no contraexemplo reduzido e só no envelope se viu que era local; depois, a revisão independente mostrou que as intervenções da primeira versão atuavam todas pelo mesmo interruptor. O motor passou a exigir o teste no envelope, e a alegação passou a ter uma intervenção discriminante nas condições registadas.
+- **Uma regra de regressão estreita esconde compromissos.** A primeira versão não contava violações novas de outros requisitos; o limiar de 1 m tinha 41 pares com R2 ou R5 novos. O motor conta-os agora à parte.
+- **Um rótulo confirmatório não se verifica a partir do pacote.** A revisão de código reclassificou um pacote exploratório como confirmatório sem falhar a verificação. O motor recusa agora esse grau.
+
 ## Integração em `main`, sem o M10
 
 O M14 foi desenvolvido sobre a pilha dos PR 15 a 18, que inclui as alterações do M10 ao `vv-rocket`. O ramo `feat/m14-research` transporta os mesmos commits para uma base sem o M10 (Studio do M11 e `vv-exec` do M12 sobre `main`). Os ficheiros congelados em `exec/benchmarks/m14/freeze.json` ficam com os mesmos bytes no repositório; `exec/src/search.rs` difere do congelamento apenas pela correção posterior à revisão (`0cfce5e` no ramo original), como já estava declarado.
