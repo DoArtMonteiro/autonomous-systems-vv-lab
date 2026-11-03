@@ -1,0 +1,94 @@
+{
+  "schema": "vv-m14-benchmark.v1",
+  "description": "M14 falsification benchmark. Development problems tune and test the pipeline; held-out problems use failure mechanisms (actuator faults, GNSS bias, IMU bias) that no development run exercised. See docs/m14-preregisto.md.",
+  "budget": 200,
+  "repetitions": 30,
+  "minimise_budget": 40,
+  "strategies": {
+    "random": {"kind": "random"},
+    "halton": {"kind": "halton"},
+    "extremes": {"kind": "extremes"},
+    "adaptive": {"kind": "adaptive", "initial": 20, "sigma": 0.3, "patience": 6}
+  },
+  "primary": {"treatment": "adaptive", "control": "random", "alpha": 0.05},
+  "splits": {
+    "development": {"seed_pool": {"low": 30000, "high": 39999}, "search_seed": 14001, "grid_seeds": [31000, 31001, 31002, 31003]},
+    "heldout": {"seed_pool": {"low": 50000, "high": 59999}, "search_seed": 14002, "grid_seeds": [51000, 51001, 51002, 51003]}
+  },
+  "bootstrap": {"resamples": 10000, "seed": 14003},
+  "objectives": {
+    "ground-m4": {"metric": "margin.restricted_zone_mm", "direction": "minimise"},
+    "rocket-landing": {"metric": "requirement.R1_vertical_speed", "direction": "maximise"}
+  },
+  "targets": {"ground-m4": "safety", "rocket-landing": "any"},
+  "problems": [
+    {
+      "id": "D1-ground-zone-sensors",
+      "split": "development",
+      "domain": "ground-m4",
+      "base_case": "../../cases/m14/ground-zone-corridor.json",
+      "grid_levels": 9,
+      "parameters": [
+        {"name": "gps_noise", "pointer": "/scenario/sensors/gps/noise_max_mm", "unit": "mm", "low": 0, "high": 160, "integer": true},
+        {"name": "gps_dropout", "pointer": "/scenario/sensors/gps/dropout_permille", "unit": "permille", "low": 0, "high": 40, "integer": true},
+        {"name": "packet_loss", "pointer": "/scenario/sensors/communication/packet_loss_permille", "unit": "permille", "low": 0, "high": 40, "integer": true}
+      ]
+    },
+    {
+      "id": "D2-rocket-thrust-loss",
+      "split": "development",
+      "domain": "rocket-landing",
+      "base_case": "../../cases/m14/rocket-thrust-loss.json",
+      "grid_levels": 15,
+      "parameters": [
+        {"name": "magnitude", "pointer": "/faults/0/magnitude", "unit": "model", "low": 0.05, "high": 0.30},
+        {"name": "start", "pointer": "/faults/0/start_s", "unit": "s", "low": 0.0, "high": 35.0, "quantum": 0.01}
+      ]
+    },
+    {
+      "id": "H1-ground-stop-actuator-delay",
+      "split": "heldout",
+      "domain": "ground-m4",
+      "base_case": "../../cases/m14/ground-stop-actuator-delay.json",
+      "grid_levels": 9,
+      "parameters": [
+        {"name": "start_tick", "pointer": "/actuator/faults/0/windows/0/start_tick", "unit": "ticks", "low": 1, "high": 16, "integer": true},
+        {"name": "delay", "pointer": "/actuator/faults/0/delay_ticks", "unit": "ticks", "low": 1, "high": 6, "integer": true},
+        {"name": "probability", "pointer": "/actuator/faults/0/probability_permille", "unit": "permille", "low": 0, "high": 1000, "integer": true}
+      ]
+    },
+    {
+      "id": "H2-ground-overshoot-actuator-loss",
+      "split": "heldout",
+      "domain": "ground-m4",
+      "base_case": "../../cases/m14/ground-overshoot-actuator-loss.json",
+      "grid_levels": 13,
+      "parameters": [
+        {"name": "start_tick", "pointer": "/actuator/faults/0/windows/0/start_tick", "unit": "ticks", "low": 1, "high": 12, "integer": true},
+        {"name": "probability", "pointer": "/actuator/faults/0/probability_permille", "unit": "permille", "low": 0, "high": 1000, "integer": true}
+      ]
+    },
+    {
+      "id": "H3-rocket-gnss-bias",
+      "split": "heldout",
+      "domain": "rocket-landing",
+      "base_case": "../../cases/m14/rocket-gnss-bias.json",
+      "grid_levels": 15,
+      "parameters": [
+        {"name": "magnitude", "pointer": "/faults/0/magnitude", "unit": "model", "low": 5.0, "high": 30.0},
+        {"name": "start", "pointer": "/faults/0/start_s", "unit": "s", "low": 0.0, "high": 35.0, "quantum": 0.01}
+      ]
+    },
+    {
+      "id": "H4-rocket-imu-accel-bias",
+      "split": "heldout",
+      "domain": "rocket-landing",
+      "base_case": "../../cases/m14/rocket-imu-accel-bias.json",
+      "grid_levels": 15,
+      "parameters": [
+        {"name": "magnitude", "pointer": "/faults/0/magnitude", "unit": "model", "low": 0.05, "high": 0.5},
+        {"name": "start", "pointer": "/faults/0/start_s", "unit": "s", "low": 0.0, "high": 35.0, "quantum": 0.01}
+      ]
+    }
+  ]
+}
