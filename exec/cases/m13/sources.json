@@ -73,6 +73,23 @@
         "magnitude": 0.15
       },
       "case_sha256": "70442780e8ba366f3bff4daa3e22d51b45815a1a64214df8e661f2c9378b76f8"
+    },
+    "family-small-net-gnss-bias": {
+      "faults": [
+        {
+          "kind": "gnss_bias",
+          "start_s": 5.0,
+          "end_s": 40.0,
+          "magnitude": 7.0
+        },
+        {
+          "kind": "gnss_bias_low",
+          "start_s": 5.0,
+          "end_s": 40.0,
+          "magnitude": 5.0
+        }
+      ],
+      "case_sha256": "f9f2bedd8f620d466dabd0a1d2e4f69247f6249668347deca39b20325b36ef60"
     }
   }
 }

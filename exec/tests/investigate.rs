@@ -110,6 +110,18 @@ fn rehash(out: &Path) {
     fs::write(path, serde_json::to_vec_pretty(&m).unwrap()).unwrap();
 }
 
+/// Adds `extra` to the manifest with its hash: the attack of listing a planted file.
+fn rehash_with(out: &Path, extra: &str) {
+    let path = out.join("manifest.json");
+    let mut m: BTreeMap<String, String> =
+        serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    m.insert(
+        extra.into(),
+        sha256_hex(&fs::read(out.join(extra)).unwrap()),
+    );
+    fs::write(path, serde_json::to_vec_pretty(&m).unwrap()).unwrap();
+}
+
 fn edit_package(out: &Path, f: impl FnOnce(&mut Value)) {
     let p = out.join("investigation.json");
     let mut v: Value = serde_json::from_slice(&fs::read(&p).unwrap()).unwrap();
@@ -309,7 +321,10 @@ fn another_source_grade_or_envelope_fails() {
     // A file added to the package.
     let d = tampered("inv-id-extra", &base);
     fs::write(d.join("note.txt"), b"added").unwrap();
-    assert_eq!(failed(&verify(&d)), vec!["manifest"]);
+    assert_eq!(failed(&verify(&d)), vec!["manifest", "file_set"]);
+    // A file added and listed in a re-written manifest is still not part of the evidence.
+    rehash_with(&d, "note.txt");
+    assert_eq!(failed(&verify(&d)), vec!["file_set"]);
 }
 
 #[test]
@@ -338,17 +353,24 @@ fn claims_that_break_the_seed_rules_or_claim_confirmation_are_refused() {
     c["hypotheses"][0]["interventions"][0]["overrides"][0]["pointer"] =
         json!("/scenario/sensors/gps/noise_max_mm");
     assert!(parse(c).unwrap_err().contains("assumption"));
-    // A preregistration that does not freeze the claim keeps the run from starting.
+    // This engine never grades evidence confirmatory, with or without a protocol: it cannot show
+    // that a protocol was frozen before the run.
     let c = claim(json!({
         "evidence_grade": "confirmatory",
         "preregistration": {"path": "p.txt", "sha256": sha256_hex(b"protocol")}
     }));
+    let e = parse(c.clone()).unwrap_err();
+    assert!(e.contains("does not grade evidence confirmatory"), "{e}");
+    let out = scratch("inv-prereg");
     let mut i = inputs(&c);
     i.preregistration = Some(b"protocol".to_vec());
-    let out = scratch("inv-prereg");
-    let e = investigate::execute(&i, &out, 2, None).unwrap_err();
-    assert!(e.contains("does not freeze this claim"), "{e}");
-    assert!(!out.exists() && !out.with_extension("partial").exists());
+    assert!(investigate::execute(&i, &out, 2, None).is_err());
+    assert!(!out.exists() && !investigate::partial_of(&out).exists());
+    // A budget above the probe cap is refused before anything runs.
+    let big = claim(
+        json!({"budget": {"baseline_seeds": 6, "challenge": 40, "minimise": 20, "replication_seeds": 20, "envelope_levels": 64, "envelope_seeds": 400, "mechanism_seeds": 20, "regression_points": 6}}),
+    );
+    assert!(parse(big).unwrap_err().contains("probes"));
 }
 
 #[test]
@@ -362,4 +384,28 @@ fn an_interrupted_investigation_never_looks_finished() {
     let done = run("inv-exists");
     let e = investigate::execute(&inputs(&claim(json!({}))), &done, 2, None).unwrap_err();
     assert!(e.contains("already exists"), "{e}");
+}
+
+#[test]
+fn a_claim_reads_only_its_own_claims_and_cases() {
+    let root = scratch("inv-paths");
+    let claims = root.join("lab").join("claims").join("m13");
+    let cases = root.join("lab").join("cases");
+    fs::create_dir_all(&claims).unwrap();
+    fs::create_dir_all(&cases).unwrap();
+    fs::write(cases.join("base.json"), corridor()).unwrap();
+    fs::write(root.join("outside.json"), corridor()).unwrap();
+    let write = |name: &str, base: &str| {
+        let mut c = claim(json!({"base_case": base}));
+        c["regression"][0]["base_case"] = json!(base);
+        let path = claims.join(name);
+        fs::write(&path, serde_json::to_vec_pretty(&c).unwrap()).unwrap();
+        path
+    };
+    assert!(investigate::read_inputs(&write("ok.json", "../../cases/base.json")).is_ok());
+    let e = investigate::read_inputs(&write("up.json", "../../../outside.json")).unwrap_err();
+    assert!(e.contains("resolves outside"), "{e}");
+    let abs = root.join("outside.json").display().to_string();
+    let e = investigate::read_inputs(&write("abs.json", &abs)).unwrap_err();
+    assert!(e.contains("relative"), "{e}");
 }

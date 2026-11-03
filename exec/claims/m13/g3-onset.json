@@ -65,12 +65,12 @@
   },
   "hypotheses": [
     {
-      "id": "masking",
-      "statement": "Sub-threshold masking: after a late onset the estimator blends the biased GNSS with an altimeter it still accepts, so the residual stays under the 3 m rejection threshold, the altimeter is never rejected, rule 1 never engages and the believed vertical motion is wrong. With the bias from 0 s, the estimator starts on the biased GNSS, the residual exceeds the threshold at once and the altimeter is rejected.",
+      "id": "rule1-not-engaged",
+      "statement": "After a late onset the altimeter residual stays under the 3 m rejection threshold, so the altimeter is never rejected and rule 1 of guarded never engages; with rule 1 engaged, the bias no longer matters. With the bias from 0 s, the estimator starts on the biased GNSS fix, the residual exceeds the threshold at once and rule 1 protects the landing.",
       "interventions": [
         {
           "id": "threshold-1m",
-          "description": "Lower the altimeter rejection threshold from 3 m to 1 m, below the predicted blended residual.",
+          "description": "Lower the rejection threshold to 1 m, under the residual the counterexample shows, so that rule 1 can engage.",
           "at": "counterexample",
           "overrides": [
             {
@@ -81,20 +81,16 @@
           "predicts": "holds"
         },
         {
-          "id": "no-altimeter-blend",
-          "description": "Remove the altimeter from the estimator (position and velocity gains 0): no blending is left to mask the bias.",
-          "at": "counterexample",
+          "id": "no-rejection-at-registered",
+          "description": "Make rejection impossible (threshold 1000 m) at the registered conditions, where G3 holds: if rule 1 is what protects G3, R1 now fails.",
+          "at": "registered",
           "overrides": [
             {
-              "pointer": "/controller/gains/altimeter_position_gain",
-              "value": 0.0
-            },
-            {
-              "pointer": "/controller/gains/altimeter_velocity_gain",
-              "value": 0.0
+              "pointer": "/controller/gains/altimeter_residual_threshold_m",
+              "value": 1000.0
             }
           ],
-          "predicts": "holds"
+          "predicts": "violated"
         }
       ],
       "trace_checks": [
@@ -106,28 +102,94 @@
           "predicate": "never_true"
         },
         {
-          "id": "velocity-belief-wrong",
-          "description": "The believed vertical velocity is wrong by at least 1 m/s at some sample.",
+          "id": "residual-under-threshold",
+          "description": "Altimeter residual (reported minus believed nozzle height, with the true lever arm) stays under 3 m in the counterexample runs.",
           "samples": "/samples",
-          "pointer": "/estimate/velocity_mps/2",
-          "minus": "/truth/velocity_mps/2",
+          "pointer": "/observation/altimeter_m",
+          "terms": [
+            {
+              "pointer": "/estimate/position_m/2",
+              "coefficient": -1.0
+            },
+            {
+              "pointer": "/truth/position_m/2",
+              "coefficient": 1.0
+            },
+            {
+              "pointer": "/truth/base_position_m/2",
+              "coefficient": -1.0
+            }
+          ],
+          "predicate": "max_abs_below",
+          "threshold": 3.0
+        },
+        {
+          "id": "residual-over-threshold-at-registered",
+          "description": "At the registered conditions the residual reaches at least 3 m.",
+          "samples": "/samples",
+          "pointer": "/observation/altimeter_m",
+          "terms": [
+            {
+              "pointer": "/estimate/position_m/2",
+              "coefficient": -1.0
+            },
+            {
+              "pointer": "/truth/position_m/2",
+              "coefficient": 1.0
+            },
+            {
+              "pointer": "/truth/base_position_m/2",
+              "coefficient": -1.0
+            }
+          ],
           "predicate": "max_abs_at_least",
-          "threshold": 1.0
+          "threshold": 3.0,
+          "at": "registered"
         }
       ]
     },
     {
-      "id": "velocity-coupling",
-      "statement": "Competing explanation: the failure travels through the altimeter velocity correction alone (the residual divided by the cycle time, fed into the velocity estimate).",
+      "id": "velocity-pathway-only",
+      "statement": "Rival: the failure needs the corrupted velocity belief that the altimeter velocity correction creates. Without that correction it disappears even when the altimeter can never be rejected.",
       "interventions": [
         {
-          "id": "no-velocity-correction",
-          "description": "Set the altimeter velocity gain to 0 and keep the altimeter position correction.",
+          "id": "no-velocity-correction-no-rejection",
+          "description": "Altimeter velocity gain 0 and rejection impossible (threshold 1000 m).",
           "at": "counterexample",
           "overrides": [
             {
               "pointer": "/controller/gains/altimeter_velocity_gain",
               "value": 0.0
+            },
+            {
+              "pointer": "/controller/gains/altimeter_residual_threshold_m",
+              "value": 1000.0
+            }
+          ],
+          "predicts": "holds"
+        }
+      ]
+    },
+    {
+      "id": "altitude-pathway-only",
+      "statement": "Rival: the failure needs the altimeter to be blended into the estimate. Without any altimeter correction it disappears even when the altimeter can never be rejected.",
+      "interventions": [
+        {
+          "id": "no-blend-no-rejection",
+          "description": "Altimeter position and velocity gains 0 and rejection impossible (threshold 1000 m): the estimator follows the biased GNSS alone.",
+          "at": "counterexample",
+          "overrides": [
+            {
+              "pointer": "/controller/gains/altimeter_position_gain",
+              "value": 0.0
+            },
+            {
+              "pointer": "/controller/gains/altimeter_velocity_gain",
+              "value": 0.0
+            },
+            {
+              "pointer": "/controller/gains/altimeter_residual_threshold_m",
+              "value": 1000.0
             }
           ],
           "predicts": "holds"
@@ -313,6 +375,20 @@
           "unit": "model",
           "low": 0.05,
           "high": 0.3
+        }
+      ]
+    },
+    {
+      "id": "small-net-gnss-bias",
+      "title": "Small net GNSS bias (below the 5 m floor)",
+      "base_case": "../../cases/m13/family-small-net-gnss-bias.json",
+      "parameters": [
+        {
+          "name": "gnss_bias_m",
+          "pointer": "/faults/0/magnitude",
+          "unit": "model",
+          "low": 5.0,
+          "high": 9.0
         }
       ]
     }

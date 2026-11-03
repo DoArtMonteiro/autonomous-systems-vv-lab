@@ -50,9 +50,12 @@ const WORDS = {
   general: ['General', 'ok', 'Acts on at least 90 % of the failing envelope pairs.'],
   local: ['Local', 'warn', 'Acts on fewer than 90 % of the failing envelope pairs.'],
   ineffective: ['Ineffective', 'bad', 'Removes the violation in fewer than 90 % of the counterexample seeds.'],
-  effective_no_regression_observed: ['Effective, no regression observed', 'ok', 'Removes the violation; no new safety or claim violation in any paired test and none in the re-challenge.'],
+  effective_no_regression_observed: ['Effective, no regression observed', 'ok', 'Removes the violation; no new violation of any requirement or invariant in the paired tests, none in the re-challenge. Observed, within the tests run.'],
   effective_with_residual_counterexamples: ['Effective, residual counterexamples', 'warn', 'Removes this counterexample, but a fresh search still finds violations of the claim.'],
   effective_with_regressions: ['Effective, with regressions', 'bad', 'Removes the violation but adds new safety or claim violations elsewhere.'],
+  effective_with_tradeoffs: ['Effective, with trade-offs', 'warn', 'Removes the violation, adds no safety or claim violation, but some paired runs gain other requirement violations (listed below).'],
+  inconclusive_no_replication: ['Inconclusive', 'warn', 'A counterexample was found but no replication run completed.'],
+  withdrawn: ['Withdrawn', 'bad', 'The package failed recomputation; it supports nothing.'],
   necessary: ['Necessary', 'ok', 'Reverting it alone removes the violation.'],
   sufficient: ['Sufficient', 'ok', 'Alone, at the registered conditions, it causes the violation.'],
   necessary_and_sufficient: ['Necessary and sufficient', 'ok', ''],
@@ -128,6 +131,14 @@ function stamp(name) {
   return m ? `${m[1]}-${m[2]}-${m[3]} ${m[4]}:${m[5]} UTC` : name;
 }
 
+function failedCheck(p) {
+  return Boolean(p.verification && !p.verification.stale && !p.verification.report.pass);
+}
+
+function verdictOf(p) {
+  return failedCheck(p) ? 'withdrawn' : p.verdict && p.verdict.claim;
+}
+
 function latestFor(claimId) {
   return st.packages.find((p) => p.claim_id === claimId);
 }
@@ -144,7 +155,7 @@ function rail() {
       },
       h('span', { class: 'dl-item-title' }, cl ? cl.title : c.file),
       cl ? h('span', { class: 'dl-item-sub' }, `${cl.domain} · ${cl.property.replace(/^\w+:/, '')}`) : h('span', { class: 'error-text small' }, c.error),
-      last ? h('span', { class: 'dl-item-chips' }, chip(last.verdict && last.verdict.claim)) : h('span', { class: 'dl-item-sub dim' }, 'Not investigated yet')));
+      last ? h('span', { class: 'dl-item-chips' }, chip(verdictOf(last))) : h('span', { class: 'dl-item-sub dim' }, 'Not investigated yet')));
     }));
   const pk = h('ul', { class: 'dl-list', 'aria-label': 'Investigations' },
     st.packages.length ? st.packages.map((p) => {
@@ -157,7 +168,7 @@ function rail() {
       },
       h('span', { class: 'dl-item-title' }, p.title),
       h('span', { class: 'dl-item-sub mono' }, stamp(p.name)),
-      h('span', { class: 'dl-item-chips' }, chip(p.verdict && p.verdict.claim),
+      h('span', { class: 'dl-item-chips' }, chip(verdictOf(p)),
         vr ? h('span', { class: `dl-chip ${vr.pass ? 'ok' : 'bad'}` }, glyph(vr.pass ? 'ok' : 'bad'), vr.pass ? 'Recomputed' : 'Failed check')
           : h('span', { class: `dl-chip ${stale ? 'warn' : 'neutral'}` }, glyph(stale ? 'warn' : 'neutral'), stale ? 'Changed since recomputed' : 'Not recomputed'))));
     }) : h('li', { class: 'empty small' }, 'No investigation yet. Choose a claim and challenge it.'));
@@ -195,8 +206,7 @@ function renderClaim() {
   }
   const c = entry.claim;
   const b = c.budget;
-  const runs = b.baseline_seeds + b.challenge + b.minimise + b.replication_seeds * (1 + 2 * c.assumptions.length)
-    + (b.envelope_levels ** Math.min(2, c.assumptions.length)) * b.envelope_seeds * (1 + c.mitigations.length);
+  const runs = (c.planned_probes || 0) + b.challenge * (1 + c.mitigations.length) + b.minimise;
   m.append(
     h('header', { class: 'dl-head' },
       h('p', { class: 'dl-kicker' }, 'Claim under test'),
@@ -209,7 +219,7 @@ function renderClaim() {
         h('span', { class: 'dl-chip warn' }, glyph('warn'), c.evidence_grade === 'exploratory' ? 'Exploratory grade' : c.evidence_grade)),
       h('div', { class: 'dl-actions' },
         h('button', { type: 'button', class: 'btn btn-primary dl-cta', onclick: () => challenge(entry) }, 'Challenge this claim'),
-        h('span', { class: 'dim small' }, `About ${runs.toLocaleString('en')} simulations plus regression families, on development seeds. Each one is logged and recomputable.`))),
+        h('span', { class: 'dim small' }, `At most ${runs.toLocaleString('en')} simulations, as planned by the engine from the budget, on development seeds. Each one is logged and recomputable.`))),
     section('Where the claim comes from', h('p', { class: 'dl-prose' }, c.origin)),
     section('Assumptions and envelope', h('p', { class: 'dl-prose dim' }, 'The challenge varies these and only these, inside the declared box. The registered value is where the claim was originally supported.'),
       h('div', { class: 'dl-assume' }, c.assumptions.map((a) => assumptionRow(a)))),
@@ -341,6 +351,12 @@ async function verify() {
 
 // ------------------------------------------------------------------------ package view
 
+/** `requirement:R1_vertical_speed` as `R1 vertical speed (requirement)`. */
+function prettyProp(name) {
+  const m = /^(\w+):(.*)$/.exec(name || '');
+  return m ? `${m[2].replace(/_/g, ' ')} (${m[1]})` : name;
+}
+
 function summarySentence(p) {
   const f = p.findings;
   const cx = f.counterexample;
@@ -351,7 +367,15 @@ function summarySentence(p) {
   }
   const vals = cx.minimised.values.map((v, i) => `${names[i]} ${valueText(v, p.assumptions[i].unit)}`).join(', ');
   const reg = cx.registered.values.map((v, i) => `${names[i]} ${valueText(v, p.assumptions[i].unit)}`).join(', ');
-  return `At ${vals}, ${p.property.replace(/^\w+:/, '')} is violated in ${frac(cx.replication.violated, cx.replication.n)} fresh seeds. At the registered conditions (${reg}) it is violated in ${frac(f.baseline.violated, f.baseline.n)}.`;
+  const other = Object.entries(f.baseline_violations || {}).filter(([k]) => k !== p.property);
+  const also = other.length ? ` Those registered runs do violate other requirements: ${other.map(([k, v]) => `${prettyProp(k)} in ${v}`).join(', ')}.` : '';
+  return `At ${vals}, ${prettyProp(p.property)} is violated in ${frac(cx.replication.violated, cx.replication.n)} fresh seeds. At the registered conditions, where the claim was originally supported (${reg}), it is violated in ${frac(f.baseline.violated, f.baseline.n)}.${also}`;
+}
+
+function worst(list) {
+  const tones = list.map(([, code]) => word(code)[1]);
+  if (!tones.length) return 'neutral';
+  return tones.includes('bad') ? 'bad' : tones.includes('warn') ? 'warn' : tones.every((t) => t === 'ok') ? 'ok' : 'neutral';
 }
 
 function acceptance(p, vr) {
@@ -371,9 +395,14 @@ function acceptance(p, vr) {
       : h('div', null, h('b', null, verified ? 'Recomputed, every check passed' : 'A check failed'), h('span', { class: 'small dim' }, `${vr.report.probes_recomputed.toLocaleString('en')} probes rerun · ${vr.verified_at_utc}`)),
     verified === null ? (vr && vr.stale ? 'warn' : 'neutral') : verified ? 'ok' : 'bad'),
     tile('Claim', withdrawn ? gone('verdict') : h('div', null, h('b', null, word(f.verdict.claim)[0]), h('span', { class: 'small dim' }, word(f.verdict.claim)[2]), stated), withdrawn ? 'bad' : word(f.verdict.claim)[1]),
-    tile('Mechanism', withdrawn ? gone('mechanism') : h('div', null, mech.length ? mech.map(([id, s2]) => h('div', { class: 'dl-tile-line' }, h('span', { class: 'mono small' }, id), chip(s2))) : h('b', null, 'No hypothesis declared')), withdrawn ? 'bad' : mech.some(([, s2]) => s2 === 'experimentally_supported') ? 'ok' : 'warn'),
-    tile('Mitigation', withdrawn ? gone('mitigation result') : h('div', null, mit.length ? mit.map(([id, s2]) => h('div', { class: 'dl-tile-line' }, h('span', { class: 'mono small' }, id), chip(s2))) : h('b', null, 'No mitigation declared')), withdrawn ? 'bad' : mit.some(([, s2]) => s2 === 'effective_no_regression_observed') ? 'ok' : 'warn'),
+    tile('Mechanism', withdrawn ? gone('mechanism') : h('div', null, mech.length ? mech.map(([id, s2]) => h('div', { class: 'dl-tile-line' }, h('span', { class: 'mono small' }, id), chip(s2))) : h('b', null, 'No hypothesis declared')), withdrawn ? 'bad' : worst(mech)),
+    tile('Mitigation', withdrawn ? gone('mitigation result') : h('div', null, mit.length ? mit.map(([id, s2]) => h('div', { class: 'dl-tile-line' }, h('span', { class: 'mono small' }, id), chip(s2))) : h('b', null, 'No mitigation declared')), withdrawn ? 'bad' : worst(mit)),
     tile('Evidence grade', h('div', null, h('b', null, f.verdict.evidence_grade === 'exploratory' ? 'Exploratory' : 'Confirmatory'), h('span', { class: 'small dim' }, 'Simulation, development seeds. Not a confirmation, not a certification.')), 'neutral'));
+}
+
+function bodyWithdrawn(d) {
+  const vr = d.verification;
+  return Boolean(vr && !vr.stale && !vr.report.pass);
 }
 
 function renderPackage() {
@@ -385,17 +414,19 @@ function renderPackage() {
     h('header', { class: 'dl-head' },
       h('div', { class: 'dl-headrow' },
         h('div', null,
-          h('p', { class: 'dl-kicker' }, `Investigation · ${p.domain} · ${p.engine}`),
+          h('p', { class: 'dl-kicker' }, `Investigation · ${p.domain} · ${p.engine}${bodyWithdrawn(d) ? ' · withdrawn' : ''}`),
           h('h1', null, p.title)),
         h('div', { class: 'dl-actions' },
           h('button', { type: 'button', class: 'btn', onclick: verify }, 'Recompute from scratch'),
           h('button', { type: 'button', class: 'btn', onclick: () => api.reveal(st.pkgName).catch((e) => toast(errorText(e), 'error')) }, 'Show package folder'))),
       h('p', { class: 'dl-statement' }, p.statement),
-      h('p', { class: 'dl-summary' }, summarySentence(p))),
+      bodyWithdrawn(d)
+        ? h('p', { class: 'dl-withdrawn', role: 'alert' }, 'This package states a result, but its recomputation failed. Nothing below is evidence; it is shown only so the failed checks can be inspected in section 7.')
+        : h('p', { class: 'dl-summary' }, summarySentence(p))),
     acceptance(p, d.verification),
     h('nav', { class: 'dl-story', 'aria-label': 'Investigation steps' },
       ['Challenge', 'Counterexample', 'Envelope', 'Cause', 'Mitigation', 'Limits', 'Evidence'].map((t, i) =>
-        h('a', { href: `#dl-s${i}`, class: 'dl-story-step', onclick: (e) => { e.preventDefault(); document.getElementById(`dl-s${i}`).scrollIntoView({ behavior: 'smooth', block: 'start' }); } }, h('span', { class: 'dl-story-n' }, String(i + 1)), t))),
+        h('a', { href: `#dl-s${i}`, class: 'dl-story-step', onclick: (e) => { e.preventDefault(); document.getElementById(`dl-s${i}`).scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' }); } }, h('span', { class: 'dl-story-n' }, String(i + 1)), t))),
     secChallenge(p),
     secCounterexample(p),
     secEnvelope(p),
@@ -405,6 +436,10 @@ function renderPackage() {
     secEvidence(p, d),
   );
   drawTimeline();
+}
+
+function reducedMotion() {
+  return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
 function sec(i, title, lead, ...body) {
@@ -460,7 +495,7 @@ function scatter(p, c, cx) {
       ticks(0, 'x'), two ? ticks(1, 'y') : null,
       s('text', { x: (L + W - R) / 2, y: H - 4, 'text-anchor': 'middle', class: 'dl-axl' }, `${a[0].name}${unitText(a[0].unit) ? ` (${unitText(a[0].unit)})` : ''}`),
       two ? s('text', { x: 12, y: (T + H - B) / 2, transform: `rotate(-90 12 ${(T + H - B) / 2})`, 'text-anchor': 'middle', class: 'dl-axl' }, `${a[1].name}${unitText(a[1].unit) ? ` (${unitText(a[1].unit)})` : ''}`) : null),
-    h('figcaption', { class: 'small dim' }, h('span', { class: 'dl-key bad' }), ' violates the property  ', h('span', { class: 'dl-key ok' }), ' holds. Rings mark the registered point, the first counterexample found and its minimised form.'));
+    h('figcaption', { class: 'small dim' }, h('span', { class: 'dl-key bad' }), ' violates the property  ', h('span', { class: 'dl-key ok' }), ' holds. Rings mark the registered point, the counterexample the engine chose (the class whose minimised point is closest to the registered conditions) and that minimised point.'));
 }
 
 // 2. Counterexample and timeline --------------------------------------------------------
@@ -487,6 +522,13 @@ function secCounterexample(p) {
       h('div', null, h('span', { class: 'dim small' }, 'Show '), pick('primary', 'primary')),
       h('div', null, h('span', { class: 'dim small' }, 'against '), pick('compare', 'compare'))),
     h('p', { class: 'small dim', id: 'dl-tl-desc' }, describeArtifacts(p)),
+    h('p', { class: 'dl-tl-key small' },
+      h('span', { class: 'dl-swatch truth' }), 'true state  ',
+      h('span', { class: 'dl-swatch belief' }), 'what the controller believed  ',
+      h('span', { class: 'dl-swatch obs' }), 'what a sensor reported  ',
+      h('span', { class: 'dl-swatch err' }), 'belief error  ',
+      h('span', { class: 'dl-swatch flag' }), 'monitor flag (0 or 1)  ',
+      'Dashed: the compared run. Vertical lines: fault start (pink), violation (red).'),
     h('div', { class: 'dl-tl', id: 'dl-tl' }),
     h('div', { class: 'dl-events', id: 'dl-events' }));
 }
@@ -536,7 +578,7 @@ function drawTimeline() {
       cursor: { sync: { key: sync.key }, points: { show: false } },
       legend: { show: true, live: true },
       scales: { x: { time: false }, y: flag ? { range: [-0.1, 1.1] } : {} },
-      axes: [{ ...ax, label: 's', labelSize: 14, size: 28 }, { ...ax, size: 54 }],
+      axes: [{ ...ax, label: 't (s)', labelSize: 14, size: 28 }, { ...ax, size: 54 }],
       series,
       hooks: { draw: [(uu) => drawEvents(uu, a.events)] },
     }, data, el);
@@ -594,7 +636,7 @@ function secEnvelope(p) {
     seg,
     heatmap(p, e),
     h('p', { class: 'small dim' }, st.envelopeSet === 'none'
-      ? 'Shade: violations of the property per cell. The ring is the registered point; the star the minimised counterexample.'
+      ? 'Shade and number: runs per cell that violate the property. The ring is the registered point; the star the minimised counterexample, drawn at its true position between grid values.'
       : 'With a mitigation, colour shows change against the unmitigated system on the same seeds: fixed, broken, still violated or unchanged.'));
 }
 
@@ -617,13 +659,17 @@ function heatmap(p, e) {
         label += `; with ${mit.id}: ${dd.fixed} fixed, ${dd.broken} broken, ${dd.both} still violated`;
       }
       rects.push(s('rect', { x: L + i * cw, y: H - B - (j + 1) * ch, width: cw - 1, height: ch - 1, class: cls }, s('title', null, label)));
+      const shown = delta ? delta[i * m + j].both + delta[i * m + j].broken : k;
+      if (shown > 0 && cw >= 18 && ch >= 14) {
+        rects.push(s('text', { x: L + (i + 0.5) * cw, y: H - B - (j + 0.5) * ch + 4, 'text-anchor': 'middle', class: 'dl-cell-n', 'aria-hidden': 'true' }, String(shown)));
+      }
     }
   }
   const cx = p.findings.counterexample;
   const unit = (q) => q / 4294967296;
-  // Markers sit at the centre of the cell their point falls in.
-  const px = (q) => L + (Math.round(unit(q[0]) * (n - 1)) + 0.5) * cw;
-  const py = (q) => (m > 1 ? H - B - (Math.round(unit(q[1]) * (m - 1)) + 0.5) * ch : (H - B + T) / 2);
+  // Markers at their true position on the axes: cell centres are the grid values.
+  const px = (q) => L + (unit(q[0]) * (n - 1) + 0.5) * cw;
+  const py = (q) => (m > 1 ? H - B - (unit(q[1]) * (m - 1) + 0.5) * ch : (H - B + T) / 2);
   const ticks = [];
   const every = Math.max(1, Math.ceil(n / 6));
   for (let i = 0; i < n; i += every) ticks.push(s('text', { x: L + (i + 0.5) * cw, y: H - B + 14, 'text-anchor': 'middle', class: 'dl-ax' }, num(e.axes[0].values[i], 3)));
@@ -636,7 +682,7 @@ function heatmap(p, e) {
     m > 1 ? s('text', { x: 14, y: (T + H - B) / 2, transform: `rotate(-90 14 ${(T + H - B) / 2})`, 'text-anchor': 'middle', class: 'dl-axl' }, `${e.axes[1].name}${unitText(e.axes[1].unit) ? ` (${unitText(e.axes[1].unit)})` : ''}`) : null),
   h('figcaption', { class: 'dl-legend small' }, mit
     ? [['d-fixed', 'fixed'], ['d-broken', 'broken'], ['d-both', 'still violated'], ['d-none', 'held, unchanged']].map(([c2, t]) => h('span', null, h('span', { class: `dl-key ${c2}` }), t))
-    : [0, 1, 2, 3, 4].map((v) => h('span', null, h('span', { class: `dl-key v${v}` }), `${v === 0 ? 'none' : `${v} in 4`}`))));
+    : [0, 1, 2, 3, 4].map((v) => h('span', null, h('span', { class: `dl-key v${v}` }), v === 0 ? 'none' : v === 4 ? `all ${e.seeds}` : `about ${Math.round((v * e.seeds) / 4)} of ${e.seeds}`))));
 }
 
 function star(x, y, r) {
@@ -683,18 +729,18 @@ function secCause(p) {
       h('header', null, h('h3', null, m.id), chip(m.status)),
       h('p', { class: 'dl-prose' }, m.statement),
       h('table', { class: 'dl-table' },
-        h('thead', null, h('tr', null, h('th', null, 'Test'), h('th', null, 'Without'), h('th', null, 'With'), h('th', null, 'Paired change'), h('th', null, 'Across the envelope'), h('th', null, 'Result'))),
+        h('thead', null, h('tr', null, h('th', null, 'Test'), h('th', null, 'Without intervention'), h('th', null, 'With intervention'), h('th', { title: 'Exact McNemar test on the seeds where the outcome changed; the rule needs p below 0.01 in the predicted direction.' }, 'Paired change'), h('th', null, 'Across the envelope'), h('th', null, 'Result'))),
         h('tbody', null,
           m.interventions.map((i) => h('tr', null,
             h('th', { scope: 'row' }, h('b', null, i.id), h('div', { class: 'small dim' }, i.description, ` Predicts: property ${i.predicts === 'holds' ? 'holds' : 'violated'}.`)),
             h('td', { class: 'mono' }, `${i.control.violated}/${i.control.n} violate`),
             h('td', { class: 'mono' }, `${i.treated.violated}/${i.treated.n} violate`),
             h('td', { class: 'mono small' }, `${i.discordant[0]} fixed, ${i.discordant[1]} broken · McNemar p ${i.mcnemar_p < 1e-4 ? i.mcnemar_p.toExponential(1) : num(i.mcnemar_p, 3)}`),
-            h('td', null, chip(i.region_status, i.region_status === 'untested' ? '' : `${i.region.fixed} of ${i.region.fixed + i.region.both} failing pairs fixed`)),
+            h('td', null, chip(i.region_status, i.region_status === 'untested' ? '' : i.predicts === 'holds' ? `${i.region.fixed} of ${i.region.fixed + i.region.both} failing pairs fixed` : `${i.region.broken} of ${i.region.broken + i.region.neither} holding pairs now violate`)),
             h('td', null, chip(i.status)))),
           m.trace_checks.map((t) => h('tr', null,
             h('th', { scope: 'row' }, h('b', null, t.id), h('div', { class: 'small dim' }, t.description)),
-            h('td', { colspan: '3', class: 'mono small' }, `held in ${frac(t.held[0], t.held[1])} counterexample runs; largest |signal| ${num(Math.min(...t.max_abs), 3)} to ${num(Math.max(...t.max_abs), 3)}`),
+            h('td', { colspan: '3', class: 'mono small' }, `held in ${frac(t.held[0], t.held[1])} runs at the ${t.at === 'registered' ? 'registered conditions' : 'counterexample'}; ${Math.max(...t.max_abs) === 0 ? 'flag never raised' : `largest |signal| ${num(Math.min(...t.max_abs), 3)} to ${num(Math.max(...t.max_abs), 3)}`}`),
             h('td', { class: 'dim small' }, 'trace'),
             h('td', null, chip(t.status))))))))));
 }
@@ -718,18 +764,25 @@ function secMitigation(p) {
         fact('Counterexample', `${frac(m.counterexample.fixed, m.counterexample.fixed + m.counterexample.both)} seeds fixed`, `${m.counterexample.broken} broken`, m.counterexample.both ? 'warn' : 'ok'),
         fact('Envelope', `${m.envelope.fixed} fixed · ${m.envelope.broken} broken`, `${m.envelope.both} pairs still violate, of ${m.envelope.n}`, m.envelope.broken ? 'bad' : m.envelope.both ? 'warn' : 'ok'),
         fact('Re-challenge', `${m.rechallenge.property_violations} of ${m.rechallenge.evaluations} violate`, m.rechallenge.upper_bound_if_none !== null && m.rechallenge.upper_bound_if_none !== undefined ? `rate below ${num(m.rechallenge.upper_bound_if_none * 100, 3)} % (95 %)` : `first at evaluation ${m.rechallenge.first_property_violation}`, m.rechallenge.property_violations ? 'warn' : 'ok'),
-        fact('Regressions', String(m.regressions), `upper 95 % bound ${num(m.regression_upper_bound * 100, 3)} % of paired tests`, m.regressions ? 'bad' : 'ok')),
+        fact('Regressions', String(m.regressions), `weakest group bound ${num(m.regression_upper_bound * 100, 3)} % (95 %, not pooled)`, m.regressions ? 'bad' : 'ok'),
+        fact('Trade-offs', String(m.tradeoffs || 0), 'paired runs that gain another requirement violation, such as R5 off the pad', m.tradeoffs ? 'warn' : 'ok')),
       h('table', { class: 'dl-table' },
-        h('thead', null, h('tr', null, h('th', null, 'Paired test'), h('th', null, 'Pairs'), h('th', null, 'Fixed'), h('th', null, 'Broken'), h('th', null, 'Violate both ways'), h('th', null, 'New violations'))),
+        h('thead', null, h('tr', null, h('th', null, 'Paired test'), h('th', null, 'Pairs'), h('th', null, 'Fixed'), h('th', null, 'Broken'), h('th', null, 'Violate both ways'), h('th', null, 'Regressing'), h('th', null, 'Trade-off'), h('th', null, 'New violations'))),
         h('tbody', null,
+          pairRow('Counterexample (claim property)', m.counterexample),
+          pairRow('Envelope (claim property)', m.envelope),
           pairRow('Registered conditions', m.registered),
-          m.families.map((fm) => pairRow(fm.title, fm.paired)))),
-      h('p', { class: 'small dim' }, 'These rows count any requirement or safety invariant, so a run that misses the pad both with and without the mitigation counts as violating both ways. A regression is a new safety violation, or a new violation of the claim property, that the mitigation introduces on the same point and seed.')))));
+          m.families.map((fm) => pairRow(fm.title, fm.paired, fm)))),
+      h('p', { class: 'small dim' }, 'The first two rows count the claim property; the others count any requirement or safety invariant, so a run that misses the pad with and without the mitigation violates both ways. Regressing: the mitigation adds a safety violation or the claim property on the same point and seed. Trade-off: it adds only another requirement violation.')))));
 }
 
-function pairRow(label, pr) {
+function pairRow(label, pr, fam) {
   const nv = Object.entries(pr.new_violations || {});
-  return h('tr', null, h('th', { scope: 'row' }, label), h('td', { class: 'mono' }, String(pr.n)), h('td', { class: 'mono' }, String(pr.fixed)), h('td', { class: ['mono', pr.broken && 'error-text'] }, String(pr.broken)), h('td', { class: 'mono' }, String(pr.both)),
+  const head = fam
+    ? h('th', { scope: 'row' }, label, h('div', { class: 'small dim' }, `regression bound ${num(fam.regression_upper_bound * 100, 3)} %`, fam.saturated ? ' · saturated: already failing without the mitigation' : '', fam.property_violations_with && fam.property_violations_with[0] ? ` · property still violated in ${fam.property_violations_with[0]} of ${fam.property_violations_with[1]}` : ''))
+    : h('th', { scope: 'row' }, label);
+  return h('tr', null, head, h('td', { class: 'mono' }, String(pr.n)), h('td', { class: 'mono' }, String(pr.fixed)), h('td', { class: ['mono', pr.broken && 'error-text'] }, String(pr.broken)), h('td', { class: 'mono' }, String(pr.both)),
+    h('td', { class: ['mono', pr.regressing && 'error-text'] }, String(pr.regressing || 0)), h('td', { class: ['mono', pr.tradeoff && 'warn-text'] }, String(pr.tradeoff || 0)),
     h('td', { class: 'small' }, nv.length ? nv.map(([k, v]) => h('div', { class: 'mono' }, `${k} × ${v}`)) : h('span', { class: 'dim' }, 'none')));
 }
 

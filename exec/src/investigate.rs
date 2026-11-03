@@ -160,9 +160,26 @@ pub struct TraceCheck {
     pub pointer: String,
     #[serde(default)]
     pub minus: Option<String>,
+    /// Further terms added to the signal, each a pointer and a coefficient.
+    #[serde(default)]
+    pub terms: Vec<Term>,
     pub predicate: Predicate,
     #[serde(default)]
     pub threshold: Option<f64>,
+    /// Where the runs are read: the counterexample (default) or the registered conditions.
+    #[serde(default = "at_counterexample")]
+    pub at: At,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct Term {
+    pub pointer: String,
+    pub coefficient: f64,
+}
+
+fn at_counterexample() -> At {
+    At::Counterexample
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -261,7 +278,7 @@ fn valid_id(s: &str) -> bool {
 }
 
 fn pool_size(p: &SeedPool) -> u64 {
-    p.high - p.low + 1
+    p.high.saturating_sub(p.low).saturating_add(1)
 }
 
 impl Claim {
@@ -429,11 +446,51 @@ impl Claim {
         }
         for f in &self.regression {
             validate_parameters(&f.parameters)?;
+            if f.parameters.is_empty() || f.parameters.len() > PRIMES.len() {
+                return Err(format!("family {}: 1 to {} parameters", f.id, PRIMES.len()));
+            }
         }
-        if self.evidence_grade == Grade::Confirmatory && self.preregistration.is_none() {
-            return Err("a confirmatory investigation needs a preregistration".into());
+        if self.evidence_grade == Grade::Confirmatory {
+            // A protocol can name the claim it freezes, but nothing in a package shows that it was
+            // frozen before the run. This engine therefore never grades evidence confirmatory; a
+            // confirmation runs as exploratory under an owner-approved protocol whose freeze commit
+            // precedes the run, and is judged against that protocol.
+            return Err("this engine does not grade evidence confirmatory: it cannot show that a protocol was frozen before the run".into());
+        }
+        let planned = self.planned_probes();
+        if planned > MAX_PROBES {
+            return Err(format!(
+                "the budget plans about {planned} probes, more than {MAX_PROBES}"
+            ));
         }
         Ok(())
+    }
+
+    /// An upper bound of the probes the budget plans, checked before anything runs.
+    pub fn planned_probes(&self) -> u64 {
+        let b = &self.budget;
+        let d = self.assumptions.len().min(2) as u32;
+        let cells = u64::from(b.envelope_levels).saturating_pow(d);
+        let env = cells.saturating_mul(u64::from(b.envelope_seeds));
+        let rep = u64::from(b.replication_seeds);
+        let m = self.mitigations.len() as u64;
+        let interventions: u64 = self
+            .hypotheses
+            .iter()
+            .map(|h| h.interventions.len() as u64)
+            .sum();
+        let families = self.regression.len() as u64;
+        u64::from(b.baseline_seeds)
+            .saturating_add(1 + rep)
+            .saturating_add(2 * self.assumptions.len() as u64 * rep)
+            .saturating_add(env.saturating_mul(1 + m))
+            .saturating_add(interventions.saturating_mul(2 * u64::from(b.mechanism_seeds) + env))
+            .saturating_add(m * (rep + u64::from(b.baseline_seeds)))
+            .saturating_add(
+                families
+                    .saturating_mul(u64::from(b.regression_points))
+                    .saturating_mul(1 + m),
+            )
     }
 }
 
@@ -446,18 +503,67 @@ pub struct Inputs {
     pub preregistration: Option<Vec<u8>>,
 }
 
+/// The folder a claim may read from: the parent of the nearest `claims` folder above the claim
+/// file (so `claims/` and `cases/` side by side), or the claim folder itself.
+fn input_root(claim_path: &Path) -> Result<PathBuf, String> {
+    let file = claim_path
+        .canonicalize()
+        .map_err(|e| format!("{}: {e}", claim_path.display()))?;
+    let dir = file
+        .parent()
+        .ok_or("the claim has no folder")?
+        .to_path_buf();
+    let root = dir
+        .ancestors()
+        .find(|a| {
+            a.file_name()
+                .is_some_and(|n| n.eq_ignore_ascii_case("claims"))
+        })
+        .and_then(Path::parent)
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| dir.clone());
+    Ok(root)
+}
+
+/// A relative input path of a claim, resolved (links included) and refused when it leaves the
+/// input root.
+fn inside(claim_path: &Path, rel: &str) -> Result<PathBuf, String> {
+    let r = Path::new(rel);
+    if r.is_absolute() || r.has_root() {
+        return Err(format!("{rel}: input paths must be relative"));
+    }
+    let dir = claim_path.parent().unwrap_or(Path::new("."));
+    let full = dir
+        .join(r)
+        .canonicalize()
+        .map_err(|e| format!("{rel}: {e}"))?;
+    let root = input_root(claim_path)?;
+    if !full.starts_with(&root) {
+        return Err(format!(
+            "{rel} resolves outside {}; a claim reads only its own claims and cases",
+            root.display()
+        ));
+    }
+    Ok(full)
+}
+
 pub fn read_inputs(claim_path: &Path) -> Result<Inputs, String> {
     let claim_bytes = read_capped(claim_path, MAX_CLAIM_BYTES)?;
     let claim = Claim::parse(&claim_bytes)?;
-    let dir = claim_path.parent().unwrap_or(Path::new("."));
-    let base_bytes = read_capped(&dir.join(&claim.base_case), MAX_CASE_BYTES)?;
+    let base_bytes = read_capped(&inside(claim_path, &claim.base_case)?, MAX_CASE_BYTES)?;
     let families = claim
         .regression
         .iter()
-        .map(|f| read_capped(&dir.join(&f.base_case), MAX_CASE_BYTES))
+        .map(|f| read_capped(&inside(claim_path, &f.base_case)?, MAX_CASE_BYTES))
         .collect::<Result<_, _>>()?;
     let preregistration = match &claim.preregistration {
-        Some(p) => Some(read_capped(&dir.join(&p.path), MAX_CLAIM_BYTES)?),
+        Some(p) => {
+            let b = read_capped(&inside(claim_path, &p.path)?, MAX_CLAIM_BYTES)?;
+            if sha256_hex(&b) != p.sha256 {
+                return Err("the preregistration file does not match its declared hash".into());
+            }
+            Some(b)
+        }
         None => None,
     };
     Ok(Inputs {
@@ -986,6 +1092,7 @@ pub struct InterventionResult {
 pub struct TraceCheckResult {
     pub id: String,
     pub description: String,
+    pub at: At,
     /// Runs where the predicate held, of the runs read.
     pub held: (u64, u64),
     /// Largest absolute value of the signal per run.
@@ -1013,6 +1120,10 @@ pub struct Paired {
     pub neither: u64,
     /// Violation names present with the mitigation and absent without it, counted per pair.
     pub new_violations: BTreeMap<String, u64>,
+    /// Pairs that gained a safety (non-requirement) violation or the claim property.
+    pub regressing: u64,
+    /// Pairs that gained only other requirement violations: a trade-off, reported, not hidden.
+    pub tradeoff: u64,
     /// Up to 8 pairs that broke or gained a violation: probe key and seed.
     pub examples: Vec<(String, u64)>,
 }
@@ -1045,6 +1156,20 @@ fn paired(before: &[&Probe], after: &[&Probe], any: bool) -> Paired {
                 new = true;
             }
         }
+        let mut other = false;
+        let mut safety = false;
+        for v in a.violations.iter().filter(|v| !had.contains(v)) {
+            if v.starts_with("requirement:") {
+                other = true;
+            } else {
+                safety = true;
+            }
+        }
+        if safety || (!b.violated() && a.violated()) {
+            out.regressing += 1;
+        } else if other {
+            out.tradeoff += 1;
+        }
         if (new || (!vb && va)) && out.examples.len() < 8 {
             out.examples.push((a.key.clone(), a.seed));
         }
@@ -1058,6 +1183,13 @@ pub struct FamilyResult {
     pub title: String,
     /// Any violation, mitigated against unmitigated, on the same points and seeds.
     pub paired: Paired,
+    /// Clopper-Pearson 95 % upper bound of the rate of regressing pairs in this family.
+    pub regression_upper_bound: f64,
+    /// At least 90 % of the unmitigated pairs already violate something: the family can then only
+    /// show a regression as a new violation name, and says little about the mitigation.
+    pub saturated: bool,
+    /// Mitigated runs of the family that still violate the claim property, of the runs.
+    pub property_violations_with: (u64, u64),
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -1077,13 +1209,16 @@ pub struct MitigationResult {
     /// A fresh falsification search of the claim with the mitigation applied, on the regression
     /// seeds: residual counterexamples the mitigation leaves inside the envelope.
     pub rechallenge: Rechallenge,
-    /// Clopper-Pearson 95 % upper bound of the rate of regressing pairs over the envelope, the
-    /// registered conditions and the families.
+    /// The largest Clopper-Pearson 95 % upper bound of the regressing rate over the groups
+    /// (counterexample, envelope, registered conditions, each family). Not pooled.
     pub regression_upper_bound: f64,
     /// Envelope cells the mitigation made violate the claim property, plus pairs at the
     /// registered conditions or in a family where it added a safety (non-requirement) violation
     /// or a violation of the claim property.
     pub regressions: u64,
+    /// Pairs, over the counterexample, the envelope, the registered conditions and every family,
+    /// where the mitigation adds only other requirement violations (for example R5 off the pad).
+    pub tradeoffs: u64,
     pub status: String,
 }
 
@@ -1112,6 +1247,8 @@ pub struct Verdict {
 pub struct Findings {
     pub baseline: Rate,
     pub baseline_within_tolerance: bool,
+    /// Every violation at the registered conditions, by name: what else fails there.
+    pub baseline_violations: BTreeMap<String, u64>,
     pub challenge: Challenge,
     pub counterexample: Option<Counterexample>,
     pub attribution: Vec<Factor>,
@@ -1445,6 +1582,12 @@ fn compute(
         .collect();
     probes.extend(s.run_all(&base_req, threads));
     let baseline = rate(&probes.iter().collect::<Vec<_>>());
+    let mut baseline_violations: BTreeMap<String, u64> = BTreeMap::new();
+    for p in &probes {
+        for v in &p.violations {
+            *baseline_violations.entry(v.clone()).or_default() += 1;
+        }
+    }
     let baseline_probes: Vec<Probe> = probes.clone();
 
     // 2. Challenge, read through the claim property.
@@ -1755,6 +1898,7 @@ fn compute(
                 rechallenge: Rechallenge::default(),
                 regression_upper_bound: 1.0,
                 regressions: 0,
+                tradeoffs: 0,
                 status: String::new(),
             });
         }
@@ -1839,10 +1983,17 @@ fn compute(
                 .iter()
                 .filter(|p| p.family == f.id && p.applied.first() == Some(&tag))
                 .collect();
+            let pr = paired(&before, &after, true);
             m.families.push(FamilyResult {
                 id: f.id.clone(),
                 title: f.title.clone(),
-                paired: paired(&before, &after, true),
+                regression_upper_bound: clopper_pearson(pr.regressing, pr.n, 0.95).1,
+                saturated: pr.n > 0 && frac((pr.fixed + pr.both, pr.n)) >= ROLE_THRESHOLD,
+                property_violations_with: (
+                    after.iter().filter(|p| p.violated()).count() as u64,
+                    after.iter().filter(|p| p.error.is_none()).count() as u64,
+                ),
+                paired: pr,
             });
         }
     }
@@ -1853,8 +2004,11 @@ fn compute(
         let seeds = eval_seeds(claim, claim.budget.mechanism_seeds);
         for (h, r) in claim.hypotheses.iter().zip(mechanism.iter_mut()) {
             for t in &h.trace_checks {
-                r.trace_checks
-                    .push(trace_check(s, &cx.minimised.q, &seeds, t)?);
+                let q = match t.at {
+                    At::Counterexample => &cx.minimised.q,
+                    At::Registered => &cx.registered.q,
+                };
+                r.trace_checks.push(trace_check(s, q, &seeds, t)?);
             }
         }
     }
@@ -1887,32 +2041,42 @@ fn compute(
             m.id
         ))?;
         m.rechallenge = rechallenge_of(&claim.property, run);
-        let regress = |p: &Paired| -> u64 {
-            p.new_violations
-                .iter()
-                .filter(|(k, _)| !k.starts_with("requirement:") || **k == claim.property)
-                .map(|(_, v)| *v)
-                .sum()
-        };
-        m.regressions = m.envelope.broken
-            + regress(&m.registered)
-            + m.families.iter().map(|f| regress(&f.paired)).sum::<u64>();
-        let pairs =
-            m.envelope.n + m.registered.n + m.families.iter().map(|f| f.paired.n).sum::<u64>();
-        m.regression_upper_bound = clopper_pearson(m.regressions.min(pairs), pairs, 0.95).1;
+        // Counted in pairs, not in violation names, so the bound below is a rate of pairs.
+        m.regressions = m.counterexample.regressing
+            + m.envelope.regressing
+            + m.registered.regressing
+            + m.families.iter().map(|f| f.paired.regressing).sum::<u64>();
+        m.tradeoffs = m.counterexample.tradeoff
+            + m.envelope.tradeoff
+            + m.registered.tradeoff
+            + m.families.iter().map(|f| f.paired.tradeoff).sum::<u64>();
+        // The groups are not one population (envelope pairs are nearly deterministic and
+        // correlated), so no pooled bound: the reported bound is the weakest group bound.
+        let groups = [&m.counterexample, &m.envelope, &m.registered];
+        m.regression_upper_bound = groups
+            .iter()
+            .map(|g| clopper_pearson(g.regressing, g.n, 0.95).1)
+            .chain(m.families.iter().map(|f| f.regression_upper_bound))
+            .fold(0.0, f64::max);
         let violated = m.counterexample.fixed + m.counterexample.both;
         let effective = violated > 0 && frac((m.counterexample.fixed, violated)) >= EFFECTIVE;
-        m.status = match (effective, m.regressions, m.rechallenge.property_violations) {
-            (false, _, _) => "ineffective",
-            (true, 0, 0) => "effective_no_regression_observed",
-            (true, 0, _) => "effective_with_residual_counterexamples",
-            (true, _, _) => "effective_with_regressions",
+        m.status = if !effective {
+            "ineffective"
+        } else if m.regressions > 0 {
+            "effective_with_regressions"
+        } else if m.rechallenge.property_violations > 0 {
+            "effective_with_residual_counterexamples"
+        } else if m.tradeoffs > 0 {
+            "effective_with_tradeoffs"
+        } else {
+            "effective_no_regression_observed"
         }
         .into();
     }
 
     // Verdict.
     let claim_status = match &counterexample {
+        Some(c) if c.replication.n == 0 => "inconclusive_no_replication",
         Some(c) if c.refutes && c.byte_reproduced => "refuted",
         Some(c) if c.refutes => "refuted_without_byte_reproduction",
         Some(_) => "counterexample_within_tolerance",
@@ -1936,6 +2100,23 @@ fn compute(
     for m in &mitigations {
         if m.status != "effective_no_regression_observed" {
             open_risks.push(format!("Mitigation {} is {}.", m.id, m.status));
+        }
+    }
+    for m in &mitigations {
+        for fm in &m.families {
+            let (k, n) = fm.property_violations_with;
+            if k > 0 {
+                open_risks.push(format!(
+                    "With mitigation {}, {} is still violated in {k} of {n} runs of family {}.",
+                    m.id, claim.property, fm.id
+                ));
+            }
+            if fm.saturated {
+                open_risks.push(format!(
+                    "Family {} already violates something in at least 90 % of its runs without mitigation {}; it can show a regression only as a new violation name.",
+                    fm.id, m.id
+                ));
+            }
         }
     }
     if !challenge.other_classes.is_empty() {
@@ -1976,6 +2157,7 @@ fn compute(
         probes,
         findings: Findings {
             baseline_within_tolerance: baseline.n > 0 && baseline.rate <= claim.tolerance,
+            baseline_violations,
             baseline,
             challenge,
             counterexample,
@@ -1995,11 +2177,14 @@ fn signal_of(sample: &Value, t: &TraceCheck) -> Option<f64> {
         Value::Number(n) => n.as_f64(),
         _ => None,
     };
-    let a = num(sample.pointer(&t.pointer)?)?;
-    match &t.minus {
-        Some(m) => Some(a - num(sample.pointer(m)?)?),
-        None => Some(a),
+    let mut a = num(sample.pointer(&t.pointer)?)?;
+    if let Some(m) = &t.minus {
+        a -= num(sample.pointer(m)?)?;
     }
+    for term in &t.terms {
+        a += term.coefficient * num(sample.pointer(&term.pointer)?)?;
+    }
+    Some(a)
 }
 
 fn trace_check(
@@ -2055,6 +2240,7 @@ fn trace_check(
     Ok(TraceCheckResult {
         id: t.id.clone(),
         description: t.description.clone(),
+        at: t.at,
         held: (held, n),
         max_abs,
         status: status.into(),
@@ -2145,7 +2331,7 @@ pub fn execute(
     }
     let s = Session::new(inputs)?;
     let start = Instant::now();
-    let partial = out.with_extension("partial");
+    let partial = partial_of(out);
     if partial.exists() {
         return Err(format!(
             "{} exists: an earlier investigation was interrupted; remove it to start again",
@@ -2264,6 +2450,13 @@ pub fn execute(
     Ok(package)
 }
 
+/// `<out>.partial`, appended to the name so `a.1` and `a.2` never share one.
+pub fn partial_of(out: &Path) -> PathBuf {
+    let mut name = out.file_name().unwrap_or_default().to_os_string();
+    name.push(".partial");
+    out.with_file_name(name)
+}
+
 /// Byte reproduction holds only when the search log, the in-process rerun and the canonical
 /// writer agree on the counterexample trace.
 fn finish_reproduction(s: &Session, c: &mut Computed) {
@@ -2351,6 +2544,8 @@ fn same_probe(a: &Probe, b: &Probe) -> bool {
 
 fn same_value(a: &Value, b: &Value) -> bool {
     match (a, b) {
+        // Integers exactly; only floats within a relative 1e-12.
+        (Value::Number(x), Value::Number(y)) if !(x.is_f64() || y.is_f64()) => x == y,
         (Value::Number(x), Value::Number(y)) => match (x.as_f64(), y.as_f64()) {
             (Some(u), Some(v)) => u == v || (u - v).abs() <= 1e-12 * u.abs().max(v.abs()),
             _ => x == y,
@@ -2478,9 +2673,19 @@ pub fn verify(dir: &Path, threads: usize, progress: Progress) -> Result<Verifica
     );
     // 3. The challenge search, recomputed by search::verify, and derived from the claim alone.
     let search_dir = dir.join("challenge");
-    let sv = search::verify(&search_dir, threads)?;
+    // The stored specification is compared before anything runs: a tampered one is a failed
+    // check, never a run of whatever budget it asks for.
     let spec_ok = read("challenge/spec.json")? == s.challenge_spec()
         && read("challenge/base-case.json")? == inputs.base_bytes;
+    if !spec_ok {
+        check(
+            "challenge",
+            false,
+            "challenge/spec.json or base-case.json is not the one the claim derives".into(),
+        );
+        return Ok(conclude(&s.claim.id, 0, checks));
+    }
+    let sv = search::verify(&search_dir, threads)?;
     check(
         "challenge",
         sv.pass && spec_ok,
@@ -2501,9 +2706,17 @@ pub fn verify(dir: &Path, threads: usize, progress: Progress) -> Result<Verifica
     for m in &s.claim.mitigations {
         let sub = dir.join("rechallenge").join(&m.id);
         let (spec, base) = s.rechallenge_inputs(m)?;
-        let rv = search::verify(&sub, threads)?;
         let derived = read(&format!("rechallenge/{}/spec.json", m.id))? == spec
             && read(&format!("rechallenge/{}/base-case.json", m.id))? == base;
+        if !derived {
+            check(
+                &format!("rechallenge:{}", m.id),
+                false,
+                "the stored re-challenge is not the one the claim and the mitigation derive".into(),
+            );
+            return Ok(conclude(&s.claim.id, 0, checks));
+        }
+        let rv = search::verify(&sub, threads)?;
         check(
             &format!("rechallenge:{}", m.id),
             rv.pass && derived,
@@ -2581,6 +2794,51 @@ pub fn verify(dir: &Path, threads: usize, progress: Progress) -> Result<Verifica
             c.artifacts.len()
         ),
     );
+    // 5b. The file set is the one this engine writes for this claim, nothing more or less: a
+    // manifest that lists an added file does not make that file part of the evidence.
+    let mut expected: BTreeSet<String> = [
+        "claim.json",
+        "base-case.json",
+        "probes.jsonl",
+        "investigation.json",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    for f in &s.claim.regression {
+        expected.insert(format!("families/{}.json", f.id));
+    }
+    if s.claim.preregistration.is_some() {
+        expected.insert("preregistration.txt".into());
+    }
+    let search_files = [
+        "spec.json",
+        "base-case.json",
+        "evaluations.jsonl",
+        "search.json",
+    ];
+    for f in search_files {
+        expected.insert(format!("challenge/{f}"));
+        for m in &s.claim.mitigations {
+            expected.insert(format!("rechallenge/{}/{f}", m.id));
+        }
+    }
+    for (name, a) in &c.artifacts {
+        for f in a.files.keys() {
+            expected.insert(format!("artifacts/{name}/{f}"));
+        }
+    }
+    let present: BTreeSet<String> = actual.keys().cloned().collect();
+    let unexpected: Vec<&String> = present.difference(&expected).collect();
+    let absent: Vec<&String> = expected.difference(&present).collect();
+    check(
+        "file_set",
+        unexpected.is_empty() && absent.is_empty(),
+        format!(
+            "{} files expected; not written by the engine {unexpected:?}; missing {absent:?}",
+            expected.len()
+        ),
+    );
     // 6. Findings and verdict recomputed and compared with what the package states.
     let stated = serde_json::to_value(&package.findings).map_err(|e| e.to_string())?;
     let recomputed = serde_json::to_value(&c.findings).map_err(|e| e.to_string())?;
@@ -2595,6 +2853,7 @@ pub fn verify(dir: &Path, threads: usize, progress: Progress) -> Result<Verifica
         },
     );
     let header_ok = package.schema == PACKAGE_SCHEMA
+        && package.engine == concat!("vv-exec ", env!("CARGO_PKG_VERSION"))
         && package.claim_id == s.claim.id
         && package.property == s.claim.property
         && package.statement == s.claim.statement
@@ -2640,6 +2899,7 @@ pub fn describe(inputs: &Inputs) -> Result<Value, String> {
         "assumptions": assumptions_view(&s)?,
         "seeds": c.seeds,
         "budget": c.budget,
+        "planned_probes": c.planned_probes(),
         "strategy": strategy_name(&c.strategy),
         "hypotheses": c.hypotheses.iter().map(|h| json!({
             "id": h.id, "statement": h.statement,

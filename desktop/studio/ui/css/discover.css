@@ -169,6 +169,20 @@
 @keyframes dl-pulse { 50% { box-shadow: 0 0 0 5px var(--accent-wash); } }
 @media (prefers-reduced-motion: reduce) { .dl-step.active .dl-step-dot { animation: none; } }
 
+.dl-withdrawn { margin: 0; padding: 10px 12px; border: 1px solid var(--unsafe); border-radius: var(--r); background: var(--unsafe-wash); color: var(--fg-1); font-weight: 600; max-width: 86ch; }
+.dl-cell-n { fill: var(--fg-1); font: 600 10px var(--mono); pointer-events: none; }
+.dl-tl-key { color: var(--fg-2); margin: 0; }
+.dl-swatch { display: inline-block; width: 16px; height: 0; vertical-align: middle; margin: 0 5px 0 8px; border-top: 2px solid var(--fg-2); }
+.dl-swatch.truth { border-color: var(--truth); }
+.dl-swatch.belief { border-color: var(--est); }
+.dl-swatch.obs { border-top-style: dotted; border-color: var(--obs); }
+.dl-swatch.err { border-color: var(--fail); }
+.dl-swatch.flag { border-color: var(--fault); }
+.dl-tile-line { display: grid; justify-items: start; gap: 2px; }
+.dl-tile-line > * { min-width: 0; max-width: 100%; }
+.dl-facts { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+:root[data-theme="light"] .dl-pt.ok { fill: color-mix(in srgb, var(--pass) 75%, transparent); }
+
 @media (max-width: 1180px) {
   .dl-two { grid-template-columns: minmax(0, 1fr); }
   .dl-assume-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }

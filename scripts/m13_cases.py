@@ -35,6 +35,16 @@ CASES: dict[str, tuple[str, str, float, float, float]] = {
     "family-thrust-loss": ("M13 regression family: thrust_loss, guarded", "thrust_loss", 0.15, 5.26, 40.0),
 }
 
+# Cases with more than one fault: name to (case name, [(kind, magnitude, start_s, end_s), ...]).
+# The small net GNSS bias family adds gnss_bias and gnss_bias_low (5 m each) from 5 s, so the
+# net bias is (gnss_bias - 5) m and can go below the 5 m floor of a single gnss_bias.
+MULTI: dict[str, tuple[str, list[tuple[str, float, float, float]]]] = {
+    "family-small-net-gnss-bias": (
+        "M13 regression family: small net GNSS bias, guarded",
+        [("gnss_bias", 7.0, 5.0, 40.0), ("gnss_bias_low", 5.0, 5.0, 40.0)],
+    ),
+}
+
 
 def canonical(value: object) -> bytes:
     return (json.dumps(value, indent=2, sort_keys=False, ensure_ascii=False) + "\n").encode("utf-8")
@@ -55,6 +65,13 @@ def build() -> tuple[dict[str, bytes], dict[str, object]]:
             "fault": case["faults"][0],
             "case_sha256": hashlib.sha256(data).hexdigest(),
         }
+    for name, (title, faults) in MULTI.items():
+        case = copy.deepcopy(source)
+        case["name"] = title
+        case["faults"] = [{"kind": k, "start_s": a, "end_s": b, "magnitude": m} for k, m, a, b in faults]
+        data = canonical(case)
+        cases[name] = data
+        record["cases"][name] = {"faults": case["faults"], "case_sha256": hashlib.sha256(data).hexdigest()}
     return cases, record
 
 

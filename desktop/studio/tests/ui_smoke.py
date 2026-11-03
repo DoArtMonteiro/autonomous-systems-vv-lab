@@ -520,10 +520,14 @@ def discovery_journeys(s, library):
     check("discover G3: investigated and recomputed in the app", "Recomputed, every check passed" in tiles, f"{secs:.1f} s")
     check("discover G3: claim refuted", "Refuted" in tiles, tiles[:300])
     mech = text_of(s, "#view-discover .dl-hyp")
-    check("discover G3: masking supported, velocity coupling only locally",
-          "Experimentally supported" in mech and "Supported only locally" in mech, mech[:300])
+    check("discover G3: rule-1 non-engagement supported, both pathway rivals contradicted",
+          mech.count("Experimentally supported") == 1 and mech.count("Contradicted") >= 2, mech[:300])
+    mit = text_of(s, "#view-discover .dl-mit")
+    check("discover G3: the 1 m threshold shows its trade-off, the 2 m threshold its residual counterexamples",
+          "Effective, with trade-offs" in mit and "Effective, residual counterexamples" in mit, mit[:300])
     summary = s.page.inner_text("#view-discover .dl-summary")
-    check("discover G3: summary states the counterexample and the registered result", "registered conditions" in summary and "fresh seeds" in summary, summary)
+    check("discover G3: summary states the counterexample, the registered result and what else fails there",
+          "registered conditions" in summary and "fresh seeds" in summary and "R5 position" in summary, summary)
     check("discover G3: belief and truth drawn apart", s.js("document.querySelectorAll('#view-discover .dl-chart canvas').length >= 5"))
     s.both("m13-g3-overview")
     s.page.click("#view-discover .dl-story-step:has-text('Envelope')")
@@ -560,6 +564,9 @@ def discovery_journeys(s, library):
     check("discover: a tampered package fails recomputation in the app, naming the checks", "manifest" in bad and "findings" in bad, bad)
     tiles = text_of(s, "#view-discover .dl-tile")
     check("discover: after a failed recomputation the verdicts are withdrawn, not shown", tiles.count("Withdrawn") == 3 and "Not refuted" not in tiles, tiles[:300])
+    rail = text_of(s, "#view-discover .dl-rail")
+    body = s.js("!!document.querySelector('#view-discover .dl-withdrawn') && !document.querySelector('#view-discover .dl-summary')")
+    check("discover: the rail and the body withdraw the failed package too", body and "Not refuted" not in rail and "Withdrawn" in rail, rail[:300])
     s.shot("m13-tampered-dark")
 
 

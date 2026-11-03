@@ -228,12 +228,29 @@ pub struct PackageEntry {
 /// Hash of the package files a verification report is bound to. A report whose binding no longer
 /// matches is stale: the package changed after it was recomputed.
 fn binding(dir: &Path) -> String {
-    let mut all = Vec::new();
-    for f in ["manifest.json", "investigation.json", "probes.jsonl"] {
-        let b = fs::read(dir.join(f)).unwrap_or_default();
-        all.extend_from_slice(vv_platform::canonical::sha256_hex(&b).as_bytes());
+    fn walk(dir: &Path, root: &Path, out: &mut Vec<String>) {
+        let Ok(rd) = fs::read_dir(dir) else { return };
+        let mut entries: Vec<_> = rd.filter_map(Result::ok).collect();
+        entries.sort_by_key(|e| e.file_name());
+        for e in entries {
+            let p = e.path();
+            if p.is_dir() {
+                walk(&p, root, out);
+            } else {
+                let rel = p
+                    .strip_prefix(root)
+                    .unwrap_or(&p)
+                    .to_string_lossy()
+                    .replace('\\', "/");
+                let b = fs::read(&p).unwrap_or_default();
+                out.push(format!("{rel} {}", vv_platform::canonical::sha256_hex(&b)));
+            }
+        }
     }
-    vv_platform::canonical::sha256_hex(&all)
+    // Every file of the package, so any change after a recomputation makes its report stale.
+    let mut lines = Vec::new();
+    walk(dir, dir, &mut lines);
+    vv_platform::canonical::sha256_hex(lines.join("\n").as_bytes())
 }
 
 /// The stored report of a package, marked stale when the package changed since.
