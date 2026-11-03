@@ -460,8 +460,10 @@ pub fn retain(plan: &Plan, out: &Path, records: &[Record]) -> Result<RetentionRe
     let wanted = |rec: &Record| match r.policy {
         RetentionPolicy::None => false,
         RetentionPolicy::Failures => rec.is_failure(),
-        RetentionPolicy::Sample => rec.index % r.sample_every == 0,
-        RetentionPolicy::FailuresAndSample => rec.is_failure() || rec.index % r.sample_every == 0,
+        RetentionPolicy::Sample => rec.index.is_multiple_of(r.sample_every),
+        RetentionPolicy::FailuresAndSample => {
+            rec.is_failure() || rec.index.is_multiple_of(r.sample_every)
+        }
     };
     let files = plan.domain.files();
     let root = out.join("retained");

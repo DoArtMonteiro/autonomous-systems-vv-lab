@@ -153,6 +153,9 @@ pub struct Analysis {
     /// Bootstrap resamples for Sobol intervals; 0 disables them.
     #[serde(default)]
     pub bootstrap: u32,
+    /// Step-halving check of sampled cases: tolerance on the estimated position error, in m.
+    #[serde(default)]
+    pub convergence_tolerance_m: Option<f64>,
 }
 
 impl Default for Analysis {
@@ -161,6 +164,7 @@ impl Default for Analysis {
             metric: None,
             confidence: default_confidence(),
             bootstrap: 0,
+            convergence_tolerance_m: None,
         }
     }
 }
@@ -432,6 +436,11 @@ impl Experiment {
             return Err(format!(
                 "analysis.bootstrap must be at most {MAX_BOOTSTRAP}"
             ));
+        }
+        if let Some(t) = a.convergence_tolerance_m
+            && !(t.is_finite() && t > 0.0)
+        {
+            return Err("analysis.convergence_tolerance_m must be positive".into());
         }
         if matches!(self.design, Design::Saltelli { .. }) && a.metric.is_none() {
             return Err("a Saltelli design needs analysis.metric".into());
