@@ -2,7 +2,7 @@
 
 A Rust and Python laboratory for repeatable autonomous-mission simulation, fault injection and verification.
 
-**Status:** M9 and M9.1 are integrated in `main`. M10.0 is a design package open for review in [PR #13](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/13); its implementation and campaign have not started.
+**Status:** M9 and M9.1 are integrated in `main`. The M10.0 resilient-navigation design was merged through [PR #13](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/13). The M10 implementation is in draft [PR #15](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/15) and has not been accepted. The M11 desktop application and the M12 experiment engine are proposed for integration by this branch, without M10, pending review.
 
 The main simulator models a two-dimensional ground vehicle. A separate, idealised six-degree-of-freedom rocket model supports the M8 and M9 research campaigns. Neither model controls real hardware, and the rocket model has no flight-data validation.
 
@@ -84,6 +84,28 @@ cargo run --release --manifest-path crates/vv-rocket/Cargo.toml -- replay runs/m
 
 An expected safety violation can make a `run` command exit with code `2`; that is a simulated finding, not a test harness failure. See the scenario's result and report before interpreting the exit code.
 
+### V&V Lab Studio (M11 desktop application)
+
+A Windows 11 application that packages the simulators behind a versioned domain contract (`vv-domain` 1.0): mission preparation, a 3D rocket scene and a 2D ground-vehicle scene, time-synchronised telemetry, requirement and invariant verdicts, controller comparison, replay by recomputation, evidence export and a persistent library. It installs per user and needs no Rust, Python or Node.js at run time. The rocket domain offers the M9 and M9.1 policies and faults only; it refuses the protected rocket seeds (3000 to 3099 and 6000 to 6099) and the M6 held-out ground seeds (101 to 112) before any simulation starts. Domains are separate host executables discovered at start; a benign reference domain shows that a new domain needs no change to the platform or the interface.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File desktop\build.ps1   # builds the NSIS installer in desktop\target\release\bundle\nsis
+```
+
+See [docs/m11-desktop.md](docs/m11-desktop.md) for the architecture and how to add a domain, and [docs/m11-acceptance.md](docs/m11-acceptance.md) for installation and acceptance. The UI smoke test has not yet been run on this branch. The developer CLI and the local Mission Control remain supported.
+
+### vv-exec experiment engine (M12)
+
+An in-process engine that runs `vv-experiment.v1` specifications (arms, fault grids, Latin hypercube and Saltelli designs) through the canonical `vv-rocket` library, with adaptive scheduling, hashed resumable records, retention by policy, an equivalence gate against the canonical command line and statistics recomputed from the records. On development seeds 7000 to 9399, the example experiment (the M9.1 guarded controller under six conditions) ran 14,400 landings in 7.5 to 10.4 s end to end on 16 threads, over three runs on a shared AMD Ryzen 7 7800X3D machine; full recomputation with `vv-exec verify` took 11.2 s. Peak memory was not re-measured on this branch. Tests check that the records are byte-identical for any worker count.
+
+```sh
+cargo build --release --manifest-path exec/Cargo.toml
+exec/target/release/vv-exec run exec/examples/m12-dev-throughput.json --output exec/target/m12-dev/throughput --threads 16
+exec/target/release/vv-exec verify exec/target/m12-dev/throughput --threads 16
+```
+
+See [docs/m12-exec.md](docs/m12-exec.md). Its development-seed verdicts are engine evidence, not evaluation results.
+
 ## Development timeline
 
 - **08/10/2026:** deterministic mission simulation and replay introduced in [commit `cfadcdb`](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/commit/cfadcdb).
@@ -101,7 +123,7 @@ Dates above are commit or merge dates, not operational acceptance dates.
 - The ground-vehicle model is two-dimensional and simulated.
 - The rocket model is idealised; no flight data, physical hardware or landing-leg contact model validates it.
 - Full M9/M9.1 campaign output is not included in the public repository.
-- M10.0 remains a design package in an open PR. Do not treat its proposed resilience work as implemented.
+- M10 resilient navigation is not in `main`: its design (M10.0) is merged, and its implementation stays in draft PR #15, which has not been accepted. Do not treat its resilience work as an integrated or evaluated result.
 - Mission Control runs locally and is not an operational service.
 
 Further model contracts and campaign reports are linked from the [repository documentation](docs/architecture.md).
