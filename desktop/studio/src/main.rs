@@ -99,8 +99,10 @@ fn display_path(path: &Path) -> String {
     }
 }
 
-fn start_platform(paths: &Paths) -> Result<(Platform, StartReport), String> {
-    Platform::start(&paths.domains, &paths.library, VERSION)
+fn start_platform(paths: &Paths, first: bool) -> Result<(Platform, StartReport), String> {
+    // Only the first start clears staging: on a restart, runs of the old instance may still be
+    // executing there.
+    Platform::start_with(&paths.domains, &paths.library, VERSION, first)
 }
 
 impl AppState {
@@ -172,7 +174,7 @@ fn list_domains(state: State<AppState>) -> Result<DomainList, PlatformError> {
 #[tauri::command]
 async fn restart_platform(state: State<'_, AppState>) -> Result<AppInfo, PlatformError> {
     let paths = state.paths.clone();
-    let outcome = tauri::async_runtime::spawn_blocking(move || start_platform(&paths))
+    let outcome = tauri::async_runtime::spawn_blocking(move || start_platform(&paths, false))
         .await
         .map_err(err)?;
     state.install(outcome);
@@ -565,7 +567,7 @@ fn main() {
             });
             let handle = app.handle().clone();
             std::thread::spawn(move || {
-                let outcome = start_platform(&paths);
+                let outcome = start_platform(&paths, true);
                 handle.state::<AppState>().install(outcome);
             });
             Ok(())

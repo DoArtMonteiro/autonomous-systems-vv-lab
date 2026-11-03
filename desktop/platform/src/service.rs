@@ -119,13 +119,29 @@ fn describe(found: &Discovered) -> Result<DomainCatalog, String> {
 }
 
 impl Platform {
+    /// Starts the platform and clears what an interrupted run left in the library staging area.
     pub fn start(
         domain_roots: &[PathBuf],
         library_root: &Path,
         version: &str,
     ) -> Result<(Platform, StartReport), String> {
+        Self::start_with(domain_roots, library_root, version, true)
+    }
+
+    /// As [`Platform::start`]; `recover_staging` is false when another platform instance in this
+    /// process may still be executing runs into the staging area (a restart).
+    pub fn start_with(
+        domain_roots: &[PathBuf],
+        library_root: &Path,
+        version: &str,
+        recover_staging: bool,
+    ) -> Result<(Platform, StartReport), String> {
         let library = Library::open(library_root)?;
-        let recovered = library.recover();
+        let recovered = if recover_staging {
+            library.recover()
+        } else {
+            0
+        };
         let report = discover(domain_roots);
         let domains: Vec<DomainEntry> = report
             .domains
@@ -398,7 +414,11 @@ impl Platform {
         if checks.iter().all(|c| c.pass) {
             let out = host_call(&entry.found, vec!["replay".into(), dir.clone().into()])?;
             match serde_json::from_slice::<ReplayReport>(&out.stdout) {
-                Ok(report) if report.schema == REPLAY_SCHEMA => checks.extend(report.checks),
+                Ok(report) if report.schema == REPLAY_SCHEMA => {
+                    let verdict = host_replay_verdict(&report, out.code);
+                    checks.extend(report.checks);
+                    checks.push(verdict);
+                }
                 Ok(_) => checks.push(failed("host replay report", "unknown schema")),
                 Err(e) => checks.push(failed(
                     "host replay report",
@@ -432,7 +452,7 @@ impl Platform {
                 .exports_dir()
                 .join(format!("{run_id}-evidence.zip"))
         });
-        fs::write(&path, bytes).map_err(io)?;
+        crate::library::write_atomic(&path, &bytes).map_err(io)?;
         Ok(path)
     }
 }
@@ -487,4 +507,73 @@ fn check_record(
         }
     }
     Ok(())
+}
+
+/// A host is a separate program: its replay counts only if it exited cleanly, said "verified" and
+/// reported the recomputation checks of the contract as passed. An empty or partial report fails.
+fn host_replay_verdict(report: &ReplayReport, code: i32) -> ReplayCheck {
+    let recomputed = RECOMPUTE_CHECKS
+        .iter()
+        .all(|n| report.checks.iter().any(|c| c.name == *n && c.pass));
+    let clean = code == EXIT_OK && report.status == "verified";
+    ReplayCheck {
+        name: "the domain host recomputed the run and reported it verified".into(),
+        pass: recomputed && clean,
+        detail: if recomputed && clean {
+            String::new()
+        } else {
+            format!(
+                "host status {:?}, exit code {code}, recomputation checks {}",
+                report.status,
+                if recomputed {
+                    "present"
+                } else {
+                    "missing or failed"
+                }
+            )
+        },
+    }
+}
+
+/// Check names every domain host replay must report as passed (see `host_sdk::replay`).
+pub const RECOMPUTE_CHECKS: [&str; 2] = [
+    "the run is recomputed from its request",
+    "recomputed artifacts equal the stored artifacts byte for byte",
+];
+
+#[cfg(test)]
+mod replay_verdict_tests {
+    use super::*;
+
+    fn report(status: &str, names: &[(&str, bool)]) -> ReplayReport {
+        ReplayReport {
+            schema: REPLAY_SCHEMA.into(),
+            status: status.into(),
+            checks: names
+                .iter()
+                .map(|(n, pass)| ReplayCheck {
+                    name: (*n).into(),
+                    pass: *pass,
+                    detail: String::new(),
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn a_host_report_without_recomputation_is_not_verified() {
+        assert!(!host_replay_verdict(&report("verified", &[]), EXIT_OK).pass);
+        let partial = report("verified", &[(RECOMPUTE_CHECKS[0], true)]);
+        assert!(!host_replay_verdict(&partial, EXIT_OK).pass);
+    }
+
+    #[test]
+    fn a_host_verdict_needs_status_exit_code_and_passed_recomputation() {
+        let full = [(RECOMPUTE_CHECKS[0], true), (RECOMPUTE_CHECKS[1], true)];
+        assert!(host_replay_verdict(&report("verified", &full), EXIT_OK).pass);
+        assert!(!host_replay_verdict(&report("rejected", &full), EXIT_OK).pass);
+        assert!(!host_replay_verdict(&report("verified", &full), 3).pass);
+        let failed = [(RECOMPUTE_CHECKS[0], true), (RECOMPUTE_CHECKS[1], false)];
+        assert!(!host_replay_verdict(&report("verified", &failed), EXIT_OK).pass);
+    }
 }

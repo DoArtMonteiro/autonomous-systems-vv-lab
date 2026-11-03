@@ -153,9 +153,27 @@ fn fresh_id(seed: &str) -> String {
 
 /// Writes through a temporary file and a rename so a reader never sees half a file.
 pub fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
-    let tmp = path.with_extension("tmp");
-    fs::write(&tmp, bytes).map_err(|e| e.to_string())?;
-    rename_retry(&tmp, path)
+    use std::io::Write;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static N: AtomicU64 = AtomicU64::new(0);
+    // A unique temporary name per write: concurrent writers never share a partial file.
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let tmp = path.with_file_name(format!(
+        ".{name}.{}-{}.tmp",
+        std::process::id(),
+        N.fetch_add(1, Ordering::Relaxed)
+    ));
+    let written = fs::File::create(&tmp)
+        .and_then(|mut f| f.write_all(bytes).and_then(|()| f.sync_all()))
+        .map_err(|e| e.to_string())
+        .and_then(|()| rename_retry(&tmp, path));
+    if written.is_err() {
+        let _ = fs::remove_file(&tmp);
+    }
+    written
 }
 
 fn rename_retry(from: &Path, to: &Path) -> Result<(), String> {
@@ -385,5 +403,33 @@ impl Library {
 
     pub fn delete_comparison(&self, id: &str) -> Result<(), String> {
         fs::remove_file(self.item_path("comparisons", id)?).map_err(|e| e.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn concurrent_atomic_writes_leave_one_complete_file_and_no_temporaries() {
+        let dir = std::env::temp_dir().join(format!("vv-write-atomic-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let target = dir.join("meta.json");
+        let payloads: Vec<Vec<u8>> = (0..4u8).map(|i| vec![b'a' + i; 64 * 1024]).collect();
+        std::thread::scope(|s| {
+            for p in &payloads {
+                let target = &target;
+                s.spawn(move || {
+                    for _ in 0..10 {
+                        write_atomic(target, p).unwrap();
+                    }
+                });
+            }
+        });
+        let got = fs::read(&target).unwrap();
+        assert!(payloads.contains(&got));
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), 1);
+        fs::remove_dir_all(&dir).unwrap();
     }
 }

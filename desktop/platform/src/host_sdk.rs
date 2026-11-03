@@ -164,7 +164,14 @@ pub fn replay<H: DomainHost>(host: &H, dir: &Path) -> ReplayReport {
             }
         }
     }
-    checks.extend(host.native_replay(dir));
+    // The native simulator only sees a stored run whose request (and so its seed) is valid. It
+    // still runs when a stored file differs, as an independent check of the tampered run.
+    if checks
+        .iter()
+        .any(|c| c.name == "stored request is valid and canonical" && c.pass)
+    {
+        checks.extend(host.native_replay(dir));
+    }
     let ok = !checks.is_empty() && checks.iter().all(|c| c.pass);
     ReplayReport {
         schema: REPLAY_SCHEMA.into(),
