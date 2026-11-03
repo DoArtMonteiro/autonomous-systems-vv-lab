@@ -33,8 +33,11 @@ fn clopper_pearson_matches_the_binomial_tail_reference() {
         let conf = c["confidence"].as_f64().unwrap();
         let (lo, hi) = stats::clopper_pearson(u(&c["k"]), u(&c["n"]), conf);
         let (rlo, rhi) = pair(&c["interval"]);
-        assert!((lo - rlo).abs() < 1e-10, "{c}: lower {lo}");
-        assert!((hi - rhi).abs() < 1e-10, "{c}: upper {hi}");
+        // Relative: the measured engine error is below 5e-13 relative for these cases; 1e-11
+        // leaves room for last-bit differences between platform libm implementations.
+        let close = |got: f64, want: f64| (got - want).abs() <= 1e-11 * want.abs().max(1e-300);
+        assert!(close(lo, rlo), "{c}: lower {lo}");
+        assert!(close(hi, rhi), "{c}: upper {hi}");
     }
 }
 

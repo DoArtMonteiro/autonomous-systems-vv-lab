@@ -277,8 +277,9 @@ fn a_fault_grid_with_arms_reports_paired_comparisons_and_the_envelope_fraction()
     assert_eq!(r.comparisons.len(), 1);
     assert_eq!(r.comparisons[0].pairs, 12);
     // Magnitude 15 lies outside [5, 12]: one cell of three in each arm.
-    assert_eq!(r.extrapolated_runs, 8);
-    assert!((r.in_envelope_fraction - 16.0 / 24.0).abs() < 1e-12);
+    assert!(r.envelope_declared);
+    assert_eq!(r.extrapolated_runs, Some(8));
+    assert!((r.in_envelope_fraction.unwrap() - 16.0 / 24.0).abs() < 1e-12);
     let cells = r.cells.unwrap();
     assert_eq!(cells.len(), 6);
     assert!(cells.iter().all(|c| c.all_pass.is_some()));
@@ -412,4 +413,179 @@ fn retention_over_the_byte_cap_leaves_no_directory_behind() {
     );
     let left: Vec<_> = fs::read_dir(dir.join("retained")).map_or(Vec::new(), |d| d.collect());
     assert!(left.is_empty(), "{left:?}");
+}
+
+#[test]
+fn a_cancelled_run_stops_cleanly_and_resumes_to_the_same_records() {
+    let s = spec(&landing("m10-nominal.json"), json!({}));
+    let p = plan(&s).unwrap();
+    let probe = plenty();
+    let full = scratch("cancel-full");
+    let go = AtomicBool::new(false);
+    engine::execute(&p, &full, &opts(&probe, &go, 2, None)).unwrap();
+    // The flag the Ctrl+C handler sets: no run starts and nothing is reported as complete.
+    let stop = AtomicBool::new(true);
+    let dir = scratch("cancel");
+    let first = engine::execute(&p, &dir, &opts(&probe, &stop, 4, None)).unwrap();
+    assert!(!first.complete);
+    assert_eq!(first.stopped_by.as_deref(), Some("cancelled"));
+    assert!(!dir.join("records.jsonl").exists());
+    let second = engine::execute(&p, &dir, &opts(&probe, &go, 4, None)).unwrap();
+    assert!(second.complete);
+    assert_eq!(records_bytes(&dir), records_bytes(&full));
+}
+
+#[test]
+fn an_initialisation_interrupted_before_the_plan_is_completed_on_restart() {
+    let s = spec(&landing("m10-nominal.json"), json!({}));
+    let p = plan(&s).unwrap();
+    let probe = plenty();
+    let go = AtomicBool::new(false);
+    let full = scratch("init-full");
+    engine::execute(&p, &full, &opts(&probe, &go, 2, None)).unwrap();
+    // A crash after the first input was written and while the second was a temporary file.
+    let dir = scratch("init-torn");
+    fs::write(dir.join("spec.json"), p.spec_bytes()).unwrap();
+    fs::write(dir.join("base-case.tmp"), b"{\"partial").unwrap();
+    let sum = engine::execute(&p, &dir, &opts(&probe, &go, 2, None)).unwrap();
+    assert!(sum.complete);
+    assert_eq!(records_bytes(&dir), records_bytes(&full));
+
+    // A stale input that differs from this plan, or any other file, is still refused.
+    let wrong = scratch("init-wrong");
+    fs::write(wrong.join("spec.json"), b"{}").unwrap();
+    let err = engine::execute(&p, &wrong, &opts(&probe, &go, 1, None)).unwrap_err();
+    assert!(err.contains("differs"), "{err}");
+    let other = scratch("init-other");
+    fs::write(other.join("notes.txt"), b"x").unwrap();
+    let err = engine::execute(&p, &other, &opts(&probe, &go, 1, None)).unwrap_err();
+    assert!(err.contains("not empty"), "{err}");
+}
+
+#[test]
+fn a_second_writer_on_the_same_output_is_refused() {
+    let s = spec(&landing("m10-nominal.json"), json!({}));
+    let p = plan(&s).unwrap();
+    let probe = plenty();
+    let go = AtomicBool::new(false);
+    let dir = scratch("locked");
+    let held = fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(dir.join(".lock"))
+        .unwrap();
+    held.try_lock().unwrap();
+    let err = engine::execute(&p, &dir, &opts(&probe, &go, 1, None)).unwrap_err();
+    assert!(err.contains("another vv-exec"), "{err}");
+    assert!(!dir.join("log.jsonl").exists());
+    drop(held);
+    assert!(
+        engine::execute(&p, &dir, &opts(&probe, &go, 1, None))
+            .unwrap()
+            .complete
+    );
+}
+
+#[test]
+fn a_record_edited_and_rehashed_passes_the_hashes_but_fails_full_verification() {
+    let s = spec(&landing("m10-nominal.json"), json!({}));
+    let p = plan(&s).unwrap();
+    let probe = plenty();
+    let go = AtomicBool::new(false);
+    let dir = scratch("rehash");
+    engine::execute(&p, &dir, &opts(&probe, &go, 2, None)).unwrap();
+    let recs = engine::read_records(&p, &dir).unwrap();
+    assert!(engine::verify_all(&p, &recs, 2).pass);
+
+    // Forge record 4 consistently: change its verdict and recompute the line hash.
+    let text = fs::read_to_string(dir.join("records.jsonl")).unwrap();
+    let mut lines: Vec<String> = text.lines().map(str::to_string).collect();
+    let json = lines[4].split_once(' ').unwrap().1.to_string();
+    assert!(json.contains("\"all_pass\":true"), "{json}");
+    let forged = json.replacen("\"all_pass\":true", "\"all_pass\":false", 1);
+    lines[4] = format!("{} {forged}", vv_exec::plan::sha256_hex(forged.as_bytes()));
+    fs::write(dir.join("records.jsonl"), lines.join("\n") + "\n").unwrap();
+
+    let recs = engine::read_records(&p, &dir).unwrap();
+    let v = engine::verify_all(&p, &recs, 3);
+    assert!(!v.pass);
+    assert_eq!(v.mismatches, vec![4]);
+}
+
+#[test]
+fn the_engine_refuses_outputs_under_a_runs_directory_without_the_command_line() {
+    let s = spec(&landing("m10-nominal.json"), json!({}));
+    let p = plan(&s).unwrap();
+    let probe = plenty();
+    let go = AtomicBool::new(false);
+    let dir = scratch("guard-lib");
+    let err =
+        engine::execute(&p, &dir.join("runs").join("x"), &opts(&probe, &go, 1, None)).unwrap_err();
+    assert!(err.contains("runs"), "{err}");
+    assert!(!dir.join("runs").exists());
+}
+
+/// SIGINT on the command line: the run stops with exit status 5 and every logged line is whole and
+/// verifiable. Windows console events cannot be sent to a child without a shared console, so the
+/// Windows handler is covered by the cancellation test of the engine flag above.
+#[cfg(unix)]
+#[test]
+fn sigint_stops_the_command_line_with_a_whole_log() {
+    let dir = scratch("sigint");
+    let spec_path = dir.join("spec.json");
+    let s = spec(
+        &landing("m10-nominal.json"),
+        json!({"seeds": {"mode": "range", "first": 7000, "count": 9000}}),
+    );
+    fs::write(&spec_path, &s).unwrap();
+    let out = dir.join("out");
+    let mut child = Command::new(env!("CARGO_BIN_EXE_vv-exec"))
+        .arg("run")
+        .arg(&spec_path)
+        .arg("--output")
+        .arg(&out)
+        .arg("--threads")
+        .arg("1")
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    let t0 = std::time::Instant::now();
+    while !out.join("log.jsonl").exists() && t0.elapsed().as_secs() < 30 {
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    std::thread::sleep(std::time::Duration::from_millis(300));
+    let killed = Command::new("kill")
+        .arg("-INT")
+        .arg(child.id().to_string())
+        .status()
+        .unwrap();
+    assert!(killed.success());
+    let status = child.wait().unwrap();
+    assert_eq!(status.code(), Some(5), "interrupted run must exit with 5");
+    let p = Plan::build(&s, &dir).unwrap();
+    let log = fs::read_to_string(out.join("log.jsonl")).unwrap();
+    assert!(log.ends_with('\n'));
+    let n = log
+        .lines()
+        .map(|l| engine::parse_line(&p, l).unwrap())
+        .count();
+    assert!(n > 0 && n < 9000, "{n} runs logged");
+}
+
+#[test]
+fn a_report_without_a_declared_envelope_claims_no_envelope_fraction() {
+    let s = spec(&landing("m10-nominal.json"), json!({}));
+    let p = plan(&s).unwrap();
+    let probe = plenty();
+    let go = AtomicBool::new(false);
+    let dir = scratch("no-envelope");
+    engine::execute(&p, &dir, &opts(&probe, &go, 2, None)).unwrap();
+    let recs = engine::read_records(&p, &dir).unwrap();
+    let r = report::build(&p, &recs, &dir).unwrap();
+    assert!(!r.envelope_declared);
+    assert_eq!(r.in_envelope_fraction, None);
+    assert_eq!(r.extrapolated_runs, None);
+    assert!(r.inference.starts_with("exploratory"));
+    assert_eq!(r.error_policy, "errors_count_as_failures");
 }

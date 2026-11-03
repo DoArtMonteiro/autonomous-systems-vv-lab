@@ -1,38 +1,74 @@
 //! `vv-exec plan <spec.json>` | `vv-exec run <spec.json> --output <dir> [--threads <n>]` |
 //! `vv-exec equiv <dir> --cli <vv-rocket> [--sample <n>]` | `vv-exec report <dir>` |
+//! `vv-exec verify <dir> [--threads <n>]` |
 //! `vv-exec converge <case.json> [--levels <n>] [--tolerance-m <m>]`
 //!
 //! Exit status: 0 done; 1 a gate or check failed; 3 usage or rejected input; 5 run interrupted
-//! (resume with the same command).
+//! (resume with the same command). The first Ctrl+C stops `run` after the runs in flight, which
+//! are logged; a second one ends the process at once.
 
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use vv_exec::plan::{Plan, read_capped};
 use vv_exec::sched::SystemProbe;
 use vv_exec::spec::MAX_SPEC_BYTES;
 use vv_exec::{converge, engine, equiv, report};
 
-const USAGE: &str = "usage: vv-exec plan <spec.json> | run <spec.json> --output <dir> [--threads <n>] | equiv <dir> --cli <vv-rocket> [--sample <n>] | report <dir> | converge <case.json> [--levels <n>] [--tolerance-m <m>]";
+const USAGE: &str = "usage: vv-exec plan <spec.json> | run <spec.json> --output <dir> [--threads <n>] | equiv <dir> --cli <vv-rocket> [--sample <n>] | report <dir> | verify <dir> [--threads <n>] | converge <case.json> [--levels <n>] [--tolerance-m <m>]";
+
+/// Set by the console interrupt handler; read by the workers of `run`.
+static CANCEL: AtomicBool = AtomicBool::new(false);
+
+/// Installs a Ctrl+C handler that sets `CANCEL`. The second interrupt is left to the default
+/// handler, which ends the process.
+#[cfg(windows)]
+fn install_interrupt_handler() {
+    unsafe extern "system" {
+        fn SetConsoleCtrlHandler(
+            handler: Option<unsafe extern "system" fn(u32) -> i32>,
+            add: i32,
+        ) -> i32;
+    }
+    unsafe extern "system" fn on_ctrl(kind: u32) -> i32 {
+        // CTRL_C_EVENT = 0, CTRL_BREAK_EVENT = 1.
+        if kind <= 1 && !CANCEL.swap(true, Ordering::SeqCst) {
+            return 1;
+        }
+        0
+    }
+    // SAFETY: registers a handler that only touches an atomic; the function lives forever.
+    unsafe {
+        SetConsoleCtrlHandler(Some(on_ctrl), 1);
+    }
+}
+
+#[cfg(unix)]
+fn install_interrupt_handler() {
+    const SIGINT: i32 = 2;
+    const SIG_DFL: usize = 0;
+    unsafe extern "C" {
+        fn signal(sig: i32, handler: usize) -> usize;
+    }
+    extern "C" fn on_sigint(_: i32) {
+        CANCEL.store(true, Ordering::SeqCst);
+        // SAFETY: signal() is async-signal-safe; the next SIGINT gets the default action.
+        unsafe {
+            signal(SIGINT, SIG_DFL);
+        }
+    }
+    // SAFETY: the handler only stores to an atomic and resets the disposition.
+    unsafe {
+        signal(SIGINT, on_sigint as extern "C" fn(i32) as usize);
+    }
+}
+
+#[cfg(not(any(windows, unix)))]
+fn install_interrupt_handler() {}
 
 fn json<T: serde::Serialize>(v: &T) -> String {
     serde_json::to_string_pretty(v).expect("serialisable")
-}
-
-/// Outputs never go under a directory named `runs`: the historical runs of the lab live there and
-/// are being restored separately; this engine writes only to new, separate locations.
-fn guard_output(out: &Path) -> Result<(), String> {
-    if out
-        .components()
-        .any(|c| matches!(c, Component::Normal(n) if n.eq_ignore_ascii_case("runs")))
-    {
-        return Err(format!(
-            "{}: vv-exec does not write under a directory named runs (historical evidence)",
-            out.display()
-        ));
-    }
-    Ok(())
 }
 
 fn plan_from_spec(spec: &Path) -> Result<Plan, String> {
@@ -82,17 +118,17 @@ fn dispatch(args: &[String]) -> Outcome {
         Some("run") => {
             let spec = args.get(1).ok_or_else(usage)?;
             let out = PathBuf::from(flag(args, "--output").ok_or_else(usage)?);
-            guard_output(&out).map_err(input)?;
+            engine::guard_output(&out).map_err(input)?;
             let threads = match flag(args, "--threads") {
                 Some(t) => Some(t.parse::<usize>().map_err(|_| usage())?),
                 None => None,
             };
             let plan = plan_from_spec(Path::new(spec)).map_err(input)?;
-            let cancel = AtomicBool::new(false);
+            install_interrupt_handler();
             let opt = engine::Options {
                 probe: &SystemProbe,
                 max_threads: threads,
-                cancel: &cancel,
+                cancel: &CANCEL,
                 stop_after: None,
                 probe_every: 256,
             };
@@ -118,7 +154,7 @@ fn dispatch(args: &[String]) -> Outcome {
                 Some(s) => s.parse::<usize>().map_err(|_| usage())?,
                 None => 8,
             };
-            guard_output(&out).map_err(input)?;
+            engine::guard_output(&out).map_err(input)?;
             let plan = plan_from_output(&out).map_err(input)?;
             let records = engine::read_records(&plan, &out).map_err(input)?;
             let r = equiv::run(&plan, &out, &records, &cli, k).map_err(input)?;
@@ -126,13 +162,13 @@ fn dispatch(args: &[String]) -> Outcome {
         }
         Some("report") => {
             let out = PathBuf::from(args.get(1).ok_or_else(usage)?);
-            guard_output(&out).map_err(input)?;
+            engine::guard_output(&out).map_err(input)?;
             let plan = plan_from_output(&out).map_err(input)?;
             let records = engine::read_records(&plan, &out).map_err(input)?;
             let r = report::build(&plan, &records, &out).map_err(input)?;
             let text = json(&r);
-            std::fs::write(out.join("report.json"), format!("{text}\n"))
-                .map_err(|e| input(e.to_string()))?;
+            engine::write_new(&out.join("report.json"), format!("{text}\n").as_bytes())
+                .map_err(input)?;
             Ok((
                 text,
                 if r.equivalence_status == "verified" {
@@ -141,6 +177,17 @@ fn dispatch(args: &[String]) -> Outcome {
                     1
                 },
             ))
+        }
+        Some("verify") => {
+            let out = PathBuf::from(args.get(1).ok_or_else(usage)?);
+            let threads = match flag(args, "--threads") {
+                Some(t) => t.parse::<usize>().map_err(|_| usage())?,
+                None => std::thread::available_parallelism().map_or(1, |n| n.get()),
+            };
+            let plan = plan_from_output(&out).map_err(input)?;
+            let records = engine::read_records(&plan, &out).map_err(input)?;
+            let v = engine::verify_all(&plan, &records, threads);
+            Ok((json(&v), if v.pass { 0 } else { 1 }))
         }
         Some("converge") => {
             let case = args.get(1).ok_or_else(usage)?;

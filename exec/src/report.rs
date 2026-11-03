@@ -103,8 +103,14 @@ pub struct Report {
     pub confidence: f64,
     pub runs: u64,
     pub errors: u64,
-    pub in_envelope_fraction: f64,
-    pub extrapolated_runs: u64,
+    /// How errored runs enter the rates and the paired tests.
+    pub error_policy: &'static str,
+    /// Confirmatory inference needs a frozen protocol and evaluation seeds, which vv-exec refuses.
+    pub inference: &'static str,
+    pub envelope_declared: bool,
+    /// `None` when no envelope was declared: then no run is known to be inside one.
+    pub in_envelope_fraction: Option<f64>,
+    pub extrapolated_runs: Option<u64>,
     pub metric: Option<String>,
     pub arms: Vec<ArmSummary>,
     pub comparisons: Vec<Comparison>,
@@ -113,6 +119,15 @@ pub struct Report {
     pub convergence: Vec<(u32, Convergence)>,
     pub equivalence: Value,
 }
+
+/// Errors are not dropped: a run that produced no artifacts met no requirement. The M10
+/// pre-registration (section 10.6) instead counts them as execution errors outside the rates, so
+/// a report with errors is not comparable with it.
+pub const ERROR_POLICY: &str = "errors_count_as_failures";
+
+/// Every p-value and interval of a vv-exec report is exploratory: development seeds only, and the
+/// intervals per arm and per cell are marginal, not simultaneous.
+pub const INFERENCE: &str = "exploratory: development seeds; marginal intervals; Holm over the paired comparisons of this report only";
 
 fn metric_of(r: &Record, metric: Option<&str>) -> Option<f64> {
     metric.and_then(|m| r.metrics.get(m).copied())
@@ -342,6 +357,7 @@ pub fn build(plan: &Plan, records: &[Record], out: &Path) -> Result<Report, Stri
     };
     let runs = records.len() as u64;
     let inside = records.iter().filter(|r| r.in_envelope).count() as u64;
+    let declared = !e.envelope.is_empty();
     Ok(Report {
         schema: SCHEMA,
         equivalence_status: status,
@@ -353,12 +369,11 @@ pub fn build(plan: &Plan, records: &[Record], out: &Path) -> Result<Report, Stri
         confidence: conf,
         runs,
         errors: records.iter().filter(|r| r.error.is_some()).count() as u64,
-        in_envelope_fraction: if runs == 0 {
-            0.0
-        } else {
-            inside as f64 / runs as f64
-        },
-        extrapolated_runs: runs - inside,
+        error_policy: ERROR_POLICY,
+        inference: INFERENCE,
+        envelope_declared: declared,
+        in_envelope_fraction: (declared && runs > 0).then(|| inside as f64 / runs as f64),
+        extrapolated_runs: declared.then_some(runs - inside),
         metric: metric.map(String::from),
         arms,
         comparisons,

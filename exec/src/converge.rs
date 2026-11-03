@@ -34,6 +34,9 @@ pub struct Convergence {
     pub round_off_m: f64,
     /// Richardson estimate of the position error of the finest run, with the expected order.
     pub error_estimate_m: f64,
+    /// Richardson estimate of the position error at the base step `dt_s[0]`, the step the
+    /// experiment runs: `d0 x 2^p / (2^p - 1)`. `pass` is decided on this value.
+    pub base_error_estimate_m: f64,
     pub tolerance_m: f64,
     pub pass: bool,
 }
@@ -48,6 +51,7 @@ pub fn not_applicable(reason: &str, tolerance_m: f64) -> Convergence {
         observed_orders: Vec::new(),
         round_off_m: 0.0,
         error_estimate_m: 0.0,
+        base_error_estimate_m: 0.0,
         tolerance_m,
         pass: false,
     }
@@ -103,7 +107,9 @@ pub fn rigid_body(case_bytes: &[u8], levels: u32, tolerance_m: f64) -> Result<Co
         .map(|w| (w[0] > floor && w[1] > floor).then(|| (w[0] / w[1]).log2()))
         .collect();
     let last = *diffs.last().expect("at least two differences");
-    let estimate = last / (2f64.powf(EXPECTED_ORDER) - 1.0);
+    let gain = 2f64.powf(EXPECTED_ORDER);
+    let estimate = last / (gain - 1.0);
+    let base_estimate = diffs[0] * gain / (gain - 1.0);
     let orders_ok = orders
         .iter()
         .flatten()
@@ -117,8 +123,9 @@ pub fn rigid_body(case_bytes: &[u8], levels: u32, tolerance_m: f64) -> Result<Co
         observed_orders: orders,
         round_off_m: floor,
         error_estimate_m: estimate,
+        base_error_estimate_m: base_estimate,
         tolerance_m,
-        pass: orders_ok && estimate <= tolerance_m,
+        pass: orders_ok && base_estimate <= tolerance_m,
     })
 }
 

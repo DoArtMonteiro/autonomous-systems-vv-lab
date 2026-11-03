@@ -12,8 +12,8 @@
 
 use std::collections::BTreeMap;
 use std::fs::{self, OpenOptions};
-use std::io::{BufWriter, Write};
-use std::path::{Path, PathBuf};
+use std::io::Write;
+use std::path::{Component, Path, PathBuf};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
@@ -130,7 +130,7 @@ pub struct Options<'a> {
     pub cancel: &'a AtomicBool,
     /// Stop after this many runs in this invocation; for tests of interruption.
     pub stop_after: Option<u64>,
-    /// Runs between two memory probes by the first worker.
+    /// Completed runs between two memory probes.
     pub probe_every: u64,
 }
 
@@ -147,10 +147,75 @@ pub struct Summary {
     pub wall_s: f64,
 }
 
-fn write_new(path: &Path, bytes: &[u8]) -> Result<(), String> {
+/// Writes `bytes` to a temporary file next to `path`, flushes it to disk and renames it, so a
+/// reader sees either the old file or the complete new one.
+pub fn write_new(path: &Path, bytes: &[u8]) -> Result<(), String> {
     let tmp = path.with_extension("tmp");
-    fs::write(&tmp, bytes).map_err(|e| format!("{}: {e}", tmp.display()))?;
+    let mut f = fs::File::create(&tmp).map_err(|e| format!("{}: {e}", tmp.display()))?;
+    f.write_all(bytes)
+        .and_then(|()| f.sync_all())
+        .map_err(|e| format!("{}: {e}", tmp.display()))?;
+    drop(f);
     fs::rename(&tmp, path).map_err(|e| format!("{}: {e}", path.display()))
+}
+
+/// Outputs never go under a directory named `runs`: the historical runs of the lab live there.
+/// The nearest existing ancestor is resolved first, so a relative path, a symbolic link or a
+/// junction into `runs` is refused as well.
+pub fn guard_output(out: &Path) -> Result<(), String> {
+    let refuse = |p: &Path| {
+        p.components()
+            .any(|c| matches!(c, Component::Normal(n) if n.eq_ignore_ascii_case("runs")))
+    };
+    let mut existing = out;
+    let mut rest = Vec::new();
+    while !existing.exists() {
+        match (existing.parent(), existing.file_name()) {
+            (Some(parent), Some(name)) => {
+                rest.push(name.to_owned());
+                existing = if parent.as_os_str().is_empty() {
+                    Path::new(".")
+                } else {
+                    parent
+                };
+            }
+            _ => break,
+        }
+    }
+    let mut resolved = fs::canonicalize(existing).unwrap_or_else(|_| existing.to_path_buf());
+    resolved.extend(rest.iter().rev());
+    if refuse(out) || refuse(&resolved) {
+        return Err(format!(
+            "{}: vv-exec does not write under a directory named runs (historical evidence)",
+            out.display()
+        ));
+    }
+    Ok(())
+}
+
+/// Files that `open_output` may find in a directory without `plan.json`: the inputs written
+/// before an interruption, their temporaries and the lock.
+const INIT_FILES: [&str; 6] = [
+    "spec.json",
+    "base-case.json",
+    "spec.tmp",
+    "base-case.tmp",
+    "plan.tmp",
+    ".lock",
+];
+
+/// Writes an input, or checks that the copy already there is byte-identical.
+fn write_or_check(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    if path.exists() {
+        if fs::read(path).map_err(|e| format!("{}: {e}", path.display()))? != bytes {
+            return Err(format!(
+                "{} differs from the input of this plan; refusing to mix runs",
+                path.display()
+            ));
+        }
+        return Ok(());
+    }
+    write_new(path, bytes)
 }
 
 /// Prepares `out` for this plan: a new directory receives the inputs and the plan; an existing one
@@ -169,22 +234,22 @@ fn open_output(plan: &Plan, out: &Path) -> Result<(), String> {
                 stored["plan_sha256"]
             ));
         }
-        return Ok(());
+        // The inputs are written before the plan, so they are present; check them anyway.
+        write_or_check(&out.join("spec.json"), plan.spec_bytes())?;
+        return write_or_check(&out.join("base-case.json"), plan.base_bytes());
     }
-    if out.exists()
-        && fs::read_dir(out)
-            .map_err(|e| e.to_string())?
-            .next()
-            .is_some()
-    {
-        return Err(format!(
-            "{} is not empty and holds no plan; refusing to write into it",
-            out.display()
-        ));
+    // Without a plan, only the inputs of an interrupted initialisation may be present.
+    for entry in fs::read_dir(out).map_err(|e| format!("{}: {e}", out.display()))? {
+        let name = entry.map_err(|e| e.to_string())?.file_name();
+        if !INIT_FILES.iter().any(|f| name == *f) {
+            return Err(format!(
+                "{} is not empty and holds no plan; refusing to write into it",
+                out.display()
+            ));
+        }
     }
-    fs::create_dir_all(out).map_err(|e| format!("{}: {e}", out.display()))?;
-    write_new(&out.join("spec.json"), plan.spec_bytes())?;
-    write_new(&out.join("base-case.json"), plan.base_bytes())?;
+    write_or_check(&out.join("spec.json"), plan.spec_bytes())?;
+    write_or_check(&out.join("base-case.json"), plan.base_bytes())?;
     let mut m = serde_json::to_vec_pretty(&plan.manifest()).map_err(|e| e.to_string())?;
     m.push(b'\n');
     write_new(&manifest_path, &m)
@@ -223,6 +288,22 @@ fn read_log(plan: &Plan, path: &Path) -> Result<Vec<bool>, String> {
 /// Executes every plan entry not yet logged in `out`.
 pub fn execute(plan: &Plan, out: &Path, opt: &Options) -> Result<Summary, String> {
     let t0 = Instant::now();
+    guard_output(out)?;
+    fs::create_dir_all(out).map_err(|e| format!("{}: {e}", out.display()))?;
+    // One writer per output directory. The operating system releases the lock when the process
+    // ends, so a crash never leaves the directory locked.
+    let lock = OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(out.join(".lock"))
+        .map_err(|e| format!(".lock: {e}"))?;
+    lock.try_lock().map_err(|_| {
+        format!(
+            "{} is being written by another vv-exec process",
+            out.display()
+        )
+    })?;
     open_output(plan, out)?;
     let log_path = out.join("log.jsonl");
     let done = read_log(plan, &log_path)?;
@@ -230,13 +311,15 @@ pub fn execute(plan: &Plan, out: &Path, opt: &Options) -> Result<Summary, String
         .filter(|&i| !done[i as usize])
         .collect();
     let already = plan.runs.len() as u64 - todo.len() as u64;
-    let log = Mutex::new(BufWriter::new(
+    // Unbuffered: each record reaches the log in one complete write, so an interruption loses at
+    // most the runs in flight, never a run counted as executed.
+    let log = Mutex::new(
         OpenOptions::new()
             .create(true)
             .append(true)
             .open(&log_path)
             .map_err(|e| format!("log.jsonl: {e}"))?,
-    ));
+    );
 
     let l = &plan.experiment.limits;
     let logical = std::thread::available_parallelism().map_or(1, |n| n.get());
@@ -280,7 +363,6 @@ pub fn execute(plan: &Plan, out: &Path, opt: &Options) -> Result<Summary, String
             let decide = &decide;
             scope.spawn(move || {
                 let mut cached: Option<(u32, Vec<u8>)> = None;
-                let mut since_probe = 0u64;
                 loop {
                     if stopped.lock().unwrap().is_some() || failed.lock().unwrap().is_some() {
                         return;
@@ -325,16 +407,14 @@ pub fn execute(plan: &Plan, out: &Path, opt: &Options) -> Result<Summary, String
                         *failed.lock().unwrap() = Some(format!("log.jsonl: {e}"));
                         return;
                     }
-                    executed.fetch_add(1, Ordering::Relaxed);
-                    if w == 0 {
-                        since_probe += 1;
-                        if since_probe >= opt.probe_every.max(1) {
-                            since_probe = 0;
-                            let n = decide();
-                            allowed.store(n, Ordering::Relaxed);
-                            min_seen.fetch_min(n, Ordering::Relaxed);
-                            max_seen.fetch_max(n, Ordering::Relaxed);
-                        }
+                    // Whichever worker completes every probe_every-th run probes memory, so a slow
+                    // or parked worker never delays the adaptation.
+                    let done_now = executed.fetch_add(1, Ordering::Relaxed) + 1;
+                    if done_now.is_multiple_of(opt.probe_every.max(1)) {
+                        let n = decide();
+                        allowed.store(n, Ordering::Relaxed);
+                        min_seen.fetch_min(n, Ordering::Relaxed);
+                        max_seen.fetch_max(n, Ordering::Relaxed);
                     }
                 }
             });
@@ -342,7 +422,7 @@ pub fn execute(plan: &Plan, out: &Path, opt: &Options) -> Result<Summary, String
     });
     log.into_inner()
         .map_err(|_| "log writer poisoned")?
-        .flush()
+        .sync_all()
         .map_err(|e| format!("log.jsonl: {e}"))?;
     if let Some(e) = failed.into_inner().unwrap() {
         return Err(e);
@@ -562,4 +642,41 @@ pub fn same(a: &Record, b: &Record) -> bool {
             .all(|((ka, va), (kb, vb))| {
                 ka == kb && (va - vb).abs() <= 1e-15 * va.abs().max(vb.abs())
             })
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct Verification {
+    pub records: u64,
+    /// Plan indices whose stored record differs from the record recomputed in process.
+    pub mismatches: Vec<u64>,
+    pub pass: bool,
+}
+
+/// Recomputes every record in process and compares it with the stored one. The log hashes only
+/// detect accidental damage; this check also rejects a record that was edited and re-hashed.
+pub fn verify_all(plan: &Plan, records: &[Record], threads: usize) -> Verification {
+    let next = AtomicUsize::new(0);
+    let bad = Mutex::new(Vec::new());
+    std::thread::scope(|scope| {
+        for _ in 0..threads.max(1) {
+            scope.spawn(|| {
+                loop {
+                    let i = next.fetch_add(1, Ordering::Relaxed);
+                    let Some(rec) = records.get(i) else { return };
+                    if recompute(plan, rec).is_err() {
+                        bad.lock()
+                            .unwrap_or_else(|p| p.into_inner())
+                            .push(rec.index);
+                    }
+                }
+            });
+        }
+    });
+    let mut mismatches = bad.into_inner().unwrap_or_else(|p| p.into_inner());
+    mismatches.sort_unstable();
+    Verification {
+        records: records.len() as u64,
+        pass: mismatches.is_empty(),
+        mismatches,
+    }
 }

@@ -23,8 +23,8 @@ class StatsReferenceTest(unittest.TestCase):
         self.assertEqual(stored, ref.render(), "run: python scripts/m12_stats_reference.py")
 
     def test_render_does_not_depend_on_the_float_summation_algorithm(self) -> None:
-        # Python 3.12 made sum() of floats compensated; CI runs 3.10. The binomial tails must not
-        # use float summation, so a naive left-to-right sum must give the same bytes.
+        # Regression guard. Python 3.12 made sum() of floats compensated and CI runs 3.10; the
+        # module now calls sum() only on integers, so this fails only if a float sum() returns.
         def naive_sum(values, start=0):
             total = start
             for v in values:

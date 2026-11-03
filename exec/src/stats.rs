@@ -158,6 +158,9 @@ pub fn normal_quantile(p: f64) -> f64 {
     }
 }
 
+/// Stream label that separates the bootstrap resampling from the design draws.
+const BOOTSTRAP_STREAM: u64 = 0xB007_57A9;
+
 /// Wilson score interval for `k` successes in `n` trials.
 pub fn wilson(k: u64, n: u64, confidence: f64) -> (f64, f64) {
     if n == 0 {
@@ -169,7 +172,18 @@ pub fn wilson(k: u64, n: u64, confidence: f64) -> (f64, f64) {
     let denom = 1.0 + z * z / n;
     let centre = (p + z * z / (2.0 * n)) / denom;
     let half = z * (p * (1.0 - p) / n + z * z / (4.0 * n * n)).sqrt() / denom;
-    ((centre - half).max(0.0), (centre + half).min(1.0))
+    // At k = 0 and k = n one bound is exactly 0 or 1; the formula misses it by rounding.
+    let lo = if k == 0.0 {
+        0.0
+    } else {
+        (centre - half).max(0.0)
+    };
+    let hi = if k == n {
+        1.0
+    } else {
+        (centre + half).min(1.0)
+    };
+    (lo, hi)
 }
 
 /// Clopper-Pearson exact interval, from quantiles of the beta distribution.
@@ -326,7 +340,8 @@ pub fn sobol(
         })
         .collect();
     if bootstrap > 0 {
-        let mut g = SplitMix64::new(seed);
+        // Not the design seed itself: the Saltelli matrices draw from SplitMix64::new(seed).
+        let mut g = SplitMix64::new(seed ^ crate::prng::mix(BOOTSTRAP_STREAM));
         let mut draws: Vec<Vec<(f64, f64)>> = vec![Vec::new(); fab.len()];
         for _ in 0..bootstrap {
             let rows: Vec<usize> = (0..n).map(|_| g.below(n as u64) as usize).collect();
