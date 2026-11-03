@@ -122,7 +122,8 @@ def predict(out: Path) -> dict:
                  "onsets_s": ONSETS, "onset_magnitude_m": ONSET_MAGNITUDE},
     }
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(pred, indent=2) + "\n", encoding="utf-8")
+    # Bytes, not text mode: the hash the test records must be the hash of the committed file.
+    out.write_bytes((json.dumps(pred, indent=2) + "\n").encode("utf-8"))
     return pred
 
 
@@ -183,7 +184,7 @@ def test(pred_path: Path, exe: Path, root: Path) -> dict:
         "P2": {"per_onset": [dict(o, prediction_ok=ok) for o, ok in zip(onsets, p2_ok)],
                "supported": all(p2_ok)},
     }
-    (root / "masking-test.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    (root / "masking-test.json").write_bytes((json.dumps(result, indent=2) + "\n").encode("utf-8"))
     return result
 
 
