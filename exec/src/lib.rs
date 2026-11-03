@@ -10,6 +10,7 @@ pub mod plan;
 pub mod prng;
 pub mod report;
 pub mod sched;
+pub mod search;
 pub mod seeds;
 pub mod spec;
 pub mod stats;

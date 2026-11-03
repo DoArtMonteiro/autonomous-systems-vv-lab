@@ -187,6 +187,27 @@ fn set(doc: &mut Value, pointer: &str, value: Value, numeric: Numeric) -> Result
     Ok(())
 }
 
+/// Sets each parameter value in `doc` and returns the case bytes as the planner writes them:
+/// pretty JSON and a final newline. Integer parameters are rounded to the nearest integer.
+pub fn apply_parameters(
+    mut doc: Value,
+    parameters: &[Parameter],
+    values: &[f64],
+) -> Result<Vec<u8>, String> {
+    for (p, &v) in parameters.iter().zip(values) {
+        let (value, kind) = if p.integer {
+            (Value::from(v.round() as i64), Numeric::Integer)
+        } else {
+            let n = serde_json::Number::from_f64(v).ok_or("non-finite parameter value")?;
+            (Value::Number(n), Numeric::Float)
+        };
+        set(&mut doc, &p.pointer, value, kind).map_err(|e| format!("parameter {}: {e}", p.name))?;
+    }
+    let mut bytes = serde_json::to_vec_pretty(&doc).map_err(|e| e.to_string())?;
+    bytes.push(b'\n');
+    Ok(bytes)
+}
+
 impl Plan {
     /// Builds and validates the plan. `spec_bytes` are hashed as given; `base_dir` resolves
     /// `base_case`.
@@ -344,24 +365,11 @@ impl Plan {
             set(&mut doc, &o.pointer, o.value.clone(), Numeric::No)
                 .map_err(|e| format!("arm {}: {e}", a.name))?;
         }
-        for (p, &v) in self
-            .experiment
-            .parameters
-            .iter()
-            .zip(&self.cells[cell as usize].values)
-        {
-            let (value, kind) = if p.integer {
-                (Value::from(v.round() as i64), Numeric::Integer)
-            } else {
-                let n = serde_json::Number::from_f64(v).ok_or("non-finite parameter value")?;
-                (Value::Number(n), Numeric::Float)
-            };
-            set(&mut doc, &p.pointer, value, kind)
-                .map_err(|e| format!("parameter {}: {e}", p.name))?;
-        }
-        let mut bytes = serde_json::to_vec_pretty(&doc).map_err(|e| e.to_string())?;
-        bytes.push(b'\n');
-        Ok(bytes)
+        apply_parameters(
+            doc,
+            &self.experiment.parameters,
+            &self.cells[cell as usize].values,
+        )
     }
 
     pub fn case_of_variant(&self, v: u32) -> Result<Vec<u8>, String> {
