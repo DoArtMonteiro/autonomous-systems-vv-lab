@@ -55,7 +55,7 @@ Validação na fronteira:
 - Cada registo chega ao `log.jsonl` numa única escrita, sem memória intermédia, e o ficheiro é sincronizado com o disco no fim. Uma interrupção perde no máximo as execuções em curso.
 - Um único escritor por diretório: `run` obtém um bloqueio exclusivo em `.lock`. O sistema operativo liberta-o quando o processo termina, por isso uma falha nunca deixa o diretório bloqueado. Um segundo `run` sobre a mesma saída é recusado antes de escrever.
 - Uma inicialização interrompida antes de `plan.json` deixa só as entradas e os seus temporários. Um novo `run` com o mesmo plano aceita esse diretório, confirma que as entradas presentes são byte a byte as do plano e completa-o. Qualquer outro ficheiro, ou uma entrada diferente, é recusado.
-- Os hashes por linha detetam danos acidentais, não uma falsificação coerente: quem altera um registo e recalcula o hash passa a leitura. `vv-exec verify <dir>` recalcula em processo todos os registos e rejeita qualquer registo que não se reproduza. Com 16 trabalhadores, as 14 400 execuções da experiência de desenvolvimento verificaram-se em 10,4 s, sem diferenças. O teste `a_record_edited_and_rehashed_passes_the_hashes_but_fails_full_verification` falsifica um veredicto com hash recalculado e confirma a rejeição.
+- Os hashes por linha detetam danos acidentais, não uma falsificação coerente: quem altera um registo e recalcula o hash passa a leitura. `vv-exec verify <dir>` recalcula em processo todos os registos e rejeita qualquer registo que não se reproduza. Com 16 trabalhadores, as 14 400 execuções da experiência de desenvolvimento verificaram-se em 10,4 s (uma execução), sem diferenças. O teste `a_record_edited_and_rehashed_passes_the_hashes_but_fails_full_verification` falsifica um veredicto com hash recalculado e confirma a rejeição.
 - Escritas de `plan.json`, `records.jsonl`, `retained.json` e `report.json`: ficheiro temporário sincronizado com o disco e depois renomeado.
 - Os valores reais são lidos pelo `serde_json` sem `float_roundtrip`. Essa funcionalidade tem de ficar desligada: ligada, mudaria a forma como o `vv-rocket` lê os casos neste binário. Por isso, a comparação de um registo recalculado aceita um desvio relativo de 1e-15 nas métricas e exige igualdade exata em hashes, veredictos e erros.
 
@@ -131,6 +131,8 @@ Experiência: `m10-nominal.json` (B+) sob seis condições de falha, sementes de
 - «Ponta a ponta» inclui planeamento e validação dos casos, escrita de `records.jsonl` e retenção de 200 diretórios pelo escritor canónico. Com 16 trabalhadores, a fase de execução mediu 5,6 s (2 567 execuções/s), segundo o resumo do próprio motor.
 - A campanha atual pela linha de comandos mediu 117 execuções/s com 16 trabalhadores na auditoria; o motor em processo faz cerca de 15 vezes mais, de ponta a ponta.
 - `records.jsonl` tem o mesmo SHA-256 com 1, 8 e 16 trabalhadores (`docs/evidence/m12-exec/records-sha256.txt`).
+- Nova medição depois do endurecimento (commit `efa463a`: registo sem memória intermédia, sincronização no fim, bloqueio), mesmo comando e mesma máquina, 3 de novembro de 2026: 16 trabalhadores, 8,3 s ponta a ponta, 5,5 s na fase de execução, 71,9 s de CPU, pico de 67 MB; 1 trabalhador, 52,8 s, pico de 61 MB. O custo do registo sem memória intermédia não se distingue da variação entre execuções. `records.jsonl` mantém o SHA-256 `078b80f0…` registado. A tabela acima é a medição de `e1a2a71`.
+- A verificação completa (`vv-exec verify`, 16 trabalhadores) das 14 400 execuções mediu 10,4 s numa execução, fora de `jobrun.py`.
 - Portão de equivalência: 25 execuções da amostra, incluindo execuções com veredicto falhado (código de saída 2 da linha de comandos), 0 diferenças, `source_sha256` igual, `replay` verificado (`docs/evidence/m12-exec/equivalence.json`).
 - Critério do roteiro (frente 1): campanha de 14 400 execuções em 6 braços em menos de 30 s, com pico abaixo de 1 GB, e amostra de equivalência sem diferenças. Cumprido nesta máquina. A comparação dos agregados com `m10_campaign.py` nas mesmas sementes não foi feita: o script usa as suas grelhas e sementes do M10, que este trabalho não executa.
 
@@ -153,6 +155,7 @@ Experiência: `m10-nominal.json` (B+) sob seis condições de falha, sementes de
   - O tratador de interrupção cobre Ctrl+C e Ctrl+Break no Windows e `SIGINT` em Unix, não o fecho da consola, `SIGTERM` nem `SIGHUP`; nesses casos o registo fica válido, mas falta o resumo e o código 5.
   - `guard_output` também recusa um checkout dentro de um diretório chamado `runs` (falso positivo assumido) e não tem teste com ligação simbólica ou junção.
   - `retain` obtém o bloqueio do diretório; `equiv` ainda não.
+  - O intervalo 100 a 129 (ciclo de cronometragem terrestre, que inclui as sementes reservadas 101 a 112 do M6) não é recusado por `seeds.rs`. O motor só executa domínios do foguetão, por isso o risco é baixo, mas a recusa tem de existir antes do domínio terrestre em processo.
 
 ## Portões científicos preservados
 
