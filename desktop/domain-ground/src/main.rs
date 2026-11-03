@@ -148,6 +148,10 @@ impl DomainHost for Host {
         record::build(request, &policy, &native).map_err(simulation_error)
     }
 
+    fn native_seed_file(&self) -> Option<&'static str> {
+        Some("native/m4.json")
+    }
+
     fn native_replay(&self, dir: &Path) -> Vec<ReplayCheck> {
         let name = "vv-lab replay-m4 recomputes the native run";
         let (pass, detail) = match native::replay_m4(&dir.join("native").join("m4.json")) {

@@ -75,6 +75,10 @@ impl DomainHost for Host {
         record::build(request, out).map_err(HostError::Simulation)
     }
 
+    fn native_seed_file(&self) -> Option<&'static str> {
+        Some("run.json")
+    }
+
     fn native_replay(&self, dir: &Path) -> Vec<ReplayCheck> {
         replay(dir)
             .checks

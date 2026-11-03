@@ -38,6 +38,30 @@ pub trait DomainHost {
     fn native_replay(&self, _dir: &Path) -> Vec<ReplayCheck> {
         Vec::new()
     }
+    /// Stored native file, relative to the run directory, whose top-level `seed` the native replay
+    /// uses. The SDK requires it to equal the seed of the validated request before
+    /// [`DomainHost::native_replay`] runs, so a protected seed never reaches the simulator.
+    fn native_seed_file(&self) -> Option<&'static str> {
+        None
+    }
+}
+
+/// The native file's own seed must be the validated request seed.
+fn native_seed_check<H: DomainHost>(host: &H, dir: &Path, seed: u64) -> Option<ReplayCheck> {
+    let rel = host.native_seed_file()?;
+    let name = "the native run uses the seed of the stored request";
+    let found = read_bounded(&dir.join(rel), MAX_RECORD_BYTES)
+        .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).map_err(|e| e.to_string()))
+        .and_then(|v| {
+            v.get("seed")
+                .and_then(serde_json::Value::as_u64)
+                .ok_or_else(|| format!("{rel} has no integer seed"))
+        });
+    Some(match found {
+        Ok(s) if s == seed => check(name, true, ""),
+        Ok(s) => check(name, false, format!("{rel} seed {s}, request seed {seed}")),
+        Err(e) => check(name, false, e),
+    })
 }
 
 pub fn read_bounded(path: &Path, cap: u64) -> Result<Vec<u8>, String> {
@@ -149,6 +173,7 @@ pub fn replay<H: DomainHost>(host: &H, dir: &Path) -> ReplayReport {
     let mut checks = Vec::new();
     let parsed: Result<RunRecord, String> = read_bounded(&dir.join(RECORD_FILE), MAX_RECORD_BYTES)
         .and_then(|b| serde_json::from_slice(&b).map_err(|e| e.to_string()));
+    let mut valid_seed = None;
     match parsed {
         Err(e) => checks.push(check("record.json is a valid run record", false, e)),
         Ok(record) => {
@@ -157,6 +182,7 @@ pub fn replay<H: DomainHost>(host: &H, dir: &Path) -> ReplayReport {
             match validate_request(host, &record.request) {
                 Ok(normal) if normal == record.request => {
                     checks.push(check(name, true, ""));
+                    valid_seed = Some(normal.seed);
                     replay_files(host, dir, &record, &normal, &mut checks);
                 }
                 Ok(_) => checks.push(check(name, false, "the request is not in canonical form")),
@@ -164,13 +190,16 @@ pub fn replay<H: DomainHost>(host: &H, dir: &Path) -> ReplayReport {
             }
         }
     }
-    // The native simulator only sees a stored run whose request (and so its seed) is valid. It
-    // still runs when a stored file differs, as an independent check of the tampered run.
-    if checks
-        .iter()
-        .any(|c| c.name == "stored request is valid and canonical" && c.pass)
-    {
-        checks.extend(host.native_replay(dir));
+    // The native simulator only sees a stored run whose request (and so its seed) is valid and
+    // whose native file carries that same seed. It still runs when another stored file differs, as
+    // an independent check of the tampered run.
+    if let Some(seed) = valid_seed {
+        let seed_check = native_seed_check(host, dir, seed);
+        let seed_ok = seed_check.as_ref().is_none_or(|c| c.pass);
+        checks.extend(seed_check);
+        if seed_ok {
+            checks.extend(host.native_replay(dir));
+        }
     }
     let ok = !checks.is_empty() && checks.iter().all(|c| c.pass);
     ReplayReport {

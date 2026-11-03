@@ -801,3 +801,31 @@ fn demo_delayed_command_after_fallback_violates_and_the_clean_run_does_not() {
     let fallback = clean.channels.iter().find(|c| c.id == "fallback").unwrap();
     assert!(fallback.values[1..].iter().all(|v| *v == Some(0.0)));
 }
+
+#[test]
+fn a_native_manifest_with_a_protected_seed_never_reaches_the_simulator() {
+    let dir = Scratch::new();
+    let (out, _) = run(
+        &dir,
+        "run",
+        &request("nominal_stop", "dominant_axis", 42, vec![]),
+    );
+    let path = out.join("native/m4.json");
+    let text = fs::read_to_string(&path)
+        .unwrap()
+        .replace("\"seed\":42", "\"seed\":101");
+    assert!(text.contains("\"seed\":101"));
+    fs::write(&path, text).unwrap();
+    let (exit, report) = replay(&out);
+    assert_eq!((exit, report.status.as_str()), (1, "rejected"));
+    let seed = report
+        .checks
+        .iter()
+        .find(|c| c.name == "the native run uses the seed of the stored request")
+        .unwrap();
+    assert!(!seed.pass && seed.detail.contains("101"), "{seed:?}");
+    assert!(
+        !report.checks.iter().any(|c| c.name.contains("replay-m4")),
+        "the simulator replay must not run"
+    );
+}
