@@ -1,0 +1,28 @@
+{
+  "schema": "vv-domain-manifest.v1",
+  "id": "ground-vehicle",
+  "name": "Ground vehicle (2D kinematic)",
+  "version": "0.11.0",
+  "description": "A generic unarmed ground vehicle driving to a waypoint in a 2D world. The controller sees only noisy or missing GPS observations; the lab injects GPS dropouts and actuator faults and checks temporal contracts and safety invariants on the true position.",
+  "contract": { "name": "vv-domain", "major": 1, "minor": 0 },
+  "host": {
+    "executable": "vv-domain-ground.exe",
+    "timeout_s": 60,
+    "max_output_bytes": 4194304
+  },
+  "capabilities": ["run", "replay", "compare", "evidence", "faults"],
+  "visualisations": ["scene.ground-2d", "plots", "requirements", "timeline", "events"],
+  "seeds": {
+    "min": 0,
+    "max": 9223372036854775807,
+    "protected": [
+      {
+        "start": 101,
+        "end": 112,
+        "reason": "held-out seeds of the M6 controller repair experiment (scenarios/m6/experiment.json); running them here would spend the evaluation set"
+      }
+    ]
+  },
+  "model_validity": "2D kinematic model: integer-millimetre positions, fixed 100 ms ticks, a fixed step per movement command. No dynamics, inertia, steering, terrain or environment. The results describe the logic of the controller and the monitors, not a physical vehicle.",
+  "user_facing": true
+}

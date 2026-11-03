@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>V&amp;V Lab Studio</title>
+  <link rel="stylesheet" href="vendor/uplot/uPlot.min.css">
+  <link rel="stylesheet" href="css/app.css">
+  <script type="module" src="js/main.js"></script>
+</head>
+<body>
+  <a class="skip" href="#view">Skip to content</a>
+  <header class="appbar">
+    <div class="brand" aria-label="V&amp;V Lab Studio">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-name">V&amp;V Lab <b>Studio</b></span>
+    </div>
+    <nav class="nav" aria-label="Workspaces">
+      <button type="button" class="nav-btn" data-view="prepare" aria-keyshortcuts="1">Prepare</button>
+      <button type="button" class="nav-btn" data-view="run" aria-keyshortcuts="2">Run</button>
+      <button type="button" class="nav-btn" data-view="compare" aria-keyshortcuts="3">Compare</button>
+      <button type="button" class="nav-btn" data-view="library" aria-keyshortcuts="4">Library</button>
+      <button type="button" class="nav-btn" data-view="settings" aria-keyshortcuts="5">Settings</button>
+    </nav>
+    <div class="appbar-end">
+      <span id="platform-status" class="status-dot" role="status" aria-live="polite">Starting</span>
+      <button type="button" id="open-palette" class="kbd-btn" aria-keyshortcuts="Control+K" title="Command and search palette">Search <kbd>Ctrl K</kbd></button>
+      <button type="button" id="open-help" class="kbd-btn" aria-keyshortcuts="?" title="Keyboard shortcuts"><kbd>?</kbd></button>
+    </div>
+  </header>
+  <main id="view" tabindex="-1">
+    <section id="startup" class="startup" aria-live="polite">
+      <div class="startup-box">
+        <span class="brand-mark big" aria-hidden="true"></span>
+        <h1>V&amp;V Lab Studio</h1>
+        <p id="startup-text">Starting the platform: discovering domain hosts and reading their catalogs.</p>
+        <div class="startup-bar" aria-hidden="true"><span></span></div>
+        <div id="startup-detail"></div>
+      </div>
+    </section>
+    <section id="view-prepare" class="view" hidden aria-label="Prepare a mission"></section>
+    <section id="view-run" class="view" hidden aria-label="Run workspace"></section>
+    <section id="view-compare" class="view" hidden aria-label="Compare runs"></section>
+    <section id="view-library" class="view" hidden aria-label="Library"></section>
+    <section id="view-settings" class="view" hidden aria-label="Settings and about"></section>
+  </main>
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+  <div id="modal-root" hidden></div>
+</body>
+</html>

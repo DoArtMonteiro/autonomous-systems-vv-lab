@@ -1,0 +1,16 @@
+{
+  "schema": "vv-run-request.v1",
+  "domain": "rocket-landing",
+  "scenario": "m9-landing",
+  "controller": "robust",
+  "seed": 5000,
+  "faults": [
+    {
+      "kind": "thrust_loss",
+      "magnitude": 0.15,
+      "start": 5.26,
+      "end": 40.0
+    }
+  ],
+  "parameters": {}
+}

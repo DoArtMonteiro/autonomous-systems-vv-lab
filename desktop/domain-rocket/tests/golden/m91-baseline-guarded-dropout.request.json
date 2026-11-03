@@ -1,0 +1,16 @@
+{
+  "schema": "vv-run-request.v1",
+  "domain": "rocket-landing",
+  "scenario": "m91-landing",
+  "controller": "baseline_guarded",
+  "seed": 5002,
+  "faults": [
+    {
+      "kind": "gnss_dropout",
+      "magnitude": null,
+      "start": 8.0,
+      "end": 14.0
+    }
+  ],
+  "parameters": {}
+}
