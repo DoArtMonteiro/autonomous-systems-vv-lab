@@ -10,7 +10,8 @@ Estado: **investigação**. Este documento mede o laboratório atual e propõe o
 - **Ferramenta:** `spikes/m12-perf/jobrun.py` executa cada comando dentro de um Job Object do Windows. O job dá, para a árvore inteira de processos, o pico de memória comprometida (`PeakJobMemoryUsed`), o tempo de CPU de utilizador e de núcleo e o número de processos. Um teto de memória por job (4 a 12 GB) termina a árvore antes de esgotar a máquina. Um fio de amostragem regista a utilização global da CPU e a memória física disponível.
 - **Simulação em processo:** `spikes/m12-perf/rocket-bench` liga `vv-rocket` como biblioteca e cronometra cada fase de uma execução. Antes de medir, compara o traço com o de `landing_run::artifacts` byte a byte.
 - **GPU:** contadores `GPU Engine` e `GPU Process Memory` do Windows, com `spikes/m12-perf/gpu_sample.ps1` (uma amostra a cada 1,2 s, aproximadamente).
-- **Sementes:** apenas de desenvolvimento (5000 a 5959, 7000 a 9399) e do M1 (42, 1337, 2026). As ferramentas da auditoria recusam 3000 a 3099 e 6000 a 6099.
+- **Sementes do foguetão:** não protegidas (5000 a 5959, 7000 a 9399). As ferramentas da auditoria recusam 3000 a 3099 e 6000 a 6099. Nenhuma semente de avaliação ou de reserva do M10 foi executada.
+- **Sementes terrestres:** as do M1 (42, 1337, 2026) e, num ciclo de cronometragem escrito à mão, 100 a 129 com `scenarios/basic-mission.json`. Esse intervalo inclui 101 a 112, as sementes reservadas de `scenarios/m6/cancellation-dev.json`. Ver «Portões científicos preservados».
 - **Evidências:** `docs/evidence/m12-perf/`, um JSON por medição, com o comando, os limites e as amostras. Os caminhos pessoais foram substituídos por `<repo>` e `<home>` (`spikes/m12-perf/collect.py`).
 
 Não foi medido: energia (não há sensor acessível sem privilégios), bytes de E/S por job (o Job Object não preencheu os contadores nesta máquina; o campo foi retirado), desempenho de núcleos de GPU (não foi construído nenhum, ver a decisão).
@@ -129,7 +130,7 @@ Razões, por ordem de peso:
 
 1. **O trabalho não o justifica.** O cálculo da campanha de desenvolvimento completa do M10 cabe em cerca de 7 s de CPU em processo. O tempo perdido está na criação de processos e na E/S, que uma GPU não resolve.
 2. **A forma do trabalho não serve a GPU.** Cada execução é uma cadeia sequencial de cerca de 2 300 passos RK4 em `f64`, com controlador, filtro de navegação, falhas e verificador cheios de ramos. Só há paralelismo entre execuções, e ramos divergentes desperdiçam a largura das unidades vetoriais.
-3. **A GPU não reproduz os bytes canónicos.** Os artefactos são comparados byte a byte e por SHA-256. O conjunto `GLSL.std.450` só define `Exp`, `Sin`, `Cos` e `Log` para 16 e 32 bits; a atmosfera (`math.rs`) usa `exp` em `f64` e teria de ser emulada. A precisão de divisões, raízes e contração em FMA não é garantida igual à do Rust na CPU. Um motor em GPU seria sempre um segundo motor, validado estatisticamente, nunca uma substituição.
+3. **A GPU não reproduz os bytes canónicos.** Os artefactos são comparados byte a byte e por SHA-256. A atmosfera (`math.rs`) usa `exp` em `f64`; o `naga` traduz `exp` para a instrução `Exp` de `GLSL.std.450`, cuja disponibilidade e precisão em `f64` no Vulkan não estão garantidas iguais às da CPU (não verificado no controlador). A precisão de divisões e raízes e a contração em FMA também não são garantidas iguais às do Rust na CPU. Um motor em GPU seria sempre um segundo motor, validado estatisticamente, nunca uma substituição.
 4. **Estabilidade:** o proprietário pediu para não carregar uma GPU instável. Sem ganho esperado, o risco não se justifica.
 
 A decisão muda se, em conjunto:
@@ -144,7 +145,7 @@ A GPU tem uso legítimo no M12 do lado da **visualização**: desenhar milhares 
 
 ## Melhorias aplicadas nesta auditoria
 
-- **`scripts/m10_campaign.py`: `MAX_JOBS` de 8 para 16.** Medido: 13,5 s para 9,4 s (1,44 vezes) em 1 100 execuções, resultados iguais, pico de 68 MB. A predefinição (`--jobs 4`) não muda; as evidências do M10 já publicadas não mudam. O `m10_onset_sweep.py` herda o teto.
+- **`scripts/m10_campaign.py`: `MAX_JOBS` de 8 para 16.** Medido: 13,5 s para 9,4 s (1,44 vezes) em 1 100 execuções, resultados iguais, pico de 68 MB. A predefinição (`--jobs 4`) não muda; as evidências do M10 já publicadas não mudam, e os comandos com `--jobs 8` em `docs/m10-implementation.md` continuam válidos. O `m10_onset_sweep.py` herda o teto.
 - **`desktop/Cargo.toml`: perfil `dev-release`.** Herda `release` com `codegen-units = 16`, sem LTO e incremental. Religação do Studio de 86,8 s para 8,1 s. A autoverificação headless do Studio construído com este perfil passa (4 de 4). O instalador, a CI e `build.ps1` continuam com `release`.
 - **Ferramentas da auditoria em `spikes/m12-perf/`:** `jobrun.py` (medição com teto de memória), `gpu_sample.ps1` (contadores de GPU), `rocket-bench` (fases em processo e executor em lote, com recusa das sementes protegidas), `collect.py` (evidências sanitizadas).
 
@@ -225,7 +226,8 @@ Cinco frentes, executadas por esta ordem porque cada uma depende da anterior. Ca
 
 ## Portões científicos preservados
 
-- Nenhuma semente de avaliação (3000 a 3099) ou de reserva (6000 a 6099) foi executada. As ferramentas novas recusam-nas.
+- Nenhuma semente de avaliação (3000 a 3099) ou de reserva (6000 a 6099) do M10 foi executada. As ferramentas novas do foguetão recusam-nas.
+- **Desvio declarado:** a cronometragem de `vv-lab run` usou as sementes 100 a 129 com `scenarios/basic-mission.json`, e esse intervalo inclui 101 a 112, reservadas no M6 (`scenarios/m6/cancellation-dev.json`). Foi um ciclo escrito à mão, sem a guarda de sementes da plataforma. O cenário não é do M6, as saídas ficaram em `runs/` (ignorado pelo Git) e foram descartadas, e nenhum veredicto foi lido; só o tempo foi medido. O M6 já está concluído. As medições terrestres do M12 devem usar sementes fora de todos os conjuntos reservados.
 - Nenhuma configuração foi congelada; `m10-freeze.json` não existe.
 - `crates/vv-rocket`, o pacote raiz, os casos e as evidências do M10 não foram alterados. Os hashes do M1 não mudam.
 - O protótipo de lote e as ferramentas ficam em `spikes/m12-perf/`, fora de qualquer espaço de trabalho existente.
