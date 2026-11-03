@@ -231,6 +231,58 @@ pub fn unit_of(pointer: &str) -> Option<&'static str> {
         .map(|(_, unit)| *unit)
 }
 
+/// Checks parameters: names, pointers, ranges, scales, integer bounds and units. Shared by
+/// experiments and searches.
+pub fn validate_parameters(parameters: &[Parameter]) -> Result<(), String> {
+    if parameters.len() > MAX_PARAMETERS {
+        return Err(format!("parameters: at most {MAX_PARAMETERS}"));
+    }
+    let mut pnames: Vec<&str> = Vec::new();
+    for (i, p) in parameters.iter().enumerate() {
+        let at = format!("parameters[{i}] ({})", p.name);
+        if !valid_name(&p.name) || pnames.contains(&p.name.as_str()) {
+            return Err(format!("{at}: name is invalid or repeated"));
+        }
+        pnames.push(&p.name);
+        if !valid_pointer(&p.pointer) {
+            return Err(format!("{at}: pointer is not a JSON pointer"));
+        }
+        if parameters[..i].iter().any(|q| q.pointer == p.pointer) {
+            return Err(format!("{at}: pointer {} is varied twice", p.pointer));
+        }
+        if !(p.low.is_finite() && p.high.is_finite() && p.low < p.high) {
+            return Err(format!("{at}: low and high must be finite with low < high"));
+        }
+        if p.integer && (p.low.fract() != 0.0 || p.high.fract() != 0.0) {
+            return Err(format!(
+                "{at}: an integer parameter needs integer low and high"
+            ));
+        }
+        if p.integer && (p.low.abs() > 9.0e15 || p.high.abs() > 9.0e15) {
+            return Err(format!("{at}: integer bounds must stay below 9e15"));
+        }
+        if p.scale == Scale::Log && p.low <= 0.0 {
+            return Err(format!("{at}: a log scale needs low > 0"));
+        }
+        match unit_of(&p.pointer) {
+            Some(u) if p.unit != u => {
+                return Err(format!(
+                    "{at}: unit {:?} does not match {u:?}, the unit of {}",
+                    p.unit, p.pointer
+                ));
+            }
+            None if p.unit != "model" => {
+                return Err(format!(
+                    "{at}: {} carries no unit in its name; declare unit \"model\"",
+                    p.pointer
+                ));
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
 impl Experiment {
     pub fn parse(bytes: &[u8]) -> Result<Self, String> {
         if bytes.len() as u64 > MAX_SPEC_BYTES {
@@ -320,52 +372,7 @@ impl Experiment {
                 }
             }
         }
-        if self.parameters.len() > MAX_PARAMETERS {
-            return Err(format!("parameters: at most {MAX_PARAMETERS}"));
-        }
-        let mut pnames: Vec<&str> = Vec::new();
-        for (i, p) in self.parameters.iter().enumerate() {
-            let at = format!("parameters[{i}] ({})", p.name);
-            if !valid_name(&p.name) || pnames.contains(&p.name.as_str()) {
-                return Err(format!("{at}: name is invalid or repeated"));
-            }
-            pnames.push(&p.name);
-            if !valid_pointer(&p.pointer) {
-                return Err(format!("{at}: pointer is not a JSON pointer"));
-            }
-            if self.parameters[..i].iter().any(|q| q.pointer == p.pointer) {
-                return Err(format!("{at}: pointer {} is varied twice", p.pointer));
-            }
-            if !(p.low.is_finite() && p.high.is_finite() && p.low < p.high) {
-                return Err(format!("{at}: low and high must be finite with low < high"));
-            }
-            if p.integer && (p.low.fract() != 0.0 || p.high.fract() != 0.0) {
-                return Err(format!(
-                    "{at}: an integer parameter needs integer low and high"
-                ));
-            }
-            if p.integer && (p.low.abs() > 9.0e15 || p.high.abs() > 9.0e15) {
-                return Err(format!("{at}: integer bounds must stay below 9e15"));
-            }
-            if p.scale == Scale::Log && p.low <= 0.0 {
-                return Err(format!("{at}: a log scale needs low > 0"));
-            }
-            match unit_of(&p.pointer) {
-                Some(u) if p.unit != u => {
-                    return Err(format!(
-                        "{at}: unit {:?} does not match {u:?}, the unit of {}",
-                        p.unit, p.pointer
-                    ));
-                }
-                None if p.unit != "model" => {
-                    return Err(format!(
-                        "{at}: {} carries no unit in its name; declare unit \"model\"",
-                        p.pointer
-                    ));
-                }
-                _ => {}
-            }
-        }
+        validate_parameters(&self.parameters)?;
         match (&self.design, self.parameters.is_empty()) {
             (Design::Single, false) => {
                 return Err("design single takes no parameters".into());
