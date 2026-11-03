@@ -82,7 +82,10 @@ FAMILIES = {
 
 MAX_RUNS = 2500
 DEFAULT_MAX_RUNS = 2500
-MAX_JOBS = 8
+# Cada execução é um processo curto de `vv-rocket`; a criação do processo domina o tempo, por isso
+# mais tarefas do que núcleos ainda ajudam. Com 16 na máquina da auditoria: 1,44 vezes mais rápido
+# do que com 8 e resultados iguais (docs/m12-performance-audit.md).
+MAX_JOBS = 16
 DEFAULT_JOBS = 4
 MAX_TIME_BUDGET_SECONDS = 3600
 DEFAULT_TIME_BUDGET_SECONDS = 1800
