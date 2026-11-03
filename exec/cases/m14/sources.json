@@ -1,0 +1,24 @@
+{
+  "ground-nominal-stop": {
+    "case_sha256": "cf29a3218292621a59e0e40cf000bbcdef7f7b3dc728f7074849b2b0c704492a",
+    "sources": {
+      "scenarios/m3/actuator-none.json": "0946f8c0c073b613e24593dc9bdeebf5225333df6038fd59004f7e0160de8a0d",
+      "scenarios/m3/contracts-stop.json": "121735ca65a08894ae912f72796f3ae3a7195b21ac297910e42da25d6d69720e",
+      "scenarios/m3/nominal-stop.json": "cbdfdbce7539c419735afa66d2e83d3e44629f60e372fc2350f940d722baa484"
+    }
+  },
+  "ground-x-first-overshoot": {
+    "case_sha256": "bcdb369eced5174b8e3c8f6fb48b2bf134ce10fab29c1969c2d1eb43f3761337",
+    "sources": {
+      "scenarios/m3/contracts-nominal.json": "0bf466b6e39715382ded341b763c883d9982d61f12768c2a5e4d7b17a578cd31",
+      "scenarios/m4/x-first-overshoot.json": "028c0cdf58586f5358822d81c90d9a8b56519c2a291b7be4fc8cfa1fe7b442c7"
+    }
+  },
+  "ground-zone-corridor": {
+    "case_sha256": "4fd198cf5ec8cff8fbfaa3f5f530b90259f6f173566f56e065c8abe4ec52e86a",
+    "sources": {
+      "scenarios/m2/f-zone-nominal.json": "0f14c5b689cd4ba5370f36ad0ac978fe59e622d5cbe2fb240375e684c99c1a7e",
+      "scenarios/m3/contracts-nominal.json": "0bf466b6e39715382ded341b763c883d9982d61f12768c2a5e4d7b17a578cd31"
+    }
+  }
+}

@@ -155,20 +155,33 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
 }
 
 /// Sets an existing value of `doc`; never creates a field the base case lacks.
-fn set(doc: &mut Value, pointer: &str, value: Value, numeric: bool) -> Result<(), String> {
+/// Which kind of number a parameter writes: none (an arm override), a float or an integer.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Numeric {
+    No,
+    Float,
+    Integer,
+}
+
+fn set(doc: &mut Value, pointer: &str, value: Value, numeric: Numeric) -> Result<(), String> {
     let slot = doc
         .pointer_mut(pointer)
         .ok_or(format!("{pointer} does not exist in the base case"))?;
-    if numeric {
-        match slot {
-            Value::Number(n) if n.is_f64() => {}
-            Value::Number(_) => {
-                return Err(format!(
-                    "{pointer} is an integer field; it cannot be varied"
-                ));
-            }
-            _ => return Err(format!("{pointer} is not a number in the base case")),
+    match (numeric, &*slot) {
+        (Numeric::No, _) => {}
+        (Numeric::Float, Value::Number(n)) if n.is_f64() => {}
+        (Numeric::Integer, Value::Number(n)) if !n.is_f64() => {}
+        (Numeric::Float, Value::Number(_)) => {
+            return Err(format!(
+                "{pointer} is an integer field; declare the parameter integer"
+            ));
         }
+        (Numeric::Integer, Value::Number(_)) => {
+            return Err(format!(
+                "{pointer} is a floating-point field; the parameter must not be integer"
+            ));
+        }
+        _ => return Err(format!("{pointer} is not a number in the base case")),
     }
     *slot = value;
     Ok(())
@@ -328,7 +341,7 @@ impl Plan {
         }
         let mut doc = self.base_value.clone();
         for o in &a.overrides {
-            set(&mut doc, &o.pointer, o.value.clone(), false)
+            set(&mut doc, &o.pointer, o.value.clone(), Numeric::No)
                 .map_err(|e| format!("arm {}: {e}", a.name))?;
         }
         for (p, &v) in self
@@ -337,8 +350,13 @@ impl Plan {
             .iter()
             .zip(&self.cells[cell as usize].values)
         {
-            let n = serde_json::Number::from_f64(v).ok_or("non-finite parameter value")?;
-            set(&mut doc, &p.pointer, Value::Number(n), true)
+            let (value, kind) = if p.integer {
+                (Value::from(v.round() as i64), Numeric::Integer)
+            } else {
+                let n = serde_json::Number::from_f64(v).ok_or("non-finite parameter value")?;
+                (Value::Number(n), Numeric::Float)
+            };
+            set(&mut doc, &p.pointer, value, kind)
                 .map_err(|e| format!("parameter {}: {e}", p.name))?;
         }
         let mut bytes = serde_json::to_vec_pretty(&doc).map_err(|e| e.to_string())?;
@@ -465,6 +483,7 @@ mod tests {
             low: 1.0,
             high: 100.0,
             scale: Scale::Log,
+            integer: false,
         };
         assert!((scale(&p, 0.0) - 1.0).abs() < 1e-12);
         assert!((scale(&p, 0.5) - 10.0).abs() < 1e-9);
