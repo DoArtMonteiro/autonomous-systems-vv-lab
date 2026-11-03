@@ -147,3 +147,8 @@ O M11 é trabalho de produto. Não altera o estimador, a configuração nem as h
 - As execuções do veículo terrestre não dependem da semente nestas três missões (não há ruído nem falhas aleatórias); a semente só muda a identidade e o registo diz isso.
 - Os eventos de saúde dos grupos do M10 vêm das amostras de 0,1 s do traço; o instante tem essa resolução.
 - Não há cancelamento de uma execução em curso; cada chamada tem o limite de tempo do manifesto.
+- A interface recusa sementes acima de 9 007 199 254 740 991 (2^53 − 1), porque os números de JavaScript não as representam exatamente; o domínio terrestre aceita até 2^63 − 1 pela linha de comandos.
+- A cena do foguetão não desenha a deflexão do gimbal: o registo não declara a convenção de sinal, e a legenda di-lo.
+- A faixa de falhas da linha de tempo mostra as janelas pedidas; as falhas já incluídas num cenário terrestre aparecem como eventos.
+- A disposição da cena é escolhida ao abrir a execução; uma execução aberta numa janela pequena fica só com a vista 3D até ser reaberta.
+- A janela "Guardar como" e o "Show in Explorer" não estão no teste automático da interface.
