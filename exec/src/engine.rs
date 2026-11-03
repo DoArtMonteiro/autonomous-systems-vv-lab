@@ -193,6 +193,25 @@ pub fn guard_output(out: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// Takes the single-writer lock of an output directory. The operating system releases it when the
+/// returned file is dropped or the process ends, so a crash never leaves the directory locked.
+pub fn lock_output(out: &Path) -> Result<fs::File, String> {
+    let lock = OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(out.join(".lock"))
+        .map_err(|e| format!(".lock: {e}"))?;
+    match lock.try_lock() {
+        Ok(()) => Ok(lock),
+        Err(fs::TryLockError::WouldBlock) => Err(format!(
+            "{} is being written by another vv-exec process",
+            out.display()
+        )),
+        Err(fs::TryLockError::Error(e)) => Err(format!("{}: cannot lock: {e}", out.display())),
+    }
+}
+
 /// Files that `open_output` may find in a directory without `plan.json`: the inputs written
 /// before an interruption, their temporaries and the lock.
 const INIT_FILES: [&str; 6] = [
@@ -290,20 +309,7 @@ pub fn execute(plan: &Plan, out: &Path, opt: &Options) -> Result<Summary, String
     let t0 = Instant::now();
     guard_output(out)?;
     fs::create_dir_all(out).map_err(|e| format!("{}: {e}", out.display()))?;
-    // One writer per output directory. The operating system releases the lock when the process
-    // ends, so a crash never leaves the directory locked.
-    let lock = OpenOptions::new()
-        .create(true)
-        .truncate(false)
-        .write(true)
-        .open(out.join(".lock"))
-        .map_err(|e| format!(".lock: {e}"))?;
-    lock.try_lock().map_err(|_| {
-        format!(
-            "{} is being written by another vv-exec process",
-            out.display()
-        )
-    })?;
+    let _lock = lock_output(out)?;
     open_output(plan, out)?;
     let log_path = out.join("log.jsonl");
     let done = read_log(plan, &log_path)?;
@@ -535,6 +541,8 @@ fn dir_bytes(dir: &Path, files: &[&str]) -> Result<u64, String> {
 /// Retains canonical artifacts in plan order, after every run is logged, so the selection does
 /// not depend on completion order. Each retained trace is checked against its record.
 pub fn retain(plan: &Plan, out: &Path, records: &[Record]) -> Result<RetentionReport, String> {
+    guard_output(out)?;
+    let _lock = lock_output(out)?;
     let r = &plan.experiment.retention;
     let l = &plan.experiment.limits;
     let wanted = |rec: &Record| match r.policy {
@@ -657,8 +665,9 @@ pub struct Verification {
 pub fn verify_all(plan: &Plan, records: &[Record], threads: usize) -> Verification {
     let next = AtomicUsize::new(0);
     let bad = Mutex::new(Vec::new());
+    let logical = std::thread::available_parallelism().map_or(1, |n| n.get());
     std::thread::scope(|scope| {
-        for _ in 0..threads.max(1) {
+        for _ in 0..threads.clamp(1, logical) {
             scope.spawn(|| {
                 loop {
                     let i = next.fetch_add(1, Ordering::Relaxed);

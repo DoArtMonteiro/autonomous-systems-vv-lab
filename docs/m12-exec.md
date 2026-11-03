@@ -146,6 +146,13 @@ Experiência: `m10-nominal.json` (B+) sob seis condições de falha, sementes de
 - Uma linha final danificada que termina em mudança de linha, ou um final preenchido com zeros, não é reparado: a retoma falha com erro de hash e o diretório tem de ser reparado à mão.
 - `equiv` recusa correr se `equivalence/` já existir; uma interrupção a meio do portão obriga a apagar esse diretório. A amostra do portão não inclui execuções terminadas em erro, e só o domínio de aterragem tem teste de paridade automático.
 - Uma máquina e uma sessão com outras aplicações abertas; os tempos absolutos variam com a carga.
+- Pontos em aberto da segunda revisão independente (03/11/2026, sobre `8d7afce`):
+  - `read_records`, `report` e `equiv` não recalculam todos os registos; só `verify` o faz, e nada regista que `verify` correu. O registo não tem cadeia de hashes nem cabeçalho ligado ao plano.
+  - `equivalence.json` é escrito sem ficheiro temporário; a pasta-mãe não é sincronizada com o disco depois de um `rename`; o registo não é sincronizado por linha, por isso um corte de energia pode perder execuções contadas como feitas (uma interrupção do processo não perde).
+  - Um trabalhador que entre em pânico envenena os mutexes partilhados e termina os outros.
+  - O tratador de interrupção cobre Ctrl+C e Ctrl+Break no Windows e `SIGINT` em Unix, não o fecho da consola, `SIGTERM` nem `SIGHUP`; nesses casos o registo fica válido, mas falta o resumo e o código 5.
+  - `guard_output` também recusa um checkout dentro de um diretório chamado `runs` (falso positivo assumido) e não tem teste com ligação simbólica ou junção.
+  - `retain` obtém o bloqueio do diretório; `equiv` ainda não.
 
 ## Portões científicos preservados
 
