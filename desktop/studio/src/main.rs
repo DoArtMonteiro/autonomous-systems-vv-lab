@@ -6,14 +6,18 @@
 //!
 //! Locations (Windows):
 //! - domain hosts: `<install dir>/domains/<id>/` (read-only, replaced by updates);
-//! - research library: `Documents/VV Lab Library/` (runs, scenarios, comparisons, exports), kept
-//!   by uninstall;
+//! - research library: `Documents/VV Lab Library/` (runs, scenarios, comparisons, exports and
+//!   M13 investigations), kept by uninstall;
+//! - Discovery Lab (M13): the investigation engine `<install dir>/engines/vv-exec.exe` and the
+//!   claims under `<install dir>/discovery/claims/`, run as child processes (see `discovery.rs`);
 //! - preferences and log: the per-user application config and log directories.
 //!
 //! `vv-studio --self-test <report.json>` runs headless: it starts the platform, runs and replays the
 //! first demonstration of every user-facing domain, writes a JSON report and exits 0 when all pass.
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+mod discovery;
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -46,6 +50,7 @@ struct Paths {
 
 struct AppState {
     paths: Paths,
+    discovery: discovery::Discovery,
     platform: RwLock<Option<Arc<Platform>>>,
     start: Mutex<Option<Result<StartReport, String>>>,
     exports: Mutex<BTreeSet<PathBuf>>,
@@ -420,6 +425,19 @@ fn env_dirs(name: &str) -> Vec<PathBuf> {
         .unwrap_or_default()
 }
 
+fn discovery_paths(app: &tauri::App, library: &Path) -> discovery::DiscoveryPaths {
+    let res = app.path().resource_dir().unwrap_or_default();
+    discovery::DiscoveryPaths {
+        engine: std::env::var_os("VVLAB_EXEC")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| res.join("engines").join("vv-exec.exe")),
+        claims: std::env::var_os("VVLAB_CLAIMS")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| res.join("discovery").join("claims")),
+        investigations: library.join("investigations"),
+    }
+}
+
 fn resolve_paths(app: &tauri::App) -> Paths {
     let resolver = app.path();
     let mut domains = env_dirs("VVLAB_DOMAINS");
@@ -529,6 +547,19 @@ fn self_test(report_path: &Path) -> i32 {
             }
         }
     }
+    // Discovery Lab: the bundled engine reads and validates every bundled claim. A full
+    // investigation is left to the UI test; it would take the self-test from seconds to minutes.
+    let engine = std::env::var_os("VVLAB_EXEC")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| exe_dir.join("engines").join("vv-exec.exe"));
+    let claims = std::env::var_os("VVLAB_CLAIMS")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| exe_dir.join("discovery").join("claims"));
+    let found = discovery::self_check(&engine, &claims);
+    for (name, pass, detail) in found {
+        ok &= pass;
+        checks.push(check(name, pass, detail));
+    }
     let report = json!({ "schema": "vv-studio-self-test.v1", "version": VERSION, "pass": ok, "checks": checks });
     let _ = fs::write(
         report_path,
@@ -559,7 +590,13 @@ fn main() {
         .setup(|app| {
             let paths = resolve_paths(app);
             log_line(&paths.log, &format!("start {VERSION}"));
+            let disc = discovery::Discovery::new(discovery_paths(app, &paths.library));
+            log_line(
+                &paths.log,
+                &format!("engine {}", disc.paths.engine.display()),
+            );
             app.manage(AppState {
+                discovery: disc,
                 paths: paths.clone(),
                 platform: RwLock::new(None),
                 start: Mutex::new(None),
@@ -599,6 +636,13 @@ fn main() {
             get_prefs,
             set_prefs,
             log_ui_error,
+            discovery::list_claims,
+            discovery::list_investigations,
+            discovery::investigation,
+            discovery::investigate,
+            discovery::verify_investigation,
+            discovery::cancel_investigation,
+            discovery::reveal_investigation,
         ])
         .build(tauri::generate_context!())
         .expect("the studio could not start")

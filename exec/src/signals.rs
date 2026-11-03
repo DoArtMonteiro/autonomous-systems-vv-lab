@@ -190,6 +190,22 @@ fn rocket(dir: &Path) -> Result<Signals, String> {
         b.push("disagreement", t, num(s, "/estimate/sensor_disagreement"));
         b.push("throttle", t, num(s, "/applied/throttle"));
     }
+    // Most diagnostic first: what the controller got wrong, how the vehicle moved, what the
+    // monitors said; the slow channels last.
+    const ORDER: [&str; 6] = [
+        "Belief error",
+        "Vertical velocity",
+        "Monitors",
+        "Height above the pad",
+        "Altitude",
+        "Engine",
+    ];
+    b.series.sort_by_key(|s| {
+        ORDER
+            .iter()
+            .position(|g| *g == s.group)
+            .unwrap_or(ORDER.len())
+    });
     let mut events = Vec::new();
     for e in trace["events"].as_array().into_iter().flatten() {
         let (Some(t), Some(kind)) = (num(e, "/t_s"), e["kind"].as_str()) else {

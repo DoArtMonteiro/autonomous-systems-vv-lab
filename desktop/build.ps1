@@ -51,6 +51,24 @@ foreach ($d in $domains) {
 Get-ChildItem -Recurse $stage | Where-Object { -not $_.PSIsContainer } | ForEach-Object {
     Write-Host ("    {0,-60} {1,10:N0} bytes" -f $_.FullName.Substring($stage.Length + 1), $_.Length)
 }
+Step "Investigation engine (vv-exec) and bundled claims (M13 Discovery Lab)"
+# Built from desktop/ so desktop/.cargo/config.toml links the VC runtime statically, into its own
+# target directory. Studio runs it as a child process; it never links it.
+$execTarget = Join-Path $desktop "target\exec-static"
+Run "cargo" @("build", "--release", "--locked", "--bin", "vv-exec", "--manifest-path", (Join-Path $repo "exec\Cargo.toml"), "--target-dir", $execTarget) $desktop
+$engines = Join-Path (Join-Path $desktop "target") "release/engines"
+$discovery = Join-Path (Join-Path $desktop "target") "release/discovery"
+foreach ($d in @($engines, $discovery)) { if (Test-Path $d) { Remove-Item -Recurse -Force $d } }
+New-Item -ItemType Directory -Force $engines | Out-Null
+Copy-Item (Join-Path (Join-Path $execTarget "release") "vv-exec.exe") $engines
+# Claims name their base cases by relative path (../../cases/...), so the two folders keep the
+# layout they have under exec/.
+New-Item -ItemType Directory -Force $discovery | Out-Null
+Copy-Item -Recurse (Join-Path $repo "exec\claims") (Join-Path $discovery "claims")
+Copy-Item -Recurse (Join-Path $repo "exec\cases") (Join-Path $discovery "cases")
+Get-ChildItem -Recurse $engines, $discovery | Where-Object { -not $_.PSIsContainer } | ForEach-Object {
+    Write-Host ("    {0,-60} {1,10:N0} bytes" -f $_.FullName.Substring($desktop.Length + 1), $_.Length)
+}
 if ($StageOnly) { exit 0 }
 
 Step "Tauri bundle (NSIS installer)"

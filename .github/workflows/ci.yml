@@ -104,6 +104,8 @@ jobs:
         run: python -m unittest discover -s tests -p "test_*.py"
       - name: Check M14 benchmark cases against their sources
         run: python scripts/m14_cases.py --check
+      - name: Check M13 claim base cases against their source
+        run: python scripts/m13_cases.py --check
 
       - name: Exercise M7 cross-process locking and publication without skips
         working-directory: tests
@@ -208,7 +210,7 @@ jobs:
       - name: Check, lint and test the desktop workspace
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force desktop/target/release/domains | Out-Null
+          New-Item -ItemType Directory -Force desktop/target/release/domains, desktop/target/release/engines, desktop/target/release/discovery | Out-Null
           cargo fmt --manifest-path desktop/Cargo.toml --all -- --check
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           cargo clippy --manifest-path desktop/Cargo.toml --locked --all-targets -- -D warnings
@@ -264,7 +266,9 @@ jobs:
             "vv-studio.exe", "uninstall.exe",
             "domains/rocket-landing/domain.json", "domains/rocket-landing/vv-domain-rocket.exe",
             "domains/ground-vehicle/domain.json", "domains/ground-vehicle/vv-domain-ground.exe", "domains/ground-vehicle/vv-lab.exe",
-            "domains/reference-oscillator/domain.json", "domains/reference-oscillator/vv-domain-reference.exe"
+            "domains/reference-oscillator/domain.json", "domains/reference-oscillator/vv-domain-reference.exe",
+            "engines/vv-exec.exe", "discovery/claims/m13/g3-onset.json", "discovery/claims/m13/corridor-noise.json",
+            "discovery/cases/m13/g3-registered.json", "discovery/cases/m14/ground-zone-corridor.json"
           )
           foreach ($f in $expected) {
             if (-not (Test-Path (Join-Path $root $f))) { throw "missing after install: $f" }

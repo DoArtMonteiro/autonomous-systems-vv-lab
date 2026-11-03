@@ -7,6 +7,7 @@
   <title>V&amp;V Lab Studio</title>
   <link rel="stylesheet" href="vendor/uplot/uPlot.min.css">
   <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/discover.css">
   <script type="module" src="js/main.js"></script>
 </head>
 <body>
@@ -17,11 +18,12 @@
       <span class="brand-name">V&amp;V Lab <b>Studio</b></span>
     </div>
     <nav class="nav" aria-label="Workspaces">
-      <button type="button" class="nav-btn" data-view="prepare" aria-keyshortcuts="1">Prepare</button>
-      <button type="button" class="nav-btn" data-view="run" aria-keyshortcuts="2">Run</button>
-      <button type="button" class="nav-btn" data-view="compare" aria-keyshortcuts="3">Compare</button>
-      <button type="button" class="nav-btn" data-view="library" aria-keyshortcuts="4">Library</button>
-      <button type="button" class="nav-btn" data-view="settings" aria-keyshortcuts="5">Settings</button>
+      <button type="button" class="nav-btn nav-discover" data-view="discover" aria-keyshortcuts="1">Discover</button>
+      <button type="button" class="nav-btn" data-view="prepare" aria-keyshortcuts="2">Prepare</button>
+      <button type="button" class="nav-btn" data-view="run" aria-keyshortcuts="3">Run</button>
+      <button type="button" class="nav-btn" data-view="compare" aria-keyshortcuts="4">Compare</button>
+      <button type="button" class="nav-btn" data-view="library" aria-keyshortcuts="5">Library</button>
+      <button type="button" class="nav-btn" data-view="settings" aria-keyshortcuts="6">Settings</button>
     </nav>
     <div class="appbar-end">
       <span id="platform-status" class="status-dot" role="status" aria-live="polite">Starting</span>
@@ -39,6 +41,7 @@
         <div id="startup-detail"></div>
       </div>
     </section>
+    <section id="view-discover" class="view" hidden aria-label="Discovery Lab: challenge a safety claim"></section>
     <section id="view-prepare" class="view" hidden aria-label="Prepare a mission"></section>
     <section id="view-run" class="view" hidden aria-label="Run workspace"></section>
     <section id="view-compare" class="view" hidden aria-label="Compare runs"></section>
