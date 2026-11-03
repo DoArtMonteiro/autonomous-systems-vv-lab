@@ -1,0 +1,16 @@
+{
+  "schema": "vv-run-request.v1",
+  "domain": "rocket-landing",
+  "scenario": "m10-landing",
+  "controller": "m10_b_plus",
+  "seed": 5004,
+  "faults": [
+    {
+      "kind": "altimeter_outliers",
+      "magnitude": 0.005,
+      "start": 0.0,
+      "end": 40.0
+    }
+  ],
+  "parameters": {}
+}

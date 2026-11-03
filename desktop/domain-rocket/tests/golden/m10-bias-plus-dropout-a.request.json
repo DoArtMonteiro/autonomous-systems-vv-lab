@@ -1,0 +1,22 @@
+{
+  "schema": "vv-run-request.v1",
+  "domain": "rocket-landing",
+  "scenario": "m10-landing",
+  "controller": "m10_a",
+  "seed": 5000,
+  "faults": [
+    {
+      "kind": "altimeter_bias",
+      "magnitude": 20.0,
+      "start": 0.0,
+      "end": 40.0
+    },
+    {
+      "kind": "gnss_dropout",
+      "magnitude": null,
+      "start": 8.0,
+      "end": 14.0
+    }
+  ],
+  "parameters": {}
+}

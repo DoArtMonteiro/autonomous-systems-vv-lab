@@ -1,0 +1,16 @@
+{
+  "schema": "vv-run-request.v1",
+  "domain": "ground-vehicle",
+  "scenario": "x_first_overshoot",
+  "controller": "dominant_axis",
+  "seed": 42,
+  "faults": [
+    {
+      "kind": "lost_movement",
+      "magnitude": null,
+      "start": 2,
+      "end": 3
+    }
+  ],
+  "parameters": {}
+}

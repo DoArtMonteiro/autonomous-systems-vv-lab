@@ -1,0 +1,22 @@
+{
+  "schema": "vv-run-request.v1",
+  "domain": "ground-vehicle",
+  "scenario": "nominal_stop",
+  "controller": "x_first",
+  "seed": 2026,
+  "faults": [
+    {
+      "kind": "gps_dropout",
+      "magnitude": null,
+      "start": 5,
+      "end": 6
+    },
+    {
+      "kind": "delayed_movement",
+      "magnitude": 4.0,
+      "start": 2,
+      "end": 2
+    }
+  ],
+  "parameters": {}
+}

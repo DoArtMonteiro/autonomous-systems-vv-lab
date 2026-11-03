@@ -103,6 +103,16 @@ python scripts/mission_control.py --port 8780   # then open http://127.0.0.1:878
 
 See [docs/m10-mission-control.md](docs/m10-mission-control.md) for the journeys, routes, security properties and limitations.
 
+### V&V Lab Studio (M11 desktop application, in development)
+
+A Windows 11 application that packages the simulators behind a versioned domain contract (`vv-domain` 1.0): mission preparation, 3D rocket and 2D ground-vehicle scenes, time-synchronised telemetry, requirement and invariant verdicts, controller comparison, replay by recomputation, evidence export and a persistent library. It installs per user, needs no Rust, Python or Node.js at run time, and refuses the protected evaluation, reserve and held-out seeds before any simulation starts. Domains are separate host executables discovered at start; a benign reference domain proves that a new one needs no change to the platform or the interface.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File desktop\build.ps1   # builds the NSIS installer in desktop\target\release\bundle\nsis
+```
+
+See [docs/m11-desktop.md](docs/m11-desktop.md) for the architecture and how to add a domain, and [docs/m11-acceptance.md](docs/m11-acceptance.md) for installation and acceptance. The developer CLI and the browser Mission Control above remain supported.
+
 An expected safety violation can make a `run` command exit with code `2`; that is a simulated finding, not a test harness failure. See the scenario's result and report before interpreting the exit code.
 
 ## Development timeline

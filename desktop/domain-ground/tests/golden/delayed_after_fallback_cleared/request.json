@@ -1,0 +1,11 @@
+{
+  "schema": "vv-run-request.v1",
+  "domain": "ground-vehicle",
+  "scenario": "delayed_after_fallback",
+  "controller": "dominant_axis",
+  "seed": 42,
+  "faults": [],
+  "parameters": {
+    "clear_builtin_faults": 1.0
+  }
+}

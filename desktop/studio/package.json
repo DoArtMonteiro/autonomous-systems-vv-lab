@@ -1,0 +1,11 @@
+{
+  "name": "vv-studio-build",
+  "private": true,
+  "description": "Build-time tooling only: the Tauri CLI that bundles the Windows installer. Nothing here ships in the product.",
+  "devDependencies": {
+    "@tauri-apps/cli": "2.11.5"
+  },
+  "scripts": {
+    "tauri": "tauri"
+  }
+}

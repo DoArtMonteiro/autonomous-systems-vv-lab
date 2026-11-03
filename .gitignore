@@ -9,3 +9,5 @@ __pycache__/
 *.profraw
 *.profdata
 /.local/
+/.impeccable/
+.impeccable/

@@ -1,0 +1,13 @@
+[
+  "nominal_stop",
+  "x_first_overshoot_dominant",
+  "x_first_overshoot_x_first",
+  "delayed_after_fallback_builtin",
+  "nominal_gps_dropout",
+  "nominal_continued",
+  "overshoot_lost",
+  "nominal_x_first_delayed_and_gps",
+  "delayed_after_fallback_cleared",
+  "delayed_after_fallback_gps_replaced",
+  "delayed_after_fallback_actuator_replaced"
+]
