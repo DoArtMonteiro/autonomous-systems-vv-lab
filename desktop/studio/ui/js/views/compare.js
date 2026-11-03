@@ -5,7 +5,7 @@
 import uPlot from '../../vendor/uplot/uPlot.esm.js';
 import { h, clear, icon, num, prose, timeText, lowerIndex, nextId } from '../dom.js';
 import { state, domainById, loadRecord, pref, setPref } from '../store.js';
-import { modelOf, distinguishingLabels, requestText, verdictOfOutcome, verdictOfSafety, verdictOfRequirement, RUN_COLOURS, CATEGORY_TITLE, STATUS_TEXT } from '../model.js';
+import { modelOf, distinguishingLabels, requestText, verdictOfOutcome, verdictOfSafety, verdictOfRequirement, RUN_COLOURS, runDash, runSwatch, CATEGORY_TITLE, STATUS_TEXT } from '../model.js';
 import { verdictGlyph } from '../verification.js';
 import { axisStyle, cursorLine, cssVar } from '../charts.js';
 import { sceneFor, sceneKind } from '../scenes/registry.js';
@@ -91,7 +91,7 @@ function build() {
       const ov = verdictOfOutcome(rec.outcome.status);
       const sv = verdictOfSafety(rec.safety.status);
       return h('div', { class: 'run-key', role: 'listitem', dataset: { run: r.id } },
-        h('span', { class: 'key-swatch', style: { background: colours[i] }, 'aria-hidden': 'true' }),
+        h('span', { class: 'key-swatch', style: { background: runSwatch(colours[i], runDash(i)) }, 'aria-hidden': 'true' }),
         h('span', { class: 'key-label', title: labels[i] }, labels[i]),
         h('button', { type: 'button', class: 'link small', 'aria-label': `Open run ${i + 1}`, onclick: () => navigate('run', { runId: r.id }) }, 'Open'),
         h('span', { class: 'key-verdicts' },
@@ -136,7 +136,7 @@ function matrix() {
   const toggle = h('label', { class: 'toggle small', for: toggleId }, h('input', { type: 'checkbox', id: toggleId, onchange: (e) => { onlyDiff = e.target.checked; draw(); } }), 'Only rows where the runs disagree');
   const draw = () => {
     clear(table);
-    table.append(h('thead', null, h('tr', null, h('th', { scope: 'col' }, 'Verdict'), records.map((r, i) => h('th', { scope: 'col', title: labels[i] }, h('span', { class: 'key-swatch', style: { background: colours[i] } }), `Run ${i + 1}`)))));
+    table.append(h('thead', null, h('tr', null, h('th', { scope: 'col' }, 'Verdict'), records.map((r, i) => h('th', { scope: 'col', title: labels[i] }, h('span', { class: 'key-swatch', style: { background: runSwatch(colours[i], runDash(i)) } }), `Run ${i + 1}`)))));
     const tb = h('tbody');
     const rows = [];
     rows.push(['Mission outcome', records.map((r) => ({ v: verdictOfOutcome(r.record.outcome.status), text: r.record.outcome.label, key: r.record.outcome.code, title: prose(r.record.outcome.explanation) }))]);
@@ -249,7 +249,7 @@ function overlayChart(host, ch) {
   const unit = cmp.unit;
   const readouts = cmp.models.map((m, i) => {
     const v = h('span', { class: 'ro-val mono' });
-    return { v, row: h('li', { class: 'ro' }, h('span', { class: 'swatch', style: { '--sw': cmp.colours[i] } }), h('span', { class: 'kind-badge' }, String(i + 1)), h('span', { class: 'ro-label' }, cmp.labels[i]), v, h('span', { class: 'ro-unit mono dim' }, ch.unit)) };
+    return { v, row: h('li', { class: 'ro' }, h('span', { class: 'swatch', style: { borderTop: '0', height: '2px', background: runSwatch(cmp.colours[i], runDash(i)) } }), h('span', { class: 'kind-badge' }, String(i + 1)), h('span', { class: 'ro-label' }, cmp.labels[i]), v, h('span', { class: 'ro-unit mono dim' }, ch.unit)) };
   });
   const plot = h('div', { class: 'chart-plot' });
   const wrap = h('section', { class: 'chart', 'aria-label': `${ch.label} across runs` },
@@ -266,7 +266,7 @@ function overlayChart(host, ch) {
       { ...ax, size: 28, values: (uu, vals) => vals.map((v) => (unit === 'tick' ? String(Math.round(v)) : num(v, 3))) },
       { ...ax, size: 52, values: (uu, vals) => vals.map((v) => num(v, 3)) },
     ],
-    series: [{}, ...cmp.models.map((m, i) => ({ label: cmp.labels[i], stroke: cmp.colours[i], width: 1.6, dash: i % 2 ? [6, 3] : [], spanGaps: false, points: { show: false } }))],
+    series: [{}, ...cmp.models.map((m, i) => ({ label: cmp.labels[i], stroke: cmp.colours[i], width: 1.6, dash: runDash(i), spanGaps: false, points: { show: false } }))],
   }, data, plot);
   u.over.addEventListener('dblclick', () => u.setScale('x', { min: cmp.t0, max: cmp.t1 }));
   const line = cursorLine(u);

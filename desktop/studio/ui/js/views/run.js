@@ -88,12 +88,15 @@ function build() {
   clear(root);
   const cat = d && d.catalog;
   const rt = requestText(record.request, cat);
+  // The development caveat sits at the end of the validity text, which the strip often cuts off.
+  const devNote = [record.model_validity, ...(record.notes || [])].map(prose).find((t) => t.includes('development arms'));
 
   // Header: identity, actions, verdicts, validity.
   const head = h('header', { class: 'run-head' },
     h('div', { class: 'run-id' },
-      h('h1', null, ws.meta && ws.meta.label ? ws.meta.label : rt.scenario),
-      h('span', { class: 'ident' }, h('b', null, rt.controller), ` · seed ${rt.seed} · ${rt.faults}`),
+      h('h1', null, ws.meta && ws.meta.label ? ws.meta.label : `${rt.controller} on ${rt.scenario}`),
+      h('span', { class: 'ident' }, `Scenario: ${rt.scenario} · `, h('b', null, rt.controller), ` · seed ${rt.seed} · ${rt.faults}`),
+      devNote ? h('span', { class: 'tag tag-dev', title: devNote }, 'development') : null,
       h('span', { class: 'mono dim small' }, `${d ? d.manifest.name : record.domain.id} · run ${ws.runId}`)),
     h('div', { class: 'run-actions' },
       h('button', { type: 'button', class: 'btn', onclick: () => { selectTab('prov'); const b = root.querySelector('[data-action="replay"]'); if (b) b.click(); } }, icon('replay'), 'Replay'),

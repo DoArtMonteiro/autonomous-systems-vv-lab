@@ -7,6 +7,7 @@ import * as THREE from '../../vendor/three/three.module.min.js';
 import { OrbitControls } from '../../vendor/three/OrbitControls.js';
 import { h, clear, lowerIndex, sampleAt, num, timeText } from '../dom.js';
 import { cssVar } from '../charts.js';
+import { runDash } from '../model.js';
 import { Plot2D, polyline, extent } from './plot2d.js';
 
 const BODY_LENGTH = 40; // illustration only
@@ -371,8 +372,8 @@ function topView(host, runs, pad, opts = {}) {
           polyline(ctx, P, r.ch.ex, r.ch.ey); ctx.setLineDash([]);
         }
         if (r.ch.nx && r.ch.ny) {
-          ctx.strokeStyle = r.colour || P.colour('--truth-dim'); ctx.lineWidth = 1.8;
-          polyline(ctx, P, r.ch.nx, r.ch.ny);
+          ctx.strokeStyle = r.colour || P.colour('--truth-dim'); ctx.lineWidth = 1.8; ctx.setLineDash(r.dash || []);
+          polyline(ctx, P, r.ch.nx, r.ch.ny); ctx.setLineDash([]);
           const n = r.ch.nx.length - 1;
           ctx.fillStyle = r.colour || P.colour('--truth');
           ctx.beginPath(); ctx.arc(P.x(r.ch.nx[n]), P.y(r.ch.ny[n]), 3.5, 0, Math.PI * 2); ctx.fill();
@@ -414,8 +415,8 @@ function profileView(host, runs, pad) {
       ctx.setLineDash([]);
       for (const r of runs) {
         if (!r.ch.padDist || !r.ch.nz) continue;
-        ctx.strokeStyle = r.colour || P.colour('--truth-dim'); ctx.lineWidth = 1.8;
-        polyline(ctx, P, r.ch.padDist, r.ch.nz);
+        ctx.strokeStyle = r.colour || P.colour('--truth-dim'); ctx.lineWidth = 1.8; ctx.setLineDash(r.dash || []);
+        polyline(ctx, P, r.ch.padDist, r.ch.nz); ctx.setLineDash([]);
       }
     },
     drawDynamic: (ctx, P, t) => {
@@ -492,7 +493,7 @@ function mount(host, model, cursor) {
     pad.keep ? h('li', null, h('span', { class: 'lg lg-zone' }), `S2 keep-out ${num(pad.keep)} m`) : null,
     h('li', { title: `The model has no vehicle length; the ${BODY_LENGTH} m body is drawn for orientation. The plume points along the body axis with a length from the applied throttle; the gimbal deflection is not drawn. Position and attitude are interpolated between the 0.1 s samples for display only.` }, h('span', { class: 'lg lg-veh' }), 'stage: illustration (no length in the model), interpolated between samples for display; plume from applied throttle, gimbal not drawn'));
   const legend = h('details', { class: 'scene-key', open: host.clientHeight > 380 },
-    h('summary', null, h('span', { class: 'lg lg-truth' }), 'true trajectory, pad R5 and S2; stage is an illustration, interpolated between samples for display'),
+    h('summary', null, h('span', { class: 'key-text' }, h('span', { class: 'lg lg-truth' }), 'true trajectory, pad R5 and S2; stage is an illustration, interpolated between samples for display')),
     legendItems);
   host.append(bar, panes, h('div', { class: 'scene-foot' }, legend));
   const r3 = new Rocket3D(v3, model, ch);
@@ -521,7 +522,7 @@ function mount(host, model, cursor) {
 
 function compare(host, models, colours, labels, cursor) {
   clear(host);
-  const runs = models.map((m, i) => ({ ch: channelsOf(m), colour: colours[i], label: labels[i] }));
+  const runs = models.map((m, i) => ({ ch: channelsOf(m), colour: colours[i], dash: runDash(i), label: labels[i] }));
   const pad = padOf(models[0].record.scene);
   const vTop = h('div', { class: 'r2d' });
   const vProf = h('div', { class: 'r2d' });

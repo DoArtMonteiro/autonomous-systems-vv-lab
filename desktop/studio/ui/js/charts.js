@@ -177,7 +177,7 @@ export class Telemetry {
     const anyBand = groups.some((g) => g.channels.some((c) => this.model.bands.has(c.id)));
     this.note.textContent = [
       'Drag across a chart to zoom in time; double-click or Reset zoom to restore. Gaps are samples without a value.',
-      anyBand ? `Shaded bands are ±${num(k)}σ of the uncertainty the controller declares${declared ? ' (k from the record scene)' : ', k = 1'}: around the estimate, and around zero on estimation-error charts, where the true error should stay inside.` : '',
+      anyBand ? `Shaded bands are ±${num(k)}σ of the uncertainty the controller declares${declared ? ` (k = ${num(k)} is the gate this controller declares in the record)` : ', k = 1'}: around the estimate, and around zero on estimation-error charts, where the true error should stay inside.` : '',
       this.windows.length ? 'Tinted spans are injected fault windows.' : '',
     ].filter(Boolean).join(' ');
     for (const g of groups) this.charts.push(this.makeChart(g, k));

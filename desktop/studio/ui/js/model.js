@@ -141,3 +141,18 @@ export function distinguishingLabels(requests, catalog) {
 
 /** One colour per run in a comparison: Okabe-Ito order, safe for the common colour-vision deficiencies. */
 export const RUN_COLOURS = ['#56B4E9', '#E69F00', '#CC79A7', '#009E73', '#0072B2', '#D55E00', '#999999', '#F0E442'];
+
+/** One line dash per run (cycled), so compared runs differ by more than colour. */
+const RUN_DASH_TABLE = [[], [6, 3], [2, 3], [8, 3, 2, 3]];
+export function runDash(i) {
+  return RUN_DASH_TABLE[i % RUN_DASH_TABLE.length];
+}
+
+/** CSS background drawing a run's colour with its dash pattern, for legend swatches. */
+export function runSwatch(colour, dash) {
+  if (!dash.length) return colour;
+  let x = 0;
+  const stops = [];
+  dash.forEach((d, k) => { stops.push(`${k % 2 ? 'transparent' : colour} ${x}px ${x + d}px`); x += d; });
+  return `repeating-linear-gradient(90deg, ${stops.join(', ')})`;
+}

@@ -4,6 +4,7 @@
 
 import { h, clear, lowerIndex, sampleAt, num, timeText } from '../dom.js';
 import { Plot2D, polyline, dots, extent } from './plot2d.js';
+import { runDash } from '../model.js';
 
 const CH = { tx: 'truth_x_mm', ty: 'truth_y_mm', gx: 'gps_x_mm', gy: 'gps_y_mm', hx: 'held_x_mm', hy: 'held_y_mm' };
 
@@ -138,7 +139,7 @@ function mount(host, model, cursor) {
     ['lg-veh', 'vehicle: illustration, interpolated between ticks for display'],
   ]);
   const legend = h('details', { class: 'scene-key', open: host.clientHeight > 380 },
-    h('summary', null, h('span', { class: 'lg lg-truth' }), 'true path, ', h('span', { class: 'lg lg-obs' }), 'GPS samples; vehicle is an illustration, interpolated between ticks for display'),
+    h('summary', null, h('span', { class: 'key-text' }, h('span', { class: 'lg lg-truth' }), 'true path, ', h('span', { class: 'lg lg-obs' }), 'GPS samples; vehicle is an illustration, interpolated between ticks for display')),
     legendItems);
   host.append(bar, plotHost, h('div', { class: 'scene-foot' }, legend, zoneNote));
 
@@ -232,7 +233,7 @@ function compare(host, models, colours, labels, cursor) {
       drawWorld(ctx, P, g);
       paths.forEach((p, i) => {
         if (p.gx && p.gy) { ctx.fillStyle = colours[i]; ctx.globalAlpha = 0.5; dots(ctx, P, p.gx.v, p.gy.v, 2.2); ctx.globalAlpha = 1; }
-        if (p.tx && p.ty) { ctx.strokeStyle = colours[i]; ctx.lineWidth = 2; ctx.setLineDash(i % 2 ? [6, 3] : []); polyline(ctx, P, p.tx.v, p.ty.v); ctx.setLineDash([]); }
+        if (p.tx && p.ty) { ctx.strokeStyle = colours[i]; ctx.lineWidth = 2; ctx.setLineDash(runDash(i)); polyline(ctx, P, p.tx.v, p.ty.v); ctx.setLineDash([]); }
       });
     },
     drawDynamic: (ctx, P, t) => {

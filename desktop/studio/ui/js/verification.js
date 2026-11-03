@@ -15,12 +15,19 @@ export function verdictGlyph(v) {
 export function verdictBlocks(record) {
   const ov = verdictOfOutcome(record.outcome.status);
   const sv = verdictOfSafety(record.safety.status);
-  const outcome = h('div', { class: ['verdict', `v-${ov}`], role: 'group', 'aria-label': 'Mission outcome' },
+  // A completed mission can still have failed requirements outside the safety invariants; say so
+  // first, so the one-line clamp keeps it visible.
+  const failedReqs = (record.requirements || []).filter((r) => r.category !== 'invariant' && r.status === 'fail');
+  const failedNote = failedReqs.length
+    ? `${failedReqs.length} requirement${failedReqs.length > 1 ? 's' : ''} outside the safety invariants failed: ${failedReqs.map((r) => r.id).join(', ')}. `
+    : '';
+  // Focusable, so keyboard users can expand the clamped explanation (:focus-within).
+  const outcome = h('div', { class: ['verdict', `v-${ov}`], role: 'group', 'aria-label': 'Mission outcome', tabindex: '0' },
     h('div', { class: 'verdict-k' }, 'Mission outcome'),
     h('div', { class: 'verdict-v' }, verdictGlyph(ov), h('span', null, record.outcome.label), h('span', { class: 'verdict-s mono' }, record.outcome.status)),
-    h('p', { class: 'verdict-x' }, prose(record.outcome.explanation)));
+    h('p', { class: 'verdict-x' }, failedNote ? h('b', null, failedNote) : null, prose(record.outcome.explanation)));
   const cls = record.safety.class;
-  const safety = h('div', { class: ['verdict', `v-${sv}`], role: 'group', 'aria-label': 'Safety' },
+  const safety = h('div', { class: ['verdict', `v-${sv}`], role: 'group', 'aria-label': 'Safety', tabindex: '0' },
     h('div', { class: 'verdict-k' }, 'Safety, judged on the true state'),
     h('div', { class: 'verdict-v' }, verdictGlyph(sv), h('span', null, record.safety.status === 'safe' ? 'Safe' : record.safety.status === 'unsafe' ? 'Unsafe' : record.safety.status),
       cls ? h('span', { class: ['class-badge', `class-${cls}`], title: 'Physical class from the verifier (M10: R recovered, T intact touchdown with a failed mission requirement, U unsafe or failed)' }, `class ${cls}`) : null),
@@ -58,7 +65,8 @@ export function requirementList(record, unit, onTime) {
 
 function requirementRow(r, unit, onTime) {
   const v = verdictOfRequirement(r);
-  const hasT = typeof r.t === 'number' && Number.isFinite(r.t);
+  // A passing requirement holds over the whole run; its instant is not a place to look.
+  const hasT = r.status !== 'pass' && typeof r.t === 'number' && Number.isFinite(r.t);
   const when = hasT
     ? h('button', { type: 'button', class: 'req-t mono', title: 'Move the time cursor to this instant', 'aria-label': `Move the cursor to ${timeText(r.t, unit)}`, onclick: () => onTime && onTime(r.t, r) }, timeText(r.t, unit))
     : h('span', { class: 'req-t mono dim', title: 'Judged over the whole run' }, 'whole run');
