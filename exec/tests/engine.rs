@@ -566,10 +566,11 @@ fn sigint_stops_the_command_line_with_a_whole_log() {
     let p = Plan::build(&s, &dir).unwrap();
     let log = fs::read_to_string(out.join("log.jsonl")).unwrap();
     assert!(log.ends_with('\n'));
-    let n = log
-        .lines()
-        .map(|l| engine::parse_line(&p, l).unwrap())
-        .count();
+    let mut n = 0;
+    for line in log.lines() {
+        engine::parse_line(&p, line).unwrap();
+        n += 1;
+    }
     assert!(n > 0 && n < 9000, "{n} runs logged");
 }
 
