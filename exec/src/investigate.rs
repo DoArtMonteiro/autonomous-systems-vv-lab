@@ -2872,6 +2872,23 @@ pub fn verify(dir: &Path, threads: usize, progress: Progress) -> Result<Verifica
     Ok(conclude(&s.claim.id, c.probes.len() as u64, checks))
 }
 
+/// Top-level fields of two `investigation.json` documents that differ under the comparison rule
+/// of `verify`: integers and strings exactly, floats within a relative 1e-12. Used to compare a
+/// package rerun on another platform, whose floating-point library may round a last digit
+/// differently, with the committed evidence.
+pub fn compare_packages(a: &Value, b: &Value) -> Vec<String> {
+    let mut out = differing_keys(a, b);
+    if let (Some(fa), Some(fb)) = (a.get("findings"), b.get("findings")) {
+        out.retain(|k| k != "findings");
+        out.extend(
+            differing_keys(fa, fb)
+                .into_iter()
+                .map(|k| format!("findings.{k}")),
+        );
+    }
+    out
+}
+
 fn conclude(claim_id: &str, n: u64, checks: Vec<Check>) -> Verification {
     let pass = checks.iter().all(|c| c.pass);
     Verification {

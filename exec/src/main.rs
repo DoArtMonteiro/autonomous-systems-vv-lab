@@ -19,7 +19,7 @@ use vv_exec::sched::SystemProbe;
 use vv_exec::spec::MAX_SPEC_BYTES;
 use vv_exec::{converge, engine, equiv, investigate, report};
 
-const USAGE: &str = "usage: vv-exec plan <spec.json> | run <spec.json> --output <dir> [--threads <n>] | equiv <dir> --cli <vv-rocket> [--sample <n>] | report <dir> | verify <dir> [--threads <n>] | converge <case.json> [--levels <n>] [--tolerance-m <m>] | search <search.json> --output <dir> [--threads <n>] | search-check <search.json> | search-verify <dir> [--threads <n>] | claim <claim.json> | investigate <claim.json> --output <dir> [--threads <n>] [--progress] | investigate-verify <dir> [--threads <n>] [--progress]";
+const USAGE: &str = "usage: vv-exec plan <spec.json> | run <spec.json> --output <dir> [--threads <n>] | equiv <dir> --cli <vv-rocket> [--sample <n>] | report <dir> | verify <dir> [--threads <n>] | converge <case.json> [--levels <n>] [--tolerance-m <m>] | search <search.json> --output <dir> [--threads <n>] | search-check <search.json> | search-verify <dir> [--threads <n>] | claim <claim.json> | investigate <claim.json> --output <dir> [--threads <n>] [--progress] | investigate-verify <dir> [--threads <n>] [--progress] | investigate-compare <a.json> <b.json>";
 
 /// Set by the console interrupt handler; read by the workers of `run`.
 static CANCEL: AtomicBool = AtomicBool::new(false);
@@ -297,6 +297,19 @@ fn dispatch(args: &[String]) -> Outcome {
             };
             let v = investigate::verify(&out, threads, p).map_err(input)?;
             Ok((json(&v), if v.pass { 0 } else { 1 }))
+        }
+        Some("investigate-compare") => {
+            let a = args.get(1).ok_or_else(usage)?;
+            let b = args.get(2).ok_or_else(usage)?;
+            let read = |p: &str| -> Result<serde_json::Value, (String, u8)> {
+                let bytes = read_capped(Path::new(p), 64 * 1024 * 1024).map_err(input)?;
+                serde_json::from_slice(&bytes).map_err(|e| input(format!("{p}: {e}")))
+            };
+            let d = investigate::compare_packages(&read(a)?, &read(b)?);
+            Ok((
+                json(&serde_json::json!({"same_findings": d.is_empty(), "differ": d})),
+                if d.is_empty() { 0 } else { 1 },
+            ))
         }
         Some("converge") => {
             let case = args.get(1).ok_or_else(usage)?;
