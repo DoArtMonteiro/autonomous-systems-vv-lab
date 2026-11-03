@@ -1,0 +1,141 @@
+{
+  "schema": "vv-claim.v1",
+  "id": "corridor-noise",
+  "title": "Corridor safety under GPS noise",
+  "statement": "In the corridor beside the restricted zone (M2 f-zone-nominal), the dominant_axis controller never enters the restricted zone when the GPS noise is at most 20 mm and observations arrive up to 3 ticks late.",
+  "origin": "The M2 scenario scenarios/m2/f-zone-nominal.json, run safe with ideal sensors. M14 (docs/m14-evidence-robustness.md, F1) found that 1 mm of GPS noise drops it from 100 to 61 safe runs in 100 and named the zero arrival radius as the cause. This claim asks the platform to rediscover and explain that, with a revised scenario variant as the candidate fix. The original scenario stays unchanged.",
+  "domain": "ground-m4",
+  "base_case": "../../cases/m14/ground-zone-corridor.json",
+  "property": "invariant:restricted_zone",
+  "tolerance": 0.0,
+  "objective": {
+    "metric": "margin.restricted_zone_mm",
+    "direction": "minimise"
+  },
+  "assumptions": [
+    {
+      "parameter": {
+        "name": "gps_noise_mm",
+        "pointer": "/scenario/sensors/gps/noise_max_mm",
+        "unit": "mm",
+        "low": 0,
+        "high": 20,
+        "integer": true
+      },
+      "description": "Largest GPS noise per axis. Registered at 0 mm."
+    },
+    {
+      "parameter": {
+        "name": "delay_max_ticks",
+        "pointer": "/scenario/sensors/communication/delay_max_ticks",
+        "unit": "ticks",
+        "low": 0,
+        "high": 3,
+        "integer": true
+      },
+      "description": "Largest observation delay. Registered at 0."
+    }
+  ],
+  "seeds": {
+    "discovery": {
+      "low": 45000,
+      "high": 45999
+    },
+    "evaluation": {
+      "low": 46000,
+      "high": 46499
+    },
+    "regression": {
+      "low": 46500,
+      "high": 46999
+    }
+  },
+  "budget": {
+    "baseline_seeds": 30,
+    "challenge": 200,
+    "minimise": 60,
+    "replication_seeds": 30,
+    "envelope_levels": 4,
+    "envelope_seeds": 20,
+    "mechanism_seeds": 30,
+    "regression_points": 60
+  },
+  "search_seed": 13,
+  "strategy": {
+    "kind": "halton"
+  },
+  "hypotheses": [
+    {
+      "id": "exact-arrival",
+      "statement": "With an arrival radius of 0 mm, a noisy observation at the waypoint shows a non-zero cross-track error; dominant_axis then steps 250 mm towards it, which is exactly the clearance to the zone.",
+      "interventions": [
+        {
+          "id": "arrival-radius-250",
+          "description": "Accept arrival within one step (250 mm) of the waypoint.",
+          "at": "counterexample",
+          "overrides": [
+            {
+              "pointer": "/scenario/mission/arrival_radius_mm",
+              "value": 250
+            }
+          ],
+          "predicts": "holds"
+        }
+      ]
+    }
+  ],
+  "mitigations": [
+    {
+      "id": "arrival-radius-250",
+      "title": "Arrival radius 250 mm (revised scenario)",
+      "rationale": "A separately versioned scenario variant whose arrival tolerance is one step, so sensor noise cannot keep the mission active at the waypoint. It changes the specification, not the controller.",
+      "overrides": [
+        {
+          "pointer": "/scenario/mission/arrival_radius_mm",
+          "value": 250
+        }
+      ]
+    },
+    {
+      "id": "arrival-radius-10",
+      "title": "Arrival radius 10 mm",
+      "rationale": "A tolerance just above the tested noise, to see whether any non-zero radius is enough.",
+      "overrides": [
+        {
+          "pointer": "/scenario/mission/arrival_radius_mm",
+          "value": 10
+        }
+      ]
+    }
+  ],
+  "regression": [
+    {
+      "id": "dropout-and-loss",
+      "title": "GPS dropout and packet loss",
+      "base_case": "../../cases/m14/ground-zone-corridor.json",
+      "parameters": [
+        {
+          "name": "dropout_permille",
+          "pointer": "/scenario/sensors/gps/dropout_permille",
+          "unit": "permille",
+          "low": 0,
+          "high": 300,
+          "integer": true
+        },
+        {
+          "name": "packet_loss_permille",
+          "pointer": "/scenario/sensors/communication/packet_loss_permille",
+          "unit": "permille",
+          "low": 0,
+          "high": 300,
+          "integer": true
+        }
+      ]
+    }
+  ],
+  "evidence_grade": "exploratory",
+  "limits": {
+    "max_evaluations": 1000,
+    "max_wall_s": 3600
+  }
+}

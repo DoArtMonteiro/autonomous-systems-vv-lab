@@ -1,0 +1,78 @@
+{
+  "source": "crates/vv-rocket/landing/m91-nominal.json",
+  "source_sha256": "69ecad65e9ec4329ffc74a3b985dbb7dc60d5cdaa1e4a9a380f296a76f68114b",
+  "cases": {
+    "g3-registered": {
+      "fault": {
+        "kind": "gnss_bias",
+        "start_s": 0.0,
+        "end_s": 40.0,
+        "magnitude": 15.0
+      },
+      "case_sha256": "4f30b68094f4b7ff30039509b4362b47d513063c7e4b87c1348fdfeb87bc88f7"
+    },
+    "family-gnss-bias-low": {
+      "fault": {
+        "kind": "gnss_bias_low",
+        "start_s": 5.0,
+        "end_s": 40.0,
+        "magnitude": 15.0
+      },
+      "case_sha256": "daa27cf70f937f467dd7e15aa7d715b8bb9a765fcb46af198d1684896681b108"
+    },
+    "family-altimeter-bias": {
+      "fault": {
+        "kind": "altimeter_bias",
+        "start_s": 5.0,
+        "end_s": 40.0,
+        "magnitude": 20.0
+      },
+      "case_sha256": "b7c7242a0241ccd68b5ca18e90e4e9378b1595a3922b122f28a1d7d440c2b229"
+    },
+    "family-altimeter-bias-low": {
+      "fault": {
+        "kind": "altimeter_bias_low",
+        "start_s": 5.0,
+        "end_s": 40.0,
+        "magnitude": 20.0
+      },
+      "case_sha256": "933107afedbd640f9407fa8b3d30d27d19cef3997fd3d7277cfef65c7e29bba6"
+    },
+    "family-gnss-dropout": {
+      "fault": {
+        "kind": "gnss_dropout",
+        "start_s": 10.0,
+        "end_s": 16.0,
+        "magnitude": 0.0
+      },
+      "case_sha256": "c47e909b258e7d5023e327ad1269fb9ff0c1921acf6cbe6f403b9d2cd3681cff"
+    },
+    "family-altimeter-dropout": {
+      "fault": {
+        "kind": "altimeter_dropout",
+        "start_s": 10.0,
+        "end_s": 16.0,
+        "magnitude": 0.0
+      },
+      "case_sha256": "9236546226aa6465a79fbd062779f3363375e2a6bf1b11e0f64b5a122315e79b"
+    },
+    "family-imu-accel-bias": {
+      "fault": {
+        "kind": "imu_accel_bias",
+        "start_s": 0.0,
+        "end_s": 40.0,
+        "magnitude": 0.2
+      },
+      "case_sha256": "5366c80d5d12f8a61bd4c84dfc85c8004e6e0e0a60b3edee2c96b27d6f1315ad"
+    },
+    "family-thrust-loss": {
+      "fault": {
+        "kind": "thrust_loss",
+        "start_s": 5.26,
+        "end_s": 40.0,
+        "magnitude": 0.15
+      },
+      "case_sha256": "70442780e8ba366f3bff4daa3e22d51b45815a1a64214df8e661f2c9378b76f8"
+    }
+  }
+}
