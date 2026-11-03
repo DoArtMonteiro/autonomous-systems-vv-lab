@@ -588,7 +588,9 @@ pub fn retain(plan: &Plan, out: &Path, records: &[Record]) -> Result<RetentionRe
             }
             let case = case_file(plan, out, rec.variant)?;
             plan.domain.write(&case, rec.seed, &tmp)?;
-            let trace = sha256_hex(&fs::read(tmp.join("trace.json")).map_err(|e| e.to_string())?);
+            let trace = sha256_hex(
+                &fs::read(tmp.join(plan.domain.trace_file())).map_err(|e| e.to_string())?,
+            );
             if Some(&trace) != rec.trace_sha256.as_ref() {
                 return Err(format!(
                     "record {}: the canonical writer produced a trace that differs from the logged run",

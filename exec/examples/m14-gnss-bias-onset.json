@@ -1,0 +1,73 @@
+{
+  "schema": "vv-experiment.v1",
+  "id": "m14-gnss-bias-onset",
+  "description": "M14 exploratory: guarded M9.1 under gnss_bias, fault onset 0 s versus later. Development seeds.",
+  "domain": "rocket-landing",
+  "base_case": "../cases/m14/rocket-gnss-bias.json",
+  "arms": [
+    {
+      "name": "onset-0s",
+      "overrides": [
+        {
+          "pointer": "/faults/0/start_s",
+          "value": 0.0
+        }
+      ]
+    },
+    {
+      "name": "onset-2s",
+      "overrides": [
+        {
+          "pointer": "/faults/0/start_s",
+          "value": 2.0
+        }
+      ]
+    },
+    {
+      "name": "onset-5s",
+      "overrides": [
+        {
+          "pointer": "/faults/0/start_s",
+          "value": 5.0
+        }
+      ]
+    },
+    {
+      "name": "onset-10s",
+      "overrides": [
+        {
+          "pointer": "/faults/0/start_s",
+          "value": 10.0
+        }
+      ]
+    }
+  ],
+  "parameters": [
+    {
+      "name": "magnitude",
+      "pointer": "/faults/0/magnitude",
+      "unit": "model",
+      "low": 5.0,
+      "high": 30.0
+    }
+  ],
+  "design": {
+    "kind": "grid",
+    "levels": 6
+  },
+  "seeds": {
+    "mode": "range",
+    "first": 32000,
+    "count": 30
+  },
+  "retention": {
+    "policy": "none",
+    "sample_every": 0
+  },
+  "limits": {
+    "max_runs": 720,
+    "max_retained": 1,
+    "max_artifact_bytes": 1000000,
+    "max_wall_s": 600
+  }
+}

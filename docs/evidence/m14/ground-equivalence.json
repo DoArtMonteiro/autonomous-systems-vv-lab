@@ -1,0 +1,492 @@
+{
+  "schema": "vv-exec-equivalence.v1",
+  "plan_sha256": "ade7fff480bc35d5ee78a7124dd1bc75ab7d2989a56a1baac7b54d242ae68c4c",
+  "cli_source_sha256": "620f76031548075a66a2e4117956a29d1b63d846263b4aed224b74e2e2501f6b",
+  "library_source_sha256": "620f76031548075a66a2e4117956a29d1b63d846263b4aed224b74e2e2501f6b",
+  "source_sha256_match": true,
+  "cases": [
+    {
+      "index": 0,
+      "seed": 10000,
+      "variant": 0,
+      "cli_exit": 0,
+      "files": [
+        {
+          "name": "events.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "report.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "mission.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "verification.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "m4.json",
+          "equal": true,
+          "first_difference": null
+        }
+      ],
+      "record_matches": true,
+      "recomputed": true,
+      "replay_verified": true,
+      "problems": []
+    },
+    {
+      "index": 29,
+      "seed": 10009,
+      "variant": 1,
+      "cli_exit": 0,
+      "files": [
+        {
+          "name": "events.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "report.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "mission.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "verification.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "m4.json",
+          "equal": true,
+          "first_difference": null
+        }
+      ],
+      "record_matches": true,
+      "recomputed": true,
+      "replay_verified": true,
+      "problems": []
+    },
+    {
+      "index": 40,
+      "seed": 10000,
+      "variant": 2,
+      "cli_exit": 0,
+      "files": [
+        {
+          "name": "events.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "report.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "mission.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "verification.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "m4.json",
+          "equal": true,
+          "first_difference": null
+        }
+      ],
+      "record_matches": true,
+      "recomputed": true,
+      "replay_verified": true,
+      "problems": []
+    },
+    {
+      "index": 58,
+      "seed": 10018,
+      "variant": 2,
+      "cli_exit": 0,
+      "files": [
+        {
+          "name": "events.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "report.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "mission.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "verification.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "m4.json",
+          "equal": true,
+          "first_difference": null
+        }
+      ],
+      "record_matches": true,
+      "recomputed": true,
+      "replay_verified": true,
+      "problems": []
+    },
+    {
+      "index": 87,
+      "seed": 10007,
+      "variant": 4,
+      "cli_exit": 2,
+      "files": [
+        {
+          "name": "events.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "report.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "mission.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "verification.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "m4.json",
+          "equal": true,
+          "first_difference": null
+        }
+      ],
+      "record_matches": true,
+      "recomputed": true,
+      "replay_verified": true,
+      "problems": []
+    },
+    {
+      "index": 116,
+      "seed": 10016,
+      "variant": 5,
+      "cli_exit": 2,
+      "files": [
+        {
+          "name": "events.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "report.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "mission.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "verification.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "m4.json",
+          "equal": true,
+          "first_difference": null
+        }
+      ],
+      "record_matches": true,
+      "recomputed": true,
+      "replay_verified": true,
+      "problems": []
+    },
+    {
+      "index": 145,
+      "seed": 10005,
+      "variant": 7,
+      "cli_exit": 0,
+      "files": [
+        {
+          "name": "events.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "report.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "mission.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "verification.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "m4.json",
+          "equal": true,
+          "first_difference": null
+        }
+      ],
+      "record_matches": true,
+      "recomputed": true,
+      "replay_verified": true,
+      "problems": []
+    },
+    {
+      "index": 174,
+      "seed": 10014,
+      "variant": 8,
+      "cli_exit": 2,
+      "files": [
+        {
+          "name": "events.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "report.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "mission.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "verification.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "m4.json",
+          "equal": true,
+          "first_difference": null
+        }
+      ],
+      "record_matches": true,
+      "recomputed": true,
+      "replay_verified": true,
+      "problems": []
+    },
+    {
+      "index": 203,
+      "seed": 10003,
+      "variant": 10,
+      "cli_exit": 2,
+      "files": [
+        {
+          "name": "events.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "report.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "mission.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "verification.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "m4.json",
+          "equal": true,
+          "first_difference": null
+        }
+      ],
+      "record_matches": true,
+      "recomputed": true,
+      "replay_verified": true,
+      "problems": []
+    },
+    {
+      "index": 232,
+      "seed": 10012,
+      "variant": 11,
+      "cli_exit": 2,
+      "files": [
+        {
+          "name": "events.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "report.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "mission.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "verification.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "m4.json",
+          "equal": true,
+          "first_difference": null
+        }
+      ],
+      "record_matches": true,
+      "recomputed": true,
+      "replay_verified": true,
+      "problems": []
+    },
+    {
+      "index": 261,
+      "seed": 10001,
+      "variant": 13,
+      "cli_exit": 0,
+      "files": [
+        {
+          "name": "events.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "report.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "mission.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "verification.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "m4.json",
+          "equal": true,
+          "first_difference": null
+        }
+      ],
+      "record_matches": true,
+      "recomputed": true,
+      "replay_verified": true,
+      "problems": []
+    },
+    {
+      "index": 290,
+      "seed": 10010,
+      "variant": 14,
+      "cli_exit": 2,
+      "files": [
+        {
+          "name": "events.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "report.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "mission.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "verification.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "m4.json",
+          "equal": true,
+          "first_difference": null
+        }
+      ],
+      "record_matches": true,
+      "recomputed": true,
+      "replay_verified": true,
+      "problems": []
+    },
+    {
+      "index": 319,
+      "seed": 10019,
+      "variant": 15,
+      "cli_exit": 2,
+      "files": [
+        {
+          "name": "events.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "report.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "mission.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "verification.json",
+          "equal": true,
+          "first_difference": null
+        },
+        {
+          "name": "m4.json",
+          "equal": true,
+          "first_difference": null
+        }
+      ],
+      "record_matches": true,
+      "recomputed": true,
+      "replay_verified": true,
+      "problems": []
+    }
+  ],
+  "differences": 0,
+  "pass": true
+}

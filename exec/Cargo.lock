@@ -3,6 +3,15 @@
 version = 4
 
 [[package]]
+name = "autonomous-systems-vv-lab"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "block-buffer"
 version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -179,6 +188,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 name = "vv-exec"
 version = "0.12.0"
 dependencies = [
+ "autonomous-systems-vv-lab",
  "serde",
  "serde_json",
  "sha2",

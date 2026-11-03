@@ -155,23 +155,70 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
 }
 
 /// Sets an existing value of `doc`; never creates a field the base case lacks.
-fn set(doc: &mut Value, pointer: &str, value: Value, numeric: bool) -> Result<(), String> {
+/// Which kind of number a parameter writes: none (an arm override), a float or an integer.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Numeric {
+    No,
+    Float,
+    Integer,
+}
+
+fn set(doc: &mut Value, pointer: &str, value: Value, numeric: Numeric) -> Result<(), String> {
     let slot = doc
         .pointer_mut(pointer)
         .ok_or(format!("{pointer} does not exist in the base case"))?;
-    if numeric {
-        match slot {
-            Value::Number(n) if n.is_f64() => {}
-            Value::Number(_) => {
-                return Err(format!(
-                    "{pointer} is an integer field; it cannot be varied"
-                ));
-            }
-            _ => return Err(format!("{pointer} is not a number in the base case")),
+    match (numeric, &*slot) {
+        (Numeric::No, _) => {}
+        (Numeric::Float, Value::Number(n)) if n.is_f64() => {}
+        (Numeric::Integer, Value::Number(n)) if !n.is_f64() => {}
+        (Numeric::Float, Value::Number(_)) => {
+            return Err(format!(
+                "{pointer} is an integer field; declare the parameter integer"
+            ));
         }
+        (Numeric::Integer, Value::Number(_)) => {
+            return Err(format!(
+                "{pointer} is a floating-point field; the parameter must not be integer"
+            ));
+        }
+        _ => return Err(format!("{pointer} is not a number in the base case")),
     }
     *slot = value;
     Ok(())
+}
+
+/// A parameter value as written into a case: rounded for an integer field, snapped to the
+/// declared quantum otherwise.
+pub fn snap(p: &Parameter, v: f64) -> f64 {
+    if p.integer {
+        v.round()
+    } else if let Some(q) = p.quantum {
+        (v / q).round() * q
+    } else {
+        v
+    }
+}
+
+/// Sets each parameter value in `doc` and returns the case bytes as the planner writes them:
+/// pretty JSON and a final newline. Integer parameters are rounded to the nearest integer.
+pub fn apply_parameters(
+    mut doc: Value,
+    parameters: &[Parameter],
+    values: &[f64],
+) -> Result<Vec<u8>, String> {
+    for (p, &v) in parameters.iter().zip(values) {
+        let v = snap(p, v);
+        let (value, kind) = if p.integer {
+            (Value::from(v as i64), Numeric::Integer)
+        } else {
+            let n = serde_json::Number::from_f64(v).ok_or("non-finite parameter value")?;
+            (Value::Number(n), Numeric::Float)
+        };
+        set(&mut doc, &p.pointer, value, kind).map_err(|e| format!("parameter {}: {e}", p.name))?;
+    }
+    let mut bytes = serde_json::to_vec_pretty(&doc).map_err(|e| e.to_string())?;
+    bytes.push(b'\n');
+    Ok(bytes)
 }
 
 impl Plan {
@@ -328,22 +375,14 @@ impl Plan {
         }
         let mut doc = self.base_value.clone();
         for o in &a.overrides {
-            set(&mut doc, &o.pointer, o.value.clone(), false)
+            set(&mut doc, &o.pointer, o.value.clone(), Numeric::No)
                 .map_err(|e| format!("arm {}: {e}", a.name))?;
         }
-        for (p, &v) in self
-            .experiment
-            .parameters
-            .iter()
-            .zip(&self.cells[cell as usize].values)
-        {
-            let n = serde_json::Number::from_f64(v).ok_or("non-finite parameter value")?;
-            set(&mut doc, &p.pointer, Value::Number(n), true)
-                .map_err(|e| format!("parameter {}: {e}", p.name))?;
-        }
-        let mut bytes = serde_json::to_vec_pretty(&doc).map_err(|e| e.to_string())?;
-        bytes.push(b'\n');
-        Ok(bytes)
+        apply_parameters(
+            doc,
+            &self.experiment.parameters,
+            &self.cells[cell as usize].values,
+        )
     }
 
     pub fn case_of_variant(&self, v: u32) -> Result<Vec<u8>, String> {
@@ -465,6 +504,8 @@ mod tests {
             low: 1.0,
             high: 100.0,
             scale: Scale::Log,
+            integer: false,
+            quantum: None,
         };
         assert!((scale(&p, 0.0) - 1.0).abs() < 1e-12);
         assert!((scale(&p, 0.5) - 10.0).abs() < 1e-9);
