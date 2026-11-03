@@ -20,6 +20,11 @@
         "start": 101,
         "end": 112,
         "reason": "held-out seeds of the M6 controller repair experiment (scenarios/m6/experiment.json); running them here would spend the evaluation set"
+      },
+      {
+        "start": 44000,
+        "end": 44999,
+        "reason": "reserved for a future preregistered confirmation; never run before the owner freezes and authorises that protocol"
       }
     ]
   },

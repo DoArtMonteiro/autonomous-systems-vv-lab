@@ -29,6 +29,11 @@
         "start": 6000,
         "end": 6099,
         "reason": "M10 reserve seeds; never run before the owner freezes the evaluation configuration. Use a development seed such as 5000 to 5099."
+      },
+      {
+        "start": 44000,
+        "end": 44999,
+        "reason": "Reserved for a future preregistered confirmation; never run before the owner freezes and authorises that protocol. Use a development seed such as 5000 to 5099."
       }
     ]
   },
