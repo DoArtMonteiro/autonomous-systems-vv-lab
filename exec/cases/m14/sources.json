@@ -1,14 +1,66 @@
 {
   "ground-nominal-stop": {
     "case_sha256": "cf29a3218292621a59e0e40cf000bbcdef7f7b3dc728f7074849b2b0c704492a",
+    "overrides": [],
     "sources": {
       "scenarios/m3/actuator-none.json": "0946f8c0c073b613e24593dc9bdeebf5225333df6038fd59004f7e0160de8a0d",
       "scenarios/m3/contracts-stop.json": "121735ca65a08894ae912f72796f3ae3a7195b21ac297910e42da25d6d69720e",
       "scenarios/m3/nominal-stop.json": "cbdfdbce7539c419735afa66d2e83d3e44629f60e372fc2350f940d722baa484"
     }
   },
+  "ground-overshoot-actuator-loss": {
+    "case_sha256": "527db174d053171350ee18b39940eb668d4b9abb0726bb7e7850b2c3ee8da566",
+    "overrides": [
+      [
+        "/actuator/faults/0/windows",
+        [
+          {
+            "end_tick": 12,
+            "start_tick": 1
+          }
+        ]
+      ],
+      [
+        "/actuator/faults/0/probability_permille",
+        0
+      ]
+    ],
+    "sources": {
+      "scenarios/m3/actuator-intermittent.json": "e0bb6730217766c5247355b561ea07dd26b309d7743b6fe501fc248e096dc654",
+      "scenarios/m3/contracts-nominal.json": "0bf466b6e39715382ded341b763c883d9982d61f12768c2a5e4d7b17a578cd31",
+      "scenarios/m4/x-first-overshoot.json": "028c0cdf58586f5358822d81c90d9a8b56519c2a291b7be4fc8cfa1fe7b442c7"
+    }
+  },
+  "ground-stop-actuator-delay": {
+    "case_sha256": "9f9a5ceb51ffc448c964f326e496e0d2fb21cda24554bc430f1fe3566fbb62f7",
+    "overrides": [
+      [
+        "/actuator/faults/0/windows",
+        [
+          {
+            "end_tick": 16,
+            "start_tick": 1
+          }
+        ]
+      ],
+      [
+        "/actuator/faults/0/delay_ticks",
+        1
+      ],
+      [
+        "/actuator/faults/0/probability_permille",
+        0
+      ]
+    ],
+    "sources": {
+      "scenarios/m3/actuator-delayed.json": "53eec81ba3c9695bc38a3fe5724654f503e77151ee8c784c8bf54711a79e18f9",
+      "scenarios/m3/contracts-stop.json": "121735ca65a08894ae912f72796f3ae3a7195b21ac297910e42da25d6d69720e",
+      "scenarios/m3/nominal-stop.json": "cbdfdbce7539c419735afa66d2e83d3e44629f60e372fc2350f940d722baa484"
+    }
+  },
   "ground-x-first-overshoot": {
     "case_sha256": "bcdb369eced5174b8e3c8f6fb48b2bf134ce10fab29c1969c2d1eb43f3761337",
+    "overrides": [],
     "sources": {
       "scenarios/m3/contracts-nominal.json": "0bf466b6e39715382ded341b763c883d9982d61f12768c2a5e4d7b17a578cd31",
       "scenarios/m4/x-first-overshoot.json": "028c0cdf58586f5358822d81c90d9a8b56519c2a291b7be4fc8cfa1fe7b442c7"
@@ -16,9 +68,67 @@
   },
   "ground-zone-corridor": {
     "case_sha256": "4fd198cf5ec8cff8fbfaa3f5f530b90259f6f173566f56e065c8abe4ec52e86a",
+    "overrides": [],
     "sources": {
       "scenarios/m2/f-zone-nominal.json": "0f14c5b689cd4ba5370f36ad0ac978fe59e622d5cbe2fb240375e684c99c1a7e",
       "scenarios/m3/contracts-nominal.json": "0bf466b6e39715382ded341b763c883d9982d61f12768c2a5e4d7b17a578cd31"
+    }
+  },
+  "rocket-gnss-bias": {
+    "case_sha256": "c7731b8c5541b14f75b9e550ba8a774aa791788b06fb0f81a59d6014ddf4d2f8",
+    "overrides": [
+      [
+        "/faults",
+        [
+          {
+            "end_s": 40.0,
+            "kind": "gnss_bias",
+            "magnitude": 5.0,
+            "start_s": 5.0
+          }
+        ]
+      ]
+    ],
+    "sources": {
+      "crates/vv-rocket/landing/m91-nominal.json": "69ecad65e9ec4329ffc74a3b985dbb7dc60d5cdaa1e4a9a380f296a76f68114b"
+    }
+  },
+  "rocket-imu-accel-bias": {
+    "case_sha256": "5dfa65f6f13014ea210c8f6c97005d7381a1c098a3816c73bd26ab179d2ff269",
+    "overrides": [
+      [
+        "/faults",
+        [
+          {
+            "end_s": 40.0,
+            "kind": "imu_accel_bias",
+            "magnitude": 0.05,
+            "start_s": 5.0
+          }
+        ]
+      ]
+    ],
+    "sources": {
+      "crates/vv-rocket/landing/m91-nominal.json": "69ecad65e9ec4329ffc74a3b985dbb7dc60d5cdaa1e4a9a380f296a76f68114b"
+    }
+  },
+  "rocket-thrust-loss": {
+    "case_sha256": "b66656f29d50e6aa3328b98700ea8c3cfa14c2ac8b5dc03661a7de13e3b7f427",
+    "overrides": [
+      [
+        "/faults",
+        [
+          {
+            "end_s": 40.0,
+            "kind": "thrust_loss",
+            "magnitude": 0.05,
+            "start_s": 5.0
+          }
+        ]
+      ]
+    ],
+    "sources": {
+      "crates/vv-rocket/landing/m91-nominal.json": "69ecad65e9ec4329ffc74a3b985dbb7dc60d5cdaa1e4a9a380f296a76f68114b"
     }
   }
 }
