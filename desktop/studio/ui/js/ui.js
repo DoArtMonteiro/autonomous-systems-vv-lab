@@ -89,7 +89,7 @@ export const SHORTCUTS = [
   ['Home / End', 'Start or end of the run'],
   ['Ctrl + Enter', 'Run the mission being prepared'],
   ['Ctrl + K', 'Command and search palette'],
-  ['1 to 5', 'Go to Prepare, Run, Compare, Library, Settings'],
+  ['1 to 6', 'Go to Discover, Prepare, Run, Compare, Library, Settings'],
   ['?', 'This help'],
   ['Escape', 'Close a dialog or panel'],
 ];

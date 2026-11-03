@@ -1,4 +1,4 @@
-// Entry point: startup state while the platform starts in the shell, theme, routing between the five
+// Entry point: startup state while the platform starts in the shell, theme, routing between the six
 // workspaces, global keyboard shortcuts and the command palette.
 
 import { api, logUiError } from './api.js';
@@ -10,8 +10,9 @@ import { initRun, showRun, runKey, rethemeRun, runWorkspace } from './views/run.
 import { initCompare, showCompare, compareKey, rethemeCompare } from './views/compare.js';
 import { initLibrary, showLibrary } from './views/library.js';
 import { initSettings, showSettings } from './views/settings.js';
+import { initDiscover, showDiscover, rethemeDiscover } from './views/discover.js';
 
-const VIEWS = ['prepare', 'run', 'compare', 'library', 'settings'];
+const VIEWS = ['discover', 'prepare', 'run', 'compare', 'library', 'settings'];
 let currentView = null;
 
 // ----------------------------------------------------------------------------- theme
@@ -27,7 +28,7 @@ function applyTheme() {
 }
 dark.addEventListener('change', applyTheme);
 on('prefs', ({ key }) => { if (key === 'theme') applyTheme(); });
-on('theme', () => { rethemeRun(); rethemeCompare(); });
+on('theme', () => { rethemeRun(); rethemeCompare(); rethemeDiscover(); });
 
 // ----------------------------------------------------------------------------- routing
 
@@ -40,7 +41,8 @@ export async function navigate(view, opts) {
     else b.removeAttribute('aria-current');
   }
   try {
-    if (view === 'prepare') showPrepare();
+    if (view === 'discover') await showDiscover();
+    else if (view === 'prepare') showPrepare();
     else if (view === 'run') await showRun(opts);
     else if (view === 'compare') await showCompare(opts);
     else if (view === 'library') await showLibrary(opts);
@@ -128,7 +130,7 @@ async function boot() {
   const broken = state.domains.filter((d) => !d.catalog);
   setStatus(`${visibleDomains().filter((d) => d.catalog).length} domains ready`, 'ok');
   if (state.rejected.length || broken.length) toast(`${state.rejected.length + broken.length} domain${state.rejected.length + broken.length > 1 ? 's' : ''} could not be loaded; see Settings for the reasons.`, 'error', 8000);
-  navigate(currentView || 'prepare');
+  navigate(currentView || 'discover');
 }
 
 on('prefs', ({ key }) => {
@@ -180,7 +182,7 @@ document.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (typing(e)) return;
   if (e.key === '?') { e.preventDefault(); showHelp(); return; }
-  if (/^[1-5]$/.test(e.key) && !(e.target && e.target.closest && e.target.closest('[role="slider"]'))) { navigate(VIEWS[Number(e.key) - 1]); e.preventDefault(); return; }
+  if (/^[1-6]$/.test(e.key) && !(e.target && e.target.closest && e.target.closest('[role="slider"]'))) { navigate(VIEWS[Number(e.key) - 1]); e.preventDefault(); return; }
   if (e.target && e.target.closest && (e.target.closest('button, a, [role="tab"], [role="radio"], summary') && (e.key === ' ' || e.key === 'Enter'))) return;
   if (e.target && e.target.closest && e.target.closest('.r3d canvas') && e.key.startsWith('Arrow')) return;
   let handled = false;
@@ -193,6 +195,7 @@ for (const b of document.querySelectorAll('.nav-btn')) b.addEventListener('click
 document.getElementById('open-help').addEventListener('click', () => showHelp());
 document.getElementById('open-palette').addEventListener('click', () => openPalette());
 
+initDiscover(document.getElementById('view-discover'));
 initPrepare(document.getElementById('view-prepare'), navigate);
 initRun(document.getElementById('view-run'), navigate);
 initCompare(document.getElementById('view-compare'), navigate);

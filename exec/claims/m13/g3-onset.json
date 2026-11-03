@@ -1,0 +1,401 @@
+{
+  "schema": "vv-claim.v1",
+  "id": "g3-onset",
+  "title": "G3 under a late GNSS bias",
+  "statement": "The guarded M9.1 controller touches down within R1 (vertical speed at most 3 m/s) when the GNSS position is biased by 5 to 30 m, whenever the bias starts within the first 20 s of the flight.",
+  "origin": "Derived from M9.1 criterion G3 (docs/m9-powered-landing.md), registered and supported only with the bias present from 0 s: R1 met in at least 27 of 30 runs. This claim extends the onset to 0-20 s as a separate, new hypothesis; it does not change G3. M14 (docs/m14-evidence-robustness.md) reported that onsets of 2, 5 and 10 s at 5 and 10 m fail.",
+  "domain": "rocket-landing",
+  "base_case": "../../cases/m13/g3-registered.json",
+  "property": "requirement:R1_vertical_speed",
+  "tolerance": 0.1,
+  "objective": {
+    "metric": "requirement.R1_vertical_speed",
+    "direction": "minimise"
+  },
+  "assumptions": [
+    {
+      "parameter": {
+        "name": "onset_s",
+        "pointer": "/faults/0/start_s",
+        "unit": "s",
+        "low": 0.0,
+        "high": 20.0,
+        "quantum": 0.01
+      },
+      "description": "Instant the GNSS bias starts. Registered at 0 s."
+    },
+    {
+      "parameter": {
+        "name": "magnitude_m",
+        "pointer": "/faults/0/magnitude",
+        "unit": "model",
+        "low": 5.0,
+        "high": 30.0
+      },
+      "description": "GNSS position bias in x and z. Registered as uniform draws over [5, 30] m; the base case uses 15 m."
+    }
+  ],
+  "seeds": {
+    "discovery": {
+      "low": 42000,
+      "high": 42999
+    },
+    "evaluation": {
+      "low": 43000,
+      "high": 43499
+    },
+    "regression": {
+      "low": 43500,
+      "high": 43999
+    }
+  },
+  "budget": {
+    "baseline_seeds": 30,
+    "challenge": 400,
+    "minimise": 120,
+    "replication_seeds": 30,
+    "envelope_levels": 16,
+    "envelope_seeds": 4,
+    "mechanism_seeds": 30,
+    "regression_points": 60
+  },
+  "search_seed": 13,
+  "strategy": {
+    "kind": "halton"
+  },
+  "hypotheses": [
+    {
+      "id": "rule1-not-engaged",
+      "statement": "After a late onset the altimeter residual stays under the 3 m rejection threshold, so the altimeter is never rejected and rule 1 of guarded never engages; with rule 1 engaged, the bias no longer matters. With the bias from 0 s, the estimator starts on the biased GNSS fix, the residual exceeds the threshold at once and rule 1 protects the landing.",
+      "interventions": [
+        {
+          "id": "threshold-1m",
+          "description": "Lower the rejection threshold to 1 m, under the residual the counterexample shows, so that rule 1 can engage.",
+          "at": "counterexample",
+          "overrides": [
+            {
+              "pointer": "/controller/gains/altimeter_residual_threshold_m",
+              "value": 1.0
+            }
+          ],
+          "predicts": "holds"
+        },
+        {
+          "id": "no-rejection-at-registered",
+          "description": "Make rejection impossible (threshold 1000 m) at the registered conditions, where G3 holds: if rule 1 is what protects G3, R1 now fails.",
+          "at": "registered",
+          "overrides": [
+            {
+              "pointer": "/controller/gains/altimeter_residual_threshold_m",
+              "value": 1000.0
+            }
+          ],
+          "predicts": "violated"
+        }
+      ],
+      "trace_checks": [
+        {
+          "id": "never-rejected",
+          "description": "The estimator never rejects the altimeter in the counterexample runs.",
+          "samples": "/samples",
+          "pointer": "/estimate/altimeter_rejected",
+          "predicate": "never_true"
+        },
+        {
+          "id": "residual-under-threshold",
+          "description": "Altimeter residual (reported minus believed nozzle height, with the true lever arm) stays under 3 m in the counterexample runs.",
+          "samples": "/samples",
+          "pointer": "/observation/altimeter_m",
+          "terms": [
+            {
+              "pointer": "/estimate/position_m/2",
+              "coefficient": -1.0
+            },
+            {
+              "pointer": "/truth/position_m/2",
+              "coefficient": 1.0
+            },
+            {
+              "pointer": "/truth/base_position_m/2",
+              "coefficient": -1.0
+            }
+          ],
+          "predicate": "max_abs_below",
+          "threshold": 3.0
+        },
+        {
+          "id": "residual-over-threshold-at-registered",
+          "description": "At the registered conditions the residual reaches at least 3 m.",
+          "samples": "/samples",
+          "pointer": "/observation/altimeter_m",
+          "terms": [
+            {
+              "pointer": "/estimate/position_m/2",
+              "coefficient": -1.0
+            },
+            {
+              "pointer": "/truth/position_m/2",
+              "coefficient": 1.0
+            },
+            {
+              "pointer": "/truth/base_position_m/2",
+              "coefficient": -1.0
+            }
+          ],
+          "predicate": "max_abs_at_least",
+          "threshold": 3.0,
+          "at": "registered"
+        }
+      ]
+    },
+    {
+      "id": "velocity-pathway-only",
+      "statement": "Rival: the failure needs the corrupted velocity belief that the altimeter velocity correction creates. Without that correction it disappears even when the altimeter can never be rejected.",
+      "interventions": [
+        {
+          "id": "no-velocity-correction-no-rejection",
+          "description": "Altimeter velocity gain 0 and rejection impossible (threshold 1000 m).",
+          "at": "counterexample",
+          "overrides": [
+            {
+              "pointer": "/controller/gains/altimeter_velocity_gain",
+              "value": 0.0
+            },
+            {
+              "pointer": "/controller/gains/altimeter_residual_threshold_m",
+              "value": 1000.0
+            }
+          ],
+          "predicts": "holds"
+        }
+      ]
+    },
+    {
+      "id": "altitude-pathway-only",
+      "statement": "Rival: the failure needs the altimeter to be blended into the estimate. Without any altimeter correction it disappears even when the altimeter can never be rejected.",
+      "interventions": [
+        {
+          "id": "no-blend-no-rejection",
+          "description": "Altimeter position and velocity gains 0 and rejection impossible (threshold 1000 m): the estimator follows the biased GNSS alone.",
+          "at": "counterexample",
+          "overrides": [
+            {
+              "pointer": "/controller/gains/altimeter_position_gain",
+              "value": 0.0
+            },
+            {
+              "pointer": "/controller/gains/altimeter_velocity_gain",
+              "value": 0.0
+            },
+            {
+              "pointer": "/controller/gains/altimeter_residual_threshold_m",
+              "value": 1000.0
+            }
+          ],
+          "predicts": "holds"
+        }
+      ]
+    }
+  ],
+  "mitigations": [
+    {
+      "id": "threshold-1m",
+      "title": "Altimeter rejection threshold 1 m",
+      "rationale": "If masking is the mechanism, a threshold below the blended residual makes the estimator reject the altimeter after a late onset as it does after an onset at 0 s, which lets rule 1 act.",
+      "overrides": [
+        {
+          "pointer": "/controller/gains/altimeter_residual_threshold_m",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "id": "threshold-2m",
+      "title": "Altimeter rejection threshold 2 m",
+      "rationale": "A smaller change of the same gain, to see whether the trade-off depends on how far the threshold moves.",
+      "overrides": [
+        {
+          "pointer": "/controller/gains/altimeter_residual_threshold_m",
+          "value": 2.0
+        }
+      ]
+    }
+  ],
+  "regression": [
+    {
+      "id": "gnss-bias-low",
+      "title": "GNSS biased low",
+      "base_case": "../../cases/m13/family-gnss-bias-low.json",
+      "parameters": [
+        {
+          "name": "onset_s",
+          "pointer": "/faults/0/start_s",
+          "unit": "s",
+          "low": 0.0,
+          "high": 20.0,
+          "quantum": 0.01
+        },
+        {
+          "name": "magnitude",
+          "pointer": "/faults/0/magnitude",
+          "unit": "model",
+          "low": 5.0,
+          "high": 30.0
+        }
+      ]
+    },
+    {
+      "id": "altimeter-bias",
+      "title": "Altimeter biased high",
+      "base_case": "../../cases/m13/family-altimeter-bias.json",
+      "parameters": [
+        {
+          "name": "onset_s",
+          "pointer": "/faults/0/start_s",
+          "unit": "s",
+          "low": 0.0,
+          "high": 20.0,
+          "quantum": 0.01
+        },
+        {
+          "name": "magnitude",
+          "pointer": "/faults/0/magnitude",
+          "unit": "model",
+          "low": 5.0,
+          "high": 50.0
+        }
+      ]
+    },
+    {
+      "id": "altimeter-bias-low",
+      "title": "Altimeter biased low",
+      "base_case": "../../cases/m13/family-altimeter-bias-low.json",
+      "parameters": [
+        {
+          "name": "onset_s",
+          "pointer": "/faults/0/start_s",
+          "unit": "s",
+          "low": 0.0,
+          "high": 20.0,
+          "quantum": 0.01
+        },
+        {
+          "name": "magnitude",
+          "pointer": "/faults/0/magnitude",
+          "unit": "model",
+          "low": 5.0,
+          "high": 50.0
+        }
+      ]
+    },
+    {
+      "id": "gnss-dropout",
+      "title": "GNSS outage",
+      "base_case": "../../cases/m13/family-gnss-dropout.json",
+      "parameters": [
+        {
+          "name": "start_s",
+          "pointer": "/faults/0/start_s",
+          "unit": "s",
+          "low": 8.0,
+          "high": 13.0,
+          "quantum": 0.01
+        },
+        {
+          "name": "end_s",
+          "pointer": "/faults/0/end_s",
+          "unit": "s",
+          "low": 15.0,
+          "high": 18.0,
+          "quantum": 0.01
+        }
+      ]
+    },
+    {
+      "id": "altimeter-dropout",
+      "title": "Altimeter outage",
+      "base_case": "../../cases/m13/family-altimeter-dropout.json",
+      "parameters": [
+        {
+          "name": "start_s",
+          "pointer": "/faults/0/start_s",
+          "unit": "s",
+          "low": 8.0,
+          "high": 13.0,
+          "quantum": 0.01
+        },
+        {
+          "name": "end_s",
+          "pointer": "/faults/0/end_s",
+          "unit": "s",
+          "low": 15.0,
+          "high": 18.0,
+          "quantum": 0.01
+        }
+      ]
+    },
+    {
+      "id": "imu-accel-bias",
+      "title": "Accelerometer bias",
+      "base_case": "../../cases/m13/family-imu-accel-bias.json",
+      "parameters": [
+        {
+          "name": "onset_s",
+          "pointer": "/faults/0/start_s",
+          "unit": "s",
+          "low": 0.0,
+          "high": 20.0,
+          "quantum": 0.01
+        },
+        {
+          "name": "magnitude",
+          "pointer": "/faults/0/magnitude",
+          "unit": "model",
+          "low": 0.05,
+          "high": 0.5
+        }
+      ]
+    },
+    {
+      "id": "thrust-loss",
+      "title": "Thrust loss",
+      "base_case": "../../cases/m13/family-thrust-loss.json",
+      "parameters": [
+        {
+          "name": "onset_s",
+          "pointer": "/faults/0/start_s",
+          "unit": "s",
+          "low": 5.26,
+          "high": 20.0,
+          "quantum": 0.01
+        },
+        {
+          "name": "magnitude",
+          "pointer": "/faults/0/magnitude",
+          "unit": "model",
+          "low": 0.05,
+          "high": 0.3
+        }
+      ]
+    },
+    {
+      "id": "small-net-gnss-bias",
+      "title": "Small net GNSS bias (below the 5 m floor)",
+      "base_case": "../../cases/m13/family-small-net-gnss-bias.json",
+      "parameters": [
+        {
+          "name": "gnss_bias_m",
+          "pointer": "/faults/0/magnitude",
+          "unit": "model",
+          "low": 5.0,
+          "high": 9.0
+        }
+      ]
+    }
+  ],
+  "evidence_grade": "exploratory",
+  "limits": {
+    "max_evaluations": 2000,
+    "max_wall_s": 3600
+  }
+}

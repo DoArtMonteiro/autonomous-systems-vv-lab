@@ -106,6 +106,20 @@ exec/target/release/vv-exec verify exec/target/m12-dev/throughput --threads 16
 
 See [docs/m12-exec.md](docs/m12-exec.md). Its development-seed verdicts are engine evidence, not evaluation results.
 
+### M13 Discovery Lab: challenge a safety claim (proposed for integration)
+
+V&V Lab Studio opens on a Discovery Lab workspace. Pick a bounded safety claim, press "Challenge this claim", and the bundled engine (`vv-exec investigate`) checks it at its registered conditions, searches its declared envelope for a counterexample, minimises and replicates it on fresh seeds, attributes it with paired counterfactuals, maps where the claim holds, tests mechanism hypotheses declared before the run (at the counterexample and over the whole envelope), and judges each candidate mitigation against the unmitigated system, including regressions, trade-offs and a fresh adversarial re-challenge. `vv-exec investigate-verify` then recomputes every number from scratch; a package that fails, or changed since, has its verdicts withdrawn in the app. Claim verdict, mechanism, mitigation, evidence integrity and evidence grade are separate results.
+
+Flagship result, simulation only, development seeds: the M9.1 criterion G3 holds as registered (GNSS bias from 0 s), but the same bias starting after the first GNSS fix breaks R1 in 30 of 30 fresh runs for magnitudes up to about 12 m. The supported mechanism is that the altimeter residual stays under the rejection threshold, so rule 1 never engages; disabling rejection at the registered conditions breaks G3 in 30 of 30. An independent estimator model with no fitted parameter, written after the coarse 10 to 15 m transition had been seen, predicted the boundary at 11.99 m before the test; the simulator gave 11.89 m on fresh seeds. A 1 m threshold removes the failure inside the envelope with no new safety violation, but 41 paired runs gain other requirement violations and the masked band moves below the 5 m floor instead of disappearing. The same workflow rediscovers and explains the M14 corridor fragility on the ground vehicle.
+
+```sh
+cargo build --release --manifest-path exec/Cargo.toml
+exec/target/release/vv-exec investigate exec/claims/m13/g3-onset.json --output exec/target/m13/g3 --progress
+exec/target/release/vv-exec investigate-verify exec/target/m13/g3
+```
+
+See [docs/m13-discovery-lab.md](docs/m13-discovery-lab.md) and [docs/evidence/m13/](docs/evidence/m13/). Exploratory evidence: the hypotheses were written after hand exploration and revised after an independent agent review; a confirmation protocol awaits the owner ([docs/m14-g3-onset-protocol-draft.md](docs/m14-g3-onset-protocol-draft.md)).
+
 ### M14 evidence robustness (proposed for integration)
 
 M14 asks whether the platform's findings hold up: on a second physical domain, on failure mechanisms the method never saw, and under small changes to the assumptions behind a published claim.

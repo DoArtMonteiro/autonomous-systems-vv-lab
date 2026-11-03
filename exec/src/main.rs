@@ -2,7 +2,9 @@
 //! `vv-exec equiv <dir> --cli <vv-rocket> [--sample <n>]` | `vv-exec report <dir>` |
 //! `vv-exec verify <dir> [--threads <n>]` |
 //! `vv-exec converge <case.json> [--levels <n>] [--tolerance-m <m>]` |
-//! `vv-exec search <search.json> --output <dir> [--threads <n>]` | `vv-exec search-verify <dir>`
+//! `vv-exec search <search.json> --output <dir> [--threads <n>]` | `vv-exec search-verify <dir>` |
+//! `vv-exec claim <claim.json>` | `vv-exec investigate <claim.json> --output <dir> [--threads <n>]
+//! [--progress]` | `vv-exec investigate-verify <dir> [--threads <n>] [--progress]`
 //!
 //! Exit status: 0 done; 1 a gate or check failed; 3 usage or rejected input; 5 run interrupted
 //! (resume with the same command). The first Ctrl+C stops `run` after the runs in flight, which
@@ -15,9 +17,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use vv_exec::plan::{Plan, read_capped};
 use vv_exec::sched::SystemProbe;
 use vv_exec::spec::MAX_SPEC_BYTES;
-use vv_exec::{converge, engine, equiv, report};
+use vv_exec::{converge, engine, equiv, investigate, report};
 
-const USAGE: &str = "usage: vv-exec plan <spec.json> | run <spec.json> --output <dir> [--threads <n>] | equiv <dir> --cli <vv-rocket> [--sample <n>] | report <dir> | verify <dir> [--threads <n>] | converge <case.json> [--levels <n>] [--tolerance-m <m>] | search <search.json> --output <dir> [--threads <n>] | search-check <search.json> | search-verify <dir> [--threads <n>]";
+const USAGE: &str = "usage: vv-exec plan <spec.json> | run <spec.json> --output <dir> [--threads <n>] | equiv <dir> --cli <vv-rocket> [--sample <n>] | report <dir> | verify <dir> [--threads <n>] | converge <case.json> [--levels <n>] [--tolerance-m <m>] | search <search.json> --output <dir> [--threads <n>] | search-check <search.json> | search-verify <dir> [--threads <n>] | claim <claim.json> | investigate <claim.json> --output <dir> [--threads <n>] [--progress] | investigate-verify <dir> [--threads <n>] [--progress] | investigate-compare <a.json> <b.json>";
 
 /// Set by the console interrupt handler; read by the workers of `run`.
 static CANCEL: AtomicBool = AtomicBool::new(false);
@@ -107,6 +109,13 @@ fn usage() -> (String, u8) {
 
 fn input(e: String) -> (String, u8) {
     (e, 3)
+}
+
+fn threads_of(args: &[String]) -> Result<usize, (String, u8)> {
+    match flag(args, "--threads") {
+        Some(t) => t.parse::<usize>().map_err(|_| usage()),
+        None => Ok(std::thread::available_parallelism().map_or(1, |n| n.get())),
+    }
 }
 
 fn dispatch(args: &[String]) -> Outcome {
@@ -238,6 +247,69 @@ fn dispatch(args: &[String]) -> Outcome {
             };
             let v = vv_exec::search::verify(&out, threads).map_err(input)?;
             Ok((json(&v), if v.pass { 0 } else { 1 }))
+        }
+        Some("claim") => {
+            let claim = args.get(1).ok_or_else(usage)?;
+            let inputs = investigate::read_inputs(Path::new(claim)).map_err(input)?;
+            let d = investigate::describe(&inputs).map_err(input)?;
+            Ok((json(&d), 0))
+        }
+        Some("investigate") => {
+            let claim = args.get(1).ok_or_else(usage)?;
+            let out = PathBuf::from(flag(args, "--output").ok_or_else(usage)?);
+            let threads = threads_of(args)?;
+            let inputs = investigate::read_inputs(Path::new(claim)).map_err(input)?;
+            let progress = |stage: &str, done: u64, total: u64| {
+                eprintln!(
+                    "{}",
+                    serde_json::json!({"progress": stage, "done": done, "total": total})
+                );
+            };
+            let p: investigate::Progress = if args.iter().any(|a| a == "--progress") {
+                Some(&progress)
+            } else {
+                None
+            };
+            let r = investigate::execute(&inputs, &out, threads, p).map_err(input)?;
+            Ok((
+                json(&serde_json::json!({
+                    "claim": r.claim_id,
+                    "verdict": r.findings.verdict,
+                    "probes": r.probes,
+                    "package": out.display().to_string(),
+                })),
+                0,
+            ))
+        }
+        Some("investigate-verify") => {
+            let out = PathBuf::from(args.get(1).ok_or_else(usage)?);
+            let threads = threads_of(args)?;
+            let progress = |stage: &str, done: u64, total: u64| {
+                eprintln!(
+                    "{}",
+                    serde_json::json!({"progress": stage, "done": done, "total": total})
+                );
+            };
+            let p: investigate::Progress = if args.iter().any(|a| a == "--progress") {
+                Some(&progress)
+            } else {
+                None
+            };
+            let v = investigate::verify(&out, threads, p).map_err(input)?;
+            Ok((json(&v), if v.pass { 0 } else { 1 }))
+        }
+        Some("investigate-compare") => {
+            let a = args.get(1).ok_or_else(usage)?;
+            let b = args.get(2).ok_or_else(usage)?;
+            let read = |p: &str| -> Result<serde_json::Value, (String, u8)> {
+                let bytes = read_capped(Path::new(p), 64 * 1024 * 1024).map_err(input)?;
+                serde_json::from_slice(&bytes).map_err(|e| input(format!("{p}: {e}")))
+            };
+            let d = investigate::compare_packages(&read(a)?, &read(b)?);
+            Ok((
+                json(&serde_json::json!({"same_findings": d.is_empty(), "differ": d})),
+                if d.is_empty() { 0 } else { 1 },
+            ))
         }
         Some("converge") => {
             let case = args.get(1).ok_or_else(usage)?;

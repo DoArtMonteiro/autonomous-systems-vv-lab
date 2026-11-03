@@ -470,6 +470,106 @@ def journeys(s):
         s.shot(f"run-{w}x{h}-dark")
 
 
+def text_of(s, selector):
+    return s.js("(sel) => [...document.querySelectorAll(sel)].map((e) => e.innerText).join(' | ')", selector)
+
+
+def challenge(s, title, timeout):
+    """Opens a claim, challenges it, and waits until the package is shown and recomputed."""
+    s.nav("discover")
+    s.wait("document.querySelectorAll('#view-discover .dl-item').length >= 2", what="claim list")
+    s.page.click(f"#view-discover .dl-list[aria-label='Claims'] .dl-item:has-text('{title}')")
+    s.wait("document.querySelector('#view-discover .dl-cta')", what="claim view")
+    t0 = time.time()
+    s.page.click("#view-discover .dl-cta")
+    s.wait("document.querySelector('#view-discover .dl-tiles') && /Recomputed|A check failed/.test(document.querySelector('#view-discover .dl-tiles').innerText)",
+           timeout=timeout, what=f"investigation and recomputation of {title}")
+    time.sleep(0.8)
+    return time.time() - t0
+
+
+def discovery_journeys(s, library):
+    """M13 Discovery Lab: challenge both bundled claims, read the evidence, and see a tampered
+    package fail its recomputation."""
+    s.resize(1440, 900)
+    s.nav("discover")
+    s.wait("document.querySelectorAll('#view-discover .dl-item').length >= 2", what="claim list")
+    claims = text_of(s, "#view-discover .dl-list[aria-label='Claims'] .dl-item-title")
+    check("discover: both bundled claims are listed", "G3 under a late GNSS bias" in claims and "Corridor safety under GPS noise" in claims, claims)
+    s.page.click("#view-discover .dl-list[aria-label='Claims'] .dl-item:has-text('G3 under a late GNSS bias')")
+    s.wait("document.querySelector('#view-discover .dl-cta')")
+    check("discover: claim view shows the envelope and the declared hypotheses",
+          s.js("document.querySelectorAll('#view-discover .dl-assume-row').length === 2 && /masking/.test(document.getElementById('view-discover').innerText)"))
+    s.shot("m13-claim-g3-dark")
+
+    # Ground claim: fast, cross-domain.
+    secs = challenge(s, "Corridor safety under GPS noise", 240)
+    tiles = text_of(s, "#view-discover .dl-tile")
+    check("discover corridor: investigated and recomputed in the app", "Recomputed, every check passed" in tiles, f"{secs:.1f} s; {tiles[:300]}")
+    check("discover corridor: claim refuted", "Refuted" in tiles, tiles[:300])
+    check("discover corridor: mechanism supported, 250 mm radius effective, 10 mm radius leaves counterexamples",
+          "Experimentally supported" in tiles and "Effective, no regression observed" in tiles and "Effective, residual counterexamples" in tiles, tiles[:400])
+    check("discover corridor: every recomputation check passed",
+          s.js("document.querySelectorAll('#view-discover .dl-checks li.bad').length === 0 && document.querySelectorAll('#view-discover .dl-checks li.ok').length >= 10"))
+    check("discover corridor: timeline charts drawn from the kept runs", s.js("document.querySelectorAll('#view-discover .dl-chart canvas').length >= 3"))
+    check("discover corridor: no horizontal scroll", s.no_hscroll())
+
+    # Rocket flagship.
+    secs = challenge(s, "G3 under a late GNSS bias", 300)
+    tiles = text_of(s, "#view-discover .dl-tile")
+    check("discover G3: investigated and recomputed in the app", "Recomputed, every check passed" in tiles, f"{secs:.1f} s")
+    check("discover G3: claim refuted", "Refuted" in tiles, tiles[:300])
+    mech = text_of(s, "#view-discover .dl-hyp")
+    check("discover G3: rule-1 non-engagement supported, both pathway rivals contradicted",
+          mech.count("Experimentally supported") == 1 and mech.count("Contradicted") >= 2, mech[:300])
+    mit = text_of(s, "#view-discover .dl-mit")
+    check("discover G3: the 1 m threshold shows its trade-off, the 2 m threshold its residual counterexamples",
+          "Effective, with trade-offs" in mit and "Effective, residual counterexamples" in mit, mit[:300])
+    summary = s.page.inner_text("#view-discover .dl-summary")
+    check("discover G3: summary states the counterexample, the registered result and what else fails there",
+          "registered conditions" in summary and "fresh seeds" in summary and "R5 position" in summary, summary)
+    check("discover G3: belief and truth drawn apart", s.js("document.querySelectorAll('#view-discover .dl-chart canvas').length >= 5"))
+    s.both("m13-g3-overview")
+    s.page.click("#view-discover .dl-story-step:has-text('Envelope')")
+    time.sleep(0.8)
+    s.shot("m13-g3-envelope-dark")
+    s.page.click("#view-discover .dl-seg-b:has-text('with threshold-1m')")
+    s.wait("document.querySelectorAll('#view-discover .dl-cell.d-fixed').length > 0", what="mitigation envelope")
+    check("discover G3: the 1 m threshold envelope shows fixed cells and no broken cell",
+          s.js("document.querySelectorAll('#view-discover .dl-cell.d-broken').length === 0"))
+    s.shot("m13-g3-envelope-threshold-1m-dark")
+    for step, name in [("Counterexample", "m13-g3-counterexample-dark"), ("Cause", "m13-g3-cause-dark"), ("Mitigation", "m13-g3-mitigation-dark"), ("Evidence", "m13-g3-evidence-dark")]:
+        s.page.click(f"#view-discover .dl-story-step:has-text('{step}')")
+        time.sleep(0.8)
+        s.shot(name)
+    s.resize(1024, 640)
+    check("discover G3: no horizontal scroll at 1024x640", s.no_hscroll())
+    s.shot("m13-g3-1024x640-dark")
+    s.resize(1440, 900)
+
+    # Tampering: change a stored verdict in the library copy, then recompute in the app.
+    packages = s.invoke("list_investigations")
+    g3 = next(p for p in packages if p["claim_id"] == "g3-onset")
+    path = os.path.join(library, "investigations", g3["name"], "investigation.json")
+    with open(path, encoding="utf-8") as f:
+        doc = json.load(f)
+    doc["findings"]["verdict"]["claim"] = "not_refuted_within_budget"
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(doc, f, indent=2)
+    s.page.click("#view-discover .dl-list[aria-label='Investigations'] .dl-item:has-text('G3 under a late GNSS bias')")
+    s.wait("document.querySelector('#view-discover .dl-tiles')")
+    s.page.click("#view-discover button:has-text('Recompute from scratch')")
+    s.wait("document.querySelector('#view-discover .dl-tiles') && /A check failed/.test(document.querySelector('#view-discover .dl-tiles').innerText)", timeout=300, what="failed recomputation")
+    bad = text_of(s, "#view-discover .dl-checks li.bad b")
+    check("discover: a tampered package fails recomputation in the app, naming the checks", "manifest" in bad and "findings" in bad, bad)
+    tiles = text_of(s, "#view-discover .dl-tile")
+    check("discover: after a failed recomputation the verdicts are withdrawn, not shown", tiles.count("Withdrawn") == 3 and "Not refuted" not in tiles, tiles[:300])
+    rail = text_of(s, "#view-discover .dl-rail")
+    body = s.js("!!document.querySelector('#view-discover .dl-withdrawn') && !document.querySelector('#view-discover .dl-summary')")
+    check("discover: the rail and the body withdraw the failed package too", body and "Not refuted" not in rail and "Withdrawn" in rail, rail[:300])
+    s.shot("m13-tampered-dark")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--exe", default=os.path.join(REPO, "desktop", "target", "debug", "vv-studio.exe"))
@@ -491,6 +591,13 @@ def main():
     env.pop("VVLAB_EXTRA_DOMAINS", None)
     if a.domains:
         env["VVLAB_DOMAINS"] = a.domains
+        # A staged build keeps the engine and the claims next to the domains folder.
+        root = os.path.dirname(os.path.abspath(a.domains))
+        env["VVLAB_EXEC"] = os.path.join(root, "engines", "vv-exec.exe")
+        env["VVLAB_CLAIMS"] = os.path.join(root, "discovery", "claims")
+    else:
+        env.pop("VVLAB_EXEC", None)
+        env.pop("VVLAB_CLAIMS", None)
     env["VVLAB_LIBRARY"] = library
     env["VVLAB_CONFIG"] = config
     print(f"exe {a.exe}\ndomains {a.domains or '(installed resource directory)'}\nlibrary {library}\nconfig {config}")
@@ -530,6 +637,7 @@ def main():
                 info = s.invoke("app_info")
                 check("platform ready with three domains and none rejected", info["ready"] and info["start"]["domains"] == 3 and not info["start"]["rejected"], json.dumps(info.get("start")))
                 journeys(s)
+                discovery_journeys(s, library)
             except Exception as e:
                 traceback.print_exc()
                 check("journeys completed without an exception", False, repr(e))
