@@ -1,0 +1,1007 @@
+{
+  "policy": "failures_and_sample",
+  "selected": 1258,
+  "retained": [
+    {
+      "index": 0,
+      "dir": "retained/00000000-s7000",
+      "bytes": 492043
+    },
+    {
+      "index": 107,
+      "dir": "retained/00000107-s7107",
+      "bytes": 493755
+    },
+    {
+      "index": 230,
+      "dir": "retained/00000230-s7230",
+      "bytes": 490478
+    },
+    {
+      "index": 235,
+      "dir": "retained/00000235-s7235",
+      "bytes": 489492
+    },
+    {
+      "index": 241,
+      "dir": "retained/00000241-s7241",
+      "bytes": 493649
+    },
+    {
+      "index": 254,
+      "dir": "retained/00000254-s7254",
+      "bytes": 497184
+    },
+    {
+      "index": 298,
+      "dir": "retained/00000298-s7298",
+      "bytes": 498050
+    },
+    {
+      "index": 352,
+      "dir": "retained/00000352-s7352",
+      "bytes": 495356
+    },
+    {
+      "index": 355,
+      "dir": "retained/00000355-s7355",
+      "bytes": 495046
+    },
+    {
+      "index": 361,
+      "dir": "retained/00000361-s7361",
+      "bytes": 489399
+    },
+    {
+      "index": 365,
+      "dir": "retained/00000365-s7365",
+      "bytes": 492932
+    },
+    {
+      "index": 463,
+      "dir": "retained/00000463-s7463",
+      "bytes": 493138
+    },
+    {
+      "index": 470,
+      "dir": "retained/00000470-s7470",
+      "bytes": 498553
+    },
+    {
+      "index": 512,
+      "dir": "retained/00000512-s7512",
+      "bytes": 493577
+    },
+    {
+      "index": 523,
+      "dir": "retained/00000523-s7523",
+      "bytes": 493514
+    },
+    {
+      "index": 561,
+      "dir": "retained/00000561-s7561",
+      "bytes": 496256
+    },
+    {
+      "index": 626,
+      "dir": "retained/00000626-s7626",
+      "bytes": 498644
+    },
+    {
+      "index": 638,
+      "dir": "retained/00000638-s7638",
+      "bytes": 493211
+    },
+    {
+      "index": 681,
+      "dir": "retained/00000681-s7681",
+      "bytes": 497579
+    },
+    {
+      "index": 684,
+      "dir": "retained/00000684-s7684",
+      "bytes": 493126
+    },
+    {
+      "index": 731,
+      "dir": "retained/00000731-s7731",
+      "bytes": 494535
+    },
+    {
+      "index": 760,
+      "dir": "retained/00000760-s7760",
+      "bytes": 490092
+    },
+    {
+      "index": 775,
+      "dir": "retained/00000775-s7775",
+      "bytes": 492410
+    },
+    {
+      "index": 865,
+      "dir": "retained/00000865-s7865",
+      "bytes": 493662
+    },
+    {
+      "index": 875,
+      "dir": "retained/00000875-s7875",
+      "bytes": 491990
+    },
+    {
+      "index": 933,
+      "dir": "retained/00000933-s7933",
+      "bytes": 493529
+    },
+    {
+      "index": 935,
+      "dir": "retained/00000935-s7935",
+      "bytes": 490344
+    },
+    {
+      "index": 955,
+      "dir": "retained/00000955-s7955",
+      "bytes": 494284
+    },
+    {
+      "index": 1000,
+      "dir": "retained/00001000-s8000",
+      "bytes": 497978
+    },
+    {
+      "index": 1035,
+      "dir": "retained/00001035-s8035",
+      "bytes": 495002
+    },
+    {
+      "index": 1037,
+      "dir": "retained/00001037-s8037",
+      "bytes": 495129
+    },
+    {
+      "index": 1044,
+      "dir": "retained/00001044-s8044",
+      "bytes": 494591
+    },
+    {
+      "index": 1066,
+      "dir": "retained/00001066-s8066",
+      "bytes": 492011
+    },
+    {
+      "index": 1107,
+      "dir": "retained/00001107-s8107",
+      "bytes": 493555
+    },
+    {
+      "index": 1148,
+      "dir": "retained/00001148-s8148",
+      "bytes": 495116
+    },
+    {
+      "index": 1165,
+      "dir": "retained/00001165-s8165",
+      "bytes": 489898
+    },
+    {
+      "index": 1168,
+      "dir": "retained/00001168-s8168",
+      "bytes": 497746
+    },
+    {
+      "index": 1174,
+      "dir": "retained/00001174-s8174",
+      "bytes": 491668
+    },
+    {
+      "index": 1194,
+      "dir": "retained/00001194-s8194",
+      "bytes": 492176
+    },
+    {
+      "index": 1217,
+      "dir": "retained/00001217-s8217",
+      "bytes": 490874
+    },
+    {
+      "index": 1370,
+      "dir": "retained/00001370-s8370",
+      "bytes": 492582
+    },
+    {
+      "index": 1379,
+      "dir": "retained/00001379-s8379",
+      "bytes": 497522
+    },
+    {
+      "index": 1481,
+      "dir": "retained/00001481-s8481",
+      "bytes": 498884
+    },
+    {
+      "index": 1510,
+      "dir": "retained/00001510-s8510",
+      "bytes": 488642
+    },
+    {
+      "index": 1550,
+      "dir": "retained/00001550-s8550",
+      "bytes": 489650
+    },
+    {
+      "index": 1602,
+      "dir": "retained/00001602-s8602",
+      "bytes": 496190
+    },
+    {
+      "index": 1636,
+      "dir": "retained/00001636-s8636",
+      "bytes": 495659
+    },
+    {
+      "index": 1643,
+      "dir": "retained/00001643-s8643",
+      "bytes": 491746
+    },
+    {
+      "index": 1658,
+      "dir": "retained/00001658-s8658",
+      "bytes": 493300
+    },
+    {
+      "index": 1681,
+      "dir": "retained/00001681-s8681",
+      "bytes": 491298
+    },
+    {
+      "index": 1753,
+      "dir": "retained/00001753-s8753",
+      "bytes": 495708
+    },
+    {
+      "index": 1790,
+      "dir": "retained/00001790-s8790",
+      "bytes": 487282
+    },
+    {
+      "index": 1791,
+      "dir": "retained/00001791-s8791",
+      "bytes": 494121
+    },
+    {
+      "index": 1818,
+      "dir": "retained/00001818-s8818",
+      "bytes": 488573
+    },
+    {
+      "index": 1838,
+      "dir": "retained/00001838-s8838",
+      "bytes": 495655
+    },
+    {
+      "index": 1851,
+      "dir": "retained/00001851-s8851",
+      "bytes": 487918
+    },
+    {
+      "index": 1853,
+      "dir": "retained/00001853-s8853",
+      "bytes": 491551
+    },
+    {
+      "index": 1890,
+      "dir": "retained/00001890-s8890",
+      "bytes": 492744
+    },
+    {
+      "index": 1896,
+      "dir": "retained/00001896-s8896",
+      "bytes": 490957
+    },
+    {
+      "index": 1898,
+      "dir": "retained/00001898-s8898",
+      "bytes": 494186
+    },
+    {
+      "index": 1916,
+      "dir": "retained/00001916-s8916",
+      "bytes": 490689
+    },
+    {
+      "index": 1928,
+      "dir": "retained/00001928-s8928",
+      "bytes": 491357
+    },
+    {
+      "index": 1932,
+      "dir": "retained/00001932-s8932",
+      "bytes": 488138
+    },
+    {
+      "index": 2000,
+      "dir": "retained/00002000-s9000",
+      "bytes": 494294
+    },
+    {
+      "index": 2038,
+      "dir": "retained/00002038-s9038",
+      "bytes": 493432
+    },
+    {
+      "index": 2058,
+      "dir": "retained/00002058-s9058",
+      "bytes": 494735
+    },
+    {
+      "index": 2178,
+      "dir": "retained/00002178-s9178",
+      "bytes": 493721
+    },
+    {
+      "index": 2191,
+      "dir": "retained/00002191-s9191",
+      "bytes": 489280
+    },
+    {
+      "index": 2221,
+      "dir": "retained/00002221-s9221",
+      "bytes": 487363
+    },
+    {
+      "index": 2292,
+      "dir": "retained/00002292-s9292",
+      "bytes": 491745
+    },
+    {
+      "index": 2322,
+      "dir": "retained/00002322-s9322",
+      "bytes": 492326
+    },
+    {
+      "index": 2362,
+      "dir": "retained/00002362-s9362",
+      "bytes": 492861
+    },
+    {
+      "index": 2375,
+      "dir": "retained/00002375-s9375",
+      "bytes": 497843
+    },
+    {
+      "index": 2405,
+      "dir": "retained/00002405-s7005",
+      "bytes": 488546
+    },
+    {
+      "index": 2407,
+      "dir": "retained/00002407-s7007",
+      "bytes": 500401
+    },
+    {
+      "index": 2423,
+      "dir": "retained/00002423-s7023",
+      "bytes": 495949
+    },
+    {
+      "index": 2425,
+      "dir": "retained/00002425-s7025",
+      "bytes": 492040
+    },
+    {
+      "index": 2426,
+      "dir": "retained/00002426-s7026",
+      "bytes": 493935
+    },
+    {
+      "index": 2429,
+      "dir": "retained/00002429-s7029",
+      "bytes": 494474
+    },
+    {
+      "index": 2437,
+      "dir": "retained/00002437-s7037",
+      "bytes": 495794
+    },
+    {
+      "index": 2438,
+      "dir": "retained/00002438-s7038",
+      "bytes": 490172
+    },
+    {
+      "index": 2439,
+      "dir": "retained/00002439-s7039",
+      "bytes": 490229
+    },
+    {
+      "index": 2444,
+      "dir": "retained/00002444-s7044",
+      "bytes": 487690
+    },
+    {
+      "index": 2447,
+      "dir": "retained/00002447-s7047",
+      "bytes": 496404
+    },
+    {
+      "index": 2448,
+      "dir": "retained/00002448-s7048",
+      "bytes": 498020
+    },
+    {
+      "index": 2450,
+      "dir": "retained/00002450-s7050",
+      "bytes": 493412
+    },
+    {
+      "index": 2453,
+      "dir": "retained/00002453-s7053",
+      "bytes": 496869
+    },
+    {
+      "index": 2459,
+      "dir": "retained/00002459-s7059",
+      "bytes": 492091
+    },
+    {
+      "index": 2485,
+      "dir": "retained/00002485-s7085",
+      "bytes": 498326
+    },
+    {
+      "index": 2488,
+      "dir": "retained/00002488-s7088",
+      "bytes": 490233
+    },
+    {
+      "index": 2490,
+      "dir": "retained/00002490-s7090",
+      "bytes": 497779
+    },
+    {
+      "index": 2495,
+      "dir": "retained/00002495-s7095",
+      "bytes": 493815
+    },
+    {
+      "index": 2497,
+      "dir": "retained/00002497-s7097",
+      "bytes": 496973
+    },
+    {
+      "index": 2501,
+      "dir": "retained/00002501-s7101",
+      "bytes": 490204
+    },
+    {
+      "index": 2507,
+      "dir": "retained/00002507-s7107",
+      "bytes": 497557
+    },
+    {
+      "index": 2518,
+      "dir": "retained/00002518-s7118",
+      "bytes": 498741
+    },
+    {
+      "index": 2521,
+      "dir": "retained/00002521-s7121",
+      "bytes": 487658
+    },
+    {
+      "index": 2526,
+      "dir": "retained/00002526-s7126",
+      "bytes": 491565
+    },
+    {
+      "index": 2529,
+      "dir": "retained/00002529-s7129",
+      "bytes": 492479
+    },
+    {
+      "index": 2530,
+      "dir": "retained/00002530-s7130",
+      "bytes": 490894
+    },
+    {
+      "index": 2537,
+      "dir": "retained/00002537-s7137",
+      "bytes": 494966
+    },
+    {
+      "index": 2540,
+      "dir": "retained/00002540-s7140",
+      "bytes": 494854
+    },
+    {
+      "index": 2542,
+      "dir": "retained/00002542-s7142",
+      "bytes": 494854
+    },
+    {
+      "index": 2544,
+      "dir": "retained/00002544-s7144",
+      "bytes": 490207
+    },
+    {
+      "index": 2547,
+      "dir": "retained/00002547-s7147",
+      "bytes": 494513
+    },
+    {
+      "index": 2548,
+      "dir": "retained/00002548-s7148",
+      "bytes": 494883
+    },
+    {
+      "index": 2549,
+      "dir": "retained/00002549-s7149",
+      "bytes": 490071
+    },
+    {
+      "index": 2557,
+      "dir": "retained/00002557-s7157",
+      "bytes": 498769
+    },
+    {
+      "index": 2558,
+      "dir": "retained/00002558-s7158",
+      "bytes": 491120
+    },
+    {
+      "index": 2563,
+      "dir": "retained/00002563-s7163",
+      "bytes": 493667
+    },
+    {
+      "index": 2567,
+      "dir": "retained/00002567-s7167",
+      "bytes": 489025
+    },
+    {
+      "index": 2569,
+      "dir": "retained/00002569-s7169",
+      "bytes": 495521
+    },
+    {
+      "index": 2570,
+      "dir": "retained/00002570-s7170",
+      "bytes": 497698
+    },
+    {
+      "index": 2573,
+      "dir": "retained/00002573-s7173",
+      "bytes": 492776
+    },
+    {
+      "index": 2583,
+      "dir": "retained/00002583-s7183",
+      "bytes": 494799
+    },
+    {
+      "index": 2584,
+      "dir": "retained/00002584-s7184",
+      "bytes": 497259
+    },
+    {
+      "index": 2585,
+      "dir": "retained/00002585-s7185",
+      "bytes": 493900
+    },
+    {
+      "index": 2587,
+      "dir": "retained/00002587-s7187",
+      "bytes": 496294
+    },
+    {
+      "index": 2590,
+      "dir": "retained/00002590-s7190",
+      "bytes": 490005
+    },
+    {
+      "index": 2593,
+      "dir": "retained/00002593-s7193",
+      "bytes": 486007
+    },
+    {
+      "index": 2596,
+      "dir": "retained/00002596-s7196",
+      "bytes": 495827
+    },
+    {
+      "index": 2600,
+      "dir": "retained/00002600-s7200",
+      "bytes": 492731
+    },
+    {
+      "index": 2603,
+      "dir": "retained/00002603-s7203",
+      "bytes": 492119
+    },
+    {
+      "index": 2606,
+      "dir": "retained/00002606-s7206",
+      "bytes": 485596
+    },
+    {
+      "index": 2614,
+      "dir": "retained/00002614-s7214",
+      "bytes": 499420
+    },
+    {
+      "index": 2617,
+      "dir": "retained/00002617-s7217",
+      "bytes": 496591
+    },
+    {
+      "index": 2622,
+      "dir": "retained/00002622-s7222",
+      "bytes": 493911
+    },
+    {
+      "index": 2628,
+      "dir": "retained/00002628-s7228",
+      "bytes": 492395
+    },
+    {
+      "index": 2630,
+      "dir": "retained/00002630-s7230",
+      "bytes": 491855
+    },
+    {
+      "index": 2635,
+      "dir": "retained/00002635-s7235",
+      "bytes": 490548
+    },
+    {
+      "index": 2636,
+      "dir": "retained/00002636-s7236",
+      "bytes": 488816
+    },
+    {
+      "index": 2639,
+      "dir": "retained/00002639-s7239",
+      "bytes": 495157
+    },
+    {
+      "index": 2640,
+      "dir": "retained/00002640-s7240",
+      "bytes": 497621
+    },
+    {
+      "index": 2641,
+      "dir": "retained/00002641-s7241",
+      "bytes": 494858
+    },
+    {
+      "index": 2644,
+      "dir": "retained/00002644-s7244",
+      "bytes": 493203
+    },
+    {
+      "index": 2645,
+      "dir": "retained/00002645-s7245",
+      "bytes": 491842
+    },
+    {
+      "index": 2648,
+      "dir": "retained/00002648-s7248",
+      "bytes": 495406
+    },
+    {
+      "index": 2654,
+      "dir": "retained/00002654-s7254",
+      "bytes": 498459
+    },
+    {
+      "index": 2659,
+      "dir": "retained/00002659-s7259",
+      "bytes": 493403
+    },
+    {
+      "index": 2663,
+      "dir": "retained/00002663-s7263",
+      "bytes": 493318
+    },
+    {
+      "index": 2664,
+      "dir": "retained/00002664-s7264",
+      "bytes": 496093
+    },
+    {
+      "index": 2665,
+      "dir": "retained/00002665-s7265",
+      "bytes": 493508
+    },
+    {
+      "index": 2685,
+      "dir": "retained/00002685-s7285",
+      "bytes": 497758
+    },
+    {
+      "index": 2687,
+      "dir": "retained/00002687-s7287",
+      "bytes": 494735
+    },
+    {
+      "index": 2688,
+      "dir": "retained/00002688-s7288",
+      "bytes": 487015
+    },
+    {
+      "index": 2689,
+      "dir": "retained/00002689-s7289",
+      "bytes": 492142
+    },
+    {
+      "index": 2690,
+      "dir": "retained/00002690-s7290",
+      "bytes": 495053
+    },
+    {
+      "index": 2698,
+      "dir": "retained/00002698-s7298",
+      "bytes": 499153
+    },
+    {
+      "index": 2703,
+      "dir": "retained/00002703-s7303",
+      "bytes": 490805
+    },
+    {
+      "index": 2705,
+      "dir": "retained/00002705-s7305",
+      "bytes": 492323
+    },
+    {
+      "index": 2715,
+      "dir": "retained/00002715-s7315",
+      "bytes": 488639
+    },
+    {
+      "index": 2726,
+      "dir": "retained/00002726-s7326",
+      "bytes": 498574
+    },
+    {
+      "index": 2731,
+      "dir": "retained/00002731-s7331",
+      "bytes": 490950
+    },
+    {
+      "index": 2736,
+      "dir": "retained/00002736-s7336",
+      "bytes": 500467
+    },
+    {
+      "index": 2738,
+      "dir": "retained/00002738-s7338",
+      "bytes": 492707
+    },
+    {
+      "index": 2743,
+      "dir": "retained/00002743-s7343",
+      "bytes": 494735
+    },
+    {
+      "index": 2749,
+      "dir": "retained/00002749-s7349",
+      "bytes": 492863
+    },
+    {
+      "index": 2752,
+      "dir": "retained/00002752-s7352",
+      "bytes": 496838
+    },
+    {
+      "index": 2755,
+      "dir": "retained/00002755-s7355",
+      "bytes": 496329
+    },
+    {
+      "index": 2761,
+      "dir": "retained/00002761-s7361",
+      "bytes": 490212
+    },
+    {
+      "index": 2765,
+      "dir": "retained/00002765-s7365",
+      "bytes": 493977
+    },
+    {
+      "index": 2773,
+      "dir": "retained/00002773-s7373",
+      "bytes": 493741
+    },
+    {
+      "index": 2775,
+      "dir": "retained/00002775-s7375",
+      "bytes": 498478
+    },
+    {
+      "index": 2780,
+      "dir": "retained/00002780-s7380",
+      "bytes": 496662
+    },
+    {
+      "index": 2785,
+      "dir": "retained/00002785-s7385",
+      "bytes": 490475
+    },
+    {
+      "index": 2791,
+      "dir": "retained/00002791-s7391",
+      "bytes": 497365
+    },
+    {
+      "index": 2792,
+      "dir": "retained/00002792-s7392",
+      "bytes": 494988
+    },
+    {
+      "index": 2794,
+      "dir": "retained/00002794-s7394",
+      "bytes": 490342
+    },
+    {
+      "index": 2796,
+      "dir": "retained/00002796-s7396",
+      "bytes": 491257
+    },
+    {
+      "index": 2813,
+      "dir": "retained/00002813-s7413",
+      "bytes": 492153
+    },
+    {
+      "index": 2818,
+      "dir": "retained/00002818-s7418",
+      "bytes": 488928
+    },
+    {
+      "index": 2820,
+      "dir": "retained/00002820-s7420",
+      "bytes": 489980
+    },
+    {
+      "index": 2823,
+      "dir": "retained/00002823-s7423",
+      "bytes": 497467
+    },
+    {
+      "index": 2825,
+      "dir": "retained/00002825-s7425",
+      "bytes": 495260
+    },
+    {
+      "index": 2826,
+      "dir": "retained/00002826-s7426",
+      "bytes": 496536
+    },
+    {
+      "index": 2829,
+      "dir": "retained/00002829-s7429",
+      "bytes": 491676
+    },
+    {
+      "index": 2830,
+      "dir": "retained/00002830-s7430",
+      "bytes": 489975
+    },
+    {
+      "index": 2836,
+      "dir": "retained/00002836-s7436",
+      "bytes": 491526
+    },
+    {
+      "index": 2838,
+      "dir": "retained/00002838-s7438",
+      "bytes": 496584
+    },
+    {
+      "index": 2839,
+      "dir": "retained/00002839-s7439",
+      "bytes": 494154
+    },
+    {
+      "index": 2849,
+      "dir": "retained/00002849-s7449",
+      "bytes": 498953
+    },
+    {
+      "index": 2851,
+      "dir": "retained/00002851-s7451",
+      "bytes": 490117
+    },
+    {
+      "index": 2853,
+      "dir": "retained/00002853-s7453",
+      "bytes": 495949
+    },
+    {
+      "index": 2854,
+      "dir": "retained/00002854-s7454",
+      "bytes": 494271
+    },
+    {
+      "index": 2855,
+      "dir": "retained/00002855-s7455",
+      "bytes": 497548
+    },
+    {
+      "index": 2856,
+      "dir": "retained/00002856-s7456",
+      "bytes": 492525
+    },
+    {
+      "index": 2857,
+      "dir": "retained/00002857-s7457",
+      "bytes": 496112
+    },
+    {
+      "index": 2863,
+      "dir": "retained/00002863-s7463",
+      "bytes": 494377
+    },
+    {
+      "index": 2864,
+      "dir": "retained/00002864-s7464",
+      "bytes": 494471
+    },
+    {
+      "index": 2867,
+      "dir": "retained/00002867-s7467",
+      "bytes": 493169
+    },
+    {
+      "index": 2868,
+      "dir": "retained/00002868-s7468",
+      "bytes": 489603
+    },
+    {
+      "index": 2870,
+      "dir": "retained/00002870-s7470",
+      "bytes": 499703
+    },
+    {
+      "index": 2872,
+      "dir": "retained/00002872-s7472",
+      "bytes": 488222
+    },
+    {
+      "index": 2874,
+      "dir": "retained/00002874-s7474",
+      "bytes": 494575
+    },
+    {
+      "index": 2876,
+      "dir": "retained/00002876-s7476",
+      "bytes": 493871
+    },
+    {
+      "index": 2877,
+      "dir": "retained/00002877-s7477",
+      "bytes": 495950
+    },
+    {
+      "index": 2882,
+      "dir": "retained/00002882-s7482",
+      "bytes": 492799
+    },
+    {
+      "index": 2885,
+      "dir": "retained/00002885-s7485",
+      "bytes": 496404
+    },
+    {
+      "index": 2887,
+      "dir": "retained/00002887-s7487",
+      "bytes": 491837
+    },
+    {
+      "index": 2888,
+      "dir": "retained/00002888-s7488",
+      "bytes": 495667
+    }
+  ],
+  "truncated_by": "limits.max_retained"
+}

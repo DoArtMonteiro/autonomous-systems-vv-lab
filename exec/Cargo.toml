@@ -1,0 +1,25 @@
+# M12 in-process experiment engine. A separate workspace, like crates/vv-rocket and desktop/, so the
+# root vv-lab package, its Cargo.lock, the M1 canonical hashes and the vv-rocket source hash stay
+# unchanged. vv-rocket is linked as a library and called through its public functions only.
+[package]
+name = "vv-exec"
+version = "0.12.0"
+edition = "2024"
+rust-version = "1.99"
+description = "Deterministic in-process experiment engine for the V&V lab domains"
+publish = false
+
+[[bin]]
+name = "vv-exec"
+path = "src/main.rs"
+
+[dependencies]
+vv-rocket = { path = "../crates/vv-rocket" }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.151"
+sha2 = "=0.10.9"
+
+[profile.release]
+debug = "line-tables-only"
+
+[workspace]

@@ -82,6 +82,18 @@ jobs:
           cargo test --locked --manifest-path crates/vv-rocket/Cargo.toml
           cargo build --locked --release --manifest-path crates/vv-rocket/Cargo.toml
 
+      # vv-exec (M12) is its own workspace and links vv-rocket as a library. Its tests include the
+      # comparison of the engine statistics with the independent reference fixture.
+      - name: Check, lint and test vv-exec
+        run: |
+          cargo fmt --manifest-path exec/Cargo.toml -- --check
+          cargo clippy --locked --manifest-path exec/Cargo.toml --all-targets -- -D warnings
+          cargo test --locked --manifest-path exec/Cargo.toml
+
+      - name: Audit locked vv-exec dependencies
+        if: runner.os == 'Linux'
+        run: cargo audit --file exec/Cargo.lock
+
       - name: Enforce vv-rocket coverage threshold
         if: runner.os == 'Linux'
         run: cargo llvm-cov --locked --manifest-path crates/vv-rocket/Cargo.toml --all-targets --fail-under-lines 80
