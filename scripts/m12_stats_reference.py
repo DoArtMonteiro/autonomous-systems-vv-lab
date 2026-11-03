@@ -2,8 +2,9 @@
 
 Python standard library only, and different algorithms from the Rust engine:
 
-- Clopper-Pearson by bisection on exact binomial tail sums in log space (the engine inverts the
-  regularised incomplete beta function).
+- Clopper-Pearson by bisection on binomial tail sums in 60-digit decimal arithmetic (the engine
+  inverts the regularised incomplete beta function). No libm call, so the values are identical on
+  every platform and Python version; see "Contratos do fixture" in docs/m12-exec.md.
 - Wilson with the normal quantile of `statistics.NormalDist` (Wichura AS 241; the engine uses
   Acklam's approximation).
 - McNemar exact p-values with integer arithmetic (`fractions.Fraction`); no rounding at all.
@@ -20,6 +21,7 @@ from __future__ import annotations
 import json
 import math
 import sys
+from decimal import ROUND_HALF_EVEN, Context, Decimal
 from fractions import Fraction
 from pathlib import Path
 from statistics import NormalDist
@@ -44,39 +46,58 @@ HOLM_CASES = [
 ]
 
 
-def log_pmf(i: int, n: int, p: float) -> float:
-    log_choose = math.lgamma(n + 1) - math.lgamma(i + 1) - math.lgamma(n - i + 1)
-    return log_choose + i * math.log(p) + (n - i) * math.log1p(-p)
+# Binomial tails use decimal arithmetic at a fixed precision, with the exact binary value of each
+# float argument (`Decimal(float)` is exact). No libm call and no float summation is involved, so
+# the result does not depend on the platform C library or on the summation algorithm of the
+# Python version (Python 3.12 changed `sum()` of floats to compensated summation). The fixture is
+# then byte-identical on every supported platform and Python version.
+TAIL_CONTEXT = Context(prec=60, rounding=ROUND_HALF_EVEN, Emin=-999999, Emax=999999)
 
 
-def log_sum_exp(xs: list[float]) -> float:
-    m = max(xs)
-    return m + math.log(sum(math.exp(x - m) for x in xs))
+def _tail(lo: int, hi: int, n: int, p: float) -> Decimal:
+    """Sum of the binomial probability mass for i in [lo, hi], in TAIL_CONTEXT."""
+    ctx = TAIL_CONTEXT
+    dp = Decimal(p)
+    dq = ctx.subtract(Decimal(1), dp)
+    # First term directly, then the ratio pmf(i + 1) / pmf(i) = (n - i) p / ((i + 1) q).
+    term = ctx.multiply(Decimal(math.comb(n, lo)), ctx.multiply(ctx.power(dp, lo), ctx.power(dq, n - lo)))
+    ratio = ctx.divide(dp, dq)
+    total = term
+    for i in range(lo, hi):
+        term = ctx.divide(ctx.multiply(term, ctx.multiply(ratio, Decimal(n - i))), Decimal(i + 1))
+        total = ctx.add(total, term)
+    return total
+
+
+def _cdf_exact(k: int, n: int, p: float) -> Decimal:
+    if k >= n or p <= 0.0:
+        return Decimal(1)
+    if p >= 1.0:
+        return Decimal(0)
+    return min(Decimal(1), _tail(0, k, n, p))
+
+
+def _sf_exact(k: int, n: int, p: float) -> Decimal:
+    if k <= 0:
+        return Decimal(1)
+    if p <= 0.0:
+        return Decimal(0)
+    if p >= 1.0:
+        return Decimal(1)
+    return min(Decimal(1), _tail(k, n, n, p))
 
 
 def binom_cdf(k: int, n: int, p: float) -> float:
     """P(X <= k), by summing the probability mass function."""
-    if k >= n:
-        return 1.0
-    if p <= 0.0:
-        return 1.0
-    if p >= 1.0:
-        return 0.0
-    return min(1.0, math.exp(log_sum_exp([log_pmf(i, n, p) for i in range(k + 1)])))
+    return float(_cdf_exact(k, n, p))
 
 
 def binom_sf(k: int, n: int, p: float) -> float:
     """P(X >= k)."""
-    if k <= 0:
-        return 1.0
-    if p <= 0.0:
-        return 0.0
-    if p >= 1.0:
-        return 1.0
-    return min(1.0, math.exp(log_sum_exp([log_pmf(i, n, p) for i in range(k, n + 1)])))
+    return float(_sf_exact(k, n, p))
 
 
-def bisect(f, target: float, increasing: bool) -> float:
+def bisect(f, target: Decimal, increasing: bool) -> float:
     lo, hi = 0.0, 1.0
     for _ in range(200):
         mid = 0.5 * (lo + hi)
@@ -91,9 +112,10 @@ def bisect(f, target: float, increasing: bool) -> float:
 
 
 def clopper_pearson(k: int, n: int, confidence: float) -> tuple[float, float]:
-    alpha = 1.0 - confidence
-    lo = 0.0 if k == 0 else bisect(lambda p: binom_sf(k, n, p), alpha / 2.0, True)
-    hi = 1.0 if k == n else bisect(lambda p: binom_cdf(k, n, p), alpha / 2.0, False)
+    # The exact decimal value of the float alpha / 2 that the engine also uses.
+    tail = Decimal((1.0 - confidence) / 2.0)
+    lo = 0.0 if k == 0 else bisect(lambda p: _sf_exact(k, n, p), tail, True)
+    hi = 1.0 if k == n else bisect(lambda p: _cdf_exact(k, n, p), tail, False)
     return lo, hi
 
 

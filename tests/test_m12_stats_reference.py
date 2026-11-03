@@ -3,9 +3,12 @@ the reference agrees with the separately written M10 statistics (scripts/m10_sta
 
 from __future__ import annotations
 
+import math
 import sys
 import unittest
+from fractions import Fraction
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -18,6 +21,33 @@ class StatsReferenceTest(unittest.TestCase):
     def test_fixture_is_the_output_of_the_reference_script(self) -> None:
         stored = ref.FIXTURE.read_text(encoding="utf-8")
         self.assertEqual(stored, ref.render(), "run: python scripts/m12_stats_reference.py")
+
+    def test_render_does_not_depend_on_the_float_summation_algorithm(self) -> None:
+        # Python 3.12 made sum() of floats compensated; CI runs 3.10. The binomial tails must not
+        # use float summation, so a naive left-to-right sum must give the same bytes.
+        def naive_sum(values, start=0):
+            total = start
+            for v in values:
+                total = total + v
+            return total
+
+        with mock.patch.object(ref, "sum", naive_sum, create=True):
+            self.assertEqual(ref.render(), ref.FIXTURE.read_text(encoding="utf-8"))
+
+    def test_binomial_tails_do_not_call_libm(self) -> None:
+        # glibc and the Windows CRT round log/exp/lgamma differently in the last bit.
+        def refuse(*_args):
+            raise AssertionError("libm function called")
+
+        with mock.patch.multiple(ref.math, lgamma=refuse, log=refuse, log1p=refuse, exp=refuse):
+            ref.binom_cdf(250, 1000, 0.25)
+            ref.clopper_pearson(3, 1000, 0.95)
+
+    def test_binomial_cdf_is_the_correctly_rounded_exact_value(self) -> None:
+        for k, n, p in ref.CDF_CASES:
+            fp = Fraction(p)
+            exact = sum(math.comb(n, i) * fp**i * (1 - fp) ** (n - i) for i in range(k + 1))
+            self.assertEqual(ref.binom_cdf(k, n, p), float(exact), (k, n, p))
 
     def test_clopper_pearson_agrees_with_the_m10_implementation(self) -> None:
         for k, n in ref.INTERVAL_CASES:

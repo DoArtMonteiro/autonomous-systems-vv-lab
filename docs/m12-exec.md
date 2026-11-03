@@ -75,12 +75,24 @@ Uma diferença falha o portão. O relatório indica `equivalence_status`: `verif
 
 ## Estatística verificada de forma independente
 
-- `scripts/m12_stats_reference.py` calcula os valores de referência só com a biblioteca padrão de Python e com algoritmos diferentes dos do motor: Clopper-Pearson por bisseção sobre somas exatas das caudas binomiais, Wilson com o quantil de `statistics.NormalDist`, McNemar com aritmética racional exata e Holm pela definição.
+- `scripts/m12_stats_reference.py` calcula os valores de referência só com a biblioteca padrão de Python e com algoritmos diferentes dos do motor: Clopper-Pearson por bisseção sobre caudas binomiais em aritmética decimal de 60 dígitos, Wilson com o quantil de `statistics.NormalDist`, McNemar com aritmética racional exata e Holm pela definição.
 - `exec/tests/stats_reference.rs` compara o motor com esses valores: 39 intervalos de Clopper-Pearson até 1e-10, 39 de Wilson até 1e-8 (limite da aproximação de Acklam), funções de distribuição e McNemar até 1e-12 relativo, Holm até 1e-15.
 - `tests/test_m12_stats_reference.py` confirma que o ficheiro de referência é exatamente o que o script produz e que a referência coincide com `scripts/m10_stats.py`, escrito antes e em separado.
 - Índices de Sobol: o teste `sobol_indices_recover_the_analytic_ishigami_solution` usa o desenho Saltelli do próprio planeador com N = 16 384 e recupera os seis índices analíticos da função de Ishigami (a = 7, b = 0,1) com erro menor que 0,03. Os valores analíticos vêm das fórmulas fechadas e são confirmados contra os valores publicados (0,3139, 0,4424, 0, 0,5576, 0,4424, 0,2437).
 
 Comparações emparelhadas: mesma célula, mesma réplica e, por isso, mesma semente em dois braços; McNemar exato e correção de Holm sobre todas as comparações do relatório. Não há paragem sequencial.
+
+### Contratos do fixture
+
+O fixture tem três contratos separados, cada um com o seu critério.
+
+1. Bytes exatos. `stats-reference.json` é byte a byte a saída de `scripts/m12_stats_reference.py` em qualquer plataforma e versão de Python suportadas. Este contrato só é legítimo porque as caudas binomiais (Clopper-Pearson e função de distribuição) usam `decimal` com 60 dígitos e o valor binário exato de cada argumento: não chamam `log`, `exp` nem `lgamma` da libm e não somam floats. McNemar usa `Fraction`; Holm usa só produtos e máximos IEEE, determinísticos.
+2. Tolerância numérica. `exec/tests/stats_reference.rs` compara o motor com o fixture com as tolerâncias acima, cada uma justificada pelo algoritmo do motor (Acklam para Wilson, inversão da beta incompleta para Clopper-Pearson). As tolerâncias não foram alteradas.
+3. Correção matemática. `tests/test_m12_stats_reference.py` verifica que a função de distribuição é o arredondamento correto do valor racional exato, que cada extremo de Clopper-Pearson deixa alpha/2 na cauda, que a referência coincide com `scripts/m10_stats.py` e que os índices de Ishigami satisfazem a decomposição da variância.
+
+Causa da falha de CI corrigida no PR #18 (execução 41642576840): a versão anterior somava em espaço logarítmico com `lgamma`, `log1p`, `exp` e `sum()`. O fixture tinha sido gerado em Windows com Python 3.14. Em Windows, a CI (Python 3.10) divergia porque `sum()` de floats passou a ser compensada no Python 3.12; a divergência foi reproduzida localmente substituindo `sum` por uma soma ingénua. Em Linux, a primeira divergência vinha da libm: glibc e a CRT de Windows arredondam o último bit de forma diferente e a bisseção amplifica essa diferença na fronteira de decisão. Não era um defeito do motor: a versão antiga da referência tinha erro relativo até 3,8e-13 na função de distribuição (por exemplo, P(X <= 250) com n = 1000 e p = 0,25), dentro da tolerância de 1e-12 do teste Rust. A versão decimal coincide com o valor racional exato arredondado. O fixture foi regenerado por mudança documentada do algoritmo, não para absorver a divergência.
+
+Dependência residual: Wilson usa `statistics.NormalDist().inv_cdf`, que chama `log` e `sqrt` da libm. As duas plataformas da CI produziram os mesmos bytes neste bloco; se isso mudar, o teste de bytes exatos falha e a correção é calcular o quantil em decimal, não alargar o contrato.
 
 ## Envelopes de validade e convergência
 
