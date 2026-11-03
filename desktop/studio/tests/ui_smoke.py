@@ -530,6 +530,11 @@ def main():
                 break
             except Exception:
                 time.sleep(0.25)
+        else:
+            # Say why there is nothing to drive: the studio exited, or WebView2 never opened the port.
+            state = "running" if proc.poll() is None else f"exited with code {proc.returncode}"
+            check("WebView2 DevTools endpoint opened", False, f"studio {state}; no endpoint on port {a.port}")
+            return 1
         with sync_playwright() as pw:
             browser = pw.chromium.connect_over_cdp(f"http://127.0.0.1:{a.port}")
             page = browser.contexts[0].pages[0]

@@ -269,6 +269,8 @@ jobs:
       - name: UI test of the installed application
         shell: pwsh
         run: |
+          $wv = Get-ItemProperty "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}" -ErrorAction SilentlyContinue
+          Write-Host "WebView2 runtime: $($wv.pv); session: $([Environment]::UserInteractive)"
           python -m pip install --disable-pip-version-check playwright==1.64.1
           python desktop/studio/tests/ui_smoke.py --exe "$env:LOCALAPPDATA\VV Lab Studio\vv-studio.exe" --domains "" --shots "$env:RUNNER_TEMP\ui-shots"
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
