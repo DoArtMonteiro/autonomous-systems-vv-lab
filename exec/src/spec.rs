@@ -84,6 +84,18 @@ pub struct Parameter {
     pub high: f64,
     #[serde(default)]
     pub scale: Scale,
+    /// For an integer field: values are rounded to the nearest integer, and `low` and `high` must
+    /// be integers. Absent means a floating-point field, as before M14.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub integer: bool,
+    /// For a field the model only accepts on a lattice, such as a time that must be a whole number
+    /// of steps: values are rounded to the nearest multiple of `quantum`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quantum: Option<f64>,
+}
+
+fn is_false(b: &bool) -> bool {
+    !*b
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -198,9 +210,11 @@ pub fn unit_of(pointer: &str) -> Option<&'static str> {
         ("_samples", "samples"),
         ("_epochs", "epochs"),
         ("_cycles", "cycles"),
+        ("_permille", "permille"),
         ("_kgpm3", "kg/m^3"),
         ("_radps", "rad/s"),
         ("_steps", "steps"),
+        ("_ticks", "ticks"),
         ("_kgm2", "kg*m^2"),
         ("_mps2", "m/s^2"),
         ("_mps", "m/s"),
@@ -208,6 +222,8 @@ pub fn unit_of(pointer: &str) -> Option<&'static str> {
         ("_tan", "1"),
         ("_kg", "kg"),
         ("_m2", "m^2"),
+        ("_mm", "mm"),
+        ("_ms", "ms"),
         ("_m", "m"),
         ("_n", "N"),
         ("_s", "s"),
@@ -217,6 +233,65 @@ pub fn unit_of(pointer: &str) -> Option<&'static str> {
         .iter()
         .find(|(suffix, _)| name.ends_with(suffix))
         .map(|(_, unit)| *unit)
+}
+
+/// Checks parameters: names, pointers, ranges, scales, integer bounds and units. Shared by
+/// experiments and searches.
+pub fn validate_parameters(parameters: &[Parameter]) -> Result<(), String> {
+    if parameters.len() > MAX_PARAMETERS {
+        return Err(format!("parameters: at most {MAX_PARAMETERS}"));
+    }
+    let mut pnames: Vec<&str> = Vec::new();
+    for (i, p) in parameters.iter().enumerate() {
+        let at = format!("parameters[{i}] ({})", p.name);
+        if !valid_name(&p.name) || pnames.contains(&p.name.as_str()) {
+            return Err(format!("{at}: name is invalid or repeated"));
+        }
+        pnames.push(&p.name);
+        if !valid_pointer(&p.pointer) {
+            return Err(format!("{at}: pointer is not a JSON pointer"));
+        }
+        if parameters[..i].iter().any(|q| q.pointer == p.pointer) {
+            return Err(format!("{at}: pointer {} is varied twice", p.pointer));
+        }
+        if !(p.low.is_finite() && p.high.is_finite() && p.low < p.high) {
+            return Err(format!("{at}: low and high must be finite with low < high"));
+        }
+        if p.integer && (p.low.fract() != 0.0 || p.high.fract() != 0.0) {
+            return Err(format!(
+                "{at}: an integer parameter needs integer low and high"
+            ));
+        }
+        if let Some(q) = p.quantum
+            && (p.integer || !(q.is_finite() && q > 0.0 && q <= p.high - p.low))
+        {
+            return Err(format!(
+                "{at}: quantum must be positive, at most high - low, and not combined with integer"
+            ));
+        }
+        if p.integer && (p.low.abs() > 9.0e15 || p.high.abs() > 9.0e15) {
+            return Err(format!("{at}: integer bounds must stay below 9e15"));
+        }
+        if p.scale == Scale::Log && p.low <= 0.0 {
+            return Err(format!("{at}: a log scale needs low > 0"));
+        }
+        match unit_of(&p.pointer) {
+            Some(u) if p.unit != u => {
+                return Err(format!(
+                    "{at}: unit {:?} does not match {u:?}, the unit of {}",
+                    p.unit, p.pointer
+                ));
+            }
+            None if p.unit != "model" => {
+                return Err(format!(
+                    "{at}: {} carries no unit in its name; declare unit \"model\"",
+                    p.pointer
+                ));
+            }
+            _ => {}
+        }
+    }
+    Ok(())
 }
 
 impl Experiment {
@@ -308,44 +383,7 @@ impl Experiment {
                 }
             }
         }
-        if self.parameters.len() > MAX_PARAMETERS {
-            return Err(format!("parameters: at most {MAX_PARAMETERS}"));
-        }
-        let mut pnames: Vec<&str> = Vec::new();
-        for (i, p) in self.parameters.iter().enumerate() {
-            let at = format!("parameters[{i}] ({})", p.name);
-            if !valid_name(&p.name) || pnames.contains(&p.name.as_str()) {
-                return Err(format!("{at}: name is invalid or repeated"));
-            }
-            pnames.push(&p.name);
-            if !valid_pointer(&p.pointer) {
-                return Err(format!("{at}: pointer is not a JSON pointer"));
-            }
-            if self.parameters[..i].iter().any(|q| q.pointer == p.pointer) {
-                return Err(format!("{at}: pointer {} is varied twice", p.pointer));
-            }
-            if !(p.low.is_finite() && p.high.is_finite() && p.low < p.high) {
-                return Err(format!("{at}: low and high must be finite with low < high"));
-            }
-            if p.scale == Scale::Log && p.low <= 0.0 {
-                return Err(format!("{at}: a log scale needs low > 0"));
-            }
-            match unit_of(&p.pointer) {
-                Some(u) if p.unit != u => {
-                    return Err(format!(
-                        "{at}: unit {:?} does not match {u:?}, the unit of {}",
-                        p.unit, p.pointer
-                    ));
-                }
-                None if p.unit != "model" => {
-                    return Err(format!(
-                        "{at}: {} carries no unit in its name; declare unit \"model\"",
-                        p.pointer
-                    ));
-                }
-                _ => {}
-            }
-        }
+        validate_parameters(&self.parameters)?;
         match (&self.design, self.parameters.is_empty()) {
             (Design::Single, false) => {
                 return Err("design single takes no parameters".into());

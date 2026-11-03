@@ -102,6 +102,8 @@ jobs:
         env:
           VV_LAB_BINARY: target/release/vv-lab${{ matrix.exe_suffix }}
         run: python -m unittest discover -s tests -p "test_*.py"
+      - name: Check M14 benchmark cases against their sources
+        run: python scripts/m14_cases.py --check
 
       - name: Exercise M7 cross-process locking and publication without skips
         working-directory: tests

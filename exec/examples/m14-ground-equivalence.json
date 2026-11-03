@@ -1,0 +1,16 @@
+{
+  "schema": "vv-experiment.v1",
+  "id": "m14-ground-equivalence",
+  "description": "Equivalence of the in-process ground domain with vv-lab run-m4: the M2 zone corridor under GPS noise and observation delay. Development seeds 10000 to 10019; no M6 reserved seed.",
+  "domain": "ground-m4",
+  "base_case": "../cases/m14/ground-zone-corridor.json",
+  "parameters": [
+    {"name": "gps_noise", "pointer": "/scenario/sensors/gps/noise_max_mm", "unit": "mm", "low": 0, "high": 600, "integer": true},
+    {"name": "delay", "pointer": "/scenario/sensors/communication/delay_max_ticks", "unit": "ticks", "low": 0, "high": 3, "integer": true}
+  ],
+  "design": {"kind": "grid", "levels": 4},
+  "seeds": {"mode": "range", "first": 10000, "count": 20},
+  "retention": {"policy": "failures", "sample_every": 0},
+  "limits": {"max_runs": 320, "max_retained": 20, "max_artifact_bytes": 200000000, "max_wall_s": 300},
+  "analysis": {"metric": "margin.restricted_zone_mm"}
+}

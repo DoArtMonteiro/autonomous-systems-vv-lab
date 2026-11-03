@@ -1,0 +1,25 @@
+{
+  "schema": "vv-m14-freeze.v1",
+  "frozen_at_utc": "2026-11-03T17:00:29+00:00",
+  "git_commit": "40985943b47d4480ad5f876d34f8d9ca0610e14e",
+  "files": {
+    "exec/benchmarks/m14/benchmark.json": "0652f0d975ba73fe41280772d0cf03961608510cca5beebf50117c1956f681d9",
+    "scripts/m14_benchmark.py": "f8706c914126285e33b37fe32a381f1ffb82b2d2bae28f2bc14338a4b06edc0c",
+    "scripts/m14_stats.py": "e3bc4eff15b28b1f3ecb8bfa8c6f7138ae0c634f4b48dbd6bc4716efc4209702",
+    "scripts/m14_cases.py": "0e209683cba779c3743697cfdbf7317b428c4a3dcb4c3f8e5c0186745fd8a10c",
+    "docs/m14-preregisto.md": "57dd29684c03c09bafdcbff114327616f9fd45b8a6ad8190985cb66b6ecdd089",
+    "exec/src/search.rs": "ddc801c7651c61a01fcabc66ad853ac87f87f2e977e50ddb1fcb087f9ec47ac8",
+    "exec/src/ground.rs": "9e34a63a0e1a101dc64d3a16e2c1d7a5201c4fbd834423ebac1386dc2bdbf489",
+    "exec/src/domain.rs": "b4c17562b0aa1aad4ac05caaad61d184229b5b6516ff63b4f486f4be21bbca25",
+    "exec/src/plan.rs": "5864ef61ca17f6f1c745b7ac2ec4a2e14c89862af551382c6282cb6a0bb28626",
+    "exec/src/spec.rs": "13ce0fa5b3ab53267fe5b72933a1c7d4593fed6b9e6412d434e77e2b64026cb5",
+    "exec/src/seeds.rs": "c58fc4082a0879608e6f09145d9cebde322b141dde9004fcca952cd91a7f899f",
+    "exec/Cargo.lock": "20508e342e406e76a24a8fb7d09bd2486326b78eae44c07434b42b8946b6bca1",
+    "exec/cases/m14/ground-overshoot-actuator-loss.json": "527db174d053171350ee18b39940eb668d4b9abb0726bb7e7850b2c3ee8da566",
+    "exec/cases/m14/ground-stop-actuator-delay.json": "9f9a5ceb51ffc448c964f326e496e0d2fb21cda24554bc430f1fe3566fbb62f7",
+    "exec/cases/m14/ground-zone-corridor.json": "4fd198cf5ec8cff8fbfaa3f5f530b90259f6f173566f56e065c8abe4ec52e86a",
+    "exec/cases/m14/rocket-gnss-bias.json": "c7731b8c5541b14f75b9e550ba8a774aa791788b06fb0f81a59d6014ddf4d2f8",
+    "exec/cases/m14/rocket-imu-accel-bias.json": "5dfa65f6f13014ea210c8f6c97005d7381a1c098a3816c73bd26ab179d2ff269",
+    "exec/cases/m14/rocket-thrust-loss.json": "b66656f29d50e6aa3328b98700ea8c3cfa14c2ac8b5dc03661a7de13e3b7f427"
+  }
+}

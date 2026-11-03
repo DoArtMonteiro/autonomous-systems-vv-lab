@@ -1,7 +1,8 @@
 //! `vv-exec plan <spec.json>` | `vv-exec run <spec.json> --output <dir> [--threads <n>]` |
 //! `vv-exec equiv <dir> --cli <vv-rocket> [--sample <n>]` | `vv-exec report <dir>` |
 //! `vv-exec verify <dir> [--threads <n>]` |
-//! `vv-exec converge <case.json> [--levels <n>] [--tolerance-m <m>]`
+//! `vv-exec converge <case.json> [--levels <n>] [--tolerance-m <m>]` |
+//! `vv-exec search <search.json> --output <dir> [--threads <n>]` | `vv-exec search-verify <dir>`
 //!
 //! Exit status: 0 done; 1 a gate or check failed; 3 usage or rejected input; 5 run interrupted
 //! (resume with the same command). The first Ctrl+C stops `run` after the runs in flight, which
@@ -16,7 +17,7 @@ use vv_exec::sched::SystemProbe;
 use vv_exec::spec::MAX_SPEC_BYTES;
 use vv_exec::{converge, engine, equiv, report};
 
-const USAGE: &str = "usage: vv-exec plan <spec.json> | run <spec.json> --output <dir> [--threads <n>] | equiv <dir> --cli <vv-rocket> [--sample <n>] | report <dir> | verify <dir> [--threads <n>] | converge <case.json> [--levels <n>] [--tolerance-m <m>]";
+const USAGE: &str = "usage: vv-exec plan <spec.json> | run <spec.json> --output <dir> [--threads <n>] | equiv <dir> --cli <vv-rocket> [--sample <n>] | report <dir> | verify <dir> [--threads <n>] | converge <case.json> [--levels <n>] [--tolerance-m <m>] | search <search.json> --output <dir> [--threads <n>] | search-check <search.json> | search-verify <dir> [--threads <n>]";
 
 /// Set by the console interrupt handler; read by the workers of `run`.
 static CANCEL: AtomicBool = AtomicBool::new(false);
@@ -187,6 +188,55 @@ fn dispatch(args: &[String]) -> Outcome {
             let plan = plan_from_output(&out).map_err(input)?;
             let records = engine::read_records(&plan, &out).map_err(input)?;
             let v = engine::verify_all(&plan, &records, threads);
+            Ok((json(&v), if v.pass { 0 } else { 1 }))
+        }
+        Some("search") => {
+            let spec = args.get(1).ok_or_else(usage)?;
+            let out = PathBuf::from(flag(args, "--output").ok_or_else(usage)?);
+            let threads = match flag(args, "--threads") {
+                Some(t) => t.parse::<usize>().map_err(|_| usage())?,
+                None => std::thread::available_parallelism().map_or(1, |n| n.get()),
+            };
+            let (spec_bytes, base_bytes) =
+                vv_exec::search::read_inputs(Path::new(spec)).map_err(input)?;
+            let r =
+                vv_exec::search::execute(&spec_bytes, &base_bytes, &out, threads).map_err(input)?;
+            let found = r
+                .repetitions
+                .iter()
+                .filter(|x| x.first_violation.is_some())
+                .count();
+            Ok((
+                json(&serde_json::json!({
+                    "id": r.id,
+                    "repetitions": r.repetitions.len(),
+                    "repetitions_with_a_violation": found,
+                    "evaluations": r.total_evaluations,
+                    "log_sha256": r.log_sha256,
+                    "wall_s": r.wall_s,
+                })),
+                0,
+            ))
+        }
+        Some("search-check") => {
+            let spec = args.get(1).ok_or_else(usage)?;
+            let (spec_bytes, base_bytes) =
+                vv_exec::search::read_inputs(Path::new(spec)).map_err(input)?;
+            let (s, _) = vv_exec::search::load(&spec_bytes, &base_bytes).map_err(input)?;
+            Ok((
+                json(
+                    &serde_json::json!({"id": s.id, "valid": true, "parameters": s.parameters.len()}),
+                ),
+                0,
+            ))
+        }
+        Some("search-verify") => {
+            let out = PathBuf::from(args.get(1).ok_or_else(usage)?);
+            let threads = match flag(args, "--threads") {
+                Some(t) => t.parse::<usize>().map_err(|_| usage())?,
+                None => std::thread::available_parallelism().map_or(1, |n| n.get()),
+            };
+            let v = vv_exec::search::verify(&out, threads).map_err(input)?;
             Ok((json(&v), if v.pass { 0 } else { 1 }))
         }
         Some("converge") => {
