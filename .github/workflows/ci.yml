@@ -175,7 +175,7 @@ jobs:
   desktop:
     # The M11 desktop workspace (platform, domain hosts, studio shell). Windows only: the product
     # targets Windows 11 and the Tauri shell needs WebView2. The installer itself is built by
-    # desktop/build.ps1, not in CI.
+    # desktop/build.ps1 in the installer job below.
     name: desktop (windows-latest)
     runs-on: windows-latest
     steps:
@@ -200,3 +200,100 @@ jobs:
           cargo clippy --manifest-path desktop/Cargo.toml --locked --all-targets -- -D warnings
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           cargo test --manifest-path desktop/Cargo.toml --locked
+
+  installer:
+    # Clean-checkout build of the Windows installer with desktop/build.ps1, then a silent per-user
+    # install and the real-window UI test against the installed application. The installer, its
+    # SHA-256 and the UI test screenshots are uploaded as artifacts.
+    name: installer (windows-latest)
+    runs-on: windows-latest
+    timeout-minutes: 75
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.99.0"
+          components: clippy, rustfmt
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop/studio/package-lock.json
+
+      - name: Build the domain hosts, the studio and the NSIS installer
+        shell: pwsh
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File desktop/build.ps1
+
+      - name: Record the installer and its SHA-256
+        id: installer
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem desktop/target/release/bundle/nsis -Filter *-setup.exe | Select-Object -First 1
+          if (-not $setup) { throw "no installer produced" }
+          $hash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLower()
+          "$hash  $($setup.Name)" | Out-File -Encoding ascii "$($setup.FullName).sha256"
+          Write-Host "$($setup.Name) $($setup.Length) bytes sha256 $hash"
+          "path=$($setup.FullName)" >> $env:GITHUB_OUTPUT
+
+      - name: Install silently for the current user
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath "${{ steps.installer.outputs.path }}" -ArgumentList "/S" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "installer exit code $($p.ExitCode)" }
+          $root = Join-Path $env:LOCALAPPDATA "VV Lab Studio"
+          $expected = @(
+            "vv-studio.exe", "uninstall.exe",
+            "domains/rocket-landing/domain.json", "domains/rocket-landing/vv-domain-rocket.exe",
+            "domains/ground-vehicle/domain.json", "domains/ground-vehicle/vv-domain-ground.exe", "domains/ground-vehicle/vv-lab.exe",
+            "domains/reference-oscillator/domain.json", "domains/reference-oscillator/vv-domain-reference.exe"
+          )
+          foreach ($f in $expected) {
+            if (-not (Test-Path (Join-Path $root $f))) { throw "missing after install: $f" }
+          }
+          # The bundled executables link the VC runtime statically: no import of VCRUNTIME140.dll.
+          Get-ChildItem -Recurse $root -Filter *.exe | Where-Object Name -ne "uninstall.exe" | ForEach-Object {
+            $text = [System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes($_.FullName))
+            if ($text -match "(?i)vcruntime140\.dll") { throw "$($_.Name) imports VCRUNTIME140.dll" }
+          }
+          # Headless self-test of the installed application (GUI subsystem: wait for the process).
+          $report = Join-Path $env:RUNNER_TEMP "self-test.json"
+          $t = Start-Process -FilePath (Join-Path $root "vv-studio.exe") -ArgumentList "--self-test", "`"$report`"" -Wait -PassThru
+          Get-Content $report
+          if ($t.ExitCode -ne 0) { throw "self-test failed with exit code $($t.ExitCode)" }
+
+      - name: UI test of the installed application
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check playwright==1.64.1
+          python desktop/studio/tests/ui_smoke.py --exe "$env:LOCALAPPDATA\VV Lab Studio\vv-studio.exe" --domains "" --shots "$env:RUNNER_TEMP\ui-shots"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+      - name: Uninstall silently
+        if: always()
+        shell: pwsh
+        run: |
+          $u = Join-Path $env:LOCALAPPDATA "VV Lab Studio\uninstall.exe"
+          if (Test-Path $u) { Start-Process $u -ArgumentList "/S" -Wait }
+
+      - name: Upload the installer
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vv-lab-studio-installer
+          path: |
+            desktop/target/release/bundle/nsis/*-setup.exe
+            desktop/target/release/bundle/nsis/*.sha256
+          if-no-files-found: warn
+
+      - name: Upload the UI test screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vv-lab-studio-ui-shots
+          path: ${{ runner.temp }}/ui-shots
+          if-no-files-found: ignore
