@@ -273,7 +273,7 @@ fn a_fault_grid_with_arms_reports_paired_comparisons_and_the_envelope_fraction()
     );
     let recs = engine::read_records(&p, &dir).unwrap();
     let r = report::build(&p, &recs, &dir).unwrap();
-    assert_eq!(r.status, "unverified");
+    assert_eq!(r.equivalence_status, "not_run");
     assert_eq!(r.comparisons.len(), 1);
     assert_eq!(r.comparisons[0].pairs, 12);
     // Magnitude 15 lies outside [5, 12]: one cell of three in each arm.
@@ -363,7 +363,7 @@ fn the_equivalence_gate_finds_identical_bytes_through_the_canonical_command_line
     assert_eq!(eq.differences, 0, "{eq:#?}");
     assert!(eq.pass);
     let r = report::build(&p, &recs, &dir).unwrap();
-    assert_eq!(r.status, "valid");
+    assert_eq!(r.equivalence_status, "verified");
 
     // A record that disagrees with its artifacts fails the gate.
     let dir2 = scratch("equivalence-tampered");
@@ -390,4 +390,26 @@ fn the_command_line_refuses_outputs_under_a_runs_directory() {
     assert_eq!(out.status.code(), Some(3));
     assert!(String::from_utf8_lossy(&out.stderr).contains("runs"));
     assert!(!dir.join("runs").exists());
+}
+
+#[test]
+fn retention_over_the_byte_cap_leaves_no_directory_behind() {
+    let s = spec(
+        &landing("m10-nominal.json"),
+        json!({"limits": {"max_runs": 100, "max_retained": 50, "max_artifact_bytes": 1000, "max_wall_s": 600}}),
+    );
+    let p = plan(&s).unwrap();
+    let cancel = AtomicBool::new(false);
+    let probe = plenty();
+    let dir = scratch("retention-cap");
+    engine::execute(&p, &dir, &opts(&probe, &cancel, 2, None)).unwrap();
+    let recs = engine::read_records(&p, &dir).unwrap();
+    let kept = engine::retain(&p, &dir, &recs).unwrap();
+    assert!(kept.retained.is_empty());
+    assert_eq!(
+        kept.truncated_by.as_deref(),
+        Some("limits.max_artifact_bytes")
+    );
+    let left: Vec<_> = fs::read_dir(dir.join("retained")).map_or(Vec::new(), |d| d.collect());
+    assert!(left.is_empty(), "{left:?}");
 }

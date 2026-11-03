@@ -133,7 +133,14 @@ fn dispatch(args: &[String]) -> Outcome {
             let text = json(&r);
             std::fs::write(out.join("report.json"), format!("{text}\n"))
                 .map_err(|e| input(e.to_string()))?;
-            Ok((text, if r.status == "valid" { 0 } else { 1 }))
+            Ok((
+                text,
+                if r.equivalence_status == "verified" {
+                    0
+                } else {
+                    1
+                },
+            ))
         }
         Some("converge") => {
             let case = args.get(1).ok_or_else(usage)?;

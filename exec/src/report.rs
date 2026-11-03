@@ -1,7 +1,8 @@
 //! Evidence report, recomputed from the plan and the hashed records every time; no stored
 //! conclusion is copied. The report keeps mission outcome and safety invariants apart, states the
-//! fraction of runs inside the declared validity envelope and refuses the status `valid` unless
-//! the equivalence gate passed for this exact plan.
+//! fraction of runs inside the declared validity envelope and says whether the equivalence gate
+//! passed for this exact plan. `equivalence_status = verified` means byte parity with the
+//! canonical command line on the sample, nothing more: it is not a scientific acceptance.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -92,8 +93,9 @@ pub struct Sensitivity {
 #[derive(Clone, Debug, Serialize)]
 pub struct Report {
     pub schema: &'static str,
-    pub status: &'static str,
-    pub status_reason: String,
+    /// `verified`, `failed`, `not_run` or `other_plan`.
+    pub equivalence_status: &'static str,
+    pub equivalence_reason: String,
     pub experiment: String,
     pub domain: String,
     pub plan_sha256: String,
@@ -318,20 +320,20 @@ pub fn build(plan: &Plan, records: &[Record], out: &Path) -> Result<Report, Stri
         .and_then(|b| serde_json::from_slice(&b).ok())
         .unwrap_or(Value::Null);
     let (status, status_reason) = if equivalence.is_null() {
-        ("unverified", "the equivalence gate has not run".to_string())
+        ("not_run", "the equivalence gate has not run".to_string())
     } else if equivalence["plan_sha256"] != plan.plan_sha256.as_str() {
         (
-            "unverified",
+            "other_plan",
             "equivalence.json belongs to another plan".to_string(),
         )
     } else if equivalence["pass"] != true {
         (
-            "invalid",
+            "failed",
             "the equivalence gate found differences".to_string(),
         )
     } else {
         (
-            "valid",
+            "verified",
             format!(
                 "equivalence gate passed on {} sampled runs",
                 equivalence["cases"].as_array().map_or(0, Vec::len)
@@ -342,8 +344,8 @@ pub fn build(plan: &Plan, records: &[Record], out: &Path) -> Result<Report, Stri
     let inside = records.iter().filter(|r| r.in_envelope).count() as u64;
     Ok(Report {
         schema: SCHEMA,
-        status,
-        status_reason,
+        equivalence_status: status,
+        equivalence_reason: status_reason,
         experiment: e.id.clone(),
         domain: e.domain.clone(),
         plan_sha256: plan.plan_sha256.clone(),

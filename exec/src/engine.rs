@@ -488,11 +488,15 @@ pub fn retain(plan: &Plan, out: &Path, records: &[Record]) -> Result<RetentionRe
         }
         let name = format!("{:08}-s{}", rec.index, rec.seed);
         let dir = root.join(&name);
-        if !dir.join(files[files.len() - 1]).exists() {
+        let complete = files.iter().all(|f| dir.join(f).exists());
+        if !complete {
+            // An incomplete directory or a stale temporary one can only come from an interrupted
+            // retention in this output; both are rebuilt.
             let tmp = root.join(format!(".tmp-{name}"));
-            if tmp.exists() {
-                // A partial directory left by an interrupted retention in this output.
-                fs::remove_dir_all(&tmp).map_err(|e| format!("{}: {e}", tmp.display()))?;
+            for stale in [&tmp, &dir] {
+                if stale.exists() {
+                    fs::remove_dir_all(stale).map_err(|e| format!("{}: {e}", stale.display()))?;
+                }
             }
             let case = case_file(plan, out, rec.variant)?;
             plan.domain.write(&case, rec.seed, &tmp)?;
@@ -502,6 +506,11 @@ pub fn retain(plan: &Plan, out: &Path, records: &[Record]) -> Result<RetentionRe
                     "record {}: the canonical writer produced a trace that differs from the logged run",
                     rec.index
                 ));
+            }
+            if total + dir_bytes(&tmp, files)? > l.max_artifact_bytes {
+                fs::remove_dir_all(&tmp).map_err(|e| format!("{}: {e}", tmp.display()))?;
+                report.truncated_by = Some("limits.max_artifact_bytes".into());
+                continue;
             }
             fs::rename(&tmp, &dir).map_err(|e| format!("{}: {e}", dir.display()))?;
         }
