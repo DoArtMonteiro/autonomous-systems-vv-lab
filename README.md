@@ -125,5 +125,6 @@ Dates above are commit or merge dates, not operational acceptance dates.
 - Full M9/M9.1 campaign output is not included in the public repository.
 - M10 resilient navigation is not in `main`: its design (M10.0) is merged, and its implementation stays in draft PR #15, which has not been accepted. Do not treat its resilience work as an integrated or evaluated result.
 - Mission Control runs locally and is not an operational service.
+- M14 has no external tool comparison (S-TaLiRo, Breach, Scenic) and no standards adapter; its preregistration was not blinded.
 
 Further model contracts and campaign reports are linked from the [repository documentation](docs/architecture.md).
