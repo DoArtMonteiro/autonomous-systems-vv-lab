@@ -348,8 +348,20 @@ def main() -> int:
     root = args.output_root.resolve()
     if root.exists():
         raise SystemExit(f"{root} already exists; every benchmark run writes a fresh directory")
+    problems = [p for p in bench["problems"] if p["split"] == args.split]
+    # Preflight: every specification of the split must pass validation before any simulation runs.
+    for problem in problems:
+        for name, strategy in bench["strategies"].items():
+            spec = search_spec(bench, problem, split, f"{problem['id']}-{name}", strategy, bench["budget"], bench["repetitions"], bench["minimise_budget"])
+            spec_dir = root.parent / f".{root.name}-preflight"
+            spec_dir.mkdir(parents=True, exist_ok=True)
+            path = spec_dir / f"{spec['id']}.json"
+            path.write_text(json.dumps(spec, indent=2) + "\n", encoding="utf-8", newline="\n")
+            c = run([VV_EXEC, "search-check", path])
+            if c.returncode != 0:
+                raise SystemExit(f"preflight refused {spec['id']}: {c.stderr.strip()}")
     analysed = []
-    for problem in [p for p in bench["problems"] if p["split"] == args.split]:
+    for problem in problems:
         pdir = root / problem["id"]
         runs = {}
         for name, strategy in bench["strategies"].items():
