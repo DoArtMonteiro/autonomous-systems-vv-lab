@@ -1,13 +1,13 @@
 {
   "schema": "vv-m14-freeze.v1",
-  "frozen_at_utc": "2026-11-03T16:59:07+00:00",
-  "git_commit": "66198159beb192f64439f16432ccfe1fe1d4c3ac",
+  "frozen_at_utc": "2026-11-03T17:00:29+00:00",
+  "git_commit": "40985943b47d4480ad5f876d34f8d9ca0610e14e",
   "files": {
-    "exec/benchmarks/m14/benchmark.json": "0c4af47a013fc273b0f89fe4920e06966e0eec21bedad9774ce5e9af6f6652d0",
-    "scripts/m14_benchmark.py": "756d09eca1139e9043e9461182ea39681cc8a0490108ee1630fa6765cfd5b779",
+    "exec/benchmarks/m14/benchmark.json": "0652f0d975ba73fe41280772d0cf03961608510cca5beebf50117c1956f681d9",
+    "scripts/m14_benchmark.py": "f8706c914126285e33b37fe32a381f1ffb82b2d2bae28f2bc14338a4b06edc0c",
     "scripts/m14_stats.py": "e3bc4eff15b28b1f3ecb8bfa8c6f7138ae0c634f4b48dbd6bc4716efc4209702",
     "scripts/m14_cases.py": "0e209683cba779c3743697cfdbf7317b428c4a3dcb4c3f8e5c0186745fd8a10c",
-    "docs/m14-preregisto.md": "be06fce38dc1499ceb2c1c492c033c33308ff6dabda88339b00b1d07e54cb97f",
+    "docs/m14-preregisto.md": "57dd29684c03c09bafdcbff114327616f9fd45b8a6ad8190985cb66b6ecdd089",
     "exec/src/search.rs": "ddc801c7651c61a01fcabc66ad853ac87f87f2e977e50ddb1fcb087f9ec47ac8",
     "exec/src/ground.rs": "9e34a63a0e1a101dc64d3a16e2c1d7a5201c4fbd834423ebac1386dc2bdbf489",
     "exec/src/domain.rs": "b4c17562b0aa1aad4ac05caaad61d184229b5b6516ff63b4f486f4be21bbca25",
