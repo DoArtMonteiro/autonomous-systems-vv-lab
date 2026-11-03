@@ -1,0 +1,187 @@
+{
+  "schema": "vv-m14-reverify.v1",
+  "note": "Re-verification of every M14 benchmark search with the stricter search-verify (fresh log must equal the stored log byte for byte), after the independent review.",
+  "all_pass": true,
+  "runs": [
+    {
+      "run": "m14-dev-2/D1-ground-zone-sensors/adaptive",
+      "pass": true,
+      "log_reproduced": true,
+      "evaluations": 6525
+    },
+    {
+      "run": "m14-dev-2/D1-ground-zone-sensors/extremes",
+      "pass": true,
+      "log_reproduced": true,
+      "evaluations": 6528
+    },
+    {
+      "run": "m14-dev-2/D1-ground-zone-sensors/grid",
+      "pass": true,
+      "log_reproduced": true,
+      "evaluations": 2916
+    },
+    {
+      "run": "m14-dev-2/D1-ground-zone-sensors/halton",
+      "pass": true,
+      "log_reproduced": true,
+      "evaluations": 6598
+    },
+    {
+      "run": "m14-dev-2/D1-ground-zone-sensors/random",
+      "pass": true,
+      "log_reproduced": true,
+      "evaluations": 6536
+    },
+    {
+      "run": "m14-dev-2/D2-rocket-thrust-loss/adaptive",
+      "pass": true,
+      "log_reproduced": true,
+      "evaluations": 6544
+    },
+    {
+      "run": "m14-dev-2/D2-rocket-thrust-loss/extremes",
+      "pass": true,
+      "log_reproduced": true,
+      "evaluations": 6552
+    },
+    {
+      "run": "m14-dev-2/D2-rocket-thrust-loss/grid",
+      "pass": true,
+      "log_reproduced": true,
+      "evaluations": 900
+    },
+    {
+      "run": "m14-dev-2/D2-rocket-thrust-loss/halton",
+      "pass": true,
+      "log_reproduced": true,
+      "evaluations": 6684
+    },
+    {
+      "run": "m14-dev-2/D2-rocket-thrust-loss/random",
+      "pass": true,
+      "log_reproduced": true,
+      "evaluations": 6480
+    },
+    {
+      "run": "m14-heldout-2/H1-ground-stop-actuator-delay/adaptive",
+      "pass": true,
+      "log_reproduced": true,
+      "evaluations": 7578
+    },
+    {
+      "run": "m14-heldout-2/H1-ground-stop-actuator-delay/extremes",
+      "pass": true,
+      "log_reproduced": true,
+      "evaluations": 7480
+    },
+    {
+      "run": "m14-heldout-2/H1-ground-stop-actuator-delay/grid",
+      "pass": true,
+      "log_reproduced": true,
+      "evaluations": 2916
+    },
+    {
+      "run": "m14-heldout-2/H1-ground-stop-actuator-delay/halton",
+      "pass": true,
+      "log_reproduced": true,
+      "evaluations": 7614
+    },
+    {
+      "run": "m14-heldout-2/H1-ground-stop-actuator-delay/random",
+      "pass": true,
+      "log_reproduced": true,
+      "evaluations": 7582
+    },
+    {
+      "run": "m14-heldout-2/H2-ground-overshoot-actuator-loss/adaptive",
+      "pass": true,
+      "log_reproduced": true,
+      "evaluations": 6300
+    },
+    {
+      "run": "m14-heldout-2/H2-ground-overshoot-actuator-loss/extremes",
+      "pass": true,
+      "log_reproduced": true,
+      "evaluations": 6270
+    },
+    {
+      "run": "m14-heldout-2/H2-ground-overshoot-actuator-loss/grid",
+      "pass": true,
+      "log_reproduced": true,
+      "evaluations": 676
+    },
+    {
+      "run": "m14-heldout-2/H2-ground-overshoot-actuator-loss/halton",
+      "pass": true,
+      "log_reproduced": true,
+      "evaluations": 6300
+    },
+    {
+      "run": "m14-heldout-2/H2-ground-overshoot-actuator-loss/random",
+      "pass": true,
+      "log_reproduced": true,
+      "evaluations": 6300
+    },
+    {
+      "run": "m14-heldout-2/H3-rocket-gnss-bias/adaptive",
+      "pass": true,
+      "log_reproduced": true,
+      "evaluations": 8504
+    },
+    {
+      "run": "m14-heldout-2/H3-rocket-gnss-bias/extremes",
+      "pass": true,
+      "log_reproduced": true,
+      "evaluations": 8758
+    },
+    {
+      "run": "m14-heldout-2/H3-rocket-gnss-bias/grid",
+      "pass": true,
+      "log_reproduced": true,
+      "evaluations": 900
+    },
+    {
+      "run": "m14-heldout-2/H3-rocket-gnss-bias/halton",
+      "pass": true,
+      "log_reproduced": true,
+      "evaluations": 8650
+    },
+    {
+      "run": "m14-heldout-2/H3-rocket-gnss-bias/random",
+      "pass": true,
+      "log_reproduced": true,
+      "evaluations": 8584
+    },
+    {
+      "run": "m14-heldout-2/H4-rocket-imu-accel-bias/adaptive",
+      "pass": true,
+      "log_reproduced": true,
+      "evaluations": 6332
+    },
+    {
+      "run": "m14-heldout-2/H4-rocket-imu-accel-bias/extremes",
+      "pass": true,
+      "log_reproduced": true,
+      "evaluations": 6222
+    },
+    {
+      "run": "m14-heldout-2/H4-rocket-imu-accel-bias/grid",
+      "pass": true,
+      "log_reproduced": true,
+      "evaluations": 900
+    },
+    {
+      "run": "m14-heldout-2/H4-rocket-imu-accel-bias/halton",
+      "pass": true,
+      "log_reproduced": true,
+      "evaluations": 6174
+    },
+    {
+      "run": "m14-heldout-2/H4-rocket-imu-accel-bias/random",
+      "pass": true,
+      "log_reproduced": true,
+      "evaluations": 6174
+    }
+  ]
+}

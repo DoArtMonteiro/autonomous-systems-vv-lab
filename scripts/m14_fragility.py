@@ -4,8 +4,10 @@ For a claim "the pass rate is at least P0" and one assumption axis, every level 
 N seeds through `vv-exec run`. Each level gets a verdict from one-sided 95 % Clopper-Pearson
 bounds: `holds` when the lower bound is at least P0, `refuted` when the upper bound is below P0,
 `inconclusive` otherwise. The robustness margin is the interval between the last level that holds,
-counting from the nominal end, and the first level that is refuted. A claim whose verdicts come
-back after a refutation is flagged non-monotone: a test of the end points alone would mislead.
+counting from the nominal end, and the first level that is refuted. A claim that holds again at a
+level beyond a refuted one is flagged non-monotone: a test of the end points alone would mislead.
+Ground safety counts a run as safe when no invariant fails and no temporal contract fails; an
+INCONCLUSIVE contract is not a failure, as in the root crate.
 
     python scripts/m14_fragility.py --output-root exec/out/m14-fragility
 """
@@ -96,8 +98,6 @@ def run_claim(claim: tuple, out: Path) -> dict:
         if x["verdict"] == "holds":
             last_hold = i
     later_hold = first_refuted is not None and any(x["verdict"] == "holds" for x in rows[first_refuted + 1 :])
-    rates = [x["pass"] / x["n"] for x in rows]
-    rises = any(rates[i + 1] > rates[i] + 0.05 for i in range(len(rates) - 1))
     return {
         "id": cid,
         "claim": f"{statement}, com probabilidade de pelo menos {P0}",
@@ -111,7 +111,7 @@ def run_claim(claim: tuple, out: Path) -> dict:
             "first_refuted_value": None if first_refuted is None else rows[first_refuted]["value"],
         },
         "nominal_holds": rows[0]["verdict"] == "holds",
-        "non_monotone": later_hold or rises,
+        "non_monotone": later_hold,
         "plan_sha256": plan["plan_sha256"],
         "verified": verified,
     }

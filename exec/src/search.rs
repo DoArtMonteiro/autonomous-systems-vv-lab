@@ -893,6 +893,8 @@ pub struct SearchVerification {
     /// Repetitions whose summary differs from the one rebuilt by a fresh search.
     pub summary_mismatches: Vec<u32>,
     pub hashes_match: bool,
+    /// The log written by a fresh search equals the stored log byte for byte.
+    pub log_reproduced: bool,
     pub source_sha256_match: bool,
     pub pass: bool,
 }
@@ -980,6 +982,7 @@ pub fn verify(out: &Path, threads: usize) -> Result<SearchVerification, String> 
     mismatches.sort();
     let next = AtomicUsize::new(0);
     let bad = Mutex::new(Vec::new());
+    let regenerated: Mutex<Vec<Option<String>>> = Mutex::new(vec![None; spec.repetitions as usize]);
     std::thread::scope(|scope| {
         for _ in 0..threads.clamp(1, logical.min(MAX_THREADS)) {
             scope.spawn(|| {
@@ -988,11 +991,14 @@ pub fn verify(out: &Path, threads: usize) -> Result<SearchVerification, String> 
                     if rep >= spec.repetitions {
                         return;
                     }
-                    let (r, _) = run_repetition(&ctx, rep, &nominal_q);
+                    let (r, evals) = run_repetition(&ctx, rep, &nominal_q);
                     let same = stored
                         .repetitions
                         .get(rep as usize)
                         .is_some_and(|s| same_json(&to_value(s), &to_value(&r)));
+                    let lines: String = evals.iter().map(log_line).collect();
+                    regenerated.lock().unwrap_or_else(|p| p.into_inner())[rep as usize] =
+                        Some(lines);
                     if !same {
                         bad.lock().unwrap_or_else(|p| p.into_inner()).push(rep);
                     }
@@ -1002,6 +1008,14 @@ pub fn verify(out: &Path, threads: usize) -> Result<SearchVerification, String> 
     });
     let mut summary_mismatches = bad.into_inner().unwrap_or_else(|p| p.into_inner());
     summary_mismatches.sort_unstable();
+    // The fresh search must reproduce the stored log byte for byte: this rejects a log with rows
+    // removed, added or reordered even when every remaining row and the stored hashes agree.
+    let regenerated: Option<String> = regenerated
+        .into_inner()
+        .unwrap_or_else(|p| p.into_inner())
+        .into_iter()
+        .collect();
+    let log_reproduced = regenerated.is_some_and(|text| text.as_bytes() == log_bytes.as_slice());
     let hashes_match = stored.log_sha256 == sha256_hex(&log_bytes)
         && stored.spec_sha256 == sha256_hex(&spec_bytes)
         && stored.base_case_sha256 == sha256_hex(&base_bytes)
@@ -1013,11 +1027,13 @@ pub fn verify(out: &Path, threads: usize) -> Result<SearchVerification, String> 
         pass: mismatches.is_empty()
             && summary_mismatches.is_empty()
             && hashes_match
+            && log_reproduced
             && source_sha256_match
             && logged.len() as u64 == stored.total_evaluations,
         mismatches,
         summary_mismatches,
         hashes_match,
+        log_reproduced,
         source_sha256_match,
     })
 }

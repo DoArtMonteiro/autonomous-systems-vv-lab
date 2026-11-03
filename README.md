@@ -128,9 +128,9 @@ See [docs/m12-exec.md](docs/m12-exec.md). Its development-seed verdicts are engi
 
 M14 asks whether the platform's findings hold up: on a second physical domain, on failure mechanisms the method never saw, and under small changes to the assumptions behind a published claim.
 
-- The ground vehicle of M1 to M6 now runs in process in `vv-exec`, byte-identical to `vv-lab run-m4` (38 compared cases, 0 differences). Four rocket-specific assumptions had to leave the shared code to make that possible.
+- The ground vehicle of M1 to M6 now runs in process in `vv-exec`, byte-identical to `vv-lab run-m4` (39 compared cases, 0 differences). Four rocket-specific assumptions had to leave the shared code to make that possible.
 - `vv-exec search` adds a domain-independent falsification search (uniform, Halton, corners-first, robustness-guided adaptive, exhaustive grid) with hashed logs, counterexample minimisation and full recomputation (`vv-exec search-verify`).
-- A preregistered benchmark compared the strategies on four held-out problems. The claim that adaptive search generalises to unseen mechanisms is **not supported** (better on 0 of 4, worse on 0 of 4), as the preregistration predicted. Corner-and-centre testing missed every violation in 22 of 30 repetitions where failures were rare.
+- A preregistered benchmark compared the strategies on four held-out problems. The claim that adaptive search generalises to unseen mechanisms is **not supported** (better on 0 of 4, worse on 0 of 4), as the preregistration predicted. The test discriminated little: in three of the four problems failures were common enough that the adaptive strategy's initial uniform draws found them. Where failures were rare, any 5 evaluations, corners or uniform, missed them in 22 of 30 repetitions.
 - An exploratory fragility study found a safety claim with no margin (1 mm of GPS noise drops the zone-corridor scenario from 100 to 61 safe runs in 100) and showed that the published M9.1 criterion G3 holds only when the GNSS bias is present from 0 s.
 
 ```sh

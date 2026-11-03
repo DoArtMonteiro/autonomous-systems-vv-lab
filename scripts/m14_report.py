@@ -205,9 +205,9 @@ def build() -> str:
         '<span class="chip">M10: continua por aceitar</span></div>',
         '<div class="findings">',
         f'<div class="finding"><div class="k">{pr["treatment_better"]} de {pr["eligible"]}</div><p>problemas reservados em que a pesquisa adaptativa foi melhor do que a uniforme. Era a previsão registada.</p></div>',
-        f'<div class="finding"><div class="k">{h4["strategies"]["extremes"]["missed_by_corners_and_centre"]} de 30</div><p>repetições em que testar só os cantos e o centro não encontrou nenhuma falha, com prevalência de {fmt(h4["grid"]["prevalence"] * 100, 2)} %.</p></div>',
+        f'<div class="finding"><div class="k">{h4["strategies"]["extremes"]["missed_by_corners_and_centre"]} de 30</div><p>repetições em H4 em que 5 avaliações (os cantos e o centro) não encontraram nenhuma falha. As primeiras 5 uniformes falham tanto quanto: o limite é o orçamento.</p></div>',
         f'<div class="finding"><div class="k">1 mm</div><p>de ruído GPS basta para a segurança do corredor cair de 100 para {f1_one["pass"]} em 100.</p></div>',
-        f'<div class="finding"><div class="k">{verified:,}</div><p>avaliações de pesquisa recalculadas uma a uma, 0 diferenças; {parity_cases} casos de paridade com as linhas de comandos, {parity_diffs} diferenças.</p></div>'.replace(",", " ", 1),
+        f'<div class="finding"><div class="k">{verified:,}</div><p>avaliações de pesquisa recalculadas, 0 diferenças, com a verificação reforçada depois da revisão independente; {parity_cases} casos de paridade com as linhas de comandos, {parity_diffs} diferenças.</p></div>'.replace(",", " ", 1),
         "</div>",
         "<h2>Pesquisa guiada contra amostragem simples</h2>",
         "<p>Quatro estratégias com o mesmo orçamento de 200 simulações por repetição e 30 repetições cada. Os "
@@ -221,13 +221,13 @@ def build() -> str:
         o.append(
             f"<figure>{strip_chart(p, held['budget'])}<figcaption>Avaliações até à primeira violação, em escala "
             "logarítmica. Cada ponto é uma repetição, o traço é a mediana, a vermelho uma repetição sem violação. "
-            f"Prevalência na grelha de referência {fmt(p['grid']['prevalence'], 4)}. Adaptativa contra uniforme: "
+            f"Taxa na grelha de 4 sementes {fmt(p['grid']['prevalence'], 4)}. Adaptativa contra uniforme: "
             f"p = {fmt(row['p'], 3)}, p de Holm = {fmt(row.get('p_holm', 1.0), 3)}.</figcaption></figure>"
         )
     o.append(
-        '<p class="note">Uma margem escolhida para um mecanismo, como a distância à zona restrita, não guia a pesquisa '
-        "para outro, como um contrato temporal. Nestes espaços de 2 e 3 dimensões, a amostragem uniforme é uma linha de "
-        "base difícil de bater.</p>"
+        '<p class="note">A adaptativa começa cada episódio com 20 sorteios uniformes. Em H1 a H3 encontrou a primeira '
+        "violação dentro desses sorteios em 89 de 90 repetições, por isso só H4 pôs a parte guiada à prova. O benchmark "
+        "não mostra que a pesquisa guiada seja útil nem que seja inútil; para as separar são precisos problemas com falhas mais raras.</p>"
     )
     o.append("<h2>Quanto aguenta cada alegação</h2>")
     o.append(
@@ -252,9 +252,10 @@ def build() -> str:
         "um passo de 250 mm. A folga até à zona é de 250 mm.</p>"
     )
     o.append(
-        '<div class="trace">semente 32001, ruído GPS 1 mm, ponto de passagem (5000, 2000)\n'
-        "tick 22  verdadeira (5000, 2000)  observada (4750, 2001)  ação: este 250 mm\n"
-        "tick 23  verdadeira (5000, 1750)  observada (5000, 2001)  ação: sul 250 mm, aresta da zona, violação</div>"
+        '<div class="trace">semente 32001, ruído GPS 1 mm, ponto de passagem (5000, 2000), raio de chegada 0\n'
+        "tick 23, antes do passo  verdadeira (5000, 2000)  observada (5000, 2001)\n"
+        "         ação            sul 250 mm\n"
+        "tick 23, depois do passo verdadeira (5000, 1750)  aresta da zona, violação</div>"
     )
     o.append("<h2>O critério G3 do M9.1 depende do instante da falha</h2>")
     o.append(
