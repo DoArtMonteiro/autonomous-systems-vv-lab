@@ -87,6 +87,10 @@ As funções estatísticas estão em `scripts/m14_stats.py` e são verificadas p
 
 Cada diretório de pesquisa é recalculado por `vv-exec search-verify`: cada avaliação é executada de novo a partir do seu ponto e da sua semente e cada repetição é pesquisada de novo de raiz. Os pontos ficam numa grelha inteira (`q / 2^32`), para que um ponto registado seja lido de volta sem arredondamento. Para cada problema, uma pequena experiência factorial passa pelo portão de equivalência do `vv-exec` contra `vv-lab run-m4` ou `vv-rocket land`. Uma falha de verificação ou de paridade faz falhar a execução do benchmark.
 
+## Desvios declarados
+
+1. Primeira tentativa da divisão reservada, logo a seguir ao congelamento `fede9c7`: abortou na validação da especificação de H1, antes de qualquer simulação, porque o nome `start_tick` não tem sufixo de unidade conhecido e a unidade declarada era `ticks`. Nenhum resultado reservado foi produzido nem visto. Correção: unidade `model` para `start_tick` em H1 e H2, e uma verificação prévia (`vv-exec search-check`) de todas as especificações da divisão antes de qualquer execução. Novo congelamento depois desta correção.
+
 ## O que este benchmark não mostra
 
 - Não compara com ferramentas externas (S-TaLiRo, Breach, Scenic, VerifAI). As estratégias são implementações próprias de famílias conhecidas.

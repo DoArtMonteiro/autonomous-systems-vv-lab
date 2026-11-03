@@ -17,7 +17,7 @@ use vv_exec::sched::SystemProbe;
 use vv_exec::spec::MAX_SPEC_BYTES;
 use vv_exec::{converge, engine, equiv, report};
 
-const USAGE: &str = "usage: vv-exec plan <spec.json> | run <spec.json> --output <dir> [--threads <n>] | equiv <dir> --cli <vv-rocket> [--sample <n>] | report <dir> | verify <dir> [--threads <n>] | converge <case.json> [--levels <n>] [--tolerance-m <m>] | search <search.json> --output <dir> [--threads <n>] | search-verify <dir> [--threads <n>]";
+const USAGE: &str = "usage: vv-exec plan <spec.json> | run <spec.json> --output <dir> [--threads <n>] | equiv <dir> --cli <vv-rocket> [--sample <n>] | report <dir> | verify <dir> [--threads <n>] | converge <case.json> [--levels <n>] [--tolerance-m <m>] | search <search.json> --output <dir> [--threads <n>] | search-check <search.json> | search-verify <dir> [--threads <n>]";
 
 /// Set by the console interrupt handler; read by the workers of `run`.
 static CANCEL: AtomicBool = AtomicBool::new(false);
@@ -215,6 +215,18 @@ fn dispatch(args: &[String]) -> Outcome {
                     "log_sha256": r.log_sha256,
                     "wall_s": r.wall_s,
                 })),
+                0,
+            ))
+        }
+        Some("search-check") => {
+            let spec = args.get(1).ok_or_else(usage)?;
+            let (spec_bytes, base_bytes) =
+                vv_exec::search::read_inputs(Path::new(spec)).map_err(input)?;
+            let (s, _) = vv_exec::search::load(&spec_bytes, &base_bytes).map_err(input)?;
+            Ok((
+                json(
+                    &serde_json::json!({"id": s.id, "valid": true, "parameters": s.parameters.len()}),
+                ),
                 0,
             ))
         }

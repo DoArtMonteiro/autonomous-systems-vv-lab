@@ -52,7 +52,7 @@
       "base_case": "../../cases/m14/ground-stop-actuator-delay.json",
       "grid_levels": 9,
       "parameters": [
-        {"name": "start_tick", "pointer": "/actuator/faults/0/windows/0/start_tick", "unit": "ticks", "low": 1, "high": 16, "integer": true},
+        {"name": "start_tick", "pointer": "/actuator/faults/0/windows/0/start_tick", "unit": "model", "low": 1, "high": 16, "integer": true},
         {"name": "delay", "pointer": "/actuator/faults/0/delay_ticks", "unit": "ticks", "low": 1, "high": 6, "integer": true},
         {"name": "probability", "pointer": "/actuator/faults/0/probability_permille", "unit": "permille", "low": 0, "high": 1000, "integer": true}
       ]
@@ -64,7 +64,7 @@
       "base_case": "../../cases/m14/ground-overshoot-actuator-loss.json",
       "grid_levels": 13,
       "parameters": [
-        {"name": "start_tick", "pointer": "/actuator/faults/0/windows/0/start_tick", "unit": "ticks", "low": 1, "high": 12, "integer": true},
+        {"name": "start_tick", "pointer": "/actuator/faults/0/windows/0/start_tick", "unit": "model", "low": 1, "high": 12, "integer": true},
         {"name": "probability", "pointer": "/actuator/faults/0/probability_permille", "unit": "permille", "low": 0, "high": 1000, "integer": true}
       ]
     },
