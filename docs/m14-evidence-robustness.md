@@ -13,6 +13,20 @@ O M13 ficou como proposta (`docs/m13-proposal.md`); não havia uma capacidade de
 - **Uma conclusão sem margem.** No corredor junto à zona restrita (`scenarios/m2/f-zone-nominal.json`), a segurança mantém-se com ruído GPS de 0 mm (100 de 100) e cai para 61 de 100 com 1 mm. A causa está identificada no código e num traço.
 - **Uma conclusão publicada com âmbito mais estreito do que parece.** O critério G3 do M9.1 («`guarded` cumpre R1 com `gnss_bias` em pelo menos 27 de 30») foi registado com o viés presente desde 0 s. Com o mesmo viés de 5 ou 10 m a começar em 2, 5 ou 10 s, R1 falha em 30 de 30. Isto não refuta o G3 como foi registado; mostra que depende de um pressuposto sobre o instante da falha que ninguém tinha posto à prova.
 
+## Integração em `main`, sem o M10
+
+O M14 foi desenvolvido sobre a pilha dos PR 15 a 18, que inclui as alterações do M10 ao `vv-rocket`. O ramo `feat/m14-research` transporta os mesmos commits para uma base sem o M10 (Studio do M11 e `vv-exec` do M12 sobre `main`). Os ficheiros congelados em `exec/benchmarks/m14/freeze.json` ficam com os mesmos bytes no repositório; `exec/src/search.rs` difere do congelamento apenas pela correção posterior à revisão (`0cfce5e` no ramo original), como já estava declarado.
+
+O que mudou é o código do `vv-rocket` que os casos do foguetão usam. O que se verificou, em 3/11/2026, na máquina de desenvolvimento:
+
+- Execuções diretas de `vv-rocket land` com `exec/cases/m14/rocket-gnss-bias.json`, início do viés em 0 s e em 5 s, sementes 30001 e 30017: `trace.json`, `verification.json` e `case.json` têm os mesmos bytes nas duas bases. Só `run.json` difere, no `source_sha256` (`304625f9...` com o M10, `12b276cb...` sem ele).
+- O estudo de fragilidade (`python scripts/m14_fragility.py`, sementes 32000 a 32099) repetido nesta base dá exatamente as mesmas contagens em F1 a F7 e no estudo do início do viés. Só os `plan_sha256` diferem, porque o script grava no plano o caminho absoluto do caso base.
+- Os 73 testes do `vv-exec` passam nesta base.
+
+A execução reservada (sementes 50000 a 59999) não foi repetida: está gasta, e repeti-la para a apresentar como nova seria um desvio. Os seus resultados continuam a ser os do ramo original, produzidos com o `vv-rocket` da pilha do M10. A equivalência de bytes acima é uma amostra pequena, não uma prova de que todas as execuções reservadas do foguetão se reproduzem nesta base.
+
+`docs/m13-proposal.md`, citado acima, está no ramo `docs/acceptance-m10-m12` (PR 19) e não neste.
+
 ## O problema
 
 Uma campanha de simulação pode passar milhares de vezes e esconder um erro de modelação, porque só explora o que alguém se lembrou de variar. Um gerador de contraexemplos pode parecer bom porque foi afinado nos casos que o autor conhecia. Uma alegação pode parecer sólida porque o pressuposto de que depende nunca foi variado. O M14 ataca estes três riscos com instrumentos que se podem recalcular.
