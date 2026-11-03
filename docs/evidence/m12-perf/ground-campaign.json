@@ -1,0 +1,210 @@
+{
+ "label": "ground-campaign-agents",
+ "cmd": [
+  "python",
+  "scripts/run_campaign.py",
+  "--seeds",
+  "42,1337,2026",
+  "--output-root",
+  "runs/m12-perf/campaign"
+ ],
+ "exit": 0,
+ "wall_s": 21.635,
+ "job_cpu_s": 14.0,
+ "job_user_s": 2.484,
+ "job_kernel_s": 11.516,
+ "avg_cores_busy": 0.65,
+ "job_cpu_util_of_machine": 0.0404,
+ "sys_cpu_util": 0.3345,
+ "peak_job_commit_mb": 21,
+ "peak_process_commit_mb": 21,
+ "processes": 325,
+ "lingering_after_root_exit": 0,
+ "page_faults": 608231,
+ "cap_mb": 4096,
+ "logical_cpus": 16,
+ "mem_before": {
+  "avail_phys_mb": 6929,
+  "total_phys_mb": 32421,
+  "avail_commit_mb": 13134,
+  "commit_limit_mb": 65189
+ },
+ "mem_after": {
+  "avail_phys_mb": 7142,
+  "total_phys_mb": 32421,
+  "avail_commit_mb": 12634,
+  "commit_limit_mb": 65189
+ },
+ "min_avail_phys_mb": 6765,
+ "machine": "AMD64 Family 25 Model 97 Stepping 2, AuthenticAMD",
+ "samples": [
+  {
+   "t": 0.625,
+   "sys_cpu": 0.2424,
+   "job_cpu_s": 0.21875,
+   "active": 2,
+   "avail_phys_mb": 6900,
+   "job_peak_mb": 16
+  },
+  {
+   "t": 1.655,
+   "sys_cpu": 0.2633,
+   "job_cpu_s": 0.671875,
+   "active": 2,
+   "avail_phys_mb": 6895,
+   "job_peak_mb": 17
+  },
+  {
+   "t": 2.669,
+   "sys_cpu": 0.4318,
+   "job_cpu_s": 1.328125,
+   "active": 1,
+   "avail_phys_mb": 6891,
+   "job_peak_mb": 19
+  },
+  {
+   "t": 3.675,
+   "sys_cpu": 0.2832,
+   "job_cpu_s": 1.984375,
+   "active": 2,
+   "avail_phys_mb": 6879,
+   "job_peak_mb": 19
+  },
+  {
+   "t": 4.704,
+   "sys_cpu": 0.2614,
+   "job_cpu_s": 2.546875,
+   "active": 2,
+   "avail_phys_mb": 6863,
+   "job_peak_mb": 19
+  },
+  {
+   "t": 5.73,
+   "sys_cpu": 0.3359,
+   "job_cpu_s": 3.28125,
+   "active": 2,
+   "avail_phys_mb": 6767,
+   "job_peak_mb": 19
+  },
+  {
+   "t": 6.743,
+   "sys_cpu": 0.3164,
+   "job_cpu_s": 3.796875,
+   "active": 2,
+   "avail_phys_mb": 6863,
+   "job_peak_mb": 19
+  },
+  {
+   "t": 7.758,
+   "sys_cpu": 0.3535,
+   "job_cpu_s": 4.515625,
+   "active": 1,
+   "avail_phys_mb": 6822,
+   "job_peak_mb": 19
+  },
+  {
+   "t": 8.771,
+   "sys_cpu": 0.332,
+   "job_cpu_s": 5.234375,
+   "active": 2,
+   "avail_phys_mb": 6839,
+   "job_peak_mb": 20
+  },
+  {
+   "t": 9.799,
+   "sys_cpu": 0.2557,
+   "job_cpu_s": 5.890625,
+   "active": 2,
+   "avail_phys_mb": 6834,
+   "job_peak_mb": 20
+  },
+  {
+   "t": 10.814,
+   "sys_cpu": 0.2969,
+   "job_cpu_s": 6.6875,
+   "active": 1,
+   "avail_phys_mb": 6835,
+   "job_peak_mb": 20
+  },
+  {
+   "t": 11.841,
+   "sys_cpu": 0.2822,
+   "job_cpu_s": 7.5,
+   "active": 2,
+   "avail_phys_mb": 6826,
+   "job_peak_mb": 20
+  },
+  {
+   "t": 12.853,
+   "sys_cpu": 0.3867,
+   "job_cpu_s": 8.234375,
+   "active": 2,
+   "avail_phys_mb": 6854,
+   "job_peak_mb": 20
+  },
+  {
+   "t": 13.866,
+   "sys_cpu": 0.3826,
+   "job_cpu_s": 8.921875,
+   "active": 1,
+   "avail_phys_mb": 6823,
+   "job_peak_mb": 20
+  },
+  {
+   "t": 14.895,
+   "sys_cpu": 0.3258,
+   "job_cpu_s": 9.328125,
+   "active": 1,
+   "avail_phys_mb": 6878,
+   "job_peak_mb": 21
+  },
+  {
+   "t": 15.907,
+   "sys_cpu": 0.2949,
+   "job_cpu_s": 10.0625,
+   "active": 1,
+   "avail_phys_mb": 6850,
+   "job_peak_mb": 21
+  },
+  {
+   "t": 16.932,
+   "sys_cpu": 0.2969,
+   "job_cpu_s": 10.71875,
+   "active": 2,
+   "avail_phys_mb": 6835,
+   "job_peak_mb": 21
+  },
+  {
+   "t": 17.96,
+   "sys_cpu": 0.2822,
+   "job_cpu_s": 11.265625,
+   "active": 1,
+   "avail_phys_mb": 7388,
+   "job_peak_mb": 21
+  },
+  {
+   "t": 18.989,
+   "sys_cpu": 0.3693,
+   "job_cpu_s": 11.921875,
+   "active": 1,
+   "avail_phys_mb": 7372,
+   "job_peak_mb": 21
+  },
+  {
+   "t": 20.005,
+   "sys_cpu": 0.2898,
+   "job_cpu_s": 12.40625,
+   "active": 2,
+   "avail_phys_mb": 7356,
+   "job_peak_mb": 21
+  },
+  {
+   "t": 21.028,
+   "sys_cpu": 0.5879,
+   "job_cpu_s": 13.390625,
+   "active": 1,
+   "avail_phys_mb": 7277,
+   "job_peak_mb": 21
+  }
+ ]
+}

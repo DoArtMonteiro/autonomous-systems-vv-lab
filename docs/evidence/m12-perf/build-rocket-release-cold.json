@@ -1,0 +1,266 @@
+{
+ "label": "build-rocket-release-cold",
+ "cmd": [
+  "cargo",
+  "build",
+  "--release",
+  "-q",
+  "--manifest-path",
+  "crates/vv-rocket/Cargo.toml"
+ ],
+ "exit": 0,
+ "wall_s": 11.4,
+ "job_cpu_s": 28.031,
+ "job_user_s": 21.953,
+ "job_kernel_s": 6.078,
+ "avg_cores_busy": 2.46,
+ "job_cpu_util_of_machine": 0.1537,
+ "sys_cpu_util": 0.3471,
+ "peak_job_commit_mb": 1397,
+ "peak_process_commit_mb": 314,
+ "processes": 60,
+ "lingering_after_root_exit": 1,
+ "page_faults": 1337202,
+ "cap_mb": 12288,
+ "logical_cpus": 16,
+ "mem_before": {
+  "avail_phys_mb": 5033,
+  "total_phys_mb": 32421,
+  "avail_commit_mb": 13436,
+  "commit_limit_mb": 65189
+ },
+ "mem_after": {
+  "avail_phys_mb": 4978,
+  "total_phys_mb": 32421,
+  "avail_commit_mb": 13409,
+  "commit_limit_mb": 65189
+ },
+ "min_avail_phys_mb": 4511,
+ "machine": "AMD64 Family 25 Model 97 Stepping 2, AuthenticAMD",
+ "samples": [
+  {
+   "t": 0.566,
+   "sys_cpu": 0.3617,
+   "job_cpu_s": 1.0,
+   "active": 9,
+   "avail_phys_mb": 4878,
+   "job_peak_mb": 627
+  },
+  {
+   "t": 1.078,
+   "sys_cpu": 0.709,
+   "job_cpu_s": 3.78125,
+   "active": 20,
+   "avail_phys_mb": 4511,
+   "job_peak_mb": 1397
+  },
+  {
+   "t": 1.59,
+   "sys_cpu": 0.5076,
+   "job_cpu_s": 5.4375,
+   "active": 5,
+   "avail_phys_mb": 4948,
+   "job_peak_mb": 1397
+  },
+  {
+   "t": 2.104,
+   "sys_cpu": 0.3447,
+   "job_cpu_s": 6.59375,
+   "active": 8,
+   "avail_phys_mb": 4747,
+   "job_peak_mb": 1397
+  },
+  {
+   "t": 2.615,
+   "sys_cpu": 0.3106,
+   "job_cpu_s": 7.765625,
+   "active": 6,
+   "avail_phys_mb": 4713,
+   "job_peak_mb": 1397
+  },
+  {
+   "t": 3.125,
+   "sys_cpu": 0.5664,
+   "job_cpu_s": 9.734375,
+   "active": 6,
+   "avail_phys_mb": 4624,
+   "job_peak_mb": 1397
+  },
+  {
+   "t": 3.636,
+   "sys_cpu": 0.4621,
+   "job_cpu_s": 11.59375,
+   "active": 5,
+   "avail_phys_mb": 4695,
+   "job_peak_mb": 1397
+  },
+  {
+   "t": 4.136,
+   "sys_cpu": 0.5215,
+   "job_cpu_s": 14.390625,
+   "active": 5,
+   "avail_phys_mb": 4778,
+   "job_peak_mb": 1397
+  },
+  {
+   "t": 4.65,
+   "sys_cpu": 0.2121,
+   "job_cpu_s": 14.828125,
+   "active": 4,
+   "avail_phys_mb": 4781,
+   "job_peak_mb": 1397
+  },
+  {
+   "t": 5.165,
+   "sys_cpu": 0.2386,
+   "job_cpu_s": 15.6875,
+   "active": 4,
+   "avail_phys_mb": 4659,
+   "job_peak_mb": 1397
+  },
+  {
+   "t": 5.681,
+   "sys_cpu": 0.2689,
+   "job_cpu_s": 16.46875,
+   "active": 4,
+   "avail_phys_mb": 4823,
+   "job_peak_mb": 1397
+  },
+  {
+   "t": 6.195,
+   "sys_cpu": 0.2348,
+   "job_cpu_s": 17.0625,
+   "active": 4,
+   "avail_phys_mb": 4780,
+   "job_peak_mb": 1397
+  },
+  {
+   "t": 6.697,
+   "sys_cpu": 0.2793,
+   "job_cpu_s": 17.5625,
+   "active": 4,
+   "avail_phys_mb": 4742,
+   "job_peak_mb": 1397
+  },
+  {
+   "t": 7.21,
+   "sys_cpu": 0.3314,
+   "job_cpu_s": 19.15625,
+   "active": 4,
+   "avail_phys_mb": 4686,
+   "job_peak_mb": 1397
+  },
+  {
+   "t": 7.724,
+   "sys_cpu": 0.411,
+   "job_cpu_s": 21.0,
+   "active": 4,
+   "avail_phys_mb": 4805,
+   "job_peak_mb": 1397
+  },
+  {
+   "t": 8.252,
+   "sys_cpu": 0.5731,
+   "job_cpu_s": 24.640625,
+   "active": 4,
+   "avail_phys_mb": 4735,
+   "job_peak_mb": 1397
+  },
+  {
+   "t": 8.755,
+   "sys_cpu": 0.3856,
+   "job_cpu_s": 26.015625,
+   "active": 4,
+   "avail_phys_mb": 4828,
+   "job_peak_mb": 1397
+  },
+  {
+   "t": 9.259,
+   "sys_cpu": 0.2715,
+   "job_cpu_s": 26.515625,
+   "active": 4,
+   "avail_phys_mb": 4826,
+   "job_peak_mb": 1397
+  },
+  {
+   "t": 9.771,
+   "sys_cpu": 0.2727,
+   "job_cpu_s": 27.03125,
+   "active": 4,
+   "avail_phys_mb": 4850,
+   "job_peak_mb": 1397
+  },
+  {
+   "t": 10.284,
+   "sys_cpu": 0.2367,
+   "job_cpu_s": 27.1875,
+   "active": 4,
+   "avail_phys_mb": 4929,
+   "job_peak_mb": 1397
+  },
+  {
+   "t": 10.797,
+   "sys_cpu": 0.3242,
+   "job_cpu_s": 27.84375,
+   "active": 4,
+   "avail_phys_mb": 4889,
+   "job_peak_mb": 1397
+  },
+  {
+   "t": 11.311,
+   "sys_cpu": 0.1913,
+   "job_cpu_s": 28.015625,
+   "active": 4,
+   "avail_phys_mb": 4882,
+   "job_peak_mb": 1397
+  },
+  {
+   "t": 11.823,
+   "sys_cpu": 0.1989,
+   "job_cpu_s": 28.03125,
+   "active": 1,
+   "avail_phys_mb": 4937,
+   "job_peak_mb": 1397
+  },
+  {
+   "t": 12.337,
+   "sys_cpu": 0.2197,
+   "job_cpu_s": 28.03125,
+   "active": 1,
+   "avail_phys_mb": 4931,
+   "job_peak_mb": 1397
+  },
+  {
+   "t": 12.853,
+   "sys_cpu": 0.3655,
+   "job_cpu_s": 28.03125,
+   "active": 1,
+   "avail_phys_mb": 4929,
+   "job_peak_mb": 1397
+  },
+  {
+   "t": 13.368,
+   "sys_cpu": 0.3864,
+   "job_cpu_s": 28.03125,
+   "active": 1,
+   "avail_phys_mb": 4914,
+   "job_peak_mb": 1397
+  },
+  {
+   "t": 13.879,
+   "sys_cpu": 0.2992,
+   "job_cpu_s": 28.03125,
+   "active": 1,
+   "avail_phys_mb": 4988,
+   "job_peak_mb": 1397
+  },
+  {
+   "t": 14.394,
+   "sys_cpu": 0.2784,
+   "job_cpu_s": 28.03125,
+   "active": 1,
+   "avail_phys_mb": 4978,
+   "job_peak_mb": 1397
+  }
+ ]
+}

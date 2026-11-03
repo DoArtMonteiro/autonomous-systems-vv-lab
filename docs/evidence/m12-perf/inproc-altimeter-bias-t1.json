@@ -1,0 +1,27 @@
+{
+ "case": "crates/vv-rocket/landing/altimeter-bias.json",
+ "equivalence_check": "trace bytes equal landing_run::artifacts for first seed",
+ "first_seed": 5000,
+ "mean_ms": {
+  "hash": 0.14547600000000002,
+  "parse": 0.0076069999999999974,
+  "prepare": 0.0035750000000000014,
+  "serialize": 0.4003780000000001,
+  "simulate": 1.3537059999999999,
+  "total": 2.1430360000000004,
+  "verify": 0.23229400000000003
+ },
+ "mean_steps": 2190.17,
+ "mean_trace_bytes": 344740.31,
+ "runs": 100,
+ "runs_per_s": 454.9189016074105,
+ "share": {
+  "hash": 0.06788313402108037,
+  "serialize": 0.1868274728002703,
+  "simulate": 0.6316767427145413,
+  "verify": 0.10839481931241471
+ },
+ "sim_steps_per_s": 996349.7307335022,
+ "threads": 1,
+ "wall_s": 0.2198194
+}

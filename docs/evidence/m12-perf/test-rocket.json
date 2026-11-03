@@ -1,0 +1,114 @@
+{
+ "label": "test-rocket",
+ "cmd": [
+  "cargo",
+  "test",
+  "-q",
+  "--release",
+  "--manifest-path",
+  "crates/vv-rocket/Cargo.toml"
+ ],
+ "exit": 0,
+ "wall_s": 9.418,
+ "job_cpu_s": 32.156,
+ "job_user_s": 27.5,
+ "job_kernel_s": 4.656,
+ "avg_cores_busy": 3.41,
+ "job_cpu_util_of_machine": 0.2134,
+ "sys_cpu_util": 0.4822,
+ "peak_job_commit_mb": 829,
+ "peak_process_commit_mb": 358,
+ "processes": 27,
+ "lingering_after_root_exit": 0,
+ "page_faults": 712740,
+ "cap_mb": 10240,
+ "logical_cpus": 16,
+ "mem_before": {
+  "avail_phys_mb": 6861,
+  "total_phys_mb": 32421,
+  "avail_commit_mb": 13255,
+  "commit_limit_mb": 65189
+ },
+ "mem_after": {
+  "avail_phys_mb": 6838,
+  "total_phys_mb": 32421,
+  "avail_commit_mb": 13098,
+  "commit_limit_mb": 65189
+ },
+ "min_avail_phys_mb": 6501,
+ "machine": "AMD64 Family 25 Model 97 Stepping 2, AuthenticAMD",
+ "samples": [
+  {
+   "t": 1.06,
+   "sys_cpu": 0.5781,
+   "job_cpu_s": 4.703125,
+   "active": 6,
+   "avail_phys_mb": 6521,
+   "job_peak_mb": 829
+  },
+  {
+   "t": 2.073,
+   "sys_cpu": 0.8163,
+   "job_cpu_s": 14.1875,
+   "active": 6,
+   "avail_phys_mb": 6501,
+   "job_peak_mb": 829
+  },
+  {
+   "t": 3.087,
+   "sys_cpu": 0.6308,
+   "job_cpu_s": 20.8125,
+   "active": 4,
+   "avail_phys_mb": 6608,
+   "job_peak_mb": 829
+  },
+  {
+   "t": 4.1,
+   "sys_cpu": 0.6923,
+   "job_cpu_s": 28.84375,
+   "active": 4,
+   "avail_phys_mb": 6620,
+   "job_peak_mb": 829
+  },
+  {
+   "t": 5.113,
+   "sys_cpu": 0.3548,
+   "job_cpu_s": 30.078125,
+   "active": 2,
+   "avail_phys_mb": 6823,
+   "job_peak_mb": 829
+  },
+  {
+   "t": 6.127,
+   "sys_cpu": 0.2327,
+   "job_cpu_s": 30.21875,
+   "active": 3,
+   "avail_phys_mb": 6805,
+   "job_peak_mb": 829
+  },
+  {
+   "t": 7.14,
+   "sys_cpu": 0.3037,
+   "job_cpu_s": 30.921875,
+   "active": 4,
+   "avail_phys_mb": 6755,
+   "job_peak_mb": 829
+  },
+  {
+   "t": 8.15,
+   "sys_cpu": 0.468,
+   "job_cpu_s": 31.453125,
+   "active": 2,
+   "avail_phys_mb": 6763,
+   "job_peak_mb": 829
+  },
+  {
+   "t": 9.157,
+   "sys_cpu": 0.2952,
+   "job_cpu_s": 32.046875,
+   "active": 3,
+   "avail_phys_mb": 6777,
+   "job_peak_mb": 829
+  }
+ ]
+}

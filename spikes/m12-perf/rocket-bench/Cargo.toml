@@ -1,0 +1,16 @@
+# M12 performance audit: in-process phase timing of the canonical vv-rocket landing pipeline.
+# Isolated spike. It links vv-rocket as a library and changes nothing in it.
+[package]
+name = "m12-rocket-bench"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+vv-rocket = { path = "../../../crates/vv-rocket" }
+serde_json = "=1.0.151"
+
+[profile.release]
+debug = "line-tables-only"
+
+[workspace]

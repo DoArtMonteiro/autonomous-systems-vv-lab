@@ -1,0 +1,224 @@
+{
+ "label": "m10-campaign-F1-bplus-j12-rep",
+ "cmd": [
+  "python",
+  "runs/m12-perf/m10_j.py",
+  "--seeds",
+  "5000-5099",
+  "--scenarios",
+  "F1",
+  "--arms",
+  "m10_b_plus",
+  "--jobs",
+  "12",
+  "--output-root",
+  "runs/m12-perf/m10c-rep-j12"
+ ],
+ "exit": 0,
+ "wall_s": 11.578,
+ "job_cpu_s": 43.406,
+ "job_user_s": 13.391,
+ "job_kernel_s": 30.016,
+ "avg_cores_busy": 3.75,
+ "job_cpu_util_of_machine": 0.2343,
+ "sys_cpu_util": 0.6849,
+ "peak_job_commit_mb": 64,
+ "peak_process_commit_mb": 29,
+ "processes": 1112,
+ "lingering_after_root_exit": 0,
+ "page_faults": 3132411,
+ "cap_mb": 8192,
+ "logical_cpus": 16,
+ "mem_before": {
+  "avail_phys_mb": 7204,
+  "total_phys_mb": 32421,
+  "avail_commit_mb": 13043,
+  "commit_limit_mb": 65189
+ },
+ "mem_after": {
+  "avail_phys_mb": 7168,
+  "total_phys_mb": 32421,
+  "avail_commit_mb": 13016,
+  "commit_limit_mb": 65189
+ },
+ "min_avail_phys_mb": 6667,
+ "machine": "AMD64 Family 25 Model 97 Stepping 2, AuthenticAMD",
+ "samples": [
+  {
+   "t": 0.523,
+   "sys_cpu": 0.4981,
+   "job_cpu_s": 1.46875,
+   "active": 13,
+   "avail_phys_mb": 7104,
+   "job_peak_mb": 53
+  },
+  {
+   "t": 1.033,
+   "sys_cpu": 0.8577,
+   "job_cpu_s": 3.765625,
+   "active": 13,
+   "avail_phys_mb": 7091,
+   "job_peak_mb": 53
+  },
+  {
+   "t": 1.545,
+   "sys_cpu": 0.7822,
+   "job_cpu_s": 6.046875,
+   "active": 13,
+   "avail_phys_mb": 7073,
+   "job_peak_mb": 53
+  },
+  {
+   "t": 2.047,
+   "sys_cpu": 0.7285,
+   "job_cpu_s": 7.78125,
+   "active": 13,
+   "avail_phys_mb": 7030,
+   "job_peak_mb": 58
+  },
+  {
+   "t": 2.562,
+   "sys_cpu": 0.8447,
+   "job_cpu_s": 10.234375,
+   "active": 13,
+   "avail_phys_mb": 6982,
+   "job_peak_mb": 58
+  },
+  {
+   "t": 3.064,
+   "sys_cpu": 0.666,
+   "job_cpu_s": 12.015625,
+   "active": 13,
+   "avail_phys_mb": 6925,
+   "job_peak_mb": 58
+  },
+  {
+   "t": 3.579,
+   "sys_cpu": 0.8144,
+   "job_cpu_s": 14.234375,
+   "active": 12,
+   "avail_phys_mb": 6871,
+   "job_peak_mb": 58
+  },
+  {
+   "t": 4.09,
+   "sys_cpu": 0.4583,
+   "job_cpu_s": 15.59375,
+   "active": 13,
+   "avail_phys_mb": 6863,
+   "job_peak_mb": 58
+  },
+  {
+   "t": 4.604,
+   "sys_cpu": 0.7348,
+   "job_cpu_s": 17.671875,
+   "active": 13,
+   "avail_phys_mb": 6816,
+   "job_peak_mb": 60
+  },
+  {
+   "t": 5.117,
+   "sys_cpu": 0.9129,
+   "job_cpu_s": 19.9375,
+   "active": 6,
+   "avail_phys_mb": 6770,
+   "job_peak_mb": 60
+  },
+  {
+   "t": 5.62,
+   "sys_cpu": 0.6426,
+   "job_cpu_s": 21.4375,
+   "active": 13,
+   "avail_phys_mb": 6846,
+   "job_peak_mb": 60
+  },
+  {
+   "t": 6.132,
+   "sys_cpu": 0.678,
+   "job_cpu_s": 23.0625,
+   "active": 4,
+   "avail_phys_mb": 6862,
+   "job_peak_mb": 61
+  },
+  {
+   "t": 6.648,
+   "sys_cpu": 0.7543,
+   "job_cpu_s": 24.984375,
+   "active": 10,
+   "avail_phys_mb": 6801,
+   "job_peak_mb": 61
+  },
+  {
+   "t": 7.16,
+   "sys_cpu": 0.699,
+   "job_cpu_s": 26.984375,
+   "active": 13,
+   "avail_phys_mb": 6798,
+   "job_peak_mb": 61
+  },
+  {
+   "t": 7.672,
+   "sys_cpu": 0.7405,
+   "job_cpu_s": 29.171875,
+   "active": 13,
+   "avail_phys_mb": 6774,
+   "job_peak_mb": 61
+  },
+  {
+   "t": 8.185,
+   "sys_cpu": 0.7917,
+   "job_cpu_s": 31.734375,
+   "active": 5,
+   "avail_phys_mb": 6748,
+   "job_peak_mb": 61
+  },
+  {
+   "t": 8.701,
+   "sys_cpu": 0.6742,
+   "job_cpu_s": 33.921875,
+   "active": 13,
+   "avail_phys_mb": 6724,
+   "job_peak_mb": 61
+  },
+  {
+   "t": 9.202,
+   "sys_cpu": 0.6777,
+   "job_cpu_s": 36.078125,
+   "active": 8,
+   "avail_phys_mb": 6696,
+   "job_peak_mb": 61
+  },
+  {
+   "t": 9.714,
+   "sys_cpu": 0.608,
+   "job_cpu_s": 38.1875,
+   "active": 12,
+   "avail_phys_mb": 6670,
+   "job_peak_mb": 64
+  },
+  {
+   "t": 10.216,
+   "sys_cpu": 0.7422,
+   "job_cpu_s": 40.359375,
+   "active": 5,
+   "avail_phys_mb": 6677,
+   "job_peak_mb": 64
+  },
+  {
+   "t": 10.729,
+   "sys_cpu": 0.7708,
+   "job_cpu_s": 42.625,
+   "active": 1,
+   "avail_phys_mb": 6667,
+   "job_peak_mb": 64
+  },
+  {
+   "t": 11.244,
+   "sys_cpu": 0.2633,
+   "job_cpu_s": 43.109375,
+   "active": 2,
+   "avail_phys_mb": 6990,
+   "job_peak_mb": 64
+  }
+ ]
+}

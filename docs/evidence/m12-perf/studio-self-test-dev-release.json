@@ -1,0 +1,41 @@
+{
+ "checks": [
+  {
+   "check": "platform start",
+   "detail": {
+    "domains": 3,
+    "recovered": 0,
+    "rejected": []
+   },
+   "pass": true
+  },
+  {
+   "check": "ground-vehicle demonstration runs and replays",
+   "detail": {
+    "outcome": "completed",
+    "replay": "verified",
+    "run_id": "181dc7602cf853ce",
+    "safety": "safe"
+   },
+   "pass": true
+  },
+  {
+   "check": "reference-oscillator has a demonstration",
+   "detail": "none",
+   "pass": true
+  },
+  {
+   "check": "rocket-landing demonstration runs and replays",
+   "detail": {
+    "outcome": "landed",
+    "replay": "verified",
+    "run_id": "250ec3128d641998",
+    "safety": "safe"
+   },
+   "pass": true
+  }
+ ],
+ "pass": true,
+ "schema": "vv-studio-self-test.v1",
+ "version": "0.11.0"
+}

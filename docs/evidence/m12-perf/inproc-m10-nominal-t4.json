@@ -1,0 +1,27 @@
+{
+ "case": "crates/vv-rocket/landing/m10-nominal.json",
+ "equivalence_check": "trace bytes equal landing_run::artifacts for first seed",
+ "first_seed": 5000,
+ "mean_ms": {
+  "hash": 0.2117739583333336,
+  "parse": 0.013400937500000005,
+  "prepare": 0.005414895833333327,
+  "serialize": 0.5793129166666664,
+  "simulate": 2.6138326041666664,
+  "total": 3.8381177083333378,
+  "verify": 0.4143823958333334
+ },
+ "mean_steps": 2328.9625,
+ "mean_trace_bytes": 483120.5875,
+ "runs": 960,
+ "runs_per_s": 996.3865419315265,
+ "share": {
+  "hash": 0.05517651474667623,
+  "serialize": 0.15093672489743076,
+  "simulate": 0.6810193961721136,
+  "verify": 0.10796500454731353
+ },
+ "sim_steps_per_s": 2320546.8916632026,
+ "threads": 4,
+ "wall_s": 0.9634815
+}

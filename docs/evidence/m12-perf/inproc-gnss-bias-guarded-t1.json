@@ -1,0 +1,27 @@
+{
+ "case": "crates/vv-rocket/landing/gnss-bias-guarded.json",
+ "equivalence_check": "trace bytes equal landing_run::artifacts for first seed",
+ "first_seed": 5000,
+ "mean_ms": {
+  "hash": 0.1609349999999999,
+  "parse": 0.007682000000000003,
+  "prepare": 0.003438000000000004,
+  "serialize": 0.4032439999999998,
+  "simulate": 1.4933679999999996,
+  "total": 2.315803,
+  "verify": 0.24713600000000013
+ },
+ "mean_steps": 2327.61,
+ "mean_trace_bytes": 377487.29,
+ "runs": 100,
+ "runs_per_s": 421.3322187691706,
+ "share": {
+  "hash": 0.0694942531812939,
+  "serialize": 0.17412707384868226,
+  "simulate": 0.6448596879786406,
+  "verify": 0.10671719485638466
+ },
+ "sim_steps_per_s": 980697.0857293091,
+ "threads": 1,
+ "wall_s": 0.2373424
+}

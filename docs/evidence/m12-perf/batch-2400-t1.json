@@ -1,0 +1,346 @@
+{
+ "label": "batch-2400-t1",
+ "cmd": [
+  "<repo>/spikes/m12-perf/rocket-bench/target/release/batch.exe",
+  "crates/vv-rocket/landing/m10-nominal.json",
+  "7000",
+  "2400",
+  "runs/m12-perf/batch-t1",
+  "1"
+ ],
+ "exit": 0,
+ "wall_s": 15.415,
+ "job_cpu_s": 14.75,
+ "job_user_s": 10.328,
+ "job_kernel_s": 4.422,
+ "avg_cores_busy": 0.96,
+ "job_cpu_util_of_machine": 0.0598,
+ "sys_cpu_util": 0.4068,
+ "peak_job_commit_mb": 6,
+ "peak_process_commit_mb": 6,
+ "processes": 1,
+ "lingering_after_root_exit": 0,
+ "page_faults": 993592,
+ "cap_mb": 4096,
+ "logical_cpus": 16,
+ "mem_before": {
+  "avail_phys_mb": 6783,
+  "total_phys_mb": 32421,
+  "avail_commit_mb": 13150,
+  "commit_limit_mb": 65189
+ },
+ "mem_after": {
+  "avail_phys_mb": 6249,
+  "total_phys_mb": 32421,
+  "avail_commit_mb": 13281,
+  "commit_limit_mb": 65189
+ },
+ "min_avail_phys_mb": 6229,
+ "machine": "AMD64 Family 25 Model 97 Stepping 2, AuthenticAMD",
+ "samples": [
+  {
+   "t": 0.219,
+   "sys_cpu": 0.3798,
+   "job_cpu_s": 0.203125,
+   "active": 1,
+   "avail_phys_mb": 6801,
+   "job_peak_mb": 5
+  },
+  {
+   "t": 0.622,
+   "sys_cpu": 0.4828,
+   "job_cpu_s": 0.59375,
+   "active": 1,
+   "avail_phys_mb": 6762,
+   "job_peak_mb": 5
+  },
+  {
+   "t": 1.025,
+   "sys_cpu": 0.4423,
+   "job_cpu_s": 0.984375,
+   "active": 1,
+   "avail_phys_mb": 6757,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 1.432,
+   "sys_cpu": 0.3942,
+   "job_cpu_s": 1.390625,
+   "active": 1,
+   "avail_phys_mb": 6717,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 1.839,
+   "sys_cpu": 0.4135,
+   "job_cpu_s": 1.78125,
+   "active": 1,
+   "avail_phys_mb": 6706,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 2.244,
+   "sys_cpu": 0.4135,
+   "job_cpu_s": 2.1875,
+   "active": 1,
+   "avail_phys_mb": 6667,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 2.649,
+   "sys_cpu": 0.4231,
+   "job_cpu_s": 2.5625,
+   "active": 1,
+   "avail_phys_mb": 6631,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 3.055,
+   "sys_cpu": 0.4712,
+   "job_cpu_s": 2.9375,
+   "active": 1,
+   "avail_phys_mb": 6589,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 3.458,
+   "sys_cpu": 0.4856,
+   "job_cpu_s": 3.34375,
+   "active": 1,
+   "avail_phys_mb": 6501,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 3.864,
+   "sys_cpu": 0.5962,
+   "job_cpu_s": 3.75,
+   "active": 1,
+   "avail_phys_mb": 6502,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 4.267,
+   "sys_cpu": 0.3413,
+   "job_cpu_s": 4.15625,
+   "active": 1,
+   "avail_phys_mb": 6462,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 4.671,
+   "sys_cpu": 0.3798,
+   "job_cpu_s": 4.546875,
+   "active": 1,
+   "avail_phys_mb": 6446,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 5.074,
+   "sys_cpu": 0.4808,
+   "job_cpu_s": 4.921875,
+   "active": 1,
+   "avail_phys_mb": 6479,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 5.48,
+   "sys_cpu": 0.375,
+   "job_cpu_s": 5.296875,
+   "active": 1,
+   "avail_phys_mb": 6442,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 5.888,
+   "sys_cpu": 0.4273,
+   "job_cpu_s": 5.703125,
+   "active": 1,
+   "avail_phys_mb": 6402,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 6.291,
+   "sys_cpu": 0.351,
+   "job_cpu_s": 6.09375,
+   "active": 1,
+   "avail_phys_mb": 6418,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 6.698,
+   "sys_cpu": 0.4038,
+   "job_cpu_s": 6.5,
+   "active": 1,
+   "avail_phys_mb": 6437,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 7.106,
+   "sys_cpu": 0.4038,
+   "job_cpu_s": 6.890625,
+   "active": 1,
+   "avail_phys_mb": 6457,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 7.512,
+   "sys_cpu": 0.4062,
+   "job_cpu_s": 7.25,
+   "active": 1,
+   "avail_phys_mb": 6411,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 7.918,
+   "sys_cpu": 0.3942,
+   "job_cpu_s": 7.65625,
+   "active": 1,
+   "avail_phys_mb": 6411,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 8.324,
+   "sys_cpu": 0.5048,
+   "job_cpu_s": 8.03125,
+   "active": 1,
+   "avail_phys_mb": 6384,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 8.73,
+   "sys_cpu": 0.375,
+   "job_cpu_s": 8.421875,
+   "active": 1,
+   "avail_phys_mb": 6342,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 9.135,
+   "sys_cpu": 0.3606,
+   "job_cpu_s": 8.78125,
+   "active": 1,
+   "avail_phys_mb": 6358,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 9.54,
+   "sys_cpu": 0.375,
+   "job_cpu_s": 9.171875,
+   "active": 1,
+   "avail_phys_mb": 6314,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 9.948,
+   "sys_cpu": 0.399,
+   "job_cpu_s": 9.578125,
+   "active": 1,
+   "avail_phys_mb": 6281,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 10.35,
+   "sys_cpu": 0.5529,
+   "job_cpu_s": 9.984375,
+   "active": 1,
+   "avail_phys_mb": 6241,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 10.754,
+   "sys_cpu": 0.2885,
+   "job_cpu_s": 10.359375,
+   "active": 1,
+   "avail_phys_mb": 6290,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 11.16,
+   "sys_cpu": 0.3413,
+   "job_cpu_s": 10.765625,
+   "active": 1,
+   "avail_phys_mb": 6287,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 11.567,
+   "sys_cpu": 0.3413,
+   "job_cpu_s": 11.140625,
+   "active": 1,
+   "avail_phys_mb": 6255,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 11.974,
+   "sys_cpu": 0.4808,
+   "job_cpu_s": 11.515625,
+   "active": 1,
+   "avail_phys_mb": 6319,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 12.379,
+   "sys_cpu": 0.4615,
+   "job_cpu_s": 11.875,
+   "active": 1,
+   "avail_phys_mb": 6321,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 12.783,
+   "sys_cpu": 0.4519,
+   "job_cpu_s": 12.265625,
+   "active": 1,
+   "avail_phys_mb": 6298,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 13.192,
+   "sys_cpu": 0.4567,
+   "job_cpu_s": 12.65625,
+   "active": 1,
+   "avail_phys_mb": 6274,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 13.598,
+   "sys_cpu": 0.4135,
+   "job_cpu_s": 13.03125,
+   "active": 1,
+   "avail_phys_mb": 6262,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 14.004,
+   "sys_cpu": 0.3462,
+   "job_cpu_s": 13.421875,
+   "active": 1,
+   "avail_phys_mb": 6297,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 14.411,
+   "sys_cpu": 0.4471,
+   "job_cpu_s": 13.828125,
+   "active": 1,
+   "avail_phys_mb": 6277,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 14.815,
+   "sys_cpu": 0.3269,
+   "job_cpu_s": 14.21875,
+   "active": 1,
+   "avail_phys_mb": 6249,
+   "job_peak_mb": 6
+  },
+  {
+   "t": 15.221,
+   "sys_cpu": 0.3942,
+   "job_cpu_s": 14.578125,
+   "active": 1,
+   "avail_phys_mb": 6272,
+   "job_peak_mb": 6
+  }
+ ]
+}
