@@ -27,6 +27,83 @@ pub const ROCKET_PROTECTED: &[Protected] = &[
     },
 ];
 
+/// Seeds the ground domain refuses. 100 to 129 is the hand-written M12 timing loop that ran without
+/// a guard; it holds 101 to 112, the M6 development reserve. 201 to 212 is the M6 confirmation
+/// reserve. The twelve seeds below are the M6 final confirmation, chosen by an independent
+/// reviewer (`docs/m6-controller-repair.md`).
+pub const GROUND_PROTECTED: &[Protected] = &[
+    Protected {
+        start: 100,
+        end: 129,
+        reason: "M6 reserved seeds 101-112 and the unguarded M12 timing range",
+    },
+    Protected {
+        start: 201,
+        end: 212,
+        reason: "M6 confirmation seeds",
+    },
+    Protected {
+        start: 7349,
+        end: 7349,
+        reason: "M6 final confirmation seed",
+    },
+    Protected {
+        start: 18265,
+        end: 18265,
+        reason: "M6 final confirmation seed",
+    },
+    Protected {
+        start: 29581,
+        end: 29581,
+        reason: "M6 final confirmation seed",
+    },
+    Protected {
+        start: 83017,
+        end: 83017,
+        reason: "M6 final confirmation seed",
+    },
+    Protected {
+        start: 156432,
+        end: 156432,
+        reason: "M6 final confirmation seed",
+    },
+    Protected {
+        start: 241907,
+        end: 241907,
+        reason: "M6 final confirmation seed",
+    },
+    Protected {
+        start: 318604,
+        end: 318604,
+        reason: "M6 final confirmation seed",
+    },
+    Protected {
+        start: 407753,
+        end: 407753,
+        reason: "M6 final confirmation seed",
+    },
+    Protected {
+        start: 536218,
+        end: 536218,
+        reason: "M6 final confirmation seed",
+    },
+    Protected {
+        start: 672941,
+        end: 672941,
+        reason: "M6 final confirmation seed",
+    },
+    Protected {
+        start: 794306,
+        end: 794306,
+        reason: "M6 final confirmation seed",
+    },
+    Protected {
+        start: 921685,
+        end: 921685,
+        reason: "M6 final confirmation seed",
+    },
+];
+
 /// Largest number of replicates per cell.
 pub const MAX_REPLICATES: u64 = 100_000;
 

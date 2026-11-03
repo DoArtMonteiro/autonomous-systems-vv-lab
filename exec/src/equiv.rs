@@ -111,8 +111,9 @@ pub fn run(
         if let Err(e) = domain.write(&case, rec.seed, &lib) {
             problems.push(format!("in-process writer: {e}"));
         }
+        let args = domain.cli_args(&case, rec.seed, &cli_dir, &dir.join("cli-inputs"))?;
         let status = Command::new(cli)
-            .args(domain.cli_args(&case, rec.seed, &cli_dir))
+            .args(args)
             .output()
             .map_err(|e| format!("{}: {e}", cli.display()))?;
         let mut files = Vec::new();
@@ -133,17 +134,21 @@ pub fn run(
                 }
             }
         }
-        if report.cli_source_sha256.is_none()
-            && let Ok(bytes) = fs::read(cli_dir.join("run.json"))
-            && let Ok(v) = serde_json::from_slice::<serde_json::Value>(&bytes)
-        {
-            report.cli_source_sha256 = v["source_sha256"].as_str().map(String::from);
+        if report.cli_source_sha256.is_none() {
+            report.cli_source_sha256 = domain.written_source_sha256(&cli_dir);
         }
         let hash = |name: &str| fs::read(lib.join(name)).ok().map(|b| sha256_hex(&b));
-        let record_matches = hash("case.json").as_deref() == Some(rec.case_sha256.as_str())
-            && hash("trace.json") == rec.trace_sha256
-            && (rec.verification_sha256.is_none()
-                || hash("verification.json") == rec.verification_sha256);
+        let case_hash = match domain.case_copy_file() {
+            Some(name) => hash(name),
+            None => fs::read(&case).ok().map(|b| sha256_hex(&b)),
+        };
+        let record_matches = case_hash.as_deref() == Some(rec.case_sha256.as_str())
+            && hash(domain.trace_file()) == rec.trace_sha256
+            && match (domain.verification_file(), &rec.verification_sha256) {
+                (_, None) => true,
+                (Some(name), Some(h)) => hash(name).as_ref() == Some(h),
+                (None, Some(_)) => false,
+            };
         if !record_matches {
             problems.push("the logged record does not match the artifacts".into());
         }
@@ -155,8 +160,7 @@ pub fn run(
             }
         };
         let replay = Command::new(cli)
-            .arg("replay")
-            .arg(&lib)
+            .args(domain.cli_replay_args(&lib))
             .output()
             .map_err(|e| format!("{}: {e}", cli.display()))?;
         let replay_verified = replay.status.success();

@@ -11,7 +11,7 @@ use std::path::Path;
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::converge::{self, Convergence};
+use crate::converge::Convergence;
 use crate::engine::Record;
 use crate::plan::{Plan, Role};
 use crate::spec::Design;
@@ -139,7 +139,7 @@ pub fn build(plan: &Plan, records: &[Record], out: &Path) -> Result<Report, Stri
     let conf = e.analysis.confidence;
     let metric = e.analysis.metric.as_deref();
     // Only a domain with a verification artifact has verdicts.
-    let verdicts = plan.domain.files().contains(&"verification.json");
+    let verdicts = plan.domain.has_verdicts();
     let arms_n = plan.arm_names.len();
     let mut arms: Vec<ArmSummary> = plan
         .arm_names
@@ -321,11 +321,7 @@ pub fn build(plan: &Plan, records: &[Record], out: &Path) -> Result<Report, Stri
             .collect();
         picks.dedup();
         for v in picks {
-            let c = if plan.domain.id() == "rocket-rigid-body" {
-                converge::rigid_body(&plan.case_of_variant(v)?, 4, tol)?
-            } else {
-                converge::not_applicable(converge::LANDING_FIXED_STEP, tol)
-            };
+            let c = plan.domain.convergence(&plan.case_of_variant(v)?, tol)?;
             convergence.push((v, c));
         }
     }
