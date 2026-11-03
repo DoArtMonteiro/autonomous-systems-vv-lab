@@ -27,3 +27,12 @@ vv-platform = { path = "platform" }
 codegen-units = 1
 lto = "thin"
 strip = "debuginfo"
+
+# Local iteration only: `cargo build --profile dev-release`. Same optimisation level, parallel
+# code generation and no LTO, so a Studio relink takes seconds instead of minutes. The installer
+# and CI keep `release`.
+[profile.dev-release]
+inherits = "release"
+codegen-units = 16
+lto = false
+incremental = true
