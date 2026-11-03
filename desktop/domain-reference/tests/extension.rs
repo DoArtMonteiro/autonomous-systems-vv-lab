@@ -222,3 +222,60 @@ fn invalid_requests_are_refused_with_a_message() {
     r.domain = "absent".into();
     assert!(matches!(p.run(&r), Err(PlatformError::NotFound(_))));
 }
+
+#[test]
+fn a_library_summary_that_disagrees_with_the_record_is_rejected_and_exported_as_such() {
+    let root = temp("meta-tamper");
+    let domains = root.join("domains");
+    install(&domains, "reference-oscillator", &manifest());
+    let (p, _) = Platform::start(&[domains], &root.join("library"), V).unwrap();
+    let run = p.run(&request(42)).unwrap();
+    let ok = p.export_evidence(&run.run_id, None).unwrap();
+    assert!(ok.to_string_lossy().ends_with("-evidence.zip"));
+
+    // The Library list and the run summary come from meta.json: make it claim another outcome.
+    let meta = p.library().run_dir(&run.run_id).unwrap().join("meta.json");
+    let text = fs::read_to_string(&meta).unwrap();
+    let forged = text.replacen("\"safe\"", "\"unsafe\"", 1);
+    assert_ne!(text, forged);
+    fs::write(&meta, forged).unwrap();
+    let replay = p.replay(&run.run_id).unwrap();
+    assert_eq!(replay.status, "rejected");
+    assert!(
+        replay
+            .checks
+            .iter()
+            .any(|c| !c.pass && c.name.contains("meta.json summary"))
+    );
+    let path = p.export_evidence(&run.run_id, None).unwrap();
+    assert!(
+        path.file_name()
+            .unwrap()
+            .to_string_lossy()
+            .ends_with("-REJECTED.zip"),
+        "{}",
+        path.display()
+    );
+}
+
+#[test]
+fn a_host_replaced_after_start_up_is_not_called() {
+    let root = temp("host-swap");
+    let domains = root.join("domains");
+    let dir = install(&domains, "reference-oscillator", &manifest());
+    let (p, _) = Platform::start(&[domains], &root.join("library"), V).unwrap();
+    let run = p.run(&request(42)).unwrap();
+    // Append a byte: a different build at the same path.
+    let exe = fs::read_dir(&dir)
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .find(|p| p.extension().is_none_or(|x| x == "exe") && p.is_file())
+        .unwrap();
+    let mut bytes = fs::read(&exe).unwrap();
+    bytes.push(0);
+    fs::write(&exe, bytes).unwrap();
+    let err = p.replay(&run.run_id).unwrap_err();
+    assert!(err.to_string().contains("changed since"), "{err}");
+    let err = p.run(&request(43)).unwrap_err();
+    assert!(err.to_string().contains("changed since"), "{err}");
+}

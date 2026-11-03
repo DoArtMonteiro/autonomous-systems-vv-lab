@@ -197,6 +197,21 @@ impl Platform {
             .collect()
     }
 
+    /// Refuses to call a host whose executable changed after start-up: the run identity and the
+    /// replay verdict are bound to the build that was hashed.
+    fn checked_host(&self, entry: &DomainEntry) -> Result<(), PlatformError> {
+        let now = fs::read(&entry.found.executable)
+            .map(|b| sha256_hex(&b))
+            .map_err(|e| PlatformError::Host(format!("domain host: {e}")))?;
+        if now != entry.host_sha256 {
+            return Err(PlatformError::Host(format!(
+                "the {} host executable changed since the application started; restart to use the new build",
+                entry.found.manifest.id
+            )));
+        }
+        Ok(())
+    }
+
     fn entry(&self, id: &str) -> Result<(&DomainEntry, &DomainCatalog), PlatformError> {
         let entry = self
             .domains
@@ -292,6 +307,7 @@ impl Platform {
         let input = work.join("request.input.json");
         let out_dir = work.join("run");
         fs::write(&input, pretty_bytes(normal)).map_err(io)?;
+        self.checked_host(entry)?;
         let out = host_call(
             &entry.found,
             vec![
@@ -410,8 +426,43 @@ impl Platform {
             pass: guard.is_ok(),
             detail: guard.err().unwrap_or_default(),
         });
+        // meta.json is what the Library shows; it must say what record.json says, and the run id
+        // must be the identity of the stored request under the host build that produced it.
+        let meta = self.library.read_meta(run_id);
+        let (summary_ok, id_ok, build) = match &meta {
+            Ok(m) => {
+                let identity = serde_json::json!({
+                    "domain": record.request.domain,
+                    "host_sha256": m.host_sha256,
+                    "request": record.request,
+                });
+                let id = sha256_hex(&canonical_bytes(&identity))[..16].to_owned();
+                (
+                    m.summary == summary_of(&record),
+                    m.run_id == run_id && id == run_id,
+                    if m.host_sha256 == entry.host_sha256 {
+                        String::new()
+                    } else {
+                        "recomputed by a different host build than the one that produced the run"
+                            .to_string()
+                    },
+                )
+            }
+            Err(_) => (false, false, String::new()),
+        };
+        checks.push(ReplayCheck {
+            name: "meta.json summary equals the summary of record.json".into(),
+            pass: summary_ok,
+            detail: meta.as_ref().err().cloned().unwrap_or_default(),
+        });
+        checks.push(ReplayCheck {
+            name: "the run id is the identity of the stored request and host build".into(),
+            pass: id_ok,
+            detail: build,
+        });
         // A protected seed is never recomputed, even from a stored run.
         if checks.iter().all(|c| c.pass) {
+            self.checked_host(entry)?;
             let out = host_call(&entry.found, vec!["replay".into(), dir.clone().into()])?;
             match serde_json::from_slice::<ReplayReport>(&out.stdout) {
                 Ok(report) if report.schema == REPLAY_SCHEMA => {
@@ -448,9 +499,14 @@ impl Platform {
             .map_err(PlatformError::Invalid)?;
         let bytes = evidence::package(&dir, run_id, &record, &replay, &self.version).map_err(io)?;
         let path = dest.unwrap_or_else(|| {
+            let suffix = if replay.status == "verified" {
+                ""
+            } else {
+                "-REJECTED"
+            };
             self.library
                 .exports_dir()
-                .join(format!("{run_id}-evidence.zip"))
+                .join(format!("{run_id}-evidence{suffix}.zip"))
         });
         crate::library::write_atomic(&path, &bytes).map_err(io)?;
         Ok(path)

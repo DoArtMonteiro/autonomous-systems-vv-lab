@@ -15,6 +15,11 @@ use crate::contract::{FileHash, META_FILE, ReplayReport, RunRecord};
 use crate::host_sdk::read_bounded;
 
 pub const EVIDENCE_SCHEMA: &str = "vv-evidence.v1";
+
+/// Every run the desktop application can make is a development demonstration: the platform and
+/// the hosts refuse the protected evaluation and reserve seeds, so no package from this
+/// application is a scientifically accepted outcome.
+pub const EVIDENCE_CLASS: &str = "development_demonstration";
 const MAX_PACKAGE_BYTES: u64 = 96 * 1024 * 1024;
 
 #[derive(Serialize)]
@@ -24,13 +29,14 @@ struct Manifest<'a> {
     domain: &'a str,
     domain_version: &'a str,
     platform_version: &'a str,
+    evidence_class: &'static str,
     replay_status: &'a str,
     files: Vec<FileHash>,
 }
 
 fn readme(run_id: &str, record: &RunRecord, replay: &ReplayReport) -> String {
     let mut text = format!(
-        "# Evidence package {run_id}\n\nDomain: {} {} (contract {})\n\nRequest: scenario {}, controller {}, seed {}, {} fault(s).\n\nOutcome: {} ({}). Safety: {}.\n\nFresh replay when this package was made: {}.\n\nModel validity: {}\n\n## Reproduce\n\nFrom a checkout of the repository at the commit that produced the simulator (source SHA-256 {}):\n\n",
+        "# Evidence package {run_id}\n\nEvidence class: development demonstration. Not a scientifically accepted outcome: this application refuses the protected evaluation and reserve seeds.\n\nDomain: {} {} (contract {})\n\nRequest: scenario {}, controller {}, seed {}, {} fault(s).\n\nOutcome: {} ({}). Safety: {}.\n\nFresh replay when this package was made: {}.\n\nModel validity: {}\n\n## Reproduce\n\nFrom a checkout of the repository at the commit that produced the simulator (source SHA-256 {}):\n\n",
         record.domain.id,
         record.domain.version,
         record.domain.contract,
@@ -89,6 +95,7 @@ pub fn package(
         domain: &record.domain.id,
         domain_version: &record.domain.version,
         platform_version,
+        evidence_class: EVIDENCE_CLASS,
         replay_status: &replay.status,
         files: files
             .iter()

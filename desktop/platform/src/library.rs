@@ -291,7 +291,8 @@ impl Library {
         Ok(meta)
     }
 
-    /// Stored runs, newest first. Entries without a readable meta.json are skipped.
+    /// Stored runs, newest first, at most `MAX_LISTED`. Entries without a readable meta.json are
+    /// skipped. The cap applies after sorting, so the newest runs are the ones listed.
     pub fn list_runs(&self) -> Vec<RunMeta> {
         let Ok(entries) = fs::read_dir(self.root.join("runs")) else {
             return Vec::new();
@@ -300,7 +301,6 @@ impl Library {
             .filter_map(Result::ok)
             .filter_map(|e| e.file_name().into_string().ok())
             .filter(|n| valid_run_id(n))
-            .take(MAX_LISTED)
             .filter_map(|n| self.read_meta(&n).ok())
             .collect();
         runs.sort_by(|a, b| {
@@ -308,6 +308,7 @@ impl Library {
                 .cmp(&a.created_utc)
                 .then(a.run_id.cmp(&b.run_id))
         });
+        runs.truncate(MAX_LISTED);
         runs
     }
 
