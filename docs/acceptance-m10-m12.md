@@ -6,7 +6,7 @@ Estado em 3 de novembro de 2026. Este painel separa cinco coisas que não são e
 
 - Nenhuma semente de avaliação (3000 a 3099), de reserva (6000 a 6099) ou do intervalo 100 a 129 foi executada. Nenhum `m10-freeze.json` foi criado.
 - Nada foi escrito em `runs/`; as evidências históricas, as referências de recuperação e as árvores de trabalho existentes não foram alteradas. O trabalho novo foi feito em árvores de trabalho separadas.
-- O autor das correções não deu nenhum veredicto sozinho. Revisões independentes: estatística, controlo e segurança do M10, fiabilidade do `vv-exec`, segurança do Studio e engenharia de integração. Uma segunda revisão verificou as correções do `vv-exec`.
+- O autor das correções não deu nenhum veredicto sozinho. Revisões independentes: estatística, controlo e segurança do M10, fiabilidade do `vv-exec`, segurança do Studio e engenharia de integração. As correções do `vv-exec` e do Studio tiveram uma segunda verificação pelos respetivos revisores.
 - `main` não tem proteção de ramo: `branches/main/protection` responde 404, sem regras nem verificações obrigatórias. Não existe requisito de revisão no repositório.
 
 ## Pilha e dependências
@@ -42,17 +42,19 @@ Revisão independente (`docs/m10-independent-review.md` no PR #15):
 | --- | --- |
 | Commit em revisão | `c494604` |
 | CI | Execução 41654052018: Linux, Windows, `desktop`, `installer` e comparação canónica verdes |
-| Engenharia | **ACEITE: ENGENHARIA**, com os riscos abaixo |
+| Engenharia | **CONDICIONAL**. O achado de severidade alta 1 (política de sementes) continua aberto, e a reprodução de execuções reais do foguetão e do veículo terrestre pela plataforma em `c494604` só é coberta pelo `--self-test` do Studio, que não foi corrido nesse commit |
 | Produto | **CONDICIONAL** |
 | Ciência | Não aplicável. As demonstrações M10 são de desenvolvimento |
 | Integração | Não integrar como está: depende do #15. Caminho proposto: PR A abaixo |
 
-Corrigido nesta revisão (`c494604`):
+Corrigido nesta revisão (`c494604`), com segunda verificação pelo revisor de segurança: achado 4 corrigido; achados 2, 5 e 7 parciais; os testes do espaço de trabalho passam:
 
 - a reprodução rejeita um `meta.json` cujo resumo difere de `record.json`, ou cujo identificador não corresponde ao pedido e ao build guardados;
 - a plataforma recusa um anfitrião substituído depois do arranque;
 - os pacotes de evidência declaram `development_demonstration`, e uma reprodução falhada fica marcada no nome;
 - a Biblioteca lista as execuções mais recentes.
+
+Defeitos de baixa severidade introduzidos ou deixados pelas correções: uma diferença de build do anfitrião aparece só como detalhe, e a reprodução continua "verified"; cada execução volta a calcular o hash do executável inteiro; continua a haver uma janela entre essa verificação e o arranque do processo; com a janela "Guardar como", um pacote rejeitado mantém o nome escolhido.
 
 Em aberto:
 
@@ -79,7 +81,7 @@ Em aberto:
 
 | Campo | Valor |
 | --- | --- |
-| Commit em revisão | `efa463a` |
+| Commit em revisão | `efa463a` (código); `c7183c8` acrescenta só documentação |
 | CI | `91de113`: execução 41648098573, verde em Linux e Windows (falha do fixture corrigida). `2b234f2`: execução 41651104910 falhou (`cargo audit` sem instalação no Windows; clippy só em Unix), corrigido em `8d7afce`. `efa463a`: execução 41655149041, verde em Linux e Windows, incluindo o teste de `SIGINT` em Linux |
 | Engenharia | **ACEITE: ENGENHARIA**, com os riscos em aberto abaixo |
 | Ciência | Não aplicável. Todos os relatórios declaram `inference` exploratória |
@@ -105,7 +107,7 @@ Corrigido e verificado pela segunda revisão:
 - fluxo de bootstrap separado;
 - teste de memória instável.
 
-Medido: 14 400 execuções em 7,0 s e verificação completa em 10,4 s, com 16 trabalhadores.
+Medido em `efa463a` com o comando documentado: 14 400 execuções em 8,3 s ponta a ponta (5,5 s de execução), pico de 67 MB, 16 trabalhadores; `records.jsonl` igual ao registado (`078b80f0…`). Verificação completa: 10,4 s numa execução.
 
 Em aberto:
 
@@ -118,7 +120,8 @@ Em aberto:
 - amostra de equivalência sem execuções com erro;
 - sem paridade automática para o corpo rígido;
 - exatidão para n grande não testada;
-- tratador de Ctrl+C do Windows sem teste automático.
+- tratador de Ctrl+C do Windows sem teste automático;
+- o intervalo 100 a 129 não é recusado por `seeds.rs` (o motor só executa domínios do foguetão).
 
 ## Estratégia de integração proposta
 
