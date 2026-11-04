@@ -18,7 +18,9 @@ Without it the test is skipped.
 import json
 import math
 import os
+import shutil
 import subprocess
+import tempfile
 import unittest
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -143,6 +145,20 @@ class CinematicPoseParity(unittest.TestCase):
                     a = p[key]
                     tilt = math.degrees(math.atan2(math.hypot(a[0], a[1]), a[2]))
                     self.assertAlmostEqual(tilt, ch["tilt_deg"][i], delta=2e-3, msg=f"{key} tilt at t={t}")
+
+    def test_tampered_pack_is_refused(self):
+        src = os.path.join(REPO, "desktop", "environments", "spaceport-america")
+        with tempfile.TemporaryDirectory() as tmp:
+            dst = os.path.join(tmp, "spaceport-america")
+            shutil.copytree(src, dst)
+            p = os.path.join(dst, "features.json")
+            data = bytearray(open(p, "rb").read())
+            data[-3] = (data[-3] + 1) % 256
+            open(p, "wb").write(bytes(data))
+            out = subprocess.run([self.godot, "--headless", "--path", PROJECT, "--", "--run", RUN, "--env", dst],
+                                 capture_output=True, text=True, timeout=120, encoding="utf-8", errors="replace")
+        self.assertEqual(out.returncode, 4, out.stderr[-1000:])
+        self.assertIn("features.json does not match its SHA-256", out.stderr)
 
     def test_bad_arguments_are_refused(self):
         out = subprocess.run([self.godot, "--headless", "--path", PROJECT, "--", "--run", RUN, "--pose-dump", "x"],
