@@ -92,6 +92,20 @@ def geospatial(s):
     # Second environment: relief that breaks the flat-ground assumption must be stated.
     s.page.click(".pl-views [data-view='geospatial']")
     wait_renderer(s, "geospatial", 30)
+    # The catalogue: one card per validated pack, with its resolution and credits; a card switches the scene.
+    s.page.click(".pl-env-cat")
+    s.wait("document.querySelector('.envc-modal .envc')", 10, "environment catalogue")
+    time.sleep(1.0)
+    cards = s.js("[...document.querySelectorAll('.envc-modal .envc')].map((c) => c.dataset.env)")
+    envs = s.js("[...document.querySelectorAll('.pl-env option')].map((o) => o.value).filter(Boolean)")
+    check("Catalogue: one card per installed environment", sorted(cards) == sorted(envs) and len(cards) >= 3, ",".join(cards))
+    txt = s.js("document.querySelector('.envc-modal').innerText")
+    check("Catalogue: cards state resolution, relief, size and credits", "image 0.5 m" in txt and "relief within 500 m" in txt and "offline" in txt and "Copernicus" in txt)
+    check("Catalogue: the thumbnails load from the packs", s.js("[...document.querySelectorAll('.envc-modal .envc-img')].every((i) => i.complete && i.naturalWidth > 0)"))
+    s.shot("m16-environment-catalogue-dark")
+    s.page.click(".envc-modal [data-use='santa-maria-azores']")
+    wait_renderer(s, "geospatial", 30)
+    check("Catalogue: choosing a card switches the scene", player(s)["environment"] == "santa-maria-azores")
     s.page.select_option(".pl-env", "santa-maria-azores")
     wait_renderer(s, "geospatial", 30)
     time.sleep(1.0)
@@ -198,10 +212,10 @@ def gating(s):
     check("Gating MC: findings exist in the run", s.js(allv) > 0, str(s.js(allv)))
     check("Gating MC: none is drawn at the start of the playback", s.js(vis) == 0)
     check("Gating MC: the event list does not list them either", s.js("[...document.querySelectorAll('.mc-evlist li')].filter((l) => !l.hidden && /sev-(violation|warning|detection)/.test(l.innerHTML)).length") == 0)
-    s.page.click(".mct-controls [data-action='analysis']")
+    s.page.click(".mc-bottom [data-action='analysis']")
     time.sleep(0.4)
     check("Gating MC: analysis mode draws them", s.js(vis) == s.js(allv))
-    s.page.click(".mct-controls [data-action='analysis']")
+    s.page.click(".mc-bottom [data-action='analysis']")
 
 
 def control_rocket(s):
@@ -225,7 +239,7 @@ def control_rocket(s):
     check("MC rocket: the timeline marks where the runs part", s.js("document.querySelectorAll('.mct-fork').length >= 1"))
     s.shot("m16-control-rocket-technical-dark")
     # Later findings are drawn only once reached or in analysis mode.
-    s.page.click(".mct-controls [data-action='analysis']")
+    s.page.click(".mc-bottom [data-action='analysis']")
     time.sleep(0.4)
     marks = s.js("[...document.querySelectorAll('.mct-mark')].map((b) => b.getAttribute('aria-label'))")
     det = next((i for i, m in enumerate(marks) if "Controller detection" in m), None)

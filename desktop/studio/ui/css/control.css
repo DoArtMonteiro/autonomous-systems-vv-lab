@@ -231,7 +231,7 @@
 
 /* M16.1: compact sources-and-accuracy control on geographic scenes. The scene keeps its space; the
    short credit stays visible and the full notices open on hover, click, tap or the keyboard. */
-.pl-scene-note.is-geo, .pl-geo .pl-scene-note.is-geo, .mc .pl-scene-note.is-geo { background: none; padding: 0; left: 16px; right: auto; bottom: 12px; width: auto; max-width: min(560px, calc(100% - 32px)); pointer-events: none; }
+.pl-scene-note.is-geo, .pl-geo .pl-scene-note.is-geo, .mc .pl-scene-note.is-geo { background: none; padding: 0; left: 16px; right: auto; bottom: 12px; width: auto; max-width: min(620px, calc(100% - 32px)); pointer-events: none; }
 .mc .pl-scene-note.is-geo { left: 18px; bottom: 126px; max-width: min(520px, calc(100% - 460px)); }
 .si { position: relative; display: grid; gap: 4px; justify-items: start; pointer-events: auto; }
 .si-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
@@ -241,7 +241,7 @@
 .si-i { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid currentColor; font: italic 700 10px/1 Georgia, serif; }
 .si-chip { height: 22px; display: inline-flex; align-items: center; padding: 0 8px; border-radius: 11px; font-size: 10.5px; background: var(--glass); backdrop-filter: blur(var(--glass-blur)); color: var(--fg-2); border: 1px solid var(--glass-rule); }
 .si-chip:not(.si-flat) { color: var(--fail); }
-.si-credit { margin: 0; font-size: 9.5px; line-height: 1.35; color: var(--fg-2); background: var(--glass); backdrop-filter: blur(var(--glass-blur)); border-radius: 4px; padding: 2px 7px; max-width: 76ch; }
+.si-credit { margin: 0; font-size: 9.5px; line-height: 1.35; color: var(--fg-2); background: var(--glass); backdrop-filter: blur(var(--glass-blur)); border-radius: 4px; padding: 2px 7px; max-width: min(600px, calc(100vw - 520px)); min-width: 280px; }
 .si-panel { position: absolute; left: 0; bottom: calc(100% + 8px); width: min(460px, calc(100vw - 48px)); max-height: min(440px, 58vh); overflow: auto; padding: 12px 14px; border-radius: 8px; background: var(--glass-strong); backdrop-filter: blur(var(--glass-blur)); border: 1px solid var(--glass-rule); box-shadow: 0 10px 32px rgba(0, 0, 0, .35); color: var(--fg-1); font-size: 11.5px; line-height: 1.45; z-index: 6; }
 .si-panel[hidden] { display: none; }
 .si-h { margin: 10px 0 4px; font: var(--t-micro); letter-spacing: .12em; text-transform: uppercase; color: var(--fg-3); }
@@ -262,3 +262,32 @@
 .pl-mark[hidden], .mct-mark[hidden] { display: none; }
 @media (prefers-reduced-motion: no-preference) { .si-panel { animation: si-in 140ms ease-out; } }
 @keyframes si-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* M16.1: environment catalogue. */
+.pl-env-tools { display: inline-flex; gap: 6px; align-items: center; }
+.envc-modal { width: min(1080px, calc(100vw - 48px)); }
+.envc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; margin-top: 12px; }
+.envc { display: grid; grid-template-columns: 132px 1fr; gap: 12px; padding: 12px; border: 1px solid var(--rule); border-radius: 8px; background: var(--bg-1); }
+.envc.is-current { border-color: color-mix(in srgb, var(--accent) 55%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent); }
+.envc-thumb { position: relative; width: 132px; height: 132px; border-radius: 6px; overflow: hidden; background: var(--bg-3); }
+.envc-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.envc-img.is-missing { visibility: hidden; }
+.envc-kind { position: absolute; left: 6px; bottom: 6px; font: var(--t-micro); letter-spacing: .08em; text-transform: uppercase; padding: 2px 6px; border-radius: 3px; background: rgba(8, 11, 15, .72); color: #e4e9ef; }
+.envc-body { display: grid; gap: 6px; align-content: start; min-width: 0; }
+.envc-name { margin: 0; font-size: 14px; }
+.envc-sum, .envc-site { margin: 0; font-size: 11.5px; line-height: 1.45; color: var(--fg-2); }
+.envc-site { color: var(--fg-3); font-style: italic; }
+.envc-facts { margin: 0; padding-left: 15px; font-size: 11px; color: var(--fg-2); display: grid; gap: 2px; }
+.envc-credit { margin: 0; font-size: 10px; color: var(--fg-3); }
+.envc-actions { margin-top: 4px; }
+.envc-using { font: var(--t-micro); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.env-build { margin: 12px 0; }
+.env-build pre { padding: 8px 10px; background: var(--bg-3); border-radius: 4px; overflow-x: auto; }
+
+/* M16.1: verdict chips stay whole at narrow widths; the analysis switch sits with the legend. */
+.mc-left, .mc-right { scrollbar-gutter: stable; }
+.mc-v { grid-template-columns: minmax(0, auto) minmax(0, 1fr) max-content; padding-right: 6px; }
+.mc-v-s { white-space: nowrap; }
+.mc-bottom .pl-analysis { position: absolute; right: 0; bottom: 0; height: 22px; font-size: 11px; }
+.mc-left > *, .mc-right > * { min-width: 0; }
+.mc-left, .mc-right { overflow-x: hidden; }

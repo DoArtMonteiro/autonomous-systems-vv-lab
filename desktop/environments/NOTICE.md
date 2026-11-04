@@ -28,6 +28,10 @@ Aviso obrigatório para dados modificados: "Contains modified Copernicus Sentine
 
 Ondulação do geoide EGM2008, U.S. National Geospatial-Intelligence Agency, obtida através da grelha `us_nga_egm08_25` do PROJ. Obra do Governo dos Estados Unidos, domínio público.
 
-## Outras fontes
+## Camadas de pormenor
 
-Os pacotes com camadas de pormenor indicam no respetivo manifesto as fontes adicionais, a licença, a atribuição exigida e a forma como foram usadas.
+Os pacotes com camada de pormenor (`detail-height.u16`, `detail-image.jpg`) usam também as fontes seguintes. O manifesto de cada pacote indica os itens usados e o tratamento aplicado (reamostragem, curvas de tom ajustadas à imagem de base, margem de transição).
+
+- USGS 3D Elevation Program, modelo digital de elevação lidar de 1 m (Cape Canaveral, Spaceport America). Domínio público dos Estados Unidos: "USGS-authored or produced data and information are considered to be in the U.S. Public Domain." (https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits). Atribuição: "Elevation: U.S. Geological Survey, 3D Elevation Program".
+- USDA National Agriculture Imagery Program (NAIP), ortoimagem (Cape Canaveral 2023, Spaceport America 2022). Domínio público segundo a política do FSA: "Public domain information may be freely distributed or copied, but use of appropriate byline/photo/image credits is requested." (https://www.fsa.usda.gov/help/policies-and-links). Não foi encontrado um documento de licença específico do NAIP. Atribuição: "Imagery: USDA Farm Production and Conservation Business Center, Geospatial Enterprise Operations, NAIP [ano]".
+- Ortofotomapa de Santa Maria 2024, Secretaria Regional do Ambiente e Ação Climática, Governo dos Açores (SRAAC). CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), segundo o registo de metadados ISO 3dbb1054-1690-43a5-b7d7-1835d5f64ef5 do catálogo IDEiA; não foi encontrada outra página de condições e a forma exata da atribuição não está confirmada. Atribuição usada: "Ortofotomapa de Santa Maria 2024 © SRAAC/Governo dos Açores, CC BY 4.0, modified (resampled and colour-balanced)".

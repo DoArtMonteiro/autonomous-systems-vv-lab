@@ -26,6 +26,7 @@ import { mountGeo } from '../scenes/geo.js';
 import { listEnvironments, loadPack, trackOf, mb } from '../environments.js';
 import { buildControl } from './control.js';
 import { sourcesInfo } from '../sources-info.js';
+import { openCatalogue } from '../env-catalogue.js';
 
 let root;
 let navigate = () => {};
@@ -198,9 +199,12 @@ function viewSwitch() {
 
 function envSelect() {
   if (!geoPossible()) return h('span', { class: 'pl-env-none small dim', title: geoReason() }, pl.kind === 'rocket-3d' ? 'No environment installed' : 'Local grid, no landscape');
-  return h('select', { class: 'select select-sm pl-env', 'aria-label': 'Geographic environment', onchange: (e) => setEnv(e.target.value || null) },
+  const sel = h('select', { class: 'select select-sm pl-env', 'aria-label': 'Geographic environment', onchange: (e) => setEnv(e.target.value || null) },
     pl.view === 'control' ? h('option', { value: '', selected: !pl.envId }, 'No landscape (engineering scene)') : null,
     pl.envs.map((x) => h('option', { value: x.id, selected: x.id === pl.envId }, `${x.name} · ${mb(x.bytes)}`)));
+  const more = h('button', { type: 'button', class: 'btn btn-quiet btn-sm pl-env-cat', dataset: { action: 'environments' }, 'aria-haspopup': 'dialog', title: 'Browse the environments: resolution, relief, sources and size',
+    onclick: () => openCatalogue(pl.envs, pl.envId, (id) => { if (pl.view === 'engineering') setView('geospatial'); setEnv(id); }) }, 'Environments');
+  return h('span', { class: 'pl-env-tools' }, sel, more);
 }
 
 function setView(v) {

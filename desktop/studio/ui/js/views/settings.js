@@ -5,6 +5,7 @@ import { h, clear, prose } from '../dom.js';
 import { api } from '../api.js';
 import { state, pref, setPref } from '../store.js';
 import { toast, errorText } from '../ui.js';
+import { envCard } from '../env-catalogue.js';
 import { listEnvironments, forgetEnvironments, mb } from '../environments.js';
 
 let root;
@@ -117,6 +118,11 @@ async function fillEnvironments(body, reloadList) {
   };
   clear(body).append(...[
     h('p', { class: 'small' }, h('b', null, 'No network. '), 'Studio never downloads geographic data and makes no network request. Environments are packs built on purpose with ', h('code', null, 'scripts/geo/build_environment.py'), ' from public sources, shipped with the installer or imported from a folder. Every pack is checked before it is shown: file sizes, SHA-256 hashes, the grid, attributed sources, and its geodetic check points recomputed by the georeference layer.'),
+    h('div', { class: 'envc-grid envc-settings' }, list.environments.map((e) => envCard(e))),
+    h('details', { class: 'env-build' }, h('summary', null, 'Build or import another environment'),
+      h('p', { class: 'small' }, 'A pack is built outside Studio, once, from public sources whose licences allow redistribution, with Python, rasterio and pyproj and an Internet connection:'),
+      h('pre', { class: 'mono small' }, 'python scripts/geo/build_environment.py --env <id> --out <folder>'),
+      h('p', { class: 'small' }, 'The script lists the environments it can build. Import the folder it writes with the button below; Studio validates it before listing it. Sources reviewed for the next environment, El Arenosillo (Huelva, Spain): IGN PNOA orthophoto and MDT05 heights, CC BY 4.0, whose credit must read “Obra derivada de … CC-BY 4.0 scne.es” at the foot of the view.')),
     h('table', { class: 'grid-table env-table' },
       h('thead', null, h('tr', null, ['environment', 'origin', 'sources and licence', 'size', 'where', ''].map((t) => h('th', null, t)))),
       h('tbody', null, list.environments.map((e) => h('tr', { dataset: { env: e.id } },

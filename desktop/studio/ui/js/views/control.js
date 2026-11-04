@@ -80,10 +80,10 @@ export function buildControl(pl, ctx) {
       h('span', { class: 'pl-swatch', style: { background: r.colour } }), r.label))) : null;
   evidenceIsOpen = ctx.evidenceOpen || (() => false);
   const tl = buildTimeline(pl, (ev) => select(ev));
-  if (ctx.analysisToggle) tl.el.querySelector('.mct-controls').append(ctx.analysisToggle());
+
   const evidence = h('section', { class: 'mc-evidence', hidden: true, 'aria-live': 'polite', 'aria-label': 'Selected event' });
   const legend = h('p', { class: 'mc-legend' });
-  const el = h('div', { class: ['mc', `mc-${density}`], dataset: { density } }, viewport, top, left, right, strip, runs, evidence, h('footer', { class: 'mc-bottom' }, tl.el, legend), ctx.sceneNote());
+  const el = h('div', { class: ['mc', `mc-${density}`], dataset: { density } }, viewport, top, left, right, strip, runs, evidence, h('footer', { class: 'mc-bottom' }, tl.el, legend, ctx.analysisToggle ? ctx.analysisToggle() : null), ctx.sceneNote());
 
   function setDensity(d) {
     density = d;

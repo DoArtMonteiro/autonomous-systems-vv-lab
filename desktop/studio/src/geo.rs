@@ -434,6 +434,21 @@ mod tests {
     }
 
     #[test]
+    fn importing_a_layered_pack_copies_its_detail_files() {
+        let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("../environments/cape-canaveral");
+        let e = Environment::open(&src).unwrap();
+        assert!(e.files().contains(&environment::DETAIL_IMAGE_FILE));
+        let root = std::env::temp_dir().join(format!("vv-import-test-{}", std::process::id()));
+        let dst = root.join("cape-canaveral");
+        let _ = fs::remove_dir_all(&root);
+        copy_pack(&src, &dst, &e.files()).unwrap();
+        let copy = Environment::open(&dst).unwrap();
+        assert_eq!(copy.files(), e.files());
+        assert!(copy.file(environment::DETAIL_IMAGE_FILE).is_ok());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
     fn a_run_without_an_enu_scene_is_refused() {
         let mut r = record();
         r.scene = json!({"kind": "ground-2d", "units": "mm"});

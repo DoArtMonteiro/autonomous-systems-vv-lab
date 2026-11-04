@@ -73,6 +73,17 @@ ENVIRONMENTS = {
                    "imagery": {"kind": "wms", "licence": "azores-orto-2024", "year": 2024,
                                "url": "https://ambiente.azores.gov.pt/qgisserver/sma/orto2024/qgis_mapserv.fcgi", "layer": "ortofotomapa_2024_sma"}},
     },
+    "spaceport-america": {
+        "name": "Spaceport America, New Mexico",
+        "summary": "High desert basin of the Jornada del Muerto at about 1400 m. The simulation's pad centre is placed on open desert ground, read from the detail image. Nearly flat around the pad, so the flat-ground assumption of the simulation holds well here.",
+        "site_note": "The detail image covers part of an existing commercial spaceport. The simulated vehicle, pad and mission are generic: they are not that spaceport, its facilities or its operations, and imply no affiliation.",
+        "lat": 32.99000, "lon": -106.96000,
+        "half_extent_m": 9000.0, "dem_spacing_m": 30.0, "image_spacing_m": 10.0,
+        "s2_items": ["S2C_T13SCS_20250430T180009_L2A", "S2B_T13SCS_20250415T180113_L2A"],
+        "heading_deg": 0.0,
+        "detail": {"half_extent_m": 1024.0, "dem_spacing_m": 4.0, "image_spacing_m": 0.5, "blend_m": 192.0,
+                   "dem": {"kind": "tnm-1m"}, "imagery": {"kind": "naip", "year": 2022}},
+    },
 }
 
 LICENCES = {
