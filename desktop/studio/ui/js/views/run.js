@@ -40,11 +40,11 @@ export async function showRun(opts) {
 
 function renderEmpty() {
   clear(root).append(h('div', { class: 'settings' },
-    h('h1', null, 'No run open'),
-    h('p', { class: 'dim' }, 'Run a mission or a demonstration from Prepare, or open a stored run from the Library.'),
+    h('h1', null, 'No run open for analysis'),
+    h('p', { class: 'dim' }, 'Play a mission from the library, configure a run, or open a stored run from Records.'),
     h('div', { class: 'row' },
-      h('button', { type: 'button', class: 'btn btn-primary', onclick: () => navigate('prepare') }, 'Prepare a mission'),
-      h('button', { type: 'button', class: 'btn', onclick: () => navigate('library') }, 'Open the library'))));
+      h('button', { type: 'button', class: 'btn btn-primary', onclick: () => navigate('prepare') }, 'Configure a run'),
+      h('button', { type: 'button', class: 'btn', onclick: () => navigate('library') }, 'Open Records'))));
 }
 
 function dispose() {

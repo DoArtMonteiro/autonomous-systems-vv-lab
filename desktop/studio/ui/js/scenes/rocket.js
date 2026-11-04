@@ -18,7 +18,7 @@ function chan(model, id) {
   return c ? c.values : null;
 }
 
-function channelsOf(model) {
+export function channelsOf(model) {
   const sc = model.record.scene.channels || {};
   const pos = sc.position || ['pos_x', 'pos_y', 'pos_z'];
   const noz = sc.nozzle_position || ['base_x', 'base_y', 'altitude'];
@@ -38,7 +38,7 @@ function channelsOf(model) {
   };
 }
 
-function padOf(scene) {
+export function padOf(scene) {
   const p = scene.pad || {};
   return {
     cx: Array.isArray(p.centre_m) ? p.centre_m[0] : 0,
@@ -48,11 +48,11 @@ function padOf(scene) {
   };
 }
 
-function hexColour(name) {
+export function hexColour(name) {
   return new THREE.Color(cssVar(name) || '#888888');
 }
 
-function circlePoints(cx, cy, r, n = 128) {
+export function circlePoints(cx, cy, r, n = 128) {
   const pts = [];
   for (let i = 0; i <= n; i++) {
     const a = (i / n) * Math.PI * 2;
@@ -69,8 +69,9 @@ function circle2d(ctx, P, cx, cy, r) {
 
 // ---------------------------------------------------------------------------- 3D view
 
-class Rocket3D {
-  constructor(host, model, ch) {
+export class Rocket3D {
+  constructor(host, model, ch, opts = {}) {
+    this.opts = opts;
     this.host = host;
     this.model = model;
     this.ch = ch;
@@ -79,6 +80,7 @@ class Rocket3D {
     this.ok = true;
     try {
       this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+      if (!this.renderer.getContext()) throw new Error('no WebGL context');
     } catch (e) {
       this.ok = false;
       host.append(h('p', { class: 'empty' }, 'The 3D view needs WebGL, which is not available here. The top and profile views below are complete.'));
@@ -97,13 +99,17 @@ class Rocket3D {
     this.controls.enableDamping = false;
     this.controls.addEventListener('change', () => this.requestRender());
     this.controls.addEventListener('start', () => { this.userMoved = true; });
+    this.lights(s);
+    this.build();
+    this.ro = new ResizeObserver(() => this.resize());
+    this.ro.observe(host);
+  }
+
+  lights(s) {
     s.add(new THREE.HemisphereLight(0xffffff, 0x404040, 2.2));
     const sun = new THREE.DirectionalLight(0xffffff, 1.6);
     sun.position.set(-300, -500, 800);
     s.add(sun);
-    this.build();
-    this.ro = new ResizeObserver(() => this.resize());
-    this.ro.observe(host);
   }
 
   build() {

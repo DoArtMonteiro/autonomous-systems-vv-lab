@@ -246,7 +246,7 @@ function renderSide() {
   const demos = d.catalog.demos || [];
   side.append(h('section', { 'aria-label': 'Demonstrations' },
     h('h2', { class: 'pane-title' }, `Demonstrations (${demos.length})`),
-    demos.length ? demos.map((demo) => demoCard(d, demo)) : h('p', { class: 'empty small' }, 'This domain ships no curated demonstration. Prepare a mission on the right.')));
+    demos.length ? demos.map((demo) => demoCard(d, demo)) : h('p', { class: 'empty small' }, 'This domain ships no curated demonstration. Configure a run on the right.')));
 
   const mine = savedScenarios.filter((s) => s.requests.length && s.requests[0].domain === d.manifest.id);
   side.append(h('section', { 'aria-label': 'Saved scenarios' },
@@ -284,7 +284,7 @@ function renderMain() {
   const unit = cat.time.unit;
   const formEl = h('div', { class: 'prep-form' });
   formEl.append(h('header', { class: 'prep-head' },
-    h('h1', null, 'Prepare a mission'),
+    h('h1', null, 'Configure a run'),
     h('span', { class: 'dim mono' }, `${d.manifest.name} · ${d.manifest.contract.name} ${d.manifest.contract.major}.${d.manifest.contract.minor}`),
     h('p', null, prose(d.manifest.description))));
 
