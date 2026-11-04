@@ -217,6 +217,9 @@ initCompare(document.getElementById('view-compare'), navigate);
 initLibrary(document.getElementById('view-library'), navigate);
 initSettings(document.getElementById('view-settings'), async () => { await refreshInfo(); await loadDomains(); });
 
+// Test hook (M16 journeys): open a library mission by id, exactly as its card does.
+document.addEventListener('vv-open-mission', (e) => navigate('mission', { experienceId: String(e.detail) }));
+
 // Test and debugging hook: read-only facts about the visible state.
 window.__studio = {
   view: () => currentView,

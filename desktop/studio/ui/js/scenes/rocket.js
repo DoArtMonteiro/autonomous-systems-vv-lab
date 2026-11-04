@@ -79,7 +79,7 @@ export class Rocket3D {
     this.mode = 'follow';
     this.ok = true;
     try {
-      this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+      this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true, ...(opts.gl || {}) });
       if (!this.renderer.getContext()) throw new Error('no WebGL context');
     } catch (e) {
       this.ok = false;
@@ -311,6 +311,7 @@ export class Rocket3D {
     this.pending = requestAnimationFrame(() => {
       this.pending = 0;
       this.renderer.render(this.s, this.camera);
+      this.rendered = (this.rendered || 0) + 1;
     });
   }
 

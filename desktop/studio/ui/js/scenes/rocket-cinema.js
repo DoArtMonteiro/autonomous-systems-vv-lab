@@ -32,7 +32,7 @@ function groundTexture(inner, outer) {
   return t;
 }
 
-class CinemaRocket extends Rocket3D {
+export class CinemaRocket extends Rocket3D {
   lights(s) {
     s.add(new THREE.HemisphereLight(0xd6dee8, 0x0a0d12, 1.5));
     const key = new THREE.DirectionalLight(0xffffff, 2.6);
