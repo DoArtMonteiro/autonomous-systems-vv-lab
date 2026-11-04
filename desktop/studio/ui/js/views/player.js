@@ -20,10 +20,11 @@ import { openRequest } from './prepare.js';
 let root;
 let navigate = () => {};
 let pl = null; // {exp, demo, domain, runs:[{runId, record, model, label, colour}], cursor, active, scene, revealed}
-let loading = null;
+let loading = null; // {id} of the load in progress; a newer load replaces it
+let visible = false;
 
 const SPEEDS = [0.5, 1, 2, 4];
-const ENGINE = ['Free fall', 'Powered descent', 'Engine cut', 'Flameout'];
+const ENGINE = ['Engine off', 'Engine on', 'Engine cut', 'Flameout'];
 const ROCKET_METRICS = ['touchdown_vertical_speed', 'touchdown_horizontal_speed', 'touchdown_pad_distance'];
 const KIND_WORD = { T: 'true state', E: 'controller estimate', O: 'sensor observation', D: 'derived' };
 
@@ -39,14 +40,25 @@ export function playerState() {
 }
 
 export async function showPlayer(opts) {
+  visible = true;
   const id = opts && opts.experienceId;
+  if (id && loading && loading.id === id) return; // the same mission is already loading
   if (id && (!pl || pl.exp.id !== id)) {
     await load(id);
   } else if (!pl && !loading) {
     renderEmpty();
-  } else if (pl && pl.scene && pl.scene.redraw) {
-    requestAnimationFrame(() => { if (pl && pl.scene && pl.scene.redraw) pl.scene.redraw(); });
+  } else if (pl) {
+    // A challenge run elsewhere may have changed what the claim card should say.
+    forgetClaims();
+    renderSide();
+    if (pl.scene && pl.scene.redraw) requestAnimationFrame(() => { if (pl && pl.scene && pl.scene.redraw) pl.scene.redraw(); });
   }
+}
+
+/** Called when another view is shown: playback stops, nothing renders off screen. */
+export function leavePlayer() {
+  visible = false;
+  if (pl) pl.cursor.pause();
 }
 
 function renderEmpty() {
@@ -70,14 +82,16 @@ function dispose() {
 
 async function load(id) {
   const exp = experienceById(id);
-  if (!exp) { renderEmpty(); return; }
-  const r = resolve(exp);
-  if (!r.demo) {
+  const r = exp ? resolve(exp) : null;
+  if (!exp || !r.demo) {
+    loading = null;
+    dispose();
+    if (!exp) { renderEmpty(); return; }
     clear(root).append(h('div', { class: 'pl-empty' }, h('h1', null, exp.title), h('p', { class: 'error-text' }, r.reason),
       h('button', { type: 'button', class: 'btn', onclick: () => navigate('missions') }, 'Back to the library')));
     return;
   }
-  const token = {};
+  const token = { id };
   loading = token;
   dispose();
   const status = h('p', { class: 'pl-loading-text', role: 'status', 'aria-live': 'polite' }, 'Starting the simulation…');
@@ -94,6 +108,7 @@ async function load(id) {
       const out = await api.run(r.demo.requests[i]);
       if (loading !== token) return;
       const record = await loadRecord(out.run_id);
+      if (loading !== token) return;
       runs.push({ runId: out.run_id, record, model: modelOf(record), label: exp.runs[i], colour: SERIES[i % SERIES.length] });
     }
   } catch (e) {
@@ -118,7 +133,7 @@ async function load(id) {
   pl = { exp, demo: r.demo, domain: r.domain, runs, cursor, active: 0, scene: null, revealed: false, unit, kind: runs[0].record.scene && runs[0].record.scene.kind };
   build();
   cursor.set(t0);
-  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) cursor.play();
+  if (visible && !matchMedia('(prefers-reduced-motion: reduce)').matches) cursor.play();
 }
 
 // ----------------------------------------------------------------------------- derived views
@@ -181,12 +196,32 @@ function value(run, id, t) {
   return v === undefined ? null : v;
 }
 
+function metricValue(run, id) {
+  const m = (run.record.metrics || []).find((x) => x.id === id);
+  return m && Number.isFinite(m.value) ? m.value : null;
+}
+
 function readouts(run, t, rocket) {
   const v = (id) => value(run, id, t);
   if (rocket) {
     const vz = v('vel_z');
     const thr = v('act_throttle');
     const rej = v('altimeter_rejected');
+    // After touchdown the speeds are the verifier's values at the contact instant, not the last
+    // 0.1 s sample before it.
+    const contact = t >= run.model.t1 - 1e-9 && metricValue(run, 'touchdown_vertical_speed') !== null;
+    if (contact) {
+      return [
+        ['Altitude', 0, 'm', 'T', 'Contact: the nozzle exit plane reached the ground'],
+        ['Descent rate', metricValue(run, 'touchdown_vertical_speed'), 'm/s', 'T', 'Vertical speed at the contact instant, from the verifier'],
+        ['Horizontal speed', metricValue(run, 'touchdown_horizontal_speed'), 'm/s', 'T', 'Horizontal speed at the contact instant, from the verifier'],
+        ['Tilt', v('tilt_deg'), '°', 'T', 'Last recorded sample'],
+        ['Throttle', thr === null ? null : 100 * thr, '%', 'T', 'Last recorded sample'],
+        ['From pad centre', metricValue(run, 'touchdown_pad_distance'), 'm', 'D', 'Distance of the nozzle plane from the pad centre at contact'],
+        ['Altitude error', v('err_z'), 'm', 'D', 'Last recorded sample: vertical position the controller believes minus the true one'],
+        ['Altimeter', rej === null ? null : rej === 1 ? 'rejected' : 'in use', '', 'E', 'Whether the controller had rejected the radar altimeter'],
+      ];
+    }
     return [
       ['Altitude', v('altitude'), 'm', 'T', 'Nozzle exit plane above the ground, true state'],
       ['Descent rate', vz === null ? null : -vz, 'm/s', 'T', 'Vertical speed, true state, positive downward'],
@@ -227,7 +262,7 @@ function build() {
     [['follow', 'Follow'], ['pad', 'From the pad'], ['wide', 'Whole descent']].map(([m, text]) => h('button', { type: 'button', role: 'radio', class: 'seg-btn', 'aria-checked': String(m === 'follow'), dataset: { cam: m },
       onclick: (e) => { for (const b of e.currentTarget.parentElement.children) b.setAttribute('aria-checked', String(b === e.currentTarget)); if (pl.scene && pl.scene.preset) pl.scene.preset(m); } }, text))) : null;
   const note = h('p', { class: 'pl-scene-note' }, rocket
-    ? (runs.length > 1 ? 'Shown run: true trajectory and stage. Other runs: their true trajectories as coloured lines. ' : 'True trajectory and stage. ') + 'Sampled every 0.1 s and interpolated for display; the stage body is drawn for orientation, the model has no length.'
+    ? (runs.length > 1 ? 'Shown run: true trajectory (solid), the controller’s estimated position (dashed yellow) and the stage. Other runs: their true trajectories as coloured lines. ' : 'True trajectory (solid), the controller’s estimated position (dashed yellow) and the stage. ') + 'Sampled every 0.1 s and interpolated for display; the stage body is drawn for orientation, the model has no length.'
     : 'True paths and GPS samples, one sample per tick. Top view, x east, y north.');
   stage.append(...[viewport, phaseTag, hud, runBar, cams, note].filter(Boolean));
 
@@ -294,16 +329,22 @@ function onTime(t) {
   const ph = phases.find((p) => t >= p.t0 && t < p.t1) || phases[phases.length - 1];
   const end = t >= run.model.t1 - 1e-9;
   const td = run.record.scene && run.record.scene.touchdown;
-  const phaseText = end ? (td ? 'Touchdown' : 'End of run') : ph ? ph.label : '';
-  const tt = Math.min(t, run.model.t1);
-  pl.dom.phaseTag.replaceChildren(
-    h('span', { class: 'pl-clock mono' }, pl.unit === 'tick' ? `tick ${Math.floor(tt)}` : `T+${tt.toFixed(1)} s`),
-    phaseText ? h('span', { class: ['pl-phase-name', `ph-${end ? 'end' : ph ? ph.kind : ''}`] }, phaseText) : null);
+  const met = run.record.outcome.status === 'success';
+  const endText = td ? (met ? 'Touchdown' : 'Touchdown, requirements not met') : 'End of run';
+  const phaseText = end ? endText : ph ? ph.label : '';
+  const clock = pl.unit === 'tick' ? `tick ${Math.floor(t)}` : `T+${t.toFixed(1)} s`;
+  const ended = end && t > run.model.t1 + 1e-9 ? (pl.unit === 'tick' ? `run ended at tick ${run.model.t1}` : `${td ? 'touched down' : 'ended'} at ${run.model.t1.toFixed(1)} s`) : null;
+  pl.dom.phaseTag.replaceChildren(...[
+    h('span', { class: 'pl-clock mono' }, clock),
+    phaseText ? h('span', { class: ['pl-phase-name', `ph-${end ? (met ? 'end' : 'end-bad') : ph ? ph.kind : ''}`] }, phaseText) : null,
+    ended ? h('span', { class: 'pl-ended small' }, `${run.label} ${ended}`) : null].filter(Boolean));
+  pl.tr.range.setAttribute('aria-valuetext', `${timeText(t, pl.unit)}, ${phaseText || 'no phase'}`);
   pl.dom.hud.replaceChildren(
-    h('p', { class: 'pl-hud-h' }, h('span', { class: 'pl-swatch', style: { background: run.colour } }), run.label),
+    h('p', { class: 'pl-hud-h' }, h('span', { class: 'pl-swatch', style: { background: run.colour } }), run.label, end && td ? h('span', { class: 'pl-hud-at' }, 'at contact') : null),
     h('dl', null, readouts(run, t, rocket).map(([k, v, u, kind, title]) => h('div', { class: 'pl-hud-row', title },
       h('dt', null, h('abbr', { class: `kind kind-${kind}`, title: KIND_WORD[kind] }, kind), k),
-      h('dd', { class: 'mono' }, v === null ? '—' : typeof v === 'string' ? v : `${hudNum(v)}${u ? ` ${u}` : ''}`)))));
+      h('dd', { class: 'mono' }, v === null ? '—' : typeof v === 'string' ? v : `${hudNum(v)}${u ? ` ${u}` : ''}`)))),
+    h('p', { class: 'pl-hud-key' }, 'T true state · E controller estimate · O sensor · D derived'));
   updateTransport(t);
   if (!pl.revealed && t >= pl.cursor.t1 - 1e-9) reveal();
 }
@@ -335,7 +376,13 @@ function buildTransport() {
   return h('section', { class: 'pl-transport', 'aria-label': 'Playback' },
     h('div', { class: 'pl-tcontrols' }, play, restart, time),
     h('div', { class: 'pl-track' }, band, marks, range),
-    h('div', { class: 'pl-tend' }, h('label', { class: 'small dim' }, 'Speed ', speed), skip));
+    h('div', { class: 'pl-tend' }, h('label', { class: 'small dim' }, 'Speed ', speed), skip),
+    h('p', { class: 'pl-legend' },
+      pl.kind === 'rocket-3d' ? h('span', null, h('i', { class: 'lg-powered' }), 'engine on') : null,
+      h('span', null, h('i', { class: 'lg-onset' }), 'injected fault starts'),
+      h('span', null, h('i', { class: 'lg-detect' }), 'controller detection'),
+      h('span', null, h('i', { class: 'lg-violation' }), 'requirement or rule violated'),
+      pl.runs.length > 1 ? h('span', null, h('i', { class: 'lg-diverge' }), 'runs part') : null));
 }
 
 function drawBand() {
@@ -366,7 +413,6 @@ function drawBand() {
 function updateTransport(t) {
   const { range, time } = pl.tr;
   if (Number(range.value) !== t) range.value = String(t);
-  range.setAttribute('aria-valuetext', timeText(t, pl.unit));
   time.textContent = pl.unit === 'tick' ? `tick ${Math.floor(t)} / ${pl.cursor.t1}` : `${t.toFixed(1)} / ${pl.cursor.t1.toFixed(1)} s`;
 }
 
@@ -414,14 +460,22 @@ function verdictChip(text, status, sub) {
 
 function runResult(run) {
   const rec = run.record;
-  const failed = (rec.requirements || []).filter((q) => q.status === 'fail');
+  const reqs = rec.requirements || [];
+  const failed = reqs.filter((q) => q.status === 'fail');
+  const missionReqs = reqs.filter((q) => q.category !== 'invariant');
+  const invariants = reqs.filter((q) => q.category === 'invariant');
+  const brokenInv = invariants.filter((q) => q.status === 'fail');
+  const metFail = missionReqs.filter((q) => q.status === 'fail');
   const metrics = pl.kind === 'rocket-3d' ? ROCKET_METRICS.map((id) => rec.metrics.find((m) => m.id === id)).filter(Boolean) : [];
+  const missionText = metFail.length ? `${metFail.length} of ${missionReqs.length} requirements failed` : `all ${missionReqs.length} requirements met`;
+  const safetyText = brokenInv.length ? `${brokenInv.length} of ${invariants.length} safety rules broken` : `no safety rule broken (${invariants.length} checked)`;
   return h('div', { class: 'pl-run-result', dataset: { outcome: rec.outcome.code, safety: rec.safety.status } },
     h('p', { class: 'pl-run-name' }, h('span', { class: 'pl-swatch', style: { background: run.colour } }), run.label),
+    h('p', { class: 'pl-run-head' }, rec.outcome.label),
     h('div', { class: 'pl-verdicts' },
-      verdictChip(rec.outcome.label, rec.outcome.status, 'Mission'),
-      verdictChip(rec.safety.status === 'safe' ? 'Safe' : 'Unsafe', rec.safety.status, 'Safety')),
-    metrics.length ? h('dl', { class: 'pl-metrics' }, metrics.map((m) => h('div', null, h('dt', null, m.label), h('dd', { class: 'mono' }, m.value === null ? '—' : `${num(m.value, 3)} ${m.unit}`)))) : null,
+      verdictChip(missionText, metFail.length ? 'fail' : 'pass', 'Mission'),
+      verdictChip(safetyText, rec.safety.status, 'Safety')),
+    metrics.length ? h('dl', { class: 'pl-metrics' }, metrics.map((m) => h('div', null, h('dt', null, m.label), h('dd', { class: 'mono' }, m.value === null ? '—' : `${hudNum(m.value)} ${m.unit}`)))) : null,
     failed.length ? h('ul', { class: 'pl-failed' }, failed.map((q) => h('li', null,
       h('button', { type: 'button', class: 'link', title: 'Move the playback to the decisive instant', onclick: () => { if (Number.isFinite(q.t)) { pl.cursor.pause(); pl.cursor.set(q.t); } } }, q.label),
       h('span', { class: 'small dim' }, ` ${q.category === 'invariant' ? 'safety invariant' : 'requirement'}: expected ${q.expected}, observed ${q.observed}`)))) : h('p', { class: 'small ok-text' }, 'Every requirement and safety invariant met.'));
@@ -436,7 +490,8 @@ function changeSummary() {
     rows.push(h('li', null, d.t === null
       ? `${pl.runs[i].label} stays within ${d.tol} ${d.unit} of ${pl.runs[0].label} for the whole run.`
       : `${pl.runs[i].label} departs from ${pl.runs[0].label} by more than ${d.tol} ${d.unit} at ${timeText(d.t, pl.unit)}.`,
-    d.t !== null ? h('button', { type: 'button', class: 'link small', onclick: () => { pl.cursor.pause(); pl.cursor.set(d.t); } }, ' Go there') : null));
+    d.t !== null ? ' ' : null,
+    d.t !== null ? h('button', { type: 'button', class: 'link small', onclick: () => { pl.cursor.pause(); pl.cursor.set(d.t); } }, 'Go there') : null));
   }
   return rows.length ? h('section', { class: 'pl-card' }, h('h2', null, 'Where the runs part'), h('ul', { class: 'pl-list' }, rows),
     h('p', { class: 'pl-fine' }, 'Derived from the recorded true positions, sample by sample. It marks where the motion differs, not why.')) : null;
@@ -453,7 +508,9 @@ function renderSide() {
     side.append(h('section', { class: 'pl-card pl-pending' }, h('h2', null, 'Result'), h('p', { class: 'small dim' }, 'Shown when the playback reaches the end of the run.'),
       h('button', { type: 'button', class: 'btn', dataset: { action: 'reveal' }, onclick: () => revealNow() }, 'Show the result now')));
   } else {
-    side.append(h('section', { class: 'pl-card pl-result', 'aria-live': 'polite' }, h('h2', null, 'Result'), pl.runs.map((r) => runResult(r))));
+    const reqOnly = pl.runs.some((r) => r.record.safety.status === 'safe' && (r.record.requirements || []).some((q) => q.status === 'fail'));
+    side.append(h('section', { class: 'pl-card pl-result', 'aria-live': 'polite' }, h('h2', null, 'Result'), pl.runs.map((r) => runResult(r)),
+      reqOnly ? h('p', { class: 'pl-fine' }, 'Mission requirements judge the landing or the goal; safety rules are judged on the true state throughout the run. A hard or off-target landing fails a requirement without breaking a safety rule.') : null));
     const parted = changeSummary();
     if (parted) side.append(parted);
     side.append(h('section', { class: 'pl-card pl-why' }, h('h2', null, 'Why it happened'), h('p', null, prose(demo.narrative)),
@@ -492,7 +549,7 @@ async function renderClaim(host) {
     h('p', { class: 'pl-claim-s' }, `“${st.claim.statement}”`),
     h('p', { class: 'small' }, 'Challenging means letting the platform search the claim’s declared conditions for runs where it stops holding, reproduce them on fresh seeds, test what causes the failure and whether a fix works, then recompute every verdict from scratch.'),
     st.latest
-      ? h('p', { class: 'small' }, 'Latest challenge in this library: ', h('span', { class: `dl-chip ${st.latest.tone}` }, st.latest.word), ' ',
+      ? h('p', { class: 'small' }, 'Latest challenge in this library: ', h('span', { class: `dl-chip ${st.latest.recomputed || st.latest.failed ? st.latest.tone : 'neutral'}` }, st.latest.word), ' ',
         st.latest.failed ? h('span', { class: 'bad-text' }, 'its recomputation failed, so its verdicts are withdrawn') : st.latest.recomputed ? h('span', { class: 'ok-text' }, 'recomputed, every check passed') : st.latest.stale ? h('span', { class: 'warn-text' }, 'changed since it was recomputed') : h('span', { class: 'dim' }, 'not recomputed yet'))
       : h('p', { class: 'small dim' }, 'Not challenged on this machine yet.'),
     h('button', { type: 'button', class: 'btn btn-primary', dataset: { action: 'challenge' }, onclick: () => navigate('discover', { claimId: exp.claim }) }, 'Challenge this claim'));

@@ -266,7 +266,10 @@ fn the_showcase_demos_show_their_look_at_values() {
         metric(&registered, "touchdown_vertical_speed").unwrap(),
         metric(&late, "touchdown_vertical_speed").unwrap(),
     );
-    assert!(a < 3.0 && (16.0..18.0).contains(&b), "{a} {b}");
+    assert!(
+        (1.8..2.3).contains(&a) && (16.0..18.0).contains(&b),
+        "{a} {b}"
+    );
     let pad = metric(&registered, "touchdown_pad_distance").unwrap();
     assert!((13.0..16.0).contains(&pad), "{pad}");
     let d = demo("threshold-trade-off");

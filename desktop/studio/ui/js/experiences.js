@@ -9,7 +9,7 @@ import { domainById, visibleDomains } from './store.js';
 /** Evidence grades, from the weakest to the strongest the platform can show. */
 export const GRADES = {
   demonstration: { label: 'Demonstration', tone: 'neutral', text: 'One development seed, chosen to show the behaviour. It illustrates; it does not measure a rate.' },
-  exploratory: { label: 'Exploratory finding', tone: 'warn', text: 'Measured on fresh development seeds by an investigation. Not confirmed by a preregistered protocol.' },
+  exploratory: { label: 'Exploratory finding', tone: 'explore', text: 'Measured on fresh development seeds by an investigation. Not confirmed by a preregistered protocol.' },
 };
 
 export const CATEGORIES = [
@@ -27,7 +27,7 @@ export const EXPERIENCES = [
   {
     id: 'first-landing', domain: 'rocket-landing', demo: 'nominal-landing',
     title: 'Land a rocket', kicker: 'Start here',
-    summary: 'A 22 t stage falls from 3 km at 200 m/s and has to stop on a pad with its engine alone.',
+    summary: 'A rocket stage of about 30 t falls from 3 km at 200 m/s and has to stop on a pad with its engine alone.',
     objective: 'Touch down slower than 3 m/s, within 10 m of the pad centre, upright, with fuel to spare, and never break a safety rule on the way.',
     watch: ['The engine lights at about 4 s and the fall slows from 200 m/s to under 2 m/s.', 'The estimate the controller flies on stays close to the true position.'],
     learn: ['What an autonomous controller is asked to do', 'Why the mission result and safety are judged separately'],
@@ -50,7 +50,7 @@ export const EXPERIENCES = [
     title: 'Smaller, later, worse?', kicker: 'Surprising counterexample',
     summary: 'A smaller GNSS error that starts 0.02 s later slips past the safety logic that catches a larger one.',
     objective: 'The guarded controller was registered as landing softly (R1) with a GNSS bias of 5 to 30 m present from the start. Does that still hold when the bias starts a moment later?',
-    watch: ['The registered run rejects the altimeter at 0.1 s; the later run never does.', 'The registered run lands softly but off the pad; the later run lands hard on it.'],
+    watch: ['The registered run rejects the altimeter at 0.1 s; the later run never does.', 'The registered run touches down at about 2 m/s but off the pad; the later run hits the pad at about 17 m/s.'],
     learn: ['Why the timing of a fault can matter more than its size', 'Why a counterexample is reported per requirement, not as a single score'],
     categories: ['start', 'faults', 'claims'], level: 'Analyst', minutes: 3,
     runs: ['Registered: 15 m from 0 s', 'Later: 9.72 m from 0.02 s'],
@@ -61,7 +61,7 @@ export const EXPERIENCES = [
     title: 'A fix with a price', kicker: 'Mitigation and trade-off',
     summary: 'Lowering one threshold removes the hard landing and moves the failure to another requirement.',
     objective: 'Test the candidate mitigation of the M13 investigation: reject the altimeter at 1 m of disagreement instead of 3 m.',
-    watch: ['With 1 m the altimeter is rejected at 0.18 s; with 3 m it never is.', 'The hard, unsafe landing becomes a soft landing about 13 m from the pad centre.'],
+    watch: ['With 1 m the altimeter is rejected at 0.18 s; with 3 m it never is.', 'The hard, unsafe landing becomes a touchdown at about 2 m/s, but about 13 m from the pad centre.'],
     learn: ['Why a fix must be checked against every requirement', 'How a regression hides behind an improvement'],
     categories: ['robustness', 'compare', 'claims'], level: 'Analyst', minutes: 3,
     runs: ['Threshold 3 m (default)', 'Threshold 1 m (mitigation)'],
@@ -70,7 +70,7 @@ export const EXPERIENCES = [
   {
     id: 'corridor', domain: 'ground-vehicle', demo: 'corridor-gps-noise',
     title: 'One millimetre', kicker: 'Second domain: ground vehicle',
-    summary: 'A ground vehicle beside a restricted zone. 1 mm of GPS noise is enough to send it into the zone.',
+    summary: 'A ground vehicle beside a restricted zone. 1 mm of GPS noise can send it into the zone (12 of 30 fresh seeds in the M13 investigation).',
     objective: 'Reach the waypoint 250 mm above the corner of the zone without ever entering it.',
     watch: ['With exact GPS the vehicle stops on the waypoint.', 'With 1 mm of noise it hunts around the waypoint and steps into the zone at tick 21.'],
     learn: ['How a tolerance set to zero makes a system fragile', 'That the platform is not specific to rockets'],

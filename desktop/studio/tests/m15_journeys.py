@@ -247,6 +247,7 @@ def layout(s):
         s.page.click("#view-missions [data-experience='first-landing'] [data-action='launch']") if True else None
         s.wait_player("first-landing")
         check(f"Layout {w}x{h}: player has no horizontal scroll", s.no_hscroll())
+        check(f"Layout {w}x{h}: no stray null or undefined text", s.js("![...document.querySelector('#view-mission').innerText.split(/[^A-Za-z]+/)].some((w) => w === 'null' || w === 'undefined' || w === 'NaN')"))
         s.shot(f"m15-player-{w}x{h}-dark")
         bad = s.unnamed_buttons()
         check(f"Layout {w}x{h}: every visible control has a name", not bad, "; ".join(bad[:3]))

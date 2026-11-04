@@ -36,7 +36,18 @@ FLOWS = {
 }
 
 READY = "window.__studio && document.getElementById('startup') && document.getElementById('startup').hidden"
-RUN_SHOWN = "window.__studio && window.__studio.run() && window.__studio.run().scene === 'rocket-3d' && document.querySelector('.r3d canvas')"
+RUN_SHOWN = {
+    "m11": "window.__studio && window.__studio.run() && window.__studio.run().scene === 'rocket-3d' && document.querySelector('.r3d canvas')",
+    "m15": "window.__studio && window.__studio.player && window.__studio.player() && window.__studio.player().scene === 'rocket-3d' && document.querySelector('.pl-viewport canvas')",
+}
+PLAY = {
+    "m11": "() => { const b = document.querySelector('.tbtn'); if (b) b.click(); const p = document.querySelector('.tbtn-main'); if (p && !p.getAttribute('aria-label').startsWith('Pause')) p.click(); }",
+    "m15": "() => { const p = document.querySelector('.pl-tbtn'); if (p) p.click(); }",
+}
+PLAYING = {
+    "m11": "() => { const p = document.querySelector('.tbtn-main'); return !!p && p.getAttribute('aria-label').startsWith('Pause'); }",
+    "m15": "() => window.__studio.player().playing",
+}
 
 
 def wait(page, js, timeout=90.0):
@@ -143,19 +154,19 @@ def main():
             t0 = time.time()
             for sel in FLOWS[a.flow]:
                 page.click(sel)
-            t_shown = wait(page, RUN_SHOWN, timeout=120)
+            t_shown = wait(page, RUN_SHOWN[a.flow], timeout=120)
             report["clicks_to_landing"] = len(FLOWS[a.flow])
             report["click_to_landing_on_screen_s"] = round(t_shown - t0, 2)
             report["machine_time_to_landing_s"] = round(report["cold_start_to_ready_s"] + report["click_to_landing_on_screen_s"], 2)
             time.sleep(1.0)
             # Playback from the start at 1x: frame times while the 3D view animates.
-            page.evaluate("() => { const b = document.querySelector('.tbtn'); if (b) b.click(); const p = document.querySelector('.tbtn-main'); if (p && !p.getAttribute('aria-label').startsWith('Pause')) p.click(); }")
+            page.evaluate(PLAY[a.flow])
             time.sleep(0.2)
-            playing = page.evaluate("() => { const p = document.querySelector('.tbtn-main'); return !!p && p.getAttribute('aria-label').startsWith('Pause'); }")
+            playing = page.evaluate(PLAYING[a.flow])
             report["playback_detected"] = playing
             report["playback_frames"] = frame_stats(page, 5000)
             report["playback_memory"] = tree_memory(proc.pid)
-            report["webgl"] = page.evaluate("""() => { const c = document.querySelector('.r3d canvas'); if (!c) return null; const g = c.getContext('webgl2') || c.getContext('webgl'); if (!g) return 'none'; const e = g.getExtension('WEBGL_debug_renderer_info'); return e ? g.getParameter(e.UNMASKED_RENDERER_WEBGL) : 'masked'; }""")
+            report["webgl"] = page.evaluate("""() => { const c = document.querySelector('.r3d canvas, .pl-viewport canvas'); if (!c) return null; const g = c.getContext('webgl2') || c.getContext('webgl'); if (!g) return 'none'; const e = g.getExtension('WEBGL_debug_renderer_info'); return e ? g.getParameter(e.UNMASKED_RENDERER_WEBGL) : 'masked'; }""")
             report["window_inner"] = page.evaluate("[innerWidth, innerHeight, devicePixelRatio]")
     finally:
         proc.kill()

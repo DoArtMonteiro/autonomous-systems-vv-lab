@@ -644,7 +644,7 @@ fn outcome_of(
                 .iter()
                 .any(|i| i.starts_with("S5"));
             Outcome {
-                label: "Hard landing".into(),
+                label: "Touched down, requirements not met".into(),
                 status: "failure".into(),
                 explanation: format!(
                     "The stage reached the ground at {} s but did not meet the mission requirements: {}.{}",

@@ -130,14 +130,14 @@ pub fn demos() -> Vec<Demo> {
             look_at: look(&[
                 "Events: the first run rejects the altimeter at 0.1 s; the second has no rejection",
                 "Top view: the first touchdown is outside the 10 m circle, the second inside it",
-                "Vertical speed at contact: about 1.5 m/s against about 17 m/s",
+                "Vertical speed at contact: about 2 m/s against about 17 m/s",
             ]),
             expectation: "Registered bias: hard landing, safe, only R5 position fails. Smaller later bias: hard landing, safe, only R1 vertical speed fails.".into(),
         },
         Demo {
             id: "threshold-trade-off".into(),
             title: "A fix with a price: lowering the rejection threshold".into(),
-            narrative: "The late, smaller GNSS bias again, on another development seed. With the default 3 m altimeter rejection threshold the guarded controller never rejects the altimeter, climbs under power near the ground (safety invariant S5) and lands at about 24 m/s. With a 1 m threshold it rejects the altimeter at 0.18 s and touches down softly, but about 13 m from the pad centre, outside R5. The change removes the hard landing and moves the failure to another requirement. In the M13 investigation the same mitigation removed the R1 violation on 30 of 30 seeds and introduced an R5 violation on 6 of them.".into(),
+            narrative: "The late, smaller GNSS bias again, on another development seed. With the default 3 m altimeter rejection threshold the guarded controller never rejects the altimeter, climbs under power near the ground (safety invariant S5) and lands at about 24 m/s. With a 1 m threshold it rejects the altimeter at 0.18 s and touches down softly, but about 13 m from the pad centre, outside R5. The change removes the hard landing and moves the failure to another requirement. In the M13 investigation the same mitigation removed the R1 violation on 30 of 30 counterexample seeds and introduced an R5 violation on 6 of them; across the envelope it added R2 violations in 26 paired runs and R5 violations in 9, and it did not remove the violation in the two regression families with a low-reading bias.".into(),
             requests: vec![
                 request(M91, "guarded", 5017, gnss_bias_late()),
                 with_threshold(request(M91, "guarded", 5017, gnss_bias_late()), 1.0),

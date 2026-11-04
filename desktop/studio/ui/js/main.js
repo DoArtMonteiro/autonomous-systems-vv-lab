@@ -13,7 +13,7 @@ import { initSettings, showSettings } from './views/settings.js';
 import { initDiscover, showDiscover, rethemeDiscover } from './views/discover.js';
 import { initHome, showHome } from './views/home.js';
 import { initMissions, showMissions } from './views/missions.js';
-import { initPlayer, showPlayer, playerKey, rethemePlayer, playerState } from './views/player.js';
+import { initPlayer, showPlayer, leavePlayer, playerKey, rethemePlayer, playerState } from './views/player.js';
 import { EXPERIENCES } from './experiences.js';
 
 // Keyboard digits follow this order; `mission` (the player) has no digit and lights "Missions".
@@ -41,6 +41,7 @@ on('theme', () => { rethemeRun(); rethemeCompare(); rethemeDiscover(); rethemePl
 export async function navigate(view, opts) {
   if (!VIEWS.includes(view)) return;
   currentView = view;
+  if (view !== 'mission') leavePlayer();
   for (const v of VIEWS) document.getElementById(`view-${v}`).hidden = v !== view;
   for (const b of document.querySelectorAll('.nav-btn')) {
     if (b.dataset.view === (NAV_OF[view] || view)) b.setAttribute('aria-current', 'page');
@@ -192,7 +193,7 @@ document.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (typing(e)) return;
   if (e.key === '?') { e.preventDefault(); showHelp(); return; }
-  if (/^[1-8]$/.test(e.key) && !(e.target && e.target.closest && e.target.closest('[role="slider"]'))) { navigate(VIEWS[Number(e.key) - 1]); e.preventDefault(); return; }
+  if (/^[1-8]$/.test(e.key) && !(e.target && e.target.closest && e.target.closest('[role="slider"], input[type="range"]'))) { navigate(VIEWS[Number(e.key) - 1]); e.preventDefault(); return; }
   if (e.target && e.target.closest && (e.target.closest('button, a, [role="tab"], [role="radio"], summary') && (e.key === ' ' || e.key === 'Enter'))) return;
   if (e.target && e.target.closest && e.target.closest('.r3d canvas') && e.key.startsWith('Arrow')) return;
   let handled = false;

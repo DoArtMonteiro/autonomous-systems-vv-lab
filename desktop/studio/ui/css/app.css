@@ -46,6 +46,7 @@
   --scene-ground-in: #18202a;
   --scene-ground-out: #0c1016;
   --hud: rgba(9, 12, 16, .72);
+  --grade-explore: #b6a6ff;
   --shadow: 0 12px 40px rgba(0, 0, 0, .55);
 }
 
@@ -84,6 +85,7 @@
   --scene-ground-in: #e9edf1;
   --scene-ground-out: #dde2e8;
   --hud: rgba(251, 251, 252, .82);
+  --grade-explore: #5a46b8;
   --shadow: 0 12px 40px rgba(20, 30, 40, .18);
 }
 
