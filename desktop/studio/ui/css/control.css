@@ -241,7 +241,7 @@
 .si-i { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid currentColor; font: italic 700 10px/1 Georgia, serif; }
 .si-chip { height: 22px; display: inline-flex; align-items: center; padding: 0 8px; border-radius: 11px; font-size: 10.5px; background: var(--glass); backdrop-filter: blur(var(--glass-blur)); color: var(--fg-2); border: 1px solid var(--glass-rule); }
 .si-chip:not(.si-flat) { color: var(--fail); }
-.si-credit { margin: 0; font-size: 9.5px; line-height: 1.3; color: rgba(255, 255, 255, .86); text-shadow: 0 0 3px rgba(0, 0, 0, .85), 0 0 1px rgba(0, 0, 0, .9); max-width: 72ch; }
+.si-credit { margin: 0; font-size: 9.5px; line-height: 1.35; color: var(--fg-2); background: var(--glass); backdrop-filter: blur(var(--glass-blur)); border-radius: 4px; padding: 2px 7px; max-width: 76ch; }
 .si-panel { position: absolute; left: 0; bottom: calc(100% + 8px); width: min(460px, calc(100vw - 48px)); max-height: min(440px, 58vh); overflow: auto; padding: 12px 14px; border-radius: 8px; background: var(--glass-strong); backdrop-filter: blur(var(--glass-blur)); border: 1px solid var(--glass-rule); box-shadow: 0 10px 32px rgba(0, 0, 0, .35); color: var(--fg-1); font-size: 11.5px; line-height: 1.45; z-index: 6; }
 .si-panel[hidden] { display: none; }
 .si-h { margin: 10px 0 4px; font: var(--t-micro); letter-spacing: .12em; text-transform: uppercase; color: var(--fg-3); }

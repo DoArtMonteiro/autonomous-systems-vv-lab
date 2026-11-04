@@ -40,14 +40,18 @@ export function loadPack(id) {
       const list = await listEnvironments();
       const m = list.environments.find((e) => e.id === id);
       if (!m) throw { kind: 'invalid', message: `The environment “${id}” is not installed or did not validate.` };
-      const [hb, ib] = await Promise.all([api.environmentFile(id, 'height.u16'), api.environmentFile(id, 'image.jpg')]);
-      const h = m.height;
-      const raw = new Uint16Array(bytesOf(hb));
-      if (raw.length !== h.columns * h.rows) throw { kind: 'invalid', message: 'The height grid does not have the declared size.' };
-      const up = new Float32Array(raw.length);
-      for (let i = 0; i < raw.length; i++) up[i] = raw[i] * h.scale_m + h.offset_m;
-      const image = new Blob([bytesOf(ib)], { type: 'image/jpeg' });
-      return { id, m, up, cols: h.columns, rows: h.rows, s: h.spacing_m, x0: h.first_node_m[0], y0: h.first_node_m[1], image };
+      const layer = async (h, hName, iName) => {
+        const [hb, ib] = await Promise.all([api.environmentFile(id, hName), api.environmentFile(id, iName)]);
+        const raw = new Uint16Array(bytesOf(hb));
+        if (raw.length !== h.columns * h.rows) throw { kind: 'invalid', message: `The height grid ${hName} does not have the declared size.` };
+        const up = new Float32Array(raw.length);
+        for (let i = 0; i < raw.length; i++) up[i] = raw[i] * h.scale_m + h.offset_m;
+        return { up, cols: h.columns, rows: h.rows, s: h.spacing_m, x0: h.first_node_m[0], y0: h.first_node_m[1], image: new Blob([bytesOf(ib)], { type: 'image/jpeg' }) };
+      };
+      const d = (m.layers || []).find((l) => l.role === 'detail');
+      const [base, detail] = await Promise.all([layer(m.height, 'height.u16', 'image.jpg'), d ? layer(d.height, 'detail-height.u16', 'detail-image.jpg') : null]);
+      if (detail) Object.assign(detail, { half: d.extent_m, blend: d.blend_m, m: d });
+      return { id, m, ...base, detail };
     })();
     p.catch((e) => { packs.delete(id); logUiError(`environment ${id}: ${e && e.message ? e.message : JSON.stringify(e)}`); });
     packs.set(id, p);
@@ -55,8 +59,32 @@ export function loadPack(id) {
   return packs.get(id);
 }
 
-/** ENU up of the terrain at (east, north) on the drawn triangles (as vv-geo); null outside. */
+/** Weight of the detail layer at (east, north): 1 inside, falling linearly to 0 over its blend margin. */
+export function detailWeight(d, e, n) {
+  const inside = d.half - Math.max(Math.abs(e), Math.abs(n));
+  if (inside < 0) return 0;
+  return d.blend > 0 ? Math.min(1, inside / d.blend) : 1;
+}
+
+/**
+ * ENU up of the drawn terrain at (east, north), as vv-geo: the detail layer where it covers the
+ * point, blending into the base grid over its edge margin; null outside the pack.
+ */
 export function terrainAt(p, e, n) {
+  const base = gridAt(p, e, n);
+  const d = p.detail;
+  if (d) {
+    const u = gridAt(d, e, n);
+    if (u !== null) {
+      const w = detailWeight(d, e, n);
+      return w >= 1 || base === null ? u : base + (u - base) * w;
+    }
+  }
+  return base;
+}
+
+/** ENU up of one height grid at (east, north) on its drawn triangles (as vv-geo); null outside. */
+export function gridAt(p, e, n) {
   const fx = (e - p.x0) / p.s;
   const fy = (p.y0 - n) / p.s;
   if (!(fx >= 0 && fy >= 0 && fx <= p.cols - 1 && fy <= p.rows - 1)) return null;

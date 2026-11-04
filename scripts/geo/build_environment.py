@@ -40,17 +40,23 @@ from rasterio.env import Env
 from rasterio.merge import merge
 from rasterio.windows import from_bounds
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import detail_sources  # noqa: E402
+
 DEM_URL = "https://copernicus-dem-30m.s3.amazonaws.com/{t}/{t}.tif"
 STAC = "https://earth-search.aws.element84.com/v1/search"
 
 ENVIRONMENTS = {
     "cape-canaveral": {
         "name": "Cape Canaveral coast, Florida",
-        "summary": "Low, flat barrier coast on the Atlantic. The simulation's pad centre is placed on a circular hard-standing visible in the image; its position was read from the image (about 10 m). The facility is not modelled and the simulated pad is not that facility.",
-        "lat": 28.48600, "lon": -80.54300,
+        "summary": "Low, flat barrier coast on the Atlantic. The simulation's pad centre is placed at the centre of a circular hard-standing visible in the detail image, measured on that image (about 2 m). The facility is not modelled and the simulated pad is not that facility.",
+        "lat": 28.48573, "lon": -80.54302,
         "half_extent_m": 9000.0, "dem_spacing_m": 30.0, "image_spacing_m": 10.0,
         "s2_items": ["S2B_T17RNM_20251115T160505_L2A"],
         "heading_deg": 0.0,
+        # Detail layer: USGS 3DEP 1 m lidar DEM sampled every 4 m and NAIP 2023 (0.3 m) at 0.5 m.
+        "detail": {"half_extent_m": 1024.0, "dem_spacing_m": 4.0, "image_spacing_m": 0.5, "blend_m": 64.0,
+                   "dem": {"kind": "tnm-1m"}, "imagery": {"kind": "naip", "year": 2023}},
     },
     "santa-maria-azores": {
         "name": "Santa Maria, Azores",
@@ -85,6 +91,25 @@ LICENCES = {
         "attribution": "EGM2008, NGA",
         "access": "PROJ network grid (cdn.proj.org)",
         "credit": "EGM2008, NGA",
+    },
+}
+
+DETAIL_LICENCES = {
+    "tnm-1m": {
+        "provider": "U.S. Geological Survey, 3D Elevation Program (3DEP), through The National Map",
+        "product": "USGS 1 m lidar digital elevation model (bare earth; heights NAVD88, converted here to NAD83(2011) ellipsoidal heights with the NOAA GEOID18 model)",
+        "licence": "U.S. Public Domain: \"USGS-authored or produced data and information are considered to be in the U.S. Public Domain.\" https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+        "attribution": "Elevation: U.S. Geological Survey, 3D Elevation Program",
+        "credit": "USGS 3DEP lidar",
+        "access": "The National Map API https://tnmaccess.nationalmap.gov/api/v1/products and s3://prd-tnm (no account)",
+    },
+    "naip": {
+        "provider": "USDA Farm Production and Conservation Business Center, Geospatial Enterprise Operations (National Agriculture Imagery Program); cloud-optimised copy on the Microsoft Planetary Computer",
+        "product": "NAIP orthoimagery (red, green, blue bands)",
+        "licence": "Public domain under the FSA web policy: \"Public domain information may be freely distributed or copied, but use of appropriate byline/photo/image credits is requested.\" https://www.fsa.usda.gov/help/policies-and-links. No NAIP-specific licence document was found; the Planetary Computer gives no licence link.",
+        "attribution": "Imagery: USDA Farm Production and Conservation Business Center, Geospatial Enterprise Operations, NAIP {year}",
+        "credit": "USDA NAIP {year}",
+        "access": "Planetary Computer STAC https://planetarycomputer.microsoft.com/api/stac/v1, collection naip (anonymous range requests)",
     },
 }
 
@@ -204,6 +229,102 @@ def surface_points(frame, dem, N, e, n):
     raise SystemExit(f"surface points did not converge (residual {err:.4f} m)")
 
 
+def surface_points_h(frame, h_of, e, n):
+    """As surface_points, for a source that gives ellipsoidal heights h_of(lat, lon) directly."""
+    ge, gn = e.astype(np.float64).copy(), n.astype(np.float64).copy()
+    u = np.zeros_like(ge)
+    for _ in range(10):
+        lat, lon, _h = frame.to_geod(ge, gn, u)
+        h = h_of(lat, lon)
+        enu = frame.to_enu(lat, lon, h)
+        de, dn = enu[..., 0] - e, enu[..., 1] - n
+        u = enu[..., 2]
+        err = float(np.hypot(de, dn).max())
+        if err < 1e-3:
+            return lat, lon, h, u, err
+        ge, gn = ge - de, gn - dn
+    raise SystemExit(f"detail surface points did not converge (residual {err:.4f} m)")
+
+
+def lattice_geodetic(frame, h_of, L, sp, step):
+    """Geodetic latitude and longitude of every texel centre of a (2L/sp)^2 image, from exact surface
+    points on a lattice every `step` texels, bilinearly interpolated between them. Over a lattice
+    cell (`step * sp` metres) the error of the interpolation is far below a millimetre."""
+    n = int(round(2 * L / sp))
+    m = n // step + 1
+    ax = -L + sp / 2 + np.arange(m) * step * sp
+    E, N = np.meshgrid(ax, ax[::-1])
+    lat, lon, _h, _u, err = surface_points_h(frame, h_of, E, N)
+
+    def rows(r0, r1):
+        r = np.arange(r0, r1)[:, None] / step
+        c = np.arange(n)[None, :] / step
+        i0 = np.clip(np.floor(r).astype(int), 0, m - 2)
+        j0 = np.clip(np.floor(c).astype(int), 0, m - 2)
+        fr, fc = r - i0, c - j0
+
+        def interp(a):
+            return (a[i0, j0] * (1 - fr) * (1 - fc) + a[i0, j0 + 1] * (1 - fr) * fc
+                    + a[i0 + 1, j0] * fr * (1 - fc) + a[i0 + 1, j0 + 1] * fr * fc)
+        return interp(lat), interp(lon)
+    return n, rows, err
+
+
+def build_detail(cfg, frame, hd, imagery, out):
+    """Writes detail-height.u16 and detail-image.jpg; returns the layer block, checks and grid."""
+    d = cfg["detail"]
+    L = d["half_extent_m"]
+    s = d["dem_spacing_m"]
+    k = int(round(L / s))
+    axis = np.arange(-k, k + 1) * s
+    E, N = np.meshgrid(axis, axis[::-1])
+    lat, lon, h, U, err = surface_points_h(frame, hd, E, N)
+    print(f"detail grid {U.shape}, max horizontal residual {err * 1000:.3f} mm", file=sys.stderr)
+    scale = 0.01
+    offset = float(math.floor(U.min()) - 1)
+    q = np.round((U - offset) / scale)
+    if q.max() > 65535:
+        raise SystemExit("detail relief exceeds the 16-bit range at 1 cm")
+    hbytes = q.astype("<u2").tobytes()
+    with open(os.path.join(out, "detail-height.u16"), "wb") as f:
+        f.write(hbytes)
+    checks = []
+    for (r, c) in [(0, 0), (0, 2 * k), (2 * k, 0), (2 * k, 2 * k), (k, k), (k // 3, k + k // 2)]:
+        checks.append({"lat_deg": float(lat[r, c]), "lon_deg": float(lon[r, c]), "h_ellipsoid_m": float(h[r, c]),
+                       "enu_m": [float(E[r, c]), float(N[r, c]), float(U[r, c])], "layer": "detail"})
+    si = d["image_spacing_m"]
+    n, rows, ierr = lattice_geodetic(frame, hd, L, si, 16)
+    img = np.zeros((n, n, 3), dtype=np.uint8)
+    have = np.zeros((n, n), dtype=bool)
+    for r0 in range(0, n, 256):
+        la, lo = rows(r0, min(n, r0 + 256))
+        v, ok = imagery.sample(la, lo)
+        img[r0:r0 + la.shape[0]] = np.clip(np.round(v), 0, 255).astype(np.uint8).transpose(1, 2, 0)
+        have[r0:r0 + la.shape[0]] = ok
+    if (~have).mean() > 0.001:
+        raise SystemExit(f"the detail imagery leaves {(~have).mean():.2%} of the texels empty")
+    buf = io.BytesIO()
+    Image.fromarray(img, "RGB").save(buf, "JPEG", quality=86, optimize=True, progressive=True)
+    ibytes = buf.getvalue()
+    with open(os.path.join(out, "detail-image.jpg"), "wb") as f:
+        f.write(ibytes)
+    layer = {
+        "role": "detail",
+        "extent_m": L,
+        "blend_m": d["blend_m"],
+        "height": {"file": "detail-height.u16", "encoding": "uint16-le", "scale_m": scale, "offset_m": offset,
+                   "columns": int(U.shape[1]), "rows": int(U.shape[0]), "spacing_m": s, "first_node_m": [float(-k * s), float(k * s)],
+                   "order": "row-major, row 0 at the north edge, column 0 at the west edge", "bytes": len(hbytes), "sha256": sha256(hbytes),
+                   "min_up_m": round(float(U.min()), 2), "max_up_m": round(float(U.max()), 2)},
+        "image": {"file": "detail-image.jpg", "columns": n, "rows": n, "spacing_m": si, "first_texel_centre_m": [-L + si / 2, L - si / 2],
+                  "nodata_fraction": round(float((~have).mean()), 5), "bytes": len(ibytes), "sha256": sha256(ibytes),
+                  "processing": "Area-averaged to the texel size from the source, then bilinear resampling onto the ENU grid, JPEG quality 86. No colour editing.",
+                  "geodetic_lattice_residual_mm": round(ierr * 1000, 3)},
+        "note": f"Within {d['blend_m']:g} m of the edge of this layer the drawn heights blend linearly into the base grid and the image fades into the base image, so the two surfaces meet. That margin is a display adjustment of the context data.",
+    }
+    return layer, checks, (E, N, U, lat, lon)
+
+
 def stac_item(item_id):
     req = urllib.request.Request(STAC, data=json.dumps({"ids": [item_id], "collections": ["sentinel-2-c1-l2a"]}).encode(), headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=60) as r:
@@ -242,6 +363,27 @@ def main():
     N0 = float(geoid.transform(lon0, lat0, 0.0)[2])
     corners = [geoid.transform(lon0 + sx * dlon / 1.6, lat0 + sy * dlat / 1.6, 0.0)[2] for sx in (-1, 1) for sy in (-1, 1)]
     N_spread = float(max(corners) - min(corners))
+    det = cfg.get("detail")
+    hd = imagery = det_dem_items = None
+    if det:
+        # The origin goes on the finest layer: the detail terrain.
+        Ld = det["half_extent_m"] * 1.25
+        dl, dn_ = Ld / 111000.0, Ld / (111000.0 * math.cos(math.radians(lat0)))
+        box = (lat0 - dl, lat0 + dl, lon0 - dn_, lon0 + dn_)
+        if det["dem"]["kind"] == "tnm-1m":
+            src = detail_sources.TnmLidarDem(*box, raw)
+            # Open water has no lidar value: there the base DEM (sea at 0 m above EGM2008) is used.
+            hd = lambda la, lo: src.h_ellipsoid(la, lo, lambda a, b: dem.sample(a, b) + N0)  # noqa: E731
+            det_dem_items = src.tiles
+        else:
+            hd = lambda la, lo: dem.sample(la, lo) + N0  # noqa: E731
+        if det["imagery"]["kind"] == "naip":
+            imagery = detail_sources.NaipImagery(*box, det["imagery"]["year"], det["image_spacing_m"], raw)
+        else:
+            im = det["imagery"]
+            imagery = detail_sources.WmsImagery(im["url"], im["layer"], *box, det["image_spacing_m"], raw)
+        h_ell0 = float(hd(np.array([lat0]), np.array([lon0]))[0])
+        H0 = h_ell0 - N0
     frame = Frame(lat0, lon0, H0 + N0)
 
     # Height grid.
@@ -265,6 +407,14 @@ def main():
     for (r, c) in [(0, 0), (0, 2 * k), (2 * k, 0), (2 * k, 2 * k), (k, k), (k // 2, k + k // 3), (k + k // 4, k // 5)]:
         checks.append({"lat_deg": float(lat[r, c]), "lon_deg": float(lon[r, c]), "h_ellipsoid_m": float(H[r, c] + N0),
                        "enu_m": [float(E[r, c]), float(Nn[r, c]), float(U[r, c])]})
+    layers = []
+    if det:
+        layer, dchecks, (Ed, Nd, Ud, dlat_g, dlon_g) = build_detail(cfg, frame, hd, imagery, out)
+        det_fill = float(1.0 - src.win.sample(dlat_g, dlon_g)[1].mean()) if det_dem_items is not None else 0.0
+        layers.append(layer)
+        for c in checks:
+            c["layer"] = "base"
+        checks += dchecks
 
     # Image: the first item that has data at a texel wins; the next items fill its gaps.
     items = [stac_item(i) for i in cfg["s2_items"]]
@@ -335,6 +485,10 @@ def main():
 
     # Relief around the origin, against the simulation's flat ground at z = 0.
     def relief(radius):
+        # Inside the detail layer the relief is read from it (the terrain drawn there).
+        if det and radius < det["half_extent_m"] - det["blend_m"]:
+            m = np.hypot(Ed, Nd) <= radius
+            return {"radius_m": radius, "min_up_m": round(float(Ud[m].min()), 2), "max_up_m": round(float(Ud[m].max()), 2)}
         m = np.hypot(E, Nn) <= radius
         return {"radius_m": radius, "min_up_m": round(float(U[m].min()), 2), "max_up_m": round(float(U[m].max()), 2)}
 
@@ -342,8 +496,23 @@ def main():
     s2 = dict(LICENCES["sentinel-2"])
     s2["attribution"] = s2["attribution"].format(year=", ".join(years))
     s2["credit"] = s2["attribution"]
+    extra_sources = []
+    extra_accuracy = []
+    if det:
+        if det["dem"]["kind"] == "tnm-1m":
+            extra_sources.append({**DETAIL_LICENCES["tnm-1m"], "layer": "detail", "items": det_dem_items, "water_fill_fraction": round(det_fill, 4),
+                                  "water_fill_note": "Detail nodes where the lidar DEM has no value (open water) take the base DEM height there."})
+            extra_accuracy.append(f"Detail layer ({2 * det['half_extent_m'] / 1000:g} km square around the origin): heights from the USGS 1 m lidar DEM, a bare-earth model, sampled every {det['dem_spacing_m']:g} m. NAVD88 heights are converted with GEOID18 to NAD83(2011) ellipsoidal heights and used as WGS84 heights, which differ by about a metre; the origin is on this surface.")
+        if det["imagery"]["kind"] == "naip":
+            years = sorted({(i["acquired"] or "")[:4] for i in imagery.items})
+            lic = dict(DETAIL_LICENCES["naip"])
+            lic["attribution"] = lic["attribution"].format(year=", ".join(years))
+            lic["credit"] = lic["credit"].format(year=", ".join(years))
+            extra_sources.append({**lic, "layer": "detail", "items": imagery.items})
+            extra_accuracy.append(f"Detail image: NAIP {', '.join(years)} at {det['image_spacing_m']:g} m per texel (source {imagery.items[0]['gsd_m']} m). NAIP and 3DEP are on NAD83(2011) and are read here as WGS84, a horizontal offset of about 1 to 2 m.")
+        extra_accuracy.append(f"Within {det['blend_m']:g} m of the edge of the detail layer the drawn heights blend into the base grid and the detail image fades into the base image; this display adjustment is the only change made to the context data.")
     manifest = {
-        "schema": "vv-geo-environment.v1",
+        "schema": "vv-geo-environment.v2" if det else "vv-geo-environment.v1",
         "id": a.env,
         "name": cfg["name"],
         "summary": cfg["summary"],
@@ -355,7 +524,7 @@ def main():
             "orthometric_height_m": round(H0, 3),
             "geoid_undulation_m": round(N0, 3),
             "geoid_undulation_spread_m": round(N_spread, 3),
-            "note": "The simulation's pad centre (model origin, z = 0) is placed on the DEM surface at this point. The geoid undulation is treated as constant over the extent (its spread across the corners is given).",
+            "note": ("The simulation's pad centre (model origin, z = 0) is placed on the detail terrain at this point; the orthometric height is that ellipsoidal height minus the EGM2008 undulation. " if det else "The simulation's pad centre (model origin, z = 0) is placed on the DEM surface at this point. ") + "The geoid undulation is treated as constant over the extent (its spread across the corners is given).",
         },
         "frame": {
             "kind": "enu-tangent-plane",
@@ -381,23 +550,26 @@ def main():
             "bytes": len(ibytes), "sha256": sha256(ibytes),
             "processing": "Bilinear resampling of the TCI asset onto the ENU grid, JPEG quality 88. No colour editing.",
         },
+        "layers": layers,
         "relief": [relief(10.0), relief(50.0), relief(500.0), relief(3000.0)],
         "accuracy": [
             "Copernicus GLO-30 is a surface model: heights include buildings and vegetation canopy. Its stated absolute vertical accuracy is better than 4 m (90 % linear error); it does not resolve pads, roads or ground conditions.",
             "The 10 m image does not resolve structures; it is context only.",
             "The simulation assumes flat ground at z = 0 and computes no interaction with this terrain. Where the terrain rises above z = 0 the drawn trajectory may pass through it; this is a property of the geographic placement, not of the simulated flight.",
             "Horizontal registration of image and terrain follows the sources' georeferencing; Sentinel-2 L2A geolocation is of the order of 10 m.",
-        ],
+        ] + extra_accuracy,
         "sources": [
             {**LICENCES["copernicus-dem"], "item": dem.tile, "url": dem.url, "raster_tags": dem.tags,
              "absent_tiles": dem.missing, "sea_fill_fraction": round(dem.sea_fill_fraction, 4),
              "sea_fill_note": "The product has no tile for a degree square of open sea; those squares are filled with 0 m above EGM2008."},
             {**s2, "items": used},
             LICENCES["egm2008"],
-        ],
+        ] + extra_sources,
         "checks": checks,
         "check_note": "Geodetic points of grid nodes and their ENU coordinates computed with pyproj; the Rust georeference crate must reproduce them within 1 mm.",
     }
+    if not det:
+        manifest.pop("layers")
     with open(os.path.join(out, "environment.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(manifest, f, indent=2, ensure_ascii=False)
         f.write("\n")

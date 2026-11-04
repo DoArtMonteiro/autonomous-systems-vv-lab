@@ -86,23 +86,24 @@ function skyDome(radius) {
  * (EGM2008 zero, within 0.6 m once the tangent plane's curvature and the origin height are added
  * back). The flag only steers the illustrative water shading.
  */
-function terrainGeometry(p) {
-  const n = p.cols * p.rows;
+function terrainGeometry(p, g0 = p, L = p.m.extent_m, heightAt = (i) => g0.up[i]) {
+  const n = g0.cols * g0.rows;
   const pos = new Float32Array(n * 3);
   const uv = new Float32Array(n * 2);
   const sea = new Float32Array(n);
-  const L = p.m.extent_m;
   const h0 = p.m.origin && Number.isFinite(p.m.origin.orthometric_height_m) ? p.m.origin.orthometric_height_m : null;
-  for (let r = 0; r < p.rows; r++) {
-    const nn = p.y0 - r * p.s;
-    for (let c = 0; c < p.cols; c++) {
-      const i = r * p.cols + c;
-      const e = p.x0 + c * p.s;
-      pos[i * 3] = e; pos[i * 3 + 1] = nn; pos[i * 3 + 2] = p.up[i];
+  for (let r = 0; r < g0.rows; r++) {
+    const nn = g0.y0 - r * g0.s;
+    for (let c = 0; c < g0.cols; c++) {
+      const i = r * g0.cols + c;
+      const e = g0.x0 + c * g0.s;
+      const z = heightAt(i, e, nn);
+      pos[i * 3] = e; pos[i * 3 + 1] = nn; pos[i * 3 + 2] = z;
       uv[i * 2] = (e + L) / (2 * L); uv[i * 2 + 1] = (nn + L) / (2 * L);
-      if (h0 !== null) sea[i] = Math.abs(p.up[i] + h0 + (e * e + nn * nn) / (2 * EARTH_R)) < 0.6 ? 1 : 0;
+      if (h0 !== null) sea[i] = Math.abs(z + h0 + (e * e + nn * nn) / (2 * EARTH_R)) < 0.6 ? 1 : 0;
     }
   }
+  p = g0;
   const idx = new Uint32Array((p.cols - 1) * (p.rows - 1) * 6);
   let k = 0;
   for (let r = 0; r < p.rows - 1; r++) {
@@ -122,14 +123,23 @@ function terrainGeometry(p) {
 }
 
 /** Terrain material: the image, plus a smooth reflective finish where the sea flag is set and the image is dark. */
-function terrainMaterial(envMap) {
-  const m = new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0, color: 0xffffff, envMap, envMapIntensity: 0.55 });
+// `detail`: {half, blend} of the pack's detail layer. The base discards its fragments inside the
+// detail interior; the detail layer fades out over its blend margin, where its heights already
+// meet the base (see terrainAt), so the two surfaces join without a step.
+function terrainMaterial(envMap, detail, role) {
+  const m = new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0, color: 0xffffff, envMap, envMapIntensity: 0.55, transparent: role === 'detail', polygonOffset: role === 'detail', polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+  const half = detail ? detail.half.toFixed(3) : '0.0';
+  const blend = detail ? Math.max(detail.blend, 1e-3).toFixed(3) : '1.0';
+  const clip = !detail ? '' : role === 'detail'
+    ? `float dIn = ${half} - max(abs(vXY.x), abs(vXY.y)); diffuseColor.a *= clamp(dIn / ${blend}, 0.0, 1.0);`
+    : `if (max(abs(vXY.x), abs(vXY.y)) < ${half} - ${blend} - 0.5) discard;`;
   m.onBeforeCompile = (sh) => {
     sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute float sea;\nvarying float vSea;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSea = sea;');
+      .replace('#include <common>', '#include <common>\nattribute float sea;\nvarying float vSea;\nvarying vec2 vXY;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSea = sea;\nvXY = position.xy;');
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying float vSea;\nfloat waterMask = 0.0;')
+      .replace('#include <common>', '#include <common>\nvarying float vSea;\nvarying vec2 vXY;\nfloat waterMask = 0.0;')
+      .replace('#include <alphatest_fragment>', `#include <alphatest_fragment>\n${clip}`)
       .replace('#include <map_fragment>', `#include <map_fragment>
         float lum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
         waterMask = smoothstep(0.5, 0.95, vSea) * (1.0 - smoothstep(0.035, 0.11, lum));
@@ -137,7 +147,7 @@ function terrainMaterial(envMap) {
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.14, waterMask);')
       .replace('#include <lights_fragment_maps>', '#include <lights_fragment_maps>\nradiance *= mix(1.0, 1.9, waterMask);');
   };
-  m.customProgramCacheKey = () => 'vv-terrain-water-2';
+  m.customProgramCacheKey = () => `vv-terrain-3-${role || 'base'}-${half}-${blend}`;
   return m;
 }
 
@@ -208,9 +218,9 @@ const ease = (k) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
 
 export class GeoRocket extends CinemaRocket {
   lights(s) {
-    this.hemi = new THREE.HemisphereLight(0xdfe9f5, 0x4a4438, 0.85);
+    this.hemi = new THREE.HemisphereLight(0xdfe9f5, 0x4a4438, 0.7);
     s.add(this.hemi);
-    this.sun = new THREE.DirectionalLight(0xfff1df, 3.4);
+    this.sun = new THREE.DirectionalLight(0xfff1df, 2.6);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
     const sc = this.sun.shadow.camera;
@@ -242,14 +252,23 @@ export class GeoRocket extends CinemaRocket {
     const p = this.opts.pack;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.renderer.toneMappingExposure = 0.95;
+    this.renderer.toneMappingExposure = 0.92;
     // The engineering backdrop gives way to the landscape.
     for (const o of [this.groundDisc, this.spokes, this.cross, ...(this.rings || [])]) if (o) o.visible = false;
     // Terrain.
-    this.terrainMat = terrainMaterial(this.envRT ? this.envRT.texture : null);
+    const env = this.envRT ? this.envRT.texture : null;
+    this.terrainMat = terrainMaterial(env, p.detail, 'base');
     this.terrain = new THREE.Mesh(terrainGeometry(p), this.terrainMat);
     this.terrain.receiveShadow = true;
     s.add(this.terrain);
+    if (p.detail) {
+      // The detail layer, with the heights the shell uses (blended into the base at its edge).
+      this.detailMat = terrainMaterial(env, p.detail, 'detail');
+      this.detail = new THREE.Mesh(terrainGeometry(p, p.detail, p.detail.half, (i, e, n) => terrainAt(p, e, n)), this.detailMat);
+      this.detail.receiveShadow = true;
+      this.detail.renderOrder = 1;
+      s.add(this.detail);
+    }
     // Beyond the pack: a neutral plane at the lowest edge height (no data there).
     let edgeMin = Infinity;
     for (let c = 0; c < p.cols; c++) edgeMin = Math.min(edgeMin, p.up[c], p.up[(p.rows - 1) * p.cols + c]);
@@ -296,17 +315,20 @@ export class GeoRocket extends CinemaRocket {
     this.sky = skyDome(80000);
     s.add(this.sky);
     // Illustrative pad surface draped on the terrain under the R5 ring (no facility is modelled).
-    const apron = Math.max(24, (this.pad.land || 10) * 1.9);
-    const pg = new THREE.RingGeometry(0.01, apron, 96, 24);
-    const pa = pg.getAttribute('position');
-    for (let i = 0; i < pa.count; i++) {
-      const x = this.pad.cx + pa.getX(i); const y = this.pad.cy + pa.getY(i);
-      pa.setXYZ(i, x, y, (terrainAt(p, x, y) ?? 0) + 0.12);
+    // A pack with a detail image shows the ground as photographed: no surface is drawn over it.
+    if (!p.detail) {
+      const apron = Math.max(24, (this.pad.land || 10) * 1.9);
+      const pg = new THREE.RingGeometry(0.01, apron, 96, 24);
+      const pa = pg.getAttribute('position');
+      for (let i = 0; i < pa.count; i++) {
+        const x = this.pad.cx + pa.getX(i); const y = this.pad.cy + pa.getY(i);
+        pa.setXYZ(i, x, y, (terrainAt(p, x, y) ?? 0) + 0.12);
+      }
+      pg.computeVertexNormals();
+      this.padSurface = new THREE.Mesh(pg, new THREE.MeshStandardMaterial({ map: padTexture(apron, this.pad.land), transparent: true, roughness: 0.92, metalness: 0, polygonOffset: true, polygonOffsetFactor: -2 }));
+      this.padSurface.receiveShadow = true;
+      s.add(this.padSurface);
     }
-    pg.computeVertexNormals();
-    this.padSurface = new THREE.Mesh(pg, new THREE.MeshStandardMaterial({ map: padTexture(apron, this.pad.land), transparent: true, roughness: 0.92, metalness: 0, polygonOffset: true, polygonOffsetFactor: -2 }));
-    this.padSurface.receiveShadow = true;
-    s.add(this.padSurface);
     if (this.padDisc) this.padDisc.visible = false;
     // Pad rings lifted onto the terrain (the model has them on z = 0).
     const drape = (pts, lift) => pts.map((v) => new THREE.Vector3(v.x, v.y, (terrainAt(p, v.x, v.y) ?? 0) + lift));
@@ -367,9 +389,9 @@ export class GeoRocket extends CinemaRocket {
     this.applyTheme();
   }
 
-  async attachImage(blob) {
+  async texture(blob) {
     const bitmap = await createImageBitmap(blob, { imageOrientation: 'flipY' });
-    if (this.disposed) { bitmap.close(); return; }
+    if (this.disposed) { bitmap.close(); return null; }
     const tex = new THREE.Texture(bitmap);
     tex.flipY = false;
     tex.colorSpace = THREE.SRGBColorSpace;
@@ -377,12 +399,24 @@ export class GeoRocket extends CinemaRocket {
     tex.generateMipmaps = true;
     tex.minFilter = THREE.LinearMipmapLinearFilter;
     tex.needsUpdate = true;
+    (this.bitmaps = this.bitmaps || []).push(bitmap);
+    return tex;
+  }
+
+  async attachImage(pack) {
+    const tex = await this.texture(pack.image);
+    if (!tex) return;
     this.terrainMat.map = tex;
     this.terrainMat.needsUpdate = true;
-    const edge = await edgeColour(bitmap);
+    const edge = await edgeColour(tex.image);
     if (this.disposed) return;
     if (!this.beyondIsSea) this.beyondMat.color = edge;
-    this.bitmap = bitmap;
+    if (this.detail && pack.detail) {
+      const dt = await this.texture(pack.detail.image);
+      if (!dt) return;
+      this.detailMat.map = dt;
+      this.detailMat.needsUpdate = true;
+    }
     this.renderer.compile(this.s, this.camera);
     this.requestRender();
   }
@@ -426,7 +460,7 @@ export class GeoRocket extends CinemaRocket {
       return { pos: aim.clone().add(off), target: aim, fov: 30 };
     }
     if (mode === 'pad') {
-      // An observer standing on the ground 420 m from the pad, following with a long lens that
+      // An observer 10 m above the ground 420 m from the pad, following with a long lens that
       // keeps about 2.4 stage lengths in frame. The bearing is the first of a fixed list with a
       // clear line of sight over the terrain to the pad (chosen once per scene).
       const at = this.observerPoint();
@@ -435,11 +469,12 @@ export class GeoRocket extends CinemaRocket {
       return { pos: at, target: aim, fov };
     }
     if (mode === 'closeup') {
-      // At the pad: a low camera beside the landing area, for the touchdown at full scale.
-      const at = pad.clone().addScaledVector(bearing(205, 0), 105);
-      at.z = this.ground(at.x, at.y) + 7;
-      const tgt = new THREE.Vector3(this.pad.cx, this.pad.cy, this.ground(this.pad.cx, this.pad.cy) + 17);
-      return { pos: at, target: tgt, fov: 34 };
+      // At the pad: a raised camera beside the landing area, for the touchdown at full scale with
+      // the ground around the pad in view.
+      const at = pad.clone().addScaledVector(bearing(205, 0), 115);
+      at.z = this.ground(at.x, at.y) + 26;
+      const tgt = new THREE.Vector3(this.pad.cx, this.pad.cy, this.ground(this.pad.cx, this.pad.cy) + 14);
+      return { pos: at, target: tgt, fov: 36 };
     }
     if (mode === 'wide') {
       // An elevated oblique view: the whole descent above the landscape it is placed on.
@@ -452,7 +487,7 @@ export class GeoRocket extends CinemaRocket {
     return { pos: new THREE.Vector3(this.pad.cx, this.pad.cy - span * 0.02, span / (2 * Math.tan(deg(20)))), target: pad, fov: 40 };
   }
 
-  /** Ground observer for the "From the ground" camera: 420 m out, on the first clear bearing. */
+  /** Ground observer for the "From the ground" camera: 420 m out, 10 m up (a mast or a roof), on the first clear bearing. */
   observerPoint() {
     if (this.observer) return this.observer.clone();
     const BEARINGS = [160, 200, 120, 240, 80, 280, 40, 320, 0];
@@ -460,7 +495,7 @@ export class GeoRocket extends CinemaRocket {
     let pick = null;
     for (const b of BEARINGS) {
       const at = new THREE.Vector3(this.pad.cx, this.pad.cy, 0).addScaledVector(bearing(b, 0), 420);
-      at.z = this.ground(at.x, at.y) + 1.7;
+      at.z = this.ground(at.x, at.y) + 10;
       let clear = true;
       for (let k = 1; k < 40 && clear; k++) {
         const q = at.clone().lerp(pad, k / 40);
@@ -593,7 +628,8 @@ export class GeoRocket extends CinemaRocket {
     if (this.animFrame) cancelAnimationFrame(this.animFrame);
     if (this.terrainMat && this.terrainMat.map) this.terrainMat.map.dispose();
     if (this.padSurface) this.padSurface.material.map.dispose();
-    if (this.bitmap) this.bitmap.close();
+    if (this.detailMat && this.detailMat.map) this.detailMat.map.dispose();
+    for (const b of this.bitmaps || []) b.close();
     super.dispose();
     // The context is gone: no late frame (an image decode or a cursor tick) may render again.
     this.ok = false;
@@ -613,7 +649,7 @@ export function mountGeo(host, models, active, cursor, colours, pack) {
   r3.preset('follow', true);
   const unsub = cursor.subscribe((t) => r3.setTime(t));
   r3.setTime(cursor.t);
-  const ready = r3.attachImage(pack.image).then(() => r3.setTime(cursor.t));
+  const ready = r3.attachImage(pack).then(() => r3.setTime(cursor.t));
   const v3 = (v) => [Math.round(v.x * 10) / 10, Math.round(v.y * 10) / 10, Math.round(v.z * 10) / 10];
   return {
     ok: true,

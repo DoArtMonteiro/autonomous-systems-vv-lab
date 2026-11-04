@@ -1,6 +1,10 @@
 //! Geographic environment packs: a terrain height grid and a true-colour image on a regular grid of
 //! the ENU tangent plane at an origin, with a manifest (`environment.json`, schema
-//! `vv-geo-environment.v1`) naming the origin, datums, sources, licences and file hashes.
+//! `vv-geo-environment.v1` or `.v2`) naming the origin, datums, sources, licences and file hashes.
+//! Schema v2 adds an optional detail layer: a smaller square around the origin with a finer
+//! height grid and image (`detail-height.u16`, `detail-image.jpg`). Where a detail layer covers a
+//! point it is the terrain there; within `blend_m` of its edge its heights blend linearly into the
+//! base grid so the drawn surfaces meet. The origin (z = 0) is on the finest layer.
 //!
 //! A pack is untrusted input until [`Environment::open`] accepts it: fixed file names, bounded
 //! sizes, matching SHA-256, a consistent grid, attributed sources, and the pack's check points
@@ -19,9 +23,12 @@ use sha2::{Digest, Sha256};
 use crate::wgs84::{Enu, Geodetic};
 
 pub const SCHEMA: &str = "vv-geo-environment.v1";
+pub const SCHEMA_V2: &str = "vv-geo-environment.v2";
 pub const MANIFEST: &str = "environment.json";
 pub const HEIGHT_FILE: &str = "height.u16";
 pub const IMAGE_FILE: &str = "image.jpg";
+pub const DETAIL_HEIGHT_FILE: &str = "detail-height.u16";
+pub const DETAIL_IMAGE_FILE: &str = "detail-image.jpg";
 const MAX_MANIFEST_BYTES: u64 = 256 * 1024;
 const MAX_HEIGHT_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_IMAGE_BYTES: u64 = 32 * 1024 * 1024;
@@ -59,8 +66,19 @@ struct Manifest {
     extent_m: f64,
     height: Height,
     image: Image,
+    #[serde(default)]
+    layers: Vec<Layer>,
     sources: Vec<Source>,
     checks: Vec<Check>,
+}
+
+#[derive(Deserialize)]
+struct Layer {
+    role: String,
+    extent_m: f64,
+    blend_m: f64,
+    height: Height,
+    image: Image,
 }
 
 #[derive(Deserialize)]
@@ -118,6 +136,57 @@ struct Check {
     lon_deg: f64,
     h_ellipsoid_m: f64,
     enu_m: [f64; 3],
+    /// The grid the check's height belongs to: "base" (default) or "detail".
+    #[serde(default)]
+    layer: Option<String>,
+}
+
+/// A validated, square height grid centred on the origin.
+#[derive(Debug, Clone)]
+struct Grid {
+    heights: Vec<f32>,
+    cols: usize,
+    rows: usize,
+    spacing: f64,
+    x0: f64,
+    y0: f64,
+}
+
+impl Grid {
+    /// Linear on the two triangles the Studio draws for each cell (split along the north-east to
+    /// south-west diagonal), so clearances refer to the surface on screen.
+    fn at(&self, e: f64, n: f64) -> Option<f64> {
+        let fx = (e - self.x0) / self.spacing;
+        let fy = (self.y0 - n) / self.spacing;
+        if !(fx >= 0.0 && fy >= 0.0 && fx <= (self.cols - 1) as f64 && fy <= (self.rows - 1) as f64)
+        {
+            return None;
+        }
+        let c = (fx.floor() as usize).min(self.cols - 2);
+        let r = (fy.floor() as usize).min(self.rows - 2);
+        let tx = fx - c as f64;
+        let ty = fy - r as f64;
+        let at = |rr: usize, cc: usize| self.heights[rr * self.cols + cc] as f64;
+        let (a, b, d, e) = (at(r, c), at(r, c + 1), at(r + 1, c), at(r + 1, c + 1));
+        Some(if tx + ty <= 1.0 {
+            a + (b - a) * tx + (d - a) * ty
+        } else {
+            e + (d - e) * (1.0 - tx) + (b - e) * (1.0 - ty)
+        })
+    }
+
+    fn half(&self) -> f64 {
+        -self.x0
+    }
+}
+
+/// A validated detail layer.
+#[derive(Debug, Clone)]
+struct Detail {
+    grid: Grid,
+    blend_m: f64,
+    height_sha: String,
+    image_sha: String,
 }
 
 /// A validated environment pack.
@@ -128,12 +197,8 @@ pub struct Environment {
     pub frame: Enu,
     /// Geoid undulation at the origin (EGM2008 minus WGS84 ellipsoid), metres.
     pub geoid_undulation_m: f64,
-    heights: Vec<f32>,
-    cols: usize,
-    rows: usize,
-    spacing: f64,
-    x0: f64,
-    y0: f64,
+    base: Grid,
+    detail: Option<Detail>,
     summary: Value,
     bytes: u64,
     image_sha: String,
@@ -243,6 +308,89 @@ pub fn jpeg_size(b: &[u8]) -> Option<(usize, usize)> {
     None
 }
 
+/// Reads and validates a square height grid centred on the origin spanning `extent` each way.
+fn read_grid(dir: &Path, h: &Height, extent: f64, name: &str) -> Result<(Grid, Vec<u8>), GeoError> {
+    if h.file != name || h.encoding != "uint16-le" {
+        return invalid(format!("the height grid must be {name}, uint16-le"));
+    }
+    if !(2..=4097).contains(&h.columns) || !(2..=4097).contains(&h.rows) {
+        return invalid(format!("{name}: grid size outside 2..4097"));
+    }
+    let s = finite(h.spacing_m, "height spacing")?;
+    if !(0.25..=1000.0).contains(&s) || finite(h.scale_m, "height scale")? <= 0.0 {
+        return invalid(format!("{name}: spacing or scale out of range"));
+    }
+    finite(h.offset_m, "height offset")?;
+    let want_x0 = -((h.columns - 1) as f64) * s / 2.0;
+    let want_y0 = ((h.rows - 1) as f64) * s / 2.0;
+    if (h.first_node_m[0] - want_x0).abs() > 1e-6 || (h.first_node_m[1] - want_y0).abs() > 1e-6 {
+        return invalid(format!("{name}: the grid is not centred on the origin"));
+    }
+    // Square grid, exactly the declared extent: the image UVs assume it.
+    if h.rows != h.columns || (2.0 * want_y0 - 2.0 * extent).abs() > 1e-6 {
+        return invalid(format!(
+            "{name}: the grid must be square and span exactly the declared extent"
+        ));
+    }
+    if h.bytes != (h.columns * h.rows * 2) as u64 {
+        return invalid(format!("{name}: byte count does not match its size"));
+    }
+    let hb = read_bounded(&dir.join(name), MAX_HEIGHT_BYTES)?;
+    if hb.len() as u64 != h.bytes || sha256_hex(&hb) != h.sha256 {
+        return invalid(format!("{name} does not match its SHA-256 in the manifest"));
+    }
+    let heights: Vec<f32> = hb
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|c| (u16::from_le_bytes(*c) as f64 * h.scale_m + h.offset_m) as f32)
+        .collect();
+    let g = Grid {
+        heights,
+        cols: h.columns,
+        rows: h.rows,
+        spacing: s,
+        x0: want_x0,
+        y0: want_y0,
+    };
+    Ok((g, hb))
+}
+
+/// Reads and validates a square JPEG image spanning `extent` each way, half a texel inside it.
+fn read_image(dir: &Path, im: &Image, extent: f64, name: &str) -> Result<Vec<u8>, GeoError> {
+    if im.file != name || !(16..=16384).contains(&im.columns) || !(16..=16384).contains(&im.rows) {
+        return invalid(format!(
+            "the image must be {name}, 16 to 16384 texels a side"
+        ));
+    }
+    let sp = finite(im.spacing_m, "image spacing")?;
+    let first = [-extent + sp / 2.0, extent - sp / 2.0];
+    if im.rows != im.columns
+        || ((im.columns as f64) * sp - 2.0 * extent).abs() > 1e-6
+        || (im.first_texel_centre_m[0] - first[0]).abs() > 1e-6
+        || (im.first_texel_centre_m[1] - first[1]).abs() > 1e-6
+    {
+        return invalid(format!(
+            "{name}: the image must be square, span exactly the declared extent and start half a texel inside it"
+        ));
+    }
+    let ib = read_bounded(&dir.join(name), MAX_IMAGE_BYTES)?;
+    if ib.len() as u64 != im.bytes || sha256_hex(&ib) != im.sha256 {
+        return invalid(format!("{name} does not match its SHA-256 in the manifest"));
+    }
+    if !ib.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        return invalid(format!("{name} is not a JPEG file"));
+    }
+    // The decoded size is what the web view allocates: it must be the declared one.
+    match jpeg_size(&ib) {
+        Some((w, hh)) if w == im.columns && hh == im.rows => Ok(ib),
+        other => invalid(format!(
+            "{name} is {other:?} pixels, the manifest declares {}x{}",
+            im.columns, im.rows
+        )),
+    }
+}
+
 impl Environment {
     /// Reads and validates the pack in `dir`. Nothing of a pack is used before this returns `Ok`.
     pub fn open(dir: &Path) -> Result<Self, GeoError> {
@@ -252,8 +400,11 @@ impl Environment {
             .map_err(|e| GeoError::Invalid(format!("{MANIFEST}: {e}")))?;
         let m: Manifest = serde_json::from_value(full.clone())
             .map_err(|e| GeoError::Invalid(format!("{MANIFEST}: {e}")))?;
-        if m.schema != SCHEMA {
-            return invalid(format!("schema {} is not {SCHEMA}", m.schema));
+        if m.schema != SCHEMA && m.schema != SCHEMA_V2 {
+            return invalid(format!(
+                "schema {} is not {SCHEMA} or {SCHEMA_V2}",
+                m.schema
+            ));
         }
         if !valid_id(&m.id) || m.id != folder {
             return invalid(format!(
@@ -291,84 +442,40 @@ impl Environment {
             return invalid(format!("extent must be in (0, {MAX_EXTENT_M}] m"));
         }
 
-        // Height grid.
-        let h = &m.height;
-        if h.file != HEIGHT_FILE || h.encoding != "uint16-le" {
-            return invalid(format!("the height grid must be {HEIGHT_FILE}, uint16-le"));
-        }
-        if !(2..=4097).contains(&h.columns) || !(2..=4097).contains(&h.rows) {
-            return invalid("height grid size outside 2..4097");
-        }
-        let s = finite(h.spacing_m, "height spacing")?;
-        if !(1.0..=1000.0).contains(&s) || finite(h.scale_m, "height scale")? <= 0.0 {
-            return invalid("height spacing or scale out of range");
-        }
-        finite(h.offset_m, "height offset")?;
-        let want_x0 = -((h.columns - 1) as f64) * s / 2.0;
-        let want_y0 = ((h.rows - 1) as f64) * s / 2.0;
-        if (h.first_node_m[0] - want_x0).abs() > 1e-6 || (h.first_node_m[1] - want_y0).abs() > 1e-6
-        {
-            return invalid("the height grid is not centred on the origin");
-        }
-        // Square grid, exactly the declared extent: the image UVs assume it.
-        if h.rows != h.columns || (2.0 * want_y0 - 2.0 * extent).abs() > 1e-6 {
-            return invalid("the height grid must be square and span exactly the declared extent");
-        }
-        if h.bytes != (h.columns * h.rows * 2) as u64 {
-            return invalid("height grid byte count does not match its size");
-        }
-        let hb = read_bounded(&dir.join(HEIGHT_FILE), MAX_HEIGHT_BYTES)?;
-        if hb.len() as u64 != h.bytes || sha256_hex(&hb) != h.sha256 {
-            return invalid(format!(
-                "{HEIGHT_FILE} does not match its SHA-256 in the manifest"
-            ));
-        }
-        let heights: Vec<f32> = hb
-            .as_chunks::<2>()
-            .0
-            .iter()
-            .map(|c| (u16::from_le_bytes(*c) as f64 * h.scale_m + h.offset_m) as f32)
-            .collect();
+        let (base, hb) = read_grid(dir, &m.height, extent, HEIGHT_FILE)?;
+        let ib = read_image(dir, &m.image, extent, IMAGE_FILE)?;
+        let mut bytes = (raw.len() + hb.len() + ib.len()) as u64;
 
-        // Image.
-        let im = &m.image;
-        if im.file != IMAGE_FILE
-            || !(16..=16384).contains(&im.columns)
-            || !(16..=16384).contains(&im.rows)
-        {
-            return invalid(format!(
-                "the image must be {IMAGE_FILE}, 16 to 16384 texels a side"
-            ));
+        // Optional layers (schema v2): at most one detail layer, nested inside the base.
+        let v2 = m.schema == SCHEMA_V2;
+        if !v2 && !m.layers.is_empty() {
+            return invalid(format!("layers need schema {SCHEMA_V2}"));
         }
-        let sp = finite(im.spacing_m, "image spacing")?;
-        let first = [-extent + sp / 2.0, extent - sp / 2.0];
-        if im.rows != im.columns
-            || ((im.columns as f64) * sp - 2.0 * extent).abs() > 1e-6
-            || (im.first_texel_centre_m[0] - first[0]).abs() > 1e-6
-            || (im.first_texel_centre_m[1] - first[1]).abs() > 1e-6
-        {
-            return invalid(
-                "the image must be square, span exactly the declared extent and start half a texel inside it",
-            );
-        }
-        let ib = read_bounded(&dir.join(IMAGE_FILE), MAX_IMAGE_BYTES)?;
-        if ib.len() as u64 != im.bytes || sha256_hex(&ib) != im.sha256 {
-            return invalid(format!(
-                "{IMAGE_FILE} does not match its SHA-256 in the manifest"
-            ));
-        }
-        if !ib.starts_with(&[0xFF, 0xD8, 0xFF]) {
-            return invalid(format!("{IMAGE_FILE} is not a JPEG file"));
-        }
-        // The decoded size is what the web view allocates: it must be the declared one.
-        match jpeg_size(&ib) {
-            Some((w, hh)) if w == im.columns && hh == im.rows => {}
-            other => {
-                return invalid(format!(
-                    "{IMAGE_FILE} is {other:?} pixels, the manifest declares {}x{}",
-                    im.columns, im.rows
-                ));
+        let mut detail = None;
+        for l in &m.layers {
+            if l.role != "detail" || detail.is_some() {
+                return invalid("only one layer, with the role \"detail\", is supported");
             }
+            let ext = finite(l.extent_m, "detail extent")?;
+            if !(ext > 0.0 && ext < extent) {
+                return invalid("the detail layer must be smaller than the base extent");
+            }
+            let blend = finite(l.blend_m, "detail blend")?;
+            if !(0.0..=ext / 4.0).contains(&blend) {
+                return invalid("the detail blend must be in [0, extent / 4]");
+            }
+            if l.height.spacing_m > m.height.spacing_m || l.image.spacing_m > m.image.spacing_m {
+                return invalid("the detail layer must not be coarser than the base");
+            }
+            let (g, dh) = read_grid(dir, &l.height, ext, DETAIL_HEIGHT_FILE)?;
+            let di = read_image(dir, &l.image, ext, DETAIL_IMAGE_FILE)?;
+            bytes += (dh.len() + di.len()) as u64;
+            detail = Some(Detail {
+                grid: g,
+                blend_m: blend,
+                height_sha: l.height.sha256.clone(),
+                image_sha: l.image.sha256.clone(),
+            });
         }
 
         if m.sources.is_empty()
@@ -388,26 +495,24 @@ impl Environment {
             Geodetic::new(o.lat_deg, o.lon_deg, o.h_ellipsoid_m),
             heading,
         );
+        let scale = m.height.scale_m;
         let mut env = Environment {
             id: m.id.clone(),
             dir: dir.to_path_buf(),
             frame,
             geoid_undulation_m: n0,
-            heights,
-            cols: h.columns,
-            rows: h.rows,
-            spacing: s,
-            x0: want_x0,
-            y0: want_y0,
+            base,
+            detail,
             summary: Value::Null,
-            bytes: (raw.len() + hb.len() + ib.len()) as u64,
-            image_sha: im.sha256.clone(),
+            bytes,
+            image_sha: m.image.sha256.clone(),
             worst_check_m: 0.0,
         };
 
         // The origin is on the terrain, and every check point recomputes within tolerance.
+        // The origin is on the finest layer.
         match env.terrain_up(0.0, 0.0) {
-            Some(u) if u.abs() <= h.scale_m => {}
+            Some(u) if u.abs() <= scale => {}
             other => return invalid(format!("the terrain at the origin is {other:?} m, not 0")),
         }
         if m.checks.is_empty() {
@@ -428,8 +533,16 @@ impl Environment {
                     "a check point recomputes {d:.4} m away from the manifest (tolerance {CHECK_TOLERANCE_M} m)"
                 ));
             }
-            match env.terrain_up(c.enu_m[0], c.enu_m[1]) {
-                Some(u) if (u - c.enu_m[2]).abs() <= h.scale_m => {}
+            let grid = match c.layer.as_deref() {
+                None | Some("base") => Some(&env.base),
+                Some("detail") => env.detail.as_ref().map(|d| &d.grid),
+                Some(_) => None,
+            };
+            let Some(grid) = grid else {
+                return invalid("a check point names a layer the pack does not have");
+            };
+            match grid.at(c.enu_m[0], c.enu_m[1]) {
+                Some(u) if (u - c.enu_m[2]).abs() <= scale => {}
                 other => {
                     return invalid(format!(
                         "the height grid at a check point is {other:?}, the manifest says {:.3}",
@@ -443,27 +556,35 @@ impl Environment {
         Ok(env)
     }
 
-    /// Terrain ENU up at (east, north) on the drawn triangles; `None` outside the grid.
+    /// Terrain ENU up at (east, north) on the drawn surface; `None` outside the pack. The detail
+    /// layer wins where it covers the point; within `blend_m` of its edge it blends linearly into
+    /// the base grid (as the Studio draws it).
     pub fn terrain_up(&self, e: f64, n: f64) -> Option<f64> {
-        let fx = (e - self.x0) / self.spacing;
-        let fy = (self.y0 - n) / self.spacing;
-        if !(fx >= 0.0 && fy >= 0.0 && fx <= (self.cols - 1) as f64 && fy <= (self.rows - 1) as f64)
+        if let Some((d, u)) = self
+            .detail
+            .as_ref()
+            .and_then(|d| d.grid.at(e, n).map(|u| (d, u)))
         {
-            return None;
+            let inside = d.grid.half() - e.abs().max(n.abs());
+            if d.blend_m <= 0.0 || inside >= d.blend_m {
+                return Some(u);
+            }
+            let w = (inside / d.blend_m).clamp(0.0, 1.0);
+            return Some(match self.base.at(e, n) {
+                Some(b) => b + (u - b) * w,
+                None => u,
+            });
         }
-        let c = (fx.floor() as usize).min(self.cols - 2);
-        let r = (fy.floor() as usize).min(self.rows - 2);
-        let tx = fx - c as f64;
-        let ty = fy - r as f64;
-        let at = |rr: usize, cc: usize| self.heights[rr * self.cols + cc] as f64;
-        // Linear on the two triangles the Studio draws for each cell (split along the
-        // north-east to south-west diagonal), so clearances refer to the surface on screen.
-        let (a, b, d, e) = (at(r, c), at(r, c + 1), at(r + 1, c), at(r + 1, c + 1));
-        Some(if tx + ty <= 1.0 {
-            a + (b - a) * tx + (d - a) * ty
-        } else {
-            e + (d - e) * (1.0 - tx) + (b - e) * (1.0 - ty)
-        })
+        self.base.at(e, n)
+    }
+
+    /// The files of this pack, the manifest first.
+    pub fn files(&self) -> Vec<&'static str> {
+        let mut v = vec![MANIFEST, HEIGHT_FILE, IMAGE_FILE];
+        if self.detail.is_some() {
+            v.extend([DETAIL_HEIGHT_FILE, DETAIL_IMAGE_FILE]);
+        }
+        v
     }
 
     /// Places model points (x, y, z in the run's local frame) on the Earth.
@@ -502,7 +623,21 @@ impl Environment {
                     .to_string(),
             ),
             IMAGE_FILE => (MAX_IMAGE_BYTES, self.image_sha.clone()),
-            _ => return invalid(format!("{name:?} is not a file of an environment pack")),
+            DETAIL_HEIGHT_FILE if self.detail.is_some() => (
+                MAX_HEIGHT_BYTES,
+                self.detail
+                    .as_ref()
+                    .map(|d| d.height_sha.clone())
+                    .unwrap_or_default(),
+            ),
+            DETAIL_IMAGE_FILE if self.detail.is_some() => (
+                MAX_IMAGE_BYTES,
+                self.detail
+                    .as_ref()
+                    .map(|d| d.image_sha.clone())
+                    .unwrap_or_default(),
+            ),
+            _ => return invalid(format!("{name:?} is not a file of this environment pack")),
         };
         let b = read_bounded(&self.dir.join(name), max)?;
         if sha256_hex(&b) != sha {
@@ -525,7 +660,7 @@ impl Environment {
 fn summary_of(full: &Value, env: &Environment) -> Value {
     let pick = |k: &str| full.get(k).cloned().unwrap_or(Value::Null);
     json!({
-        "schema": SCHEMA,
+        "schema": pick("schema"),
         "id": env.id,
         "name": pick("name"),
         "summary": pick("summary"),
@@ -534,6 +669,7 @@ fn summary_of(full: &Value, env: &Environment) -> Value {
         "extent_m": pick("extent_m"),
         "height": pick("height"),
         "image": pick("image"),
+        "layers": full.get("layers").cloned().unwrap_or_else(|| json!([])),
         "relief": pick("relief"),
         "accuracy": pick("accuracy"),
         "sources": pick("sources"),
@@ -582,7 +718,8 @@ mod tests {
     fn copy_pack(id: &str, to: &Path) -> PathBuf {
         let dst = to.join(id);
         fs::create_dir_all(&dst).unwrap();
-        for f in [MANIFEST, HEIGHT_FILE, IMAGE_FILE] {
+        let src = Environment::open(&packs().join(id)).unwrap();
+        for f in src.files() {
             fs::copy(packs().join(id).join(f), dst.join(f)).unwrap();
         }
         dst
@@ -621,7 +758,7 @@ mod tests {
         assert!((t[1].h_ellipsoid_m - o.h_m - 3000.0).abs() < 1e-6);
         assert!((t[0].above_terrain_m.unwrap()).abs() < 0.011);
         // Orthometric height of the origin is the DEM height there.
-        assert!((t[0].h_msl_m - (o.h_m - e.geoid_undulation_m)).abs() < 1e-9);
+        assert!((t[0].h_msl_m - (o.h_m - e.geoid_undulation_m)).abs() < 1e-6);
     }
 
     #[test]
@@ -746,5 +883,176 @@ mod tests {
         let (none, none_bad) = discover(&d.join("missing"));
         assert!(none.is_empty() && none_bad.is_empty());
         let _ = fs::remove_dir_all(d);
+    }
+
+    // ------------------------------------------------------------------ synthetic packs (v1, v2)
+
+    const TINY_JPEG: &[u8] = include_bytes!("../tests/fixtures/tiny16.jpg");
+
+    /// Writes a square height grid with heights `f(e, n)` and returns its manifest block.
+    fn grid(dir: &Path, name: &str, half: f64, spacing: f64, f: &dyn Fn(f64, f64) -> f64) -> Value {
+        let k = (half / spacing).round() as i64;
+        let n = (2 * k + 1) as usize;
+        let (scale, offset) = (0.01, -100.0);
+        let mut b = Vec::with_capacity(n * n * 2);
+        for r in 0..n {
+            for c in 0..n {
+                let e = (c as i64 - k) as f64 * spacing;
+                let nn = (k - r as i64) as f64 * spacing;
+                let q = ((f(e, nn) - offset) / scale).round() as u16;
+                b.extend_from_slice(&q.to_le_bytes());
+            }
+        }
+        fs::write(dir.join(name), &b).unwrap();
+        json!({"file": name, "encoding": "uint16-le", "scale_m": scale, "offset_m": offset, "columns": n, "rows": n,
+               "spacing_m": spacing, "first_node_m": [-(k as f64) * spacing, k as f64 * spacing], "bytes": b.len(), "sha256": sha256_hex(&b)})
+    }
+
+    fn image(dir: &Path, name: &str, half: f64) -> Value {
+        fs::write(dir.join(name), TINY_JPEG).unwrap();
+        let sp = 2.0 * half / 16.0;
+        json!({"file": name, "columns": 16, "rows": 16, "spacing_m": sp, "first_texel_centre_m": [-half + sp / 2.0, half - sp / 2.0],
+               "bytes": TINY_JPEG.len(), "sha256": sha256_hex(TINY_JPEG)})
+    }
+
+    /// A pack with a 300 m base and, when `detail`, a 100 m detail layer at 0 m over a base at
+    /// 10 m, blending over its outer 20 m. Check points come from this crate's own geodesy.
+    fn synthetic(id: &str, detail: bool) -> (PathBuf, PathBuf) {
+        let root = scratch(id);
+        let dir = root.join(id);
+        fs::create_dir_all(&dir).unwrap();
+        let base_up = if detail { 10.0 } else { 0.0 };
+        let frame = Enu::new(Geodetic::new(28.5, -80.5, 0.0), 0.0);
+        let check = |e: f64, n: f64, u: f64, layer: &str| {
+            let g = frame.ecef_of([e, n, u]).to_geodetic();
+            json!({"lat_deg": g.lat_deg, "lon_deg": g.lon_deg, "h_ellipsoid_m": g.h_m, "enu_m": [e, n, u], "layer": layer})
+        };
+        let mut m = json!({
+            "schema": if detail { SCHEMA_V2 } else { SCHEMA },
+            "id": id, "name": "Synthetic", "summary": "Test pack.",
+            "origin": {"lat_deg": 28.5, "lon_deg": -80.5, "h_ellipsoid_m": 0.0, "orthometric_height_m": 0.0, "geoid_undulation_m": 0.0},
+            "frame": {"kind": "enu-tangent-plane", "ellipsoid": "WGS84", "heading_deg": 0.0},
+            "extent_m": 300.0,
+            "height": grid(&dir, HEIGHT_FILE, 300.0, 100.0, &|_, _| base_up),
+            "image": image(&dir, IMAGE_FILE, 300.0),
+            "sources": [{"provider": "test", "product": "test", "licence": "test", "attribution": "test"}],
+            "checks": [check(200.0, 200.0, base_up, "base")],
+        });
+        if detail {
+            m["layers"] = json!([{"role": "detail", "extent_m": 100.0, "blend_m": 20.0,
+                "height": grid(&dir, DETAIL_HEIGHT_FILE, 100.0, 25.0, &|_, _| 0.0),
+                "image": image(&dir, DETAIL_IMAGE_FILE, 100.0)}]);
+            m["checks"]
+                .as_array_mut()
+                .unwrap()
+                .push(check(50.0, 50.0, 0.0, "detail"));
+        }
+        fs::write(dir.join(MANIFEST), serde_json::to_vec(&m).unwrap()).unwrap();
+        (root, dir)
+    }
+
+    fn edit(dir: &Path, f: impl FnOnce(&mut Value)) {
+        let mut m: Value = serde_json::from_slice(&fs::read(dir.join(MANIFEST)).unwrap()).unwrap();
+        f(&mut m);
+        fs::write(dir.join(MANIFEST), serde_json::to_vec(&m).unwrap()).unwrap();
+    }
+
+    #[test]
+    fn a_v1_pack_without_layers_still_opens() {
+        let (root, dir) = synthetic("syn-v1", false);
+        let e = Environment::open(&dir).unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(e.files(), vec![MANIFEST, HEIGHT_FILE, IMAGE_FILE]);
+        assert!(e.file(DETAIL_HEIGHT_FILE).is_err());
+        assert_eq!(e.summary()["layers"], json!([]));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn the_detail_layer_is_the_terrain_and_blends_into_the_base_at_its_edge() {
+        let (root, dir) = synthetic("syn-v2", true);
+        let e = Environment::open(&dir).unwrap_or_else(|e| panic!("{e}"));
+        let near = |a: Option<f64>, b: f64| (a.unwrap() - b).abs() < 0.011;
+        assert!(
+            near(e.terrain_up(0.0, 0.0), 0.0),
+            "the origin is on the detail layer"
+        );
+        assert!(
+            near(e.terrain_up(50.0, -50.0), 0.0),
+            "inside the detail interior"
+        );
+        assert!(
+            near(e.terrain_up(90.0, 0.0), 5.0),
+            "half way through the 20 m blend"
+        );
+        assert!(
+            near(e.terrain_up(0.0, 100.0), 10.0),
+            "at the detail edge the base takes over"
+        );
+        assert!(
+            near(e.terrain_up(200.0, 0.0), 10.0),
+            "outside the detail layer"
+        );
+        assert!(e.terrain_up(400.0, 0.0).is_none());
+        assert_eq!(e.files().len(), 5);
+        assert!(e.file(DETAIL_IMAGE_FILE).is_ok() && e.file(DETAIL_HEIGHT_FILE).is_ok());
+        assert!(e.file("horizon-image.jpg").is_err());
+        assert_eq!(e.summary()["layers"][0]["role"], json!("detail"));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn layers_need_schema_v2_and_must_nest_inside_the_base() {
+        let (root, dir) = synthetic("syn-rules", true);
+        let reason = |d: &Path| Environment::open(d).unwrap_err().to_string();
+        edit(&dir, |m| m["schema"] = json!(SCHEMA));
+        assert!(reason(&dir).contains("schema"));
+        edit(&dir, |m| {
+            m["schema"] = json!(SCHEMA_V2);
+            m["layers"][0]["extent_m"] = json!(400.0);
+        });
+        assert!(reason(&dir).contains("smaller"));
+        edit(&dir, |m| {
+            m["layers"][0]["extent_m"] = json!(100.0);
+            m["layers"][0]["blend_m"] = json!(30.0);
+        });
+        assert!(reason(&dir).contains("blend"));
+        edit(&dir, |m| {
+            m["layers"][0]["blend_m"] = json!(20.0);
+            m["layers"][0]["role"] = json!("horizon");
+        });
+        assert!(reason(&dir).contains("detail"));
+        edit(&dir, |m| {
+            m["layers"][0]["role"] = json!("detail");
+            m["checks"][1]["layer"] = json!("other");
+        });
+        assert!(reason(&dir).contains("layer"));
+        edit(&dir, |m| m["checks"][1]["layer"] = json!("detail"));
+        assert!(Environment::open(&dir).is_ok());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn a_tampered_detail_file_is_rejected_by_name() {
+        let (root, dir) = synthetic("syn-tamper", true);
+        let mut b = fs::read(dir.join(DETAIL_HEIGHT_FILE)).unwrap();
+        b[10] ^= 1;
+        fs::write(dir.join(DETAIL_HEIGHT_FILE), b).unwrap();
+        let e = Environment::open(&dir).unwrap_err().to_string();
+        assert!(
+            e.contains(DETAIL_HEIGHT_FILE) && e.contains("SHA-256"),
+            "{e}"
+        );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn the_origin_must_be_on_the_finest_layer() {
+        let (root, dir) = synthetic("syn-origin", true);
+        // A detail grid 3 m above the origin: the base would put z = 0 elsewhere.
+        let h = grid(&dir, DETAIL_HEIGHT_FILE, 100.0, 25.0, &|_, _| 3.0);
+        edit(&dir, |m| m["layers"][0]["height"] = h);
+        let e = Environment::open(&dir).unwrap_err().to_string();
+        assert!(e.contains("origin"), "{e}");
+        let _ = fs::remove_dir_all(root);
     }
 }

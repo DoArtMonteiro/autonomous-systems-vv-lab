@@ -1,8 +1,8 @@
 {
-  "schema": "vv-geo-environment.v1",
+  "schema": "vv-geo-environment.v2",
   "id": "cape-canaveral",
   "name": "Cape Canaveral coast, Florida",
-  "summary": "Low, flat barrier coast on the Atlantic. The simulation's pad centre is placed on a circular hard-standing visible in the image; its position was read from the image (about 10 m). The facility is not modelled and the simulated pad is not that facility.",
+  "summary": "Low, flat barrier coast on the Atlantic. The simulation's pad centre is placed at the centre of a circular hard-standing visible in the detail image, measured on that image (about 2 m). The facility is not modelled and the simulated pad is not that facility.",
   "built": {
     "by": "scripts/geo/build_environment.py",
     "date": "2026-11-04",
@@ -12,13 +12,13 @@
     "gdal": "3.12.2"
   },
   "origin": {
-    "lat_deg": 28.486,
-    "lon_deg": -80.543,
-    "h_ellipsoid_m": -26.598,
-    "orthometric_height_m": 3.127,
+    "lat_deg": 28.48573,
+    "lon_deg": -80.54302,
+    "h_ellipsoid_m": -25.824,
+    "orthometric_height_m": 3.901,
     "geoid_undulation_m": -29.725,
     "geoid_undulation_spread_m": 0.211,
-    "note": "The simulation's pad centre (model origin, z = 0) is placed on the DEM surface at this point. The geoid undulation is treated as constant over the extent (its spread across the corners is given)."
+    "note": "The simulation's pad centre (model origin, z = 0) is placed on the detail terrain at this point; the orthometric height is that ellipsoidal height minus the EGM2008 undulation. The geoid undulation is treated as constant over the extent (its spread across the corners is given)."
   },
   "frame": {
     "kind": "enu-tangent-plane",
@@ -36,7 +36,7 @@
     "file": "height.u16",
     "encoding": "uint16-le",
     "scale_m": 0.01,
-    "offset_m": -17.0,
+    "offset_m": -18.0,
     "columns": 601,
     "rows": 601,
     "spacing_m": 30.0,
@@ -46,9 +46,9 @@
     ],
     "order": "row-major, row 0 at the north edge, column 0 at the west edge",
     "bytes": 722402,
-    "sha256": "92f5390f509704ac34eb4e9e9ad336cc1ad12889f63c6d154e3044900a82a38d",
-    "min_up_m": -15.85,
-    "max_up_m": 15.27
+    "sha256": "93c0f1c17638ae0c04d7e38d22d42f2be37befb98850d0eaa74aa18d86b0bed9",
+    "min_up_m": -16.62,
+    "max_up_m": 14.85
   },
   "image": {
     "file": "image.jpg",
@@ -62,42 +62,86 @@
     "nodata_fraction": 0.0,
     "registration": {
       "agreement_at_zero_shift": 0.8381,
-      "best_agreement": 0.8429,
+      "best_agreement": 0.8427,
       "best_shift_east_m": 120.0,
       "best_shift_north_m": -30.0,
       "method": "Fraction of texels where the DEM says land (> 1 m) and the image is not dark water, at zero shift and at the best shift on a 30 m lattice within 300 m."
     },
-    "bytes": 355150,
-    "sha256": "f6fea511499dc6b4a8a8886e39974a6e6132a5a96d979f62b1dafd168302c233",
+    "bytes": 355701,
+    "sha256": "4327bad1e0031b87b1912a896c2f8710e6268cf09a263655e857e17a378814bf",
     "processing": "Bilinear resampling of the TCI asset onto the ENU grid, JPEG quality 88. No colour editing."
   },
+  "layers": [
+    {
+      "role": "detail",
+      "extent_m": 1024.0,
+      "blend_m": 64.0,
+      "height": {
+        "file": "detail-height.u16",
+        "encoding": "uint16-le",
+        "scale_m": 0.01,
+        "offset_m": -6.0,
+        "columns": 513,
+        "rows": 513,
+        "spacing_m": 4.0,
+        "first_node_m": [
+          -1024.0,
+          1024.0
+        ],
+        "order": "row-major, row 0 at the north edge, column 0 at the west edge",
+        "bytes": 526338,
+        "sha256": "24218ee35bf42196c227c20d165073bfb5f514d020e58696c57554da9a0a6bbd",
+        "min_up_m": -4.07,
+        "max_up_m": 4.92
+      },
+      "image": {
+        "file": "detail-image.jpg",
+        "columns": 4096,
+        "rows": 4096,
+        "spacing_m": 0.5,
+        "first_texel_centre_m": [
+          -1023.75,
+          1023.75
+        ],
+        "nodata_fraction": 0.0,
+        "bytes": 3244992,
+        "sha256": "5a4b38475fe777588d256a3d698ece533388e114b59a15f9c719b238b1be71f6",
+        "processing": "Area-averaged to the texel size from the source, then bilinear resampling onto the ENU grid, JPEG quality 86. No colour editing.",
+        "geodetic_lattice_residual_mm": 0.925
+      },
+      "note": "Within 64 m of the edge of this layer the drawn heights blend linearly into the base grid and the image fades into the base image, so the two surfaces meet. That margin is a display adjustment of the context data."
+    }
+  ],
   "relief": [
     {
       "radius_m": 10.0,
-      "min_up_m": 0.0,
-      "max_up_m": 0.0
+      "min_up_m": -0.06,
+      "max_up_m": 0.05
     },
     {
       "radius_m": 50.0,
-      "min_up_m": -0.6,
-      "max_up_m": 0.13
+      "min_up_m": -0.29,
+      "max_up_m": 0.07
     },
     {
       "radius_m": 500.0,
-      "min_up_m": -3.15,
-      "max_up_m": 4.73
+      "min_up_m": -3.48,
+      "max_up_m": 3.81
     },
     {
       "radius_m": 3000.0,
-      "min_up_m": -4.73,
-      "max_up_m": 15.27
+      "min_up_m": -5.67,
+      "max_up_m": 14.85
     }
   ],
   "accuracy": [
     "Copernicus GLO-30 is a surface model: heights include buildings and vegetation canopy. Its stated absolute vertical accuracy is better than 4 m (90 % linear error); it does not resolve pads, roads or ground conditions.",
     "The 10 m image does not resolve structures; it is context only.",
     "The simulation assumes flat ground at z = 0 and computes no interaction with this terrain. Where the terrain rises above z = 0 the drawn trajectory may pass through it; this is a property of the geographic placement, not of the simulated flight.",
-    "Horizontal registration of image and terrain follows the sources' georeferencing; Sentinel-2 L2A geolocation is of the order of 10 m."
+    "Horizontal registration of image and terrain follows the sources' georeferencing; Sentinel-2 L2A geolocation is of the order of 10 m.",
+    "Detail layer (2.048 km square around the origin): heights from the USGS 1 m lidar DEM, a bare-earth model, sampled every 4 m. NAVD88 heights are converted with GEOID18 to NAD83(2011) ellipsoidal heights and used as WGS84 heights, which differ by about a metre; the origin is on this surface.",
+    "Detail image: NAIP 2023 at 0.5 m per texel (source 0.3 m). NAIP and 3DEP are on NAD83(2011) and are read here as WGS84, a horizontal offset of about 1 to 2 m.",
+    "Within 64 m of the edge of the detail layer the drawn heights blend into the base grid and the detail image fades into the base image; this display adjustment is the only change made to the context data."
   ],
   "sources": [
     {
@@ -106,6 +150,7 @@
       "licence": "Licence for the use of the Copernicus WorldDEM-30: free of charge; reproduction, distribution, communication to the public and adaptation are permitted (Art. 4, 5), with the notices of Art. 6; no endorsement may be implied and later users are bound by the same obligations. https://documentation.dataspace.copernicus.eu/APIs/SentinelHub/Data/DEM/resources/license/License-COPDEM-30.pdf",
       "attribution": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved. The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
       "access": "AWS Open Data, s3://copernicus-dem-30m (no account)",
+      "credit": "Copernicus WorldDEM-30 © DLR e.V. 2010-2014, © Airbus 2014-2018",
       "item": "Copernicus_DSM_COG_10_N28_00_W081_00_DEM",
       "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N28_00_W081_00_DEM/Copernicus_DSM_COG_10_N28_00_W081_00_DEM.tif",
       "raster_tags": {
@@ -113,8 +158,7 @@
       },
       "absent_tiles": [],
       "sea_fill_fraction": 0.0,
-      "sea_fill_note": "The product has no tile for a degree square of open sea; those squares are filled with 0 m above EGM2008.",
-      "credit": "Copernicus WorldDEM-30 © DLR e.V. 2010-2014, © Airbus 2014-2018"
+      "sea_fill_note": "The product has no tile for a degree square of open sea; those squares are filled with 0 m above EGM2008."
     },
     {
       "provider": "European Union, Copernicus Sentinel-2 (ESA), Level-2A processing; cloud-optimised copy by Element 84 on AWS Open Data",
@@ -122,6 +166,7 @@
       "licence": "Legal notice on the use of Copernicus Sentinel data and service information (European Commission): free, full and open access, including reproduction, distribution, communication to the public, adaptation and combination; users waive claims for damages. https://sentinels.copernicus.eu/documents/247904/690755/Sentinel_Data_Legal_Notice",
       "attribution": "Contains modified Copernicus Sentinel data 2025",
       "access": "Earth Search STAC API https://earth-search.aws.element84.com/v1, collection sentinel-2-c1-l2a (no account)",
+      "credit": "Contains modified Copernicus Sentinel data 2025",
       "items": [
         {
           "item": "S2B_T17RNM_20251115T160505_L2A",
@@ -131,8 +176,7 @@
           "crs": "EPSG:32617",
           "texel_fraction": 1.0
         }
-      ],
-      "credit": "Contains modified Copernicus Sentinel data 2025"
+      ]
     },
     {
       "provider": "U.S. National Geospatial-Intelligence Agency, EGM2008, through the PROJ data grid us_nga_egm08_25",
@@ -141,78 +185,194 @@
       "attribution": "EGM2008, NGA",
       "access": "PROJ network grid (cdn.proj.org)",
       "credit": "EGM2008, NGA"
+    },
+    {
+      "provider": "U.S. Geological Survey, 3D Elevation Program (3DEP), through The National Map",
+      "product": "USGS 1 m lidar digital elevation model (bare earth; heights NAVD88, converted here to NAD83(2011) ellipsoidal heights with the NOAA GEOID18 model)",
+      "licence": "U.S. Public Domain: \"USGS-authored or produced data and information are considered to be in the U.S. Public Domain.\" https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+      "attribution": "Elevation: U.S. Geological Survey, 3D Elevation Program",
+      "credit": "USGS 3DEP lidar",
+      "access": "The National Map API https://tnmaccess.nationalmap.gov/api/v1/products and s3://prd-tnm (no account)",
+      "layer": "detail",
+      "items": [
+        {
+          "item": "USGS 1 Meter 17 x54y315 FL_Peninsular_FDEM_2018_D19_DRRA",
+          "url": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/FL_Peninsular_FDEM_2018_D19_DRRA/TIFF/USGS_1M_17_x54y315_FL_Peninsular_FDEM_2018_D19_DRRA.tif",
+          "published": "2023-02-10",
+          "crs": "EPSG:26917"
+        },
+        {
+          "item": "USGS 1 Meter 17 x54y316 FL_Peninsular_FDEM_2018_D19_DRRA",
+          "url": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/FL_Peninsular_FDEM_2018_D19_DRRA/TIFF/USGS_1M_17_x54y316_FL_Peninsular_FDEM_2018_D19_DRRA.tif",
+          "published": "2023-02-10",
+          "crs": "EPSG:26917"
+        }
+      ],
+      "water_fill_fraction": 0.0864,
+      "water_fill_note": "Detail nodes where the lidar DEM has no value (open water) take the base DEM height there."
+    },
+    {
+      "provider": "USDA Farm Production and Conservation Business Center, Geospatial Enterprise Operations (National Agriculture Imagery Program); cloud-optimised copy on the Microsoft Planetary Computer",
+      "product": "NAIP orthoimagery (red, green, blue bands)",
+      "licence": "Public domain under the FSA web policy: \"Public domain information may be freely distributed or copied, but use of appropriate byline/photo/image credits is requested.\" https://www.fsa.usda.gov/help/policies-and-links. No NAIP-specific licence document was found; the Planetary Computer gives no licence link.",
+      "attribution": "Imagery: USDA Farm Production and Conservation Business Center, Geospatial Enterprise Operations, NAIP 2023",
+      "credit": "USDA NAIP 2023",
+      "access": "Planetary Computer STAC https://planetarycomputer.microsoft.com/api/stac/v1, collection naip (anonymous range requests)",
+      "layer": "detail",
+      "items": [
+        {
+          "item": "fl_m_2808036_ne_17_030_20230109_20230530",
+          "url": "https://naipeuwest.blob.core.windows.net/naip/v002/fl/2023/fl_030cm_2023/28080/m_2808036_ne_17_030_20230109_20230530.tif",
+          "acquired": "2023-01-09T16:00:00Z",
+          "gsd_m": 0.3,
+          "crs": "EPSG:26917"
+        }
+      ]
     }
   ],
   "checks": [
     {
-      "lat_deg": 28.56717619637314,
-      "lon_deg": -80.63498541864021,
-      "h_ellipsoid_m": -26.65159154127953,
+      "lat_deg": 28.56690618207185,
+      "lon_deg": -80.63500516367306,
+      "h_ellipsoid_m": -25.252301910301572,
       "enu_m": [
         -9000.0,
         9000.0,
-        -12.77651516427306
-      ]
+        -12.151171414588003
+      ],
+      "layer": "base"
     },
     {
-      "lat_deg": 28.56717623562822,
-      "lon_deg": -80.45101453705662,
-      "h_ellipsoid_m": -29.72468905151367,
+      "lat_deg": 28.566906239207036,
+      "lon_deg": -80.4510347718445,
+      "h_ellipsoid_m": -29.72476205806788,
       "enu_m": [
         9000.0,
         9000.0,
-        -15.849618811454352
-      ]
+        -16.623640495465203
+      ],
+      "layer": "base"
     },
     {
-      "lat_deg": 28.40476066188129,
-      "lon_deg": -80.63484480784409,
-      "h_ellipsoid_m": -29.557966804803833,
+      "lat_deg": 28.404490656905708,
+      "lon_deg": -80.63486457734997,
+      "h_ellipsoid_m": -29.72476205806788,
       "enu_m": [
         -9000.0,
         -9000.0,
-        -15.682997610603653
-      ]
+        -16.623741862060125
+      ],
+      "layer": "base"
     },
     {
-      "lat_deg": 28.404760659783427,
-      "lon_deg": -80.4511551897992,
-      "h_ellipsoid_m": -29.72468905151367,
+      "lat_deg": 28.404490656905708,
+      "lon_deg": -80.45117542265001,
+      "h_ellipsoid_m": -29.72476205806788,
       "enu_m": [
         9000.0,
         -9000.0,
-        -15.849720178716609
-      ]
+        -16.623741862361623
+      ],
+      "layer": "base"
     },
     {
-      "lat_deg": 28.486,
-      "lon_deg": -80.543,
-      "h_ellipsoid_m": -26.59808623011871,
+      "lat_deg": 28.48573,
+      "lon_deg": -80.54302,
+      "h_ellipsoid_m": -26.402038615409392,
+      "enu_m": [
+        0.0,
+        0.0,
+        -0.5779007242702621
+      ],
+      "layer": "base"
+    },
+    {
+      "lat_deg": 28.526330322729653,
+      "lon_deg": -80.51237001832187,
+      "h_ellipsoid_m": -29.72476205806788,
+      "enu_m": [
+        3000.0,
+        4500.0,
+        -6.200132248717239
+      ],
+      "layer": "base"
+    },
+    {
+      "lat_deg": 28.465408143444556,
+      "lon_deg": -80.61653774430664,
+      "h_ellipsoid_m": -29.72476205806788,
+      "enu_m": [
+        -7200.0,
+        -2250.0,
+        -8.360064097514071
+      ],
+      "layer": "base"
+    },
+    {
+      "lat_deg": 28.494969227256842,
+      "lon_deg": -80.5534787593418,
+      "h_ellipsoid_m": -26.79725273631405,
+      "enu_m": [
+        -1024.0,
+        1024.0,
+        -1.1378194454762307
+      ],
+      "layer": "detail"
+    },
+    {
+      "lat_deg": 28.49496922725684,
+      "lon_deg": -80.5325612406582,
+      "h_ellipsoid_m": -29.72476205806788,
+      "enu_m": [
+        1024.0,
+        1024.0,
+        -4.065328691705384
+      ],
+      "layer": "detail"
+    },
+    {
+      "lat_deg": 28.47648995584257,
+      "lon_deg": -80.55347693856918,
+      "h_ellipsoid_m": -26.816465666748837,
+      "enu_m": [
+        -1024.0,
+        -1024.0,
+        -1.1570325255711424
+      ],
+      "layer": "detail"
+    },
+    {
+      "lat_deg": 28.47648995584257,
+      "lon_deg": -80.5325630614308,
+      "h_ellipsoid_m": -29.287304665717635,
+      "enu_m": [
+        1024.0,
+        -1024.0,
+        -3.627871460139896
+      ],
+      "layer": "detail"
+    },
+    {
+      "lat_deg": 28.48573,
+      "lon_deg": -80.54302,
+      "h_ellipsoid_m": -25.824137890253883,
       "enu_m": [
         0.0,
         0.0,
         0.0
-      ]
+      ],
+      "layer": "detail"
     },
     {
-      "lat_deg": 28.526600321076437,
-      "lon_deg": -80.51234994022094,
-      "h_ellipsoid_m": -29.72468905151367,
+      "lat_deg": 28.49190168467576,
+      "lon_deg": -80.53779077144584,
+      "h_ellipsoid_m": -29.28350564827902,
       "enu_m": [
-        3000.0,
-        4500.0,
-        -5.426110830930065
-      ]
-    },
-    {
-      "lat_deg": 28.465678144028903,
-      "lon_deg": -80.61651793116744,
-      "h_ellipsoid_m": -29.72468905151367,
-      "enu_m": [
-        -7200.0,
-        -2250.0,
-        -7.5860426814544715
-      ]
+        512.0,
+        684.0,
+        -3.516741903325876
+      ],
+      "layer": "detail"
     }
   ],
   "check_note": "Geodetic points of grid nodes and their ENU coordinates computed with pyproj; the Rust georeference crate must reproduce them within 1 mm."

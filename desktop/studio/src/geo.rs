@@ -20,7 +20,7 @@ use serde_json::{Value, json};
 use tauri::State;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
-use vv_geo::environment::{self, Environment, HEIGHT_FILE, IMAGE_FILE, MANIFEST};
+use vv_geo::environment::{self, Environment};
 use vv_platform::{PlatformError, RunRecord};
 
 use crate::{AppState, blocking, display_path, err, log_line};
@@ -142,7 +142,7 @@ pub async fn list_environments(state: State<'_, AppState>) -> Result<Value, Plat
     blocking(move || Ok(listing(&geo, false))).await
 }
 
-/// The bytes of one pack file (`height.u16` or `image.jpg`), re-checked against its hash.
+/// The bytes of one pack file (`height.u16`, `image.jpg` or a detail layer file), re-checked against its hash.
 #[tauri::command]
 pub async fn environment_file(
     state: State<'_, AppState>,
@@ -275,15 +275,15 @@ pub async fn geo_track(
     .await
 }
 
-fn copy_pack(src: &Path, dst: &Path) -> Result<(), PlatformError> {
+fn copy_pack(src: &Path, dst: &Path, files: &[&str]) -> Result<(), PlatformError> {
     fs::create_dir_all(dst).map_err(err)?;
-    for f in [MANIFEST, HEIGHT_FILE, IMAGE_FILE] {
+    for f in files {
         fs::copy(src.join(f), dst.join(f)).map_err(err)?;
     }
     Ok(())
 }
 
-/// Asks for a pack folder, validates it where it is, copies its three files into the library and
+/// Asks for a pack folder, validates it where it is, copies its files into the library and
 /// validates the copy. Returns the new listing, or `None` when the dialog was cancelled.
 #[tauri::command]
 pub async fn import_environment(
@@ -317,7 +317,7 @@ pub async fn import_environment(
         }
         let staged = geo.paths.imported.join(format!(".import-{}", env.id));
         let _ = fs::remove_dir_all(&staged);
-        if let Err(e) = copy_pack(&src, &staged) {
+        if let Err(e) = copy_pack(&src, &staged, &env.files()) {
             let _ = fs::remove_dir_all(&staged);
             return Err(e);
         }
