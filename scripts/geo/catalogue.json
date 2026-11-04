@@ -1,9 +1,22 @@
 {
   "schema": "vv-geo-catalogue.v1",
-  "note": "Definitions of the environment packs that scripts/geo/build_environment.py (terrain and image) and scripts/geo/build_features.py (world layer) can build. Adding an environment is adding an entry here; see docs/m16-2-flagship.md.",
+  "note": "Definitions of the environment packs that scripts/geo/build_environment.py (terrain and image) and scripts/geo/build_features.py (world layer) can build, and that scripts/geo/package_environment.py packages. Adding an environment is adding an entry here; see docs/m16-2-flagship.md and docs/m17-environments.md. Entries with \"bundled\": true ship with the Studio in desktop/environments; the others are built into dist/packs and installed separately.",
+  "tiers": {
+    "A": "orthophoto of 1 m or finer, lidar terrain of 1 to 2 m in the detail layer, and a world layer whose heights and vegetation are measured in a lidar point cloud",
+    "B": "orthophoto of 1 m or finer and lidar or survey terrain of 5 m or finer in the detail layer; world layer from OpenStreetMap only, no measured vegetation",
+    "C": "orthophoto of 1 m or finer; the detail terrain is the 30 m base surface; world layer from OpenStreetMap only",
+    "D": "Sentinel-2 image (10 m) and the 30 m base surface only"
+  },
   "environments": {
     "cape-canaveral": {
       "name": "Cape Canaveral coast, Florida",
+      "bundled": true,
+      "landscape": "low barrier coast",
+      "tier": "A",
+      "pack_version": "1",
+      "licence_gaps": [
+        "NAIP: não foi encontrado um documento de licença específico do NAIP; vale a política de domínio público do FSA citada acima, que pede o crédito da imagem."
+      ],
       "summary": "Low, flat barrier coast on the Atlantic. The simulation's pad centre is placed at the centre of a circular hard-standing visible in the detail image, measured on that image (about 2 m). The facility is not modelled and the simulated pad is not that facility.",
       "site_note": "The detail image is an aerial photograph of an existing landing facility. The simulated vehicle, pad and mission are generic: they are not that facility, its operations or its operator, and imply no affiliation.",
       "lat": 28.48573,
@@ -36,6 +49,14 @@
     },
     "santa-maria-azores": {
       "name": "Santa Maria, Azores",
+      "bundled": true,
+      "landscape": "volcanic island",
+      "tier": "C",
+      "pack_version": "1",
+      "licence_gaps": [
+        "Ortofotomapa de Santa Maria 2024: a licença CC BY 4.0 vem só do registo de metadados ISO do catálogo IDEiA; não foi encontrada outra página de condições e a forma exata da atribuição não está confirmada.",
+        "Sem lidar aberto: não há vegetação medida, e a camada de pormenor usa a superfície de base de 30 m."
+      ],
       "summary": "Volcanic island with cliffs and a plateau. The simulation's pad centre is placed in an open pasture on the eastern uplands, read from the 2024 orthophoto; the slopes around it break the flat-ground assumption of the simulation, which the Studio states. No launch or landing facility is there or is implied.",
       "lat": 36.98645,
       "lon": -25.10763,
@@ -67,6 +88,13 @@
     },
     "spaceport-america": {
       "name": "Spaceport America, New Mexico",
+      "bundled": true,
+      "landscape": "high desert basin",
+      "tier": "A",
+      "pack_version": "1",
+      "licence_gaps": [
+        "NAIP: não foi encontrado um documento de licença específico do NAIP; vale a política de domínio público do FSA citada acima, que pede o crédito da imagem."
+      ],
       "summary": "High desert basin of the Jornada del Muerto at about 1400 m. The simulation's pad centre is placed on open desert ground, read from the detail image. Nearly flat around the pad, so the flat-ground assumption of the simulation holds well here.",
       "site_note": "The detail image covers part of an existing commercial spaceport. The simulated vehicle, pad and mission are generic: they are not that spaceport, its facilities or its operations, and imply no affiliation.",
       "lat": 32.99,

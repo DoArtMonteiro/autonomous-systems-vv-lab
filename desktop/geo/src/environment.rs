@@ -802,6 +802,54 @@ mod tests {
         }
     }
 
+    /// Every pack of the package index (scripts/geo/environment-index.json) validates, with the
+    /// schema and the file list the index records. Bundled packs are in the repository; catalogue
+    /// packs are not, so they are checked from the unpacked zips in the folder named by
+    /// `VV_GEO_PACK_ROOT` (one sub-folder per id). When that variable is set, a missing pack fails.
+    #[test]
+    fn indexed_packs_validate_with_the_indexed_schema_and_files() {
+        let index_path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/geo/environment-index.json");
+        let index: Value = serde_json::from_slice(&fs::read(&index_path).unwrap()).unwrap();
+        assert_eq!(index["schema"], json!("vv-geo-environment-index.v1"));
+        let root = std::env::var_os("VV_GEO_PACK_ROOT").map(PathBuf::from);
+        let (mut bundled, mut catalogue, mut unchecked) = (0, 0, Vec::new());
+        for e in index["environments"].as_array().unwrap() {
+            let id = e["id"].as_str().unwrap();
+            let dir = if e["bundled"] == json!(true) {
+                packs().join(id)
+            } else if let Some(r) = &root {
+                r.join(id)
+            } else {
+                unchecked.push(id.to_string());
+                continue;
+            };
+            let env = Environment::open(&dir).unwrap_or_else(|err| panic!("{id}: {err}"));
+            assert_eq!(env.summary()["schema"], e["schema"], "{id}");
+            let mut want: Vec<&str> = e["files"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|f| f.as_str().unwrap())
+                .collect();
+            assert_eq!(want.pop(), Some("NOTICE.md"), "{id}");
+            assert_eq!(env.files(), want, "{id}");
+            assert!(env.worst_check_m() < CHECK_TOLERANCE_M, "{id}");
+            if e["bundled"] == json!(true) {
+                bundled += 1;
+            } else {
+                catalogue += 1;
+            }
+        }
+        assert_eq!(bundled, 3, "the three bundled packs are indexed");
+        if !unchecked.is_empty() {
+            eprintln!(
+                "catalogue packs not checked (set VV_GEO_PACK_ROOT to the unpacked zips): {unchecked:?}"
+            );
+        }
+        eprintln!("indexed packs validated: {bundled} bundled, {catalogue} from the catalogue");
+    }
+
     #[test]
     fn the_origin_of_a_track_is_the_pack_origin() {
         let e = Environment::open(&packs().join("cape-canaveral")).unwrap();
