@@ -1,0 +1,13 @@
+[package]
+name = "vv-geo"
+description = "Georeference layer of V&V Lab Studio: WGS84 geodesy, local ENU frames and validated geographic environment packs"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true

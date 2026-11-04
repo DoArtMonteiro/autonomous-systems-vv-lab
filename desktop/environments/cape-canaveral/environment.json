@@ -1,0 +1,216 @@
+{
+  "schema": "vv-geo-environment.v1",
+  "id": "cape-canaveral",
+  "name": "Cape Canaveral coast, Florida",
+  "summary": "Low, flat barrier coast on the Atlantic. The simulation's pad centre is placed on a circular hard-standing visible in the image; its position was read from the image (about 10 m). The facility is not modelled and the simulated pad is not that facility.",
+  "built": {
+    "by": "scripts/geo/build_environment.py",
+    "date": "2026-11-04",
+    "pyproj": "3.8.0",
+    "proj": "9.8.1",
+    "rasterio": "1.5.2",
+    "gdal": "3.12.2"
+  },
+  "origin": {
+    "lat_deg": 28.486,
+    "lon_deg": -80.543,
+    "h_ellipsoid_m": -26.598,
+    "orthometric_height_m": 3.127,
+    "geoid_undulation_m": -29.725,
+    "geoid_undulation_spread_m": 0.211,
+    "note": "The simulation's pad centre (model origin, z = 0) is placed on the DEM surface at this point. The geoid undulation is treated as constant over the extent (its spread across the corners is given)."
+  },
+  "frame": {
+    "kind": "enu-tangent-plane",
+    "ellipsoid": "WGS84",
+    "axes": {
+      "x": "east",
+      "y": "north",
+      "z": "up"
+    },
+    "heading_deg": 0.0,
+    "note": "Model x, y, z map to east, north, up of the tangent plane at the origin. Terrain heights are ENU up, so they include the curvature of the Earth."
+  },
+  "extent_m": 9000.0,
+  "height": {
+    "file": "height.u16",
+    "encoding": "uint16-le",
+    "scale_m": 0.01,
+    "offset_m": -17.0,
+    "columns": 601,
+    "rows": 601,
+    "spacing_m": 30.0,
+    "first_node_m": [
+      -9000.0,
+      9000.0
+    ],
+    "order": "row-major, row 0 at the north edge, column 0 at the west edge",
+    "bytes": 722402,
+    "sha256": "92f5390f509704ac34eb4e9e9ad336cc1ad12889f63c6d154e3044900a82a38d",
+    "min_up_m": -15.85,
+    "max_up_m": 15.27
+  },
+  "image": {
+    "file": "image.jpg",
+    "columns": 1800,
+    "rows": 1800,
+    "spacing_m": 10.0,
+    "first_texel_centre_m": [
+      -8995.0,
+      8995.0
+    ],
+    "nodata_fraction": 0.0,
+    "registration": {
+      "agreement_at_zero_shift": 0.8381,
+      "best_agreement": 0.8429,
+      "best_shift_east_m": 120.0,
+      "best_shift_north_m": -30.0,
+      "method": "Fraction of texels where the DEM says land (> 1 m) and the image is not dark water, at zero shift and at the best shift on a 30 m lattice within 300 m."
+    },
+    "bytes": 355150,
+    "sha256": "f6fea511499dc6b4a8a8886e39974a6e6132a5a96d979f62b1dafd168302c233",
+    "processing": "Bilinear resampling of the TCI asset onto the ENU grid, JPEG quality 88. No colour editing."
+  },
+  "relief": [
+    {
+      "radius_m": 10.0,
+      "min_up_m": 0.0,
+      "max_up_m": 0.0
+    },
+    {
+      "radius_m": 50.0,
+      "min_up_m": -0.6,
+      "max_up_m": 0.13
+    },
+    {
+      "radius_m": 500.0,
+      "min_up_m": -3.15,
+      "max_up_m": 4.73
+    },
+    {
+      "radius_m": 3000.0,
+      "min_up_m": -4.73,
+      "max_up_m": 15.27
+    }
+  ],
+  "accuracy": [
+    "Copernicus GLO-30 is a surface model: heights include buildings and vegetation canopy. Its stated absolute vertical accuracy is better than 4 m (90 % linear error); it does not resolve pads, roads or ground conditions.",
+    "The 10 m image does not resolve structures; it is context only.",
+    "The simulation assumes flat ground at z = 0 and computes no interaction with this terrain. Where the terrain rises above z = 0 the drawn trajectory may pass through it; this is a property of the geographic placement, not of the simulated flight.",
+    "Horizontal registration of image and terrain follows the sources' georeferencing; Sentinel-2 L2A geolocation is of the order of 10 m."
+  ],
+  "sources": [
+    {
+      "provider": "European Space Agency and European Union (Copernicus programme); WorldDEM-30 produced by DLR and Airbus",
+      "product": "Copernicus DEM GLO-30 (digital surface model, 1 arc-second; vertical datum EGM2008, EPSG 3855; horizontal WGS84-G1150, EPSG 4326)",
+      "licence": "Licence for the use of the Copernicus WorldDEM-30: free of charge; reproduction, distribution, communication to the public and adaptation are permitted (Art. 4, 5), with the notices of Art. 6; no endorsement may be implied and later users are bound by the same obligations. https://documentation.dataspace.copernicus.eu/APIs/SentinelHub/Data/DEM/resources/license/License-COPDEM-30.pdf",
+      "attribution": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved. The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+      "access": "AWS Open Data, s3://copernicus-dem-30m (no account)",
+      "item": "Copernicus_DSM_COG_10_N28_00_W081_00_DEM",
+      "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N28_00_W081_00_DEM/Copernicus_DSM_COG_10_N28_00_W081_00_DEM.tif",
+      "raster_tags": {
+        "AREA_OR_POINT": "Point"
+      },
+      "absent_tiles": [],
+      "sea_fill_fraction": 0.0,
+      "sea_fill_note": "The product has no tile for a degree square of open sea; those squares are filled with 0 m above EGM2008."
+    },
+    {
+      "provider": "European Union, Copernicus Sentinel-2 (ESA), Level-2A processing; cloud-optimised copy by Element 84 on AWS Open Data",
+      "product": "Sentinel-2 Level-2A true-colour image (TCI, 10 m)",
+      "licence": "Legal notice on the use of Copernicus Sentinel data and service information (European Commission): free, full and open access, including reproduction, distribution, communication to the public, adaptation and combination; users waive claims for damages. https://sentinels.copernicus.eu/documents/247904/690755/Sentinel_Data_Legal_Notice",
+      "attribution": "Contains modified Copernicus Sentinel data 2025",
+      "access": "Earth Search STAC API https://earth-search.aws.element84.com/v1, collection sentinel-2-c1-l2a (no account)",
+      "items": [
+        {
+          "item": "S2B_T17RNM_20251115T160505_L2A",
+          "url": "https://e84-earth-search-sentinel-data.s3.us-west-2.amazonaws.com/sentinel-2-c1-l2a/17/R/NM/2025/11/S2B_T17RNM_20251115T160505_L2A/TCI.tif",
+          "acquired": "2025-11-15T16:05:25.800000Z",
+          "cloud_cover_percent": 0.009273,
+          "crs": "EPSG:32617",
+          "texel_fraction": 1.0
+        }
+      ]
+    },
+    {
+      "provider": "U.S. National Geospatial-Intelligence Agency, EGM2008, through the PROJ data grid us_nga_egm08_25",
+      "product": "Geoid undulation at the origin (EGM2008 to the WGS84 ellipsoid)",
+      "licence": "Public domain (U.S. Government work); PROJ-data grid redistributed under its stated terms. https://cdn.proj.org",
+      "attribution": "EGM2008, NGA",
+      "access": "PROJ network grid (cdn.proj.org)"
+    }
+  ],
+  "checks": [
+    {
+      "lat_deg": 28.56717619637314,
+      "lon_deg": -80.63498541864021,
+      "h_ellipsoid_m": -26.65159154127953,
+      "enu_m": [
+        -9000.0,
+        9000.0,
+        -12.77651516427306
+      ]
+    },
+    {
+      "lat_deg": 28.56717623562822,
+      "lon_deg": -80.45101453705662,
+      "h_ellipsoid_m": -29.72468905151367,
+      "enu_m": [
+        9000.0,
+        9000.0,
+        -15.849618811454352
+      ]
+    },
+    {
+      "lat_deg": 28.40476066188129,
+      "lon_deg": -80.63484480784409,
+      "h_ellipsoid_m": -29.557966804803833,
+      "enu_m": [
+        -9000.0,
+        -9000.0,
+        -15.682997610603653
+      ]
+    },
+    {
+      "lat_deg": 28.404760659783427,
+      "lon_deg": -80.4511551897992,
+      "h_ellipsoid_m": -29.72468905151367,
+      "enu_m": [
+        9000.0,
+        -9000.0,
+        -15.849720178716609
+      ]
+    },
+    {
+      "lat_deg": 28.486,
+      "lon_deg": -80.543,
+      "h_ellipsoid_m": -26.59808623011871,
+      "enu_m": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "lat_deg": 28.526600321076437,
+      "lon_deg": -80.51234994022094,
+      "h_ellipsoid_m": -29.72468905151367,
+      "enu_m": [
+        3000.0,
+        4500.0,
+        -5.426110830930065
+      ]
+    },
+    {
+      "lat_deg": 28.465678144028903,
+      "lon_deg": -80.61651793116744,
+      "h_ellipsoid_m": -29.72468905151367,
+      "enu_m": [
+        -7200.0,
+        -2250.0,
+        -7.5860426814544715
+      ]
+    }
+  ],
+  "check_note": "Geodetic points of grid nodes and their ENU coordinates computed with pyproj; the Rust georeference crate must reproduce them within 1 mm."
+}

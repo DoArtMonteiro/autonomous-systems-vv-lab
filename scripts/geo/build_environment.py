@@ -1,0 +1,404 @@
+r"""Builds a geographic environment pack for V&V Lab Studio from public, keyless sources.
+
+A pack is the geographic context of a replay: a terrain height grid and a true-colour image on a
+regular grid of a local east-north-up (ENU) tangent plane, plus a manifest that names the origin,
+the datums, the sources, their licences and the SHA-256 of every file. Studio never downloads
+anything; packs are built here, on purpose, by a person who runs this command.
+
+    python -m venv .geovenv && .geovenv\Scripts\pip install rasterio pyproj numpy pillow
+    .geovenv\Scripts\python scripts/geo/build_environment.py --env cape-canaveral --out desktop/environments
+
+Sources (fetched over HTTPS from public AWS Open Data buckets, no account or key):
+  - Copernicus DEM GLO-30 (copernicus-dem-30m), a digital surface model, heights relative to EGM2008.
+  - Sentinel-2 L2A true-colour image (TCI) of one scene, located with the Earth Search STAC API.
+  - The EGM2008 geoid undulation at the origin, through PROJ (us_nga_egm08_25 grid, PROJ CDN).
+
+Geometry. For every grid node (e, n) the script finds the terrain point whose exact ENU east and
+north are (e, n): it starts from the tangent-plane point, converts it to geodetic coordinates,
+samples the DEM there and iterates until the ENU east/north of (lat, lon, h_DEM) match to 1 mm. The
+stored value is that point's ENU up component, so the curvature of the Earth and the tilt of the
+local vertical are in the heights. Image texels use the same construction, so the image is
+registered on the terrain. ENU is computed with pyproj (WGS84, EPSG:4978/4979); the Studio's Rust
+georeference crate is tested against the nodes stored here (independent implementation).
+"""
+
+import argparse
+import datetime
+import hashlib
+import io
+import json
+import math
+import os
+import sys
+import urllib.request
+
+import numpy as np
+import pyproj
+import rasterio
+from PIL import Image
+from rasterio.env import Env
+from rasterio.merge import merge
+from rasterio.windows import from_bounds
+
+DEM_URL = "https://copernicus-dem-30m.s3.amazonaws.com/{t}/{t}.tif"
+STAC = "https://earth-search.aws.element84.com/v1/search"
+
+ENVIRONMENTS = {
+    "cape-canaveral": {
+        "name": "Cape Canaveral coast, Florida",
+        "summary": "Low, flat barrier coast on the Atlantic. The simulation's pad centre is placed on a circular hard-standing visible in the image; its position was read from the image (about 10 m). The facility is not modelled and the simulated pad is not that facility.",
+        "lat": 28.48600, "lon": -80.54300,
+        "half_extent_m": 9000.0, "dem_spacing_m": 30.0, "image_spacing_m": 10.0,
+        "s2_items": ["S2B_T17RNM_20251115T160505_L2A"],
+        "heading_deg": 0.0,
+    },
+    "santa-maria-azores": {
+        "name": "Santa Maria, Azores",
+        "summary": "Volcanic island with cliffs and a plateau. The relief breaks the flat-ground assumption of the simulation, which the Studio states.",
+        "lat": 36.99000, "lon": -25.10000,
+        "half_extent_m": 9000.0, "dem_spacing_m": 30.0, "image_spacing_m": 10.0,
+        "s2_items": ["S2A_T26SPF_20250423T123128_L2A", "S2A_T26SPG_20250423T123128_L2A"],
+        "heading_deg": 0.0,
+    },
+}
+
+LICENCES = {
+    "copernicus-dem": {
+        "provider": "European Space Agency and European Union (Copernicus programme); WorldDEM-30 produced by DLR and Airbus",
+        "product": "Copernicus DEM GLO-30 (digital surface model, 1 arc-second; vertical datum EGM2008, EPSG 3855; horizontal WGS84-G1150, EPSG 4326)",
+        "licence": "Licence for the use of the Copernicus WorldDEM-30: free of charge; reproduction, distribution, communication to the public and adaptation are permitted (Art. 4, 5), with the notices of Art. 6; no endorsement may be implied and later users are bound by the same obligations. https://documentation.dataspace.copernicus.eu/APIs/SentinelHub/Data/DEM/resources/license/License-COPDEM-30.pdf",
+        "attribution": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved. The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "access": "AWS Open Data, s3://copernicus-dem-30m (no account)",
+    },
+    "sentinel-2": {
+        "provider": "European Union, Copernicus Sentinel-2 (ESA), Level-2A processing; cloud-optimised copy by Element 84 on AWS Open Data",
+        "product": "Sentinel-2 Level-2A true-colour image (TCI, 10 m)",
+        "licence": "Legal notice on the use of Copernicus Sentinel data and service information (European Commission): free, full and open access, including reproduction, distribution, communication to the public, adaptation and combination; users waive claims for damages. https://sentinels.copernicus.eu/documents/247904/690755/Sentinel_Data_Legal_Notice",
+        "attribution": "Contains modified Copernicus Sentinel data {year}",
+        "access": "Earth Search STAC API https://earth-search.aws.element84.com/v1, collection sentinel-2-c1-l2a (no account)",
+    },
+    "egm2008": {
+        "provider": "U.S. National Geospatial-Intelligence Agency, EGM2008, through the PROJ data grid us_nga_egm08_25",
+        "product": "Geoid undulation at the origin (EGM2008 to the WGS84 ellipsoid)",
+        "licence": "Public domain (U.S. Government work); PROJ-data grid redistributed under its stated terms. https://cdn.proj.org",
+        "attribution": "EGM2008, NGA",
+        "access": "PROJ network grid (cdn.proj.org)",
+    },
+}
+
+GEOD = pyproj.CRS("EPSG:4979")
+ECEF = pyproj.CRS("EPSG:4978")
+TO_ECEF = pyproj.Transformer.from_crs(GEOD, ECEF, always_xy=True)
+TO_GEOD = pyproj.Transformer.from_crs(ECEF, GEOD, always_xy=True)
+
+
+def enu_basis(lat, lon):
+    la, lo = math.radians(lat), math.radians(lon)
+    e = np.array([-math.sin(lo), math.cos(lo), 0.0])
+    n = np.array([-math.sin(la) * math.cos(lo), -math.sin(la) * math.sin(lo), math.cos(la)])
+    u = np.array([math.cos(la) * math.cos(lo), math.cos(la) * math.sin(lo), math.sin(la)])
+    return np.stack([e, n, u])  # rows: e, n, u
+
+
+class Frame:
+    def __init__(self, lat, lon, h):
+        self.lat, self.lon, self.h = lat, lon, h
+        self.o = np.array(TO_ECEF.transform(lon, lat, h))
+        self.R = enu_basis(lat, lon)
+
+    def to_enu(self, lat, lon, h):
+        x, y, z = TO_ECEF.transform(lon, lat, h)
+        d = np.stack([x - self.o[0], y - self.o[1], z - self.o[2]], axis=-1)
+        return d @ self.R.T
+
+    def to_geod(self, e, n, u):
+        d = np.stack([e, n, u], axis=-1) @ self.R
+        lon, lat, h = TO_GEOD.transform(d[..., 0] + self.o[0], d[..., 1] + self.o[1], d[..., 2] + self.o[2])
+        return lat, lon, h
+
+
+class Dem:
+    """Copernicus GLO-30 heights in a window, sampled bilinearly at pixel centres."""
+
+    def __init__(self, lat0, lon0, lat1, lon1, raw_dir):
+        tiles = []
+        for la in range(math.floor(lat0), math.floor(lat1) + 1):
+            for lo in range(math.floor(lon0), math.floor(lon1) + 1):
+                ns = f"N{la:02d}" if la >= 0 else f"S{-la:02d}"
+                ew = f"E{lo:03d}" if lo >= 0 else f"W{-lo:03d}"
+                tiles.append(f"Copernicus_DSM_COG_10_{ns}_00_{ew}_00_DEM")
+        srcs, found, missing = [], [], []
+        with Env(AWS_NO_SIGN_REQUEST="YES", GDAL_DISABLE_READDIR_ON_OPEN="EMPTY_DIR"):
+            for t in tiles:
+                try:
+                    srcs.append(rasterio.open("/vsicurl/" + DEM_URL.format(t=t)))
+                    found.append(t)
+                except rasterio.errors.RasterioIOError:
+                    # The product has no tile where the whole degree square is open sea.
+                    missing.append(t)
+            if not srcs:
+                raise SystemExit("no DEM tile covers the extent")
+            try:
+                # Bounds snapped to the source pixel grid, so the mosaic is not resampled.
+                tr = srcs[0].transform
+                res = abs(tr.a)
+                pad = 4 * res
+                snap = lambda v, o: o + math.floor((v - o) / res) * res
+                left = snap(lon0 - pad, tr.c)
+                top = tr.f - math.floor((tr.f - (lat1 + pad)) / res) * res
+                right = snap(lon1 + pad, tr.c) + res
+                bottom = tr.f - math.ceil((tr.f - (lat0 - pad)) / res) * res
+                z, T = merge(srcs, bounds=(left, bottom, right, top), res=res, nodata=-32768.0)
+                self.z = z[0].astype(np.float64)
+                self.T = T
+                self.tags = srcs[0].tags()
+                for s in srcs:
+                    if abs(abs(s.transform.a) - res) > 1e-12:
+                        raise SystemExit("DEM tiles with different resolutions")
+            finally:
+                for s in srcs:
+                    s.close()
+        self.tile = " + ".join(found)
+        self.missing = missing
+        self.url = " ".join(DEM_URL.format(t=t) for t in found)
+        hole = self.z == -32768.0
+        if hole.any() and not missing:
+            raise SystemExit("the DEM mosaic has holes")
+        # Squares without a tile are open sea: height 0 m above EGM2008.
+        self.z[hole] = 0.0
+        self.sea_fill_fraction = float(hole.mean())
+        np.save(os.path.join(raw_dir, "dem-window.npy"), self.z)
+        if not np.isfinite(self.z).all():
+            raise SystemExit("the DEM window has missing values")
+
+    def sample(self, lat, lon):
+        inv = ~self.T
+        col, row = inv * (lon, lat)
+        x = col - 0.5
+        y = row - 0.5
+        x0 = np.clip(np.floor(x).astype(int), 0, self.z.shape[1] - 2)
+        y0 = np.clip(np.floor(y).astype(int), 0, self.z.shape[0] - 2)
+        fx = np.clip(x - x0, 0, 1)
+        fy = np.clip(y - y0, 0, 1)
+        z = self.z
+        return (z[y0, x0] * (1 - fx) * (1 - fy) + z[y0, x0 + 1] * fx * (1 - fy)
+                + z[y0 + 1, x0] * (1 - fx) * fy + z[y0 + 1, x0 + 1] * fx * fy)
+
+
+def surface_points(frame, dem, N, e, n):
+    """Terrain points whose exact ENU east/north are (e, n). Returns lat, lon, H (EGM2008) and up."""
+    ge, gn = e.astype(np.float64).copy(), n.astype(np.float64).copy()
+    u = np.zeros_like(ge)
+    for _ in range(10):
+        lat, lon, _h = frame.to_geod(ge, gn, u)
+        H = dem.sample(lat, lon)
+        enu = frame.to_enu(lat, lon, H + N)
+        de, dn = enu[..., 0] - e, enu[..., 1] - n
+        u = enu[..., 2]
+        err = float(np.hypot(de, dn).max())
+        if err < 1e-3:
+            return lat, lon, H, u, err
+        ge, gn = ge - de, gn - dn
+    raise SystemExit(f"surface points did not converge (residual {err:.4f} m)")
+
+
+def stac_item(item_id):
+    req = urllib.request.Request(STAC, data=json.dumps({"ids": [item_id], "collections": ["sentinel-2-c1-l2a"]}).encode(), headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        d = json.load(r)
+    if len(d["features"]) != 1:
+        raise SystemExit(f"STAC item {item_id} not found")
+    return d["features"][0]
+
+
+def sha256(b):
+    return hashlib.sha256(b).hexdigest()
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--env", choices=sorted(ENVIRONMENTS), required=True)
+    ap.add_argument("--out", required=True, help="parent directory of the pack")
+    ap.add_argument("--raw", default=None, help="directory for the downloaded windows (default: <out>/../.geo-raw)")
+    a = ap.parse_args()
+    cfg = ENVIRONMENTS[a.env]
+    out = os.path.join(a.out, a.env)
+    raw = a.raw or os.path.join(os.path.dirname(os.path.abspath(a.out)), ".geo-raw", a.env)
+    os.makedirs(out, exist_ok=True)
+    os.makedirs(raw, exist_ok=True)
+
+    pyproj.network.set_network_enabled(True)
+    geoid = pyproj.Transformer.from_crs("EPSG:4326+3855", "EPSG:4979", always_xy=True)
+    lat0, lon0 = cfg["lat"], cfg["lon"]
+    L = cfg["half_extent_m"]
+    # Geographic bounds of the extent, with margin.
+    dlat = (L * 1.6) / 111000.0
+    dlon = (L * 1.6) / (111000.0 * math.cos(math.radians(lat0)))
+    dem = Dem(lat0 - dlat, lon0 - dlon, lat0 + dlat, lon0 + dlon, raw)
+    H0 = float(dem.sample(np.array(lat0), np.array(lon0)))
+    N0 = float(geoid.transform(lon0, lat0, 0.0)[2])
+    corners = [geoid.transform(lon0 + sx * dlon / 1.6, lat0 + sy * dlat / 1.6, 0.0)[2] for sx in (-1, 1) for sy in (-1, 1)]
+    N_spread = float(max(corners) - min(corners))
+    frame = Frame(lat0, lon0, H0 + N0)
+
+    # Height grid.
+    s = cfg["dem_spacing_m"]
+    k = int(round(L / s))
+    axis = np.arange(-k, k + 1) * s
+    E, Nn = np.meshgrid(axis, axis[::-1])  # row 0 is the north edge
+    lat, lon, H, U, err = surface_points(frame, dem, N0, E, Nn)
+    print(f"height grid {U.shape}, max horizontal residual {err * 1000:.3f} mm", file=sys.stderr)
+    scale = 0.01
+    offset = float(math.floor(U.min()) - 1)
+    q = np.round((U - offset) / scale)
+    if q.max() > 65535:
+        raise SystemExit("relief exceeds the 16-bit range at 1 cm")
+    hbytes = q.astype("<u2").tobytes()
+    with open(os.path.join(out, "height.u16"), "wb") as f:
+        f.write(hbytes)
+
+    # Check nodes for the Rust crate: geodetic point and its ENU, a sparse subset.
+    checks = []
+    for (r, c) in [(0, 0), (0, 2 * k), (2 * k, 0), (2 * k, 2 * k), (k, k), (k // 2, k + k // 3), (k + k // 4, k // 5)]:
+        checks.append({"lat_deg": float(lat[r, c]), "lon_deg": float(lon[r, c]), "h_ellipsoid_m": float(H[r, c] + N0),
+                       "enu_m": [float(E[r, c]), float(Nn[r, c]), float(U[r, c])]})
+
+    # Image: the first item that has data at a texel wins; the next items fill its gaps.
+    items = [stac_item(i) for i in cfg["s2_items"]]
+    si = cfg["image_spacing_m"]
+    ki = int(round(L / si))
+    iax = np.arange(-ki, ki) * si + si / 2
+    IE, IN = np.meshgrid(iax, iax[::-1])
+    ilat, ilon, _IH, _IU, ierr = surface_points(frame, dem, N0, IE, IN)
+    px = np.zeros((3,) + IE.shape)
+    have = np.zeros(IE.shape, dtype=bool)
+    used = []
+    for item in items:
+        href = item["assets"]["visual"]["href"]
+        with Env(GDAL_DISABLE_READDIR_ON_OPEN="EMPTY_DIR"):
+            with rasterio.open("/vsicurl/" + href) as d:
+                to_img = pyproj.Transformer.from_crs("EPSG:4326", d.crs, always_xy=True)
+                X, Y = to_img.transform(ilon, ilat)
+                w = from_bounds(X.min() - 50, Y.min() - 50, X.max() + 50, Y.max() + 50, d.transform).round_offsets().round_lengths()
+                # Boundless: texels outside the scene read as 0 (no data), never as shifted pixels.
+                rgb = d.read(window=w, boundless=True, fill_value=0).astype(np.float64)
+                T = d.window_transform(w)
+                img_crs = str(d.crs)
+        np.save(os.path.join(raw, f"{item['id']}-window.npy"), rgb.astype(np.uint8))
+        col, row = (~T) * (X, Y)
+        x = col - 0.5
+        y = row - 0.5
+        x0 = np.clip(np.floor(x).astype(int), 0, rgb.shape[2] - 2)
+        y0 = np.clip(np.floor(y).astype(int), 0, rgb.shape[1] - 2)
+        fx = np.clip(x - x0, 0, 1)[None]
+        fy = np.clip(y - y0, 0, 1)[None]
+        corners = [rgb[:, y0, x0], rgb[:, y0, x0 + 1], rgb[:, y0 + 1, x0], rgb[:, y0 + 1, x0 + 1]]
+        valid = np.all([c.sum(axis=0) > 0 for c in corners], axis=0)
+        val = corners[0] * (1 - fx) * (1 - fy) + corners[1] * fx * (1 - fy) + corners[2] * (1 - fx) * fy + corners[3] * fx * fy
+        take = valid & ~have
+        px[:, take] = val[:, take]
+        have |= take
+        used.append({"item": item["id"], "url": href, "acquired": item["properties"]["datetime"],
+                     "cloud_cover_percent": item["properties"].get("eo:cloud_cover"), "crs": img_crs,
+                     "texel_fraction": round(float(take.mean()), 4)})
+    nodata = ~have
+    img = np.clip(np.round(px), 0, 255).astype(np.uint8).transpose(1, 2, 0)
+    buf = io.BytesIO()
+    Image.fromarray(img, "RGB").save(buf, "JPEG", quality=88, optimize=True, progressive=True)
+    ibytes = buf.getvalue()
+    with open(os.path.join(out, "image.jpg"), "wb") as f:
+        f.write(ibytes)
+
+    # Registration check: the DEM land mask against the image water mask, best shift within 300 m.
+    land = dem.sample(ilat, ilon) > 1.0
+    f32 = img.astype(np.float32)
+    water = (f32.mean(axis=2) < 60) & (f32[..., 2] >= f32[..., 0])
+    dry = ~water & have
+    step = 3
+    best = None
+    for dy in range(-30, 31, step):
+        for dx in range(-30, 31, step):
+            a_ = np.roll(np.roll(land, dy, axis=0), dx, axis=1)[40:-40:2, 40:-40:2]
+            b_ = dry[40:-40:2, 40:-40:2]
+            ok = have[40:-40:2, 40:-40:2]
+            agree = float((a_ == b_)[ok].mean())
+            if best is None or agree > best[0]:
+                best = (agree, dx, dy)
+    zero = float((land == dry)[40:-40:2, 40:-40:2][have[40:-40:2, 40:-40:2]].mean())
+    registration = {"agreement_at_zero_shift": round(zero, 4), "best_agreement": round(best[0], 4),
+                    "best_shift_east_m": best[1] * si, "best_shift_north_m": -best[2] * si,
+                    "method": "Fraction of texels where the DEM says land (> 1 m) and the image is not dark water, at zero shift and at the best shift on a 30 m lattice within 300 m."}
+    print("registration", registration, file=sys.stderr)
+
+    # Relief around the origin, against the simulation's flat ground at z = 0.
+    def relief(radius):
+        m = np.hypot(E, Nn) <= radius
+        return {"radius_m": radius, "min_up_m": round(float(U[m].min()), 2), "max_up_m": round(float(U[m].max()), 2)}
+
+    years = sorted({u["acquired"][:4] for u in used})
+    s2 = dict(LICENCES["sentinel-2"])
+    s2["attribution"] = s2["attribution"].format(year=", ".join(years))
+    manifest = {
+        "schema": "vv-geo-environment.v1",
+        "id": a.env,
+        "name": cfg["name"],
+        "summary": cfg["summary"],
+        "built": {"by": "scripts/geo/build_environment.py", "date": datetime.date.today().isoformat(),
+                  "pyproj": pyproj.__version__, "proj": pyproj.proj_version_str, "rasterio": rasterio.__version__, "gdal": rasterio.__gdal_version__},
+        "origin": {
+            "lat_deg": lat0, "lon_deg": lon0,
+            "h_ellipsoid_m": round(H0 + N0, 3),
+            "orthometric_height_m": round(H0, 3),
+            "geoid_undulation_m": round(N0, 3),
+            "geoid_undulation_spread_m": round(N_spread, 3),
+            "note": "The simulation's pad centre (model origin, z = 0) is placed on the DEM surface at this point. The geoid undulation is treated as constant over the extent (its spread across the corners is given).",
+        },
+        "frame": {
+            "kind": "enu-tangent-plane",
+            "ellipsoid": "WGS84",
+            "axes": {"x": "east", "y": "north", "z": "up"},
+            "heading_deg": cfg["heading_deg"],
+            "note": "Model x, y, z map to east, north, up of the tangent plane at the origin. Terrain heights are ENU up, so they include the curvature of the Earth.",
+        },
+        "extent_m": L,
+        "height": {
+            "file": "height.u16", "encoding": "uint16-le", "scale_m": scale, "offset_m": offset,
+            "columns": int(U.shape[1]), "rows": int(U.shape[0]), "spacing_m": s,
+            "first_node_m": [float(-k * s), float(k * s)],
+            "order": "row-major, row 0 at the north edge, column 0 at the west edge",
+            "bytes": len(hbytes), "sha256": sha256(hbytes),
+            "min_up_m": round(float(U.min()), 2), "max_up_m": round(float(U.max()), 2),
+        },
+        "image": {
+            "file": "image.jpg", "columns": int(img.shape[1]), "rows": int(img.shape[0]), "spacing_m": si,
+            "first_texel_centre_m": [float(iax[0]), float(iax[-1])],
+            "nodata_fraction": round(float(nodata.mean()), 4),
+            "registration": registration,
+            "bytes": len(ibytes), "sha256": sha256(ibytes),
+            "processing": "Bilinear resampling of the TCI asset onto the ENU grid, JPEG quality 88. No colour editing.",
+        },
+        "relief": [relief(10.0), relief(50.0), relief(500.0), relief(3000.0)],
+        "accuracy": [
+            "Copernicus GLO-30 is a surface model: heights include buildings and vegetation canopy. Its stated absolute vertical accuracy is better than 4 m (90 % linear error); it does not resolve pads, roads or ground conditions.",
+            "The 10 m image does not resolve structures; it is context only.",
+            "The simulation assumes flat ground at z = 0 and computes no interaction with this terrain. Where the terrain rises above z = 0 the drawn trajectory may pass through it; this is a property of the geographic placement, not of the simulated flight.",
+            "Horizontal registration of image and terrain follows the sources' georeferencing; Sentinel-2 L2A geolocation is of the order of 10 m.",
+        ],
+        "sources": [
+            {**LICENCES["copernicus-dem"], "item": dem.tile, "url": dem.url, "raster_tags": dem.tags,
+             "absent_tiles": dem.missing, "sea_fill_fraction": round(dem.sea_fill_fraction, 4),
+             "sea_fill_note": "The product has no tile for a degree square of open sea; those squares are filled with 0 m above EGM2008."},
+            {**s2, "items": used},
+            LICENCES["egm2008"],
+        ],
+        "checks": checks,
+        "check_note": "Geodetic points of grid nodes and their ENU coordinates computed with pyproj; the Rust georeference crate must reproduce them within 1 mm.",
+    }
+    with open(os.path.join(out, "environment.json"), "w", encoding="utf-8", newline="\n") as f:
+        json.dump(manifest, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    print(json.dumps({"out": out, "height_bytes": len(hbytes), "image_bytes": len(ibytes), "H0": H0, "N0": N0, "relief": manifest["relief"], "image_residual_mm": ierr * 1000}, indent=1))
+
+
+if __name__ == "__main__":
+    main()

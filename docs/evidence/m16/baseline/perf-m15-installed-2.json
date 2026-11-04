@@ -1,0 +1,56 @@
+{
+  "flow": "m15",
+  "exe": "vv-studio.exe",
+  "machine": {
+    "cpu": "AMD64 Family 25 Model 97 Stepping 2, AuthenticAMD",
+    "os": "Windows-11-10.0.26300-SP0",
+    "python": "3.14.6"
+  },
+  "cold_start_to_ready_s": 1.09,
+  "idle_memory": {
+    "processes": 7,
+    "working_set_mb": 396.8,
+    "private_mb": 217.9,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "idle_frames": {
+    "frames": 331,
+    "mean_ms": 6.06,
+    "p50_ms": 6.1,
+    "p95_ms": 6.2,
+    "p99_ms": 6.2,
+    "max_ms": 6.3,
+    "over_33ms": 0
+  },
+  "clicks_to_landing": 1,
+  "click_to_landing_on_screen_s": 0.54,
+  "machine_time_to_landing_s": 1.63,
+  "playback_detected": true,
+  "playback_frames": {
+    "frames": 825,
+    "mean_ms": 6.06,
+    "p50_ms": 6.1,
+    "p95_ms": 6.1,
+    "p99_ms": 6.2,
+    "max_ms": 6.2,
+    "over_33ms": 0
+  },
+  "playback_memory": {
+    "processes": 7,
+    "working_set_mb": 451.8,
+    "private_mb": 319.2,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "webgl": "ANGLE (AMD, AMD Radeon RX 7700 XT (0x0000747E) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "window_inner": [
+    1440,
+    900,
+    1
+  ]
+}

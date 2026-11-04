@@ -44,7 +44,8 @@
     "resources": {
       "../target/release/domains/": "domains/",
       "../target/release/engines/": "engines/",
-      "../target/release/discovery/": "discovery/"
+      "../target/release/discovery/": "discovery/",
+      "../environments/": "environments/"
     },
     "windows": {
       "webviewInstallMode": { "type": "embedBootstrapper", "silent": true },

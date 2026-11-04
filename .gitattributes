@@ -6,3 +6,6 @@
 *.yml text eol=lf
 *.md text eol=lf
 *.sh text eol=lf
+*.u16 binary
+*.jpg binary
+*.png binary
