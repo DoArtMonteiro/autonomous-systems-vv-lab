@@ -228,7 +228,8 @@ def main():
     os.makedirs(raw, exist_ok=True)
 
     pyproj.network.set_network_enabled(True)
-    geoid = pyproj.Transformer.from_crs("EPSG:4326+3855", "EPSG:4979", always_xy=True)
+    # only_best: fail rather than fall back silently to a transform without the geoid grid.
+    geoid = pyproj.Transformer.from_crs("EPSG:4326+3855", "EPSG:4979", always_xy=True, only_best=True)
     lat0, lon0 = cfg["lat"], cfg["lon"]
     L = cfg["half_extent_m"]
     # Geographic bounds of the extent, with margin.

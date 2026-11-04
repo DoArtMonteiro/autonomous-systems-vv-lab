@@ -152,9 +152,9 @@ export class GeoRocket extends CinemaRocket {
     this.sky = skyDome(80000);
     s.add(this.sky);
     // Pad rings lifted onto the terrain (the model has them on z = 0).
-    const drape = (pts, lift) => pts.map((v) => new THREE.Vector3(v.x, v.y, Math.max(0, terrainAt(p, v.x, v.y) ?? 0) + lift));
+    const drape = (pts, lift) => pts.map((v) => new THREE.Vector3(v.x, v.y, (terrainAt(p, v.x, v.y) ?? 0) + lift));
     if (this.padRing) this.padRing.geometry.setFromPoints(drape(circlePoints(this.pad.cx, this.pad.cy, this.pad.land), 0.35));
-    if (this.padDisc) this.padDisc.position.z = Math.max(0, terrainAt(p, this.pad.cx, this.pad.cy) ?? 0) + 0.25;
+    if (this.padDisc) this.padDisc.position.z = (terrainAt(p, this.pad.cx, this.pad.cy) ?? 0) + 0.25;
     if (this.keepRing) {
       this.keepRing.geometry.setFromPoints(drape(circlePoints(this.pad.cx, this.pad.cy, this.pad.keep, 192), 0.4));
       this.keepRing.computeLineDistances();
@@ -268,6 +268,10 @@ export class GeoRocket extends CinemaRocket {
       return;
     }
     super.preset(mode, initial);
+    // The base presets reset the clip planes for the engineering scene; keep the landscape's.
+    this.camera.near = 1;
+    this.camera.far = 120000;
+    this.camera.updateProjectionMatrix();
     if (mode === 'follow') {
       // A longer, slightly higher chase so the 10 m image reads as landscape, not as blur.
       this.followOffset = new THREE.Vector3(150, -330, 95);
@@ -313,7 +317,7 @@ export class GeoRocket extends CinemaRocket {
     const g = terrainAt(this.opts.pack, cur.x, cur.y);
     if (g !== null) {
       const dp = this.drop.geometry.getAttribute('position');
-      dp.setXYZ(1, cur.x, cur.y, Math.max(0, g));
+      dp.setXYZ(1, cur.x, cur.y, g);
       dp.needsUpdate = true;
       this.drop.computeLineDistances();
     }

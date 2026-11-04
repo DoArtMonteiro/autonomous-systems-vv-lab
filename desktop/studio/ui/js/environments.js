@@ -55,7 +55,7 @@ export function loadPack(id) {
   return packs.get(id);
 }
 
-/** ENU up of the terrain at (east, north), bilinear; null outside the pack. */
+/** ENU up of the terrain at (east, north) on the drawn triangles (as vv-geo); null outside. */
 export function terrainAt(p, e, n) {
   const fx = (e - p.x0) / p.s;
   const fy = (p.y0 - n) / p.s;
@@ -65,7 +65,9 @@ export function terrainAt(p, e, n) {
   const tx = fx - c;
   const ty = fy - r;
   const at = (rr, cc) => p.up[rr * p.cols + cc];
-  return at(r, c) * (1 - tx) * (1 - ty) + at(r, c + 1) * tx * (1 - ty) + at(r + 1, c) * (1 - tx) * ty + at(r + 1, c + 1) * tx * ty;
+  const a = at(r, c); const b = at(r, c + 1); const d = at(r + 1, c); const g = at(r + 1, c + 1);
+  // The mesh splits each cell into (a, d, b) and (b, d, g); interpolate on the same triangles.
+  return tx + ty <= 1 ? a + (b - a) * tx + (d - a) * ty : g + (d - g) * (1 - tx) + (b - g) * (1 - ty);
 }
 
 /** The run placed on the pack by the shell's georeference layer (vv-geo), cached. */

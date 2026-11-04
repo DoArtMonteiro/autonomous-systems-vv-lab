@@ -165,10 +165,12 @@ fn points(record: &RunRecord, ids: &[&str]) -> Option<Vec<Option<[f64; 3]>>> {
         .map(|id| record.channels.iter().find(|c| c.id == *id))
         .collect::<Option<Vec<_>>>()?;
     let n = ch[0].values.len();
-    if ch
-        .iter()
-        .any(|c| c.values.len() != n || c.timebase != ch[0].timebase)
-    {
+    // The channels must be on the scene's timebase, which the warning and the interface index by.
+    let tb = record.scene["channels"]["timebase"]
+        .as_str()
+        .unwrap_or(&ch[0].timebase);
+    let times = record.timebases.get(tb).map(Vec::len);
+    if times != Some(n) || ch.iter().any(|c| c.values.len() != n || c.timebase != tb) {
         return None;
     }
     Some(

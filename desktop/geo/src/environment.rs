@@ -99,6 +99,7 @@ struct Image {
     columns: usize,
     rows: usize,
     spacing_m: f64,
+    first_texel_centre_m: [f64; 2],
     bytes: u64,
     sha256: String,
 }
@@ -280,8 +281,10 @@ impl Environment {
             return invalid("only WGS84 ENU tangent-plane packs are supported");
         }
         let heading = finite(m.frame.heading_deg, "heading")?;
-        if !(-360.0..=360.0).contains(&heading) {
-            return invalid("heading outside [-360, 360] degrees");
+        // The renderer draws model x, y as east, north: a rotated pack would put the drawn path
+        // off its own geodetic readouts. Only heading 0 is accepted until the renderer rotates.
+        if heading != 0.0 {
+            return invalid("only packs with heading 0 are supported");
         }
         let extent = finite(m.extent_m, "extent")?;
         if !(extent > 0.0 && extent <= MAX_EXTENT_M) {
@@ -307,8 +310,9 @@ impl Environment {
         {
             return invalid("the height grid is not centred on the origin");
         }
-        if (want_y0 - extent).abs() > s {
-            return invalid("the height grid does not cover the declared extent");
+        // Square grid, exactly the declared extent: the image UVs assume it.
+        if h.rows != h.columns || (2.0 * want_y0 - 2.0 * extent).abs() > 1e-6 {
+            return invalid("the height grid must be square and span exactly the declared extent");
         }
         if h.bytes != (h.columns * h.rows * 2) as u64 {
             return invalid("height grid byte count does not match its size");
@@ -336,10 +340,16 @@ impl Environment {
                 "the image must be {IMAGE_FILE}, 16 to 16384 texels a side"
             ));
         }
-        if ((im.columns as f64) * finite(im.spacing_m, "image spacing")? - 2.0 * extent).abs()
-            > im.spacing_m
+        let sp = finite(im.spacing_m, "image spacing")?;
+        let first = [-extent + sp / 2.0, extent - sp / 2.0];
+        if im.rows != im.columns
+            || ((im.columns as f64) * sp - 2.0 * extent).abs() > 1e-6
+            || (im.first_texel_centre_m[0] - first[0]).abs() > 1e-6
+            || (im.first_texel_centre_m[1] - first[1]).abs() > 1e-6
         {
-            return invalid("the image does not cover the declared extent");
+            return invalid(
+                "the image must be square, span exactly the declared extent and start half a texel inside it",
+            );
         }
         let ib = read_bounded(&dir.join(IMAGE_FILE), MAX_IMAGE_BYTES)?;
         if ib.len() as u64 != im.bytes || sha256_hex(&ib) != im.sha256 {
@@ -433,7 +443,7 @@ impl Environment {
         Ok(env)
     }
 
-    /// Terrain ENU up at (east, north), bilinear between grid nodes; `None` outside the grid.
+    /// Terrain ENU up at (east, north) on the drawn triangles; `None` outside the grid.
     pub fn terrain_up(&self, e: f64, n: f64) -> Option<f64> {
         let fx = (e - self.x0) / self.spacing;
         let fy = (self.y0 - n) / self.spacing;
@@ -446,12 +456,14 @@ impl Environment {
         let tx = fx - c as f64;
         let ty = fy - r as f64;
         let at = |rr: usize, cc: usize| self.heights[rr * self.cols + cc] as f64;
-        Some(
-            at(r, c) * (1.0 - tx) * (1.0 - ty)
-                + at(r, c + 1) * tx * (1.0 - ty)
-                + at(r + 1, c) * (1.0 - tx) * ty
-                + at(r + 1, c + 1) * tx * ty,
-        )
+        // Linear on the two triangles the Studio draws for each cell (split along the
+        // north-east to south-west diagonal), so clearances refer to the surface on screen.
+        let (a, b, d, e) = (at(r, c), at(r, c + 1), at(r + 1, c), at(r + 1, c + 1));
+        Some(if tx + ty <= 1.0 {
+            a + (b - a) * tx + (d - a) * ty
+        } else {
+            e + (d - e) * (1.0 - tx) + (b - e) * (1.0 - ty)
+        })
     }
 
     /// Places model points (x, y, z in the run's local frame) on the Earth.
