@@ -4155,6 +4155,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "vv-ascent"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
+name = "vv-domain-ascent"
+version = "0.15.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "vv-ascent",
+ "vv-platform",
+]
+
+[[package]]
 name = "vv-domain-ground"
 version = "0.15.0"
 dependencies = [

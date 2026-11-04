@@ -1,0 +1,23 @@
+[package]
+name = "vv-domain-ascent"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+description = "Two-stage launch ascent domain host of the V&V Lab desktop product (vv-domain v1, records vv-run.v2)"
+
+[[bin]]
+name = "vv-domain-ascent"
+path = "src/main.rs"
+
+[lib]
+name = "vv_domain_ascent"
+path = "src/lib.rs"
+
+[dependencies]
+vv-platform.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+# The ascent simulator of the repository. It is a separate workspace and is not modified from here.
+vv-ascent = { path = "../../crates/vv-ascent" }
