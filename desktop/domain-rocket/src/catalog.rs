@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 
 use vv_platform::contract::*;
 
-use crate::case::{M9, M91};
+use crate::case::{HEAVY, LIGHT, M9, M91};
 
 pub const DOMAIN: &str = "rocket-landing";
 
@@ -57,12 +57,17 @@ struct Param {
     max: f64,
     step: f64,
     default: f64,
+    group: &'static str,
+    advanced: bool,
+    /// Requirements this parameter is known to act on: a static, hand-written hint for the
+    /// Experiment Lab, never computed from a run.
+    influences: &'static [&'static str],
 }
 
 // Defaults equal the values of the two templates (a test checks it). The initial state, the vehicle
 // and the atmosphere are not parameters: the simulator pins them to the pre-registered case and the
 // seed disperses the initial state.
-const PARAMS: [Param; 6] = [
+const PARAMS: [Param; 15] = [
     Param {
         id: "ignition_fraction",
         label: "Ignition point",
@@ -72,6 +77,9 @@ const PARAMS: [Param; 6] = [
         max: 1.2,
         step: 0.05,
         default: 0.75,
+        group: "Controller tuning",
+        advanced: true,
+        influences: &["R1_vertical_speed", "R6_propellant_margin", "S3_axial_load"],
     },
     Param {
         id: "throttle_gain",
@@ -82,6 +90,9 @@ const PARAMS: [Param; 6] = [
         max: 1.0,
         step: 0.05,
         default: 0.8,
+        group: "Controller tuning",
+        advanced: true,
+        influences: &["R1_vertical_speed", "S5_no_powered_ascent"],
     },
     Param {
         id: "cutoff_altitude_m",
@@ -92,6 +103,9 @@ const PARAMS: [Param; 6] = [
         max: 100.0,
         step: 1.0,
         default: 15.0,
+        group: "Controller tuning",
+        advanced: true,
+        influences: &["R1_vertical_speed", "S5_no_powered_ascent"],
     },
     Param {
         id: "lateral_position_gain",
@@ -102,6 +116,9 @@ const PARAMS: [Param; 6] = [
         max: 1.0,
         step: 0.01,
         default: 0.12,
+        group: "Controller tuning",
+        advanced: true,
+        influences: &["R5_position", "R2_horizontal_speed", "S2_keep_out"],
     },
     Param {
         id: "tilt_max_tan",
@@ -112,6 +129,9 @@ const PARAMS: [Param; 6] = [
         max: 0.2,
         step: 0.01,
         default: 0.2,
+        group: "Controller tuning",
+        advanced: true,
+        influences: &["R5_position", "R3_tilt", "S1_tilt_envelope"],
     },
     Param {
         id: "altimeter_residual_threshold_m",
@@ -122,6 +142,130 @@ const PARAMS: [Param; 6] = [
         max: 10.0,
         step: 0.5,
         default: 3.0,
+        group: "Controller tuning",
+        advanced: true,
+        influences: &["R1_vertical_speed", "R6_propellant_margin"],
+    },
+    // M17 Experiment Lab. Initial state, sensor noise and two requirement limits: each maps to one
+    // field of the case (case::parameter_path) and is written only when changed, so a default case
+    // stays the pre-registered template byte for byte. The seed still disperses the initial state
+    // around the value set here.
+    Param {
+        id: "initial_altitude_m",
+        label: "Initial altitude",
+        unit: "m",
+        description: "Height of the centre of mass above the pad when the simulation starts, before the dispersion of the seed (about 50 m). Higher gives the controller more time and costs more propellant. Not part of the pre-registered case when changed.",
+        min: 1500.0,
+        max: 4000.0,
+        step: 50.0,
+        default: 3000.0,
+        group: "Initial conditions",
+        advanced: false,
+        influences: &["R6_propellant_margin", "R1_vertical_speed"],
+    },
+    Param {
+        id: "initial_downrange_m",
+        label: "Initial offset east of the pad",
+        unit: "m",
+        description: "Horizontal offset from the pad centre along x when the simulation starts, before the dispersion of the seed (about 30 m). The lateral guidance has to remove it. Not part of the pre-registered case when changed.",
+        min: -300.0,
+        max: 300.0,
+        step: 5.0,
+        default: 80.0,
+        group: "Initial conditions",
+        advanced: false,
+        influences: &["R5_position", "R2_horizontal_speed", "S2_keep_out"],
+    },
+    Param {
+        id: "initial_crossrange_m",
+        label: "Initial offset north of the pad",
+        unit: "m",
+        description: "Horizontal offset from the pad centre along y when the simulation starts, before the dispersion of the seed (about 30 m). Not part of the pre-registered case when changed.",
+        min: -300.0,
+        max: 300.0,
+        step: 5.0,
+        default: 0.0,
+        group: "Initial conditions",
+        advanced: false,
+        influences: &["R5_position", "R2_horizontal_speed", "S2_keep_out"],
+    },
+    Param {
+        id: "initial_vertical_velocity_mps",
+        label: "Initial vertical velocity",
+        unit: "m/s",
+        description: "Vertical velocity when the simulation starts, negative downward, before the dispersion of the seed (about 10 m/s). A faster fall needs an earlier, harder burn and more propellant. Not part of the pre-registered case when changed.",
+        min: -260.0,
+        max: -150.0,
+        step: 5.0,
+        default: -200.0,
+        group: "Initial conditions",
+        advanced: false,
+        influences: &["R1_vertical_speed", "R6_propellant_margin", "S3_axial_load"],
+    },
+    Param {
+        id: "initial_horizontal_velocity_mps",
+        label: "Initial horizontal velocity east",
+        unit: "m/s",
+        description: "Horizontal velocity along x when the simulation starts, before the dispersion of the seed (about 3 m/s). Negative moves the stage west, toward the pad when it starts east of it. Not part of the pre-registered case when changed.",
+        min: -30.0,
+        max: 30.0,
+        step: 1.0,
+        default: -12.0,
+        group: "Initial conditions",
+        advanced: false,
+        influences: &["R5_position", "R2_horizontal_speed"],
+    },
+    Param {
+        id: "altimeter_sigma_m",
+        label: "Radar altimeter noise",
+        unit: "m",
+        description: "Standard deviation of the white noise on each radar altimeter reading. Not part of the pre-registered case when changed.",
+        min: 0.02,
+        max: 3.0,
+        step: 0.02,
+        default: 0.1,
+        group: "Sensors",
+        advanced: true,
+        influences: &["R1_vertical_speed"],
+    },
+    Param {
+        id: "gnss_position_sigma_m",
+        label: "GNSS position noise",
+        unit: "m",
+        description: "Standard deviation of the white noise on each GNSS position component. The lateral guidance steers on the estimate it feeds. Not part of the pre-registered case when changed.",
+        min: 0.1,
+        max: 5.0,
+        step: 0.1,
+        default: 0.5,
+        group: "Sensors",
+        advanced: true,
+        influences: &["R5_position", "R2_horizontal_speed"],
+    },
+    Param {
+        id: "landing_zone_radius_m",
+        label: "Landing-zone radius (R5)",
+        unit: "m",
+        description: "Largest distance of the touchdown point from the pad centre that R5 accepts. It changes only how the run is judged: the flight, the controller and every other verdict are unchanged. Not part of the pre-registered requirements when changed.",
+        min: 2.0,
+        max: 50.0,
+        step: 1.0,
+        default: 10.0,
+        group: "Requirements",
+        advanced: false,
+        influences: &["R5_position"],
+    },
+    Param {
+        id: "contact_vertical_speed_limit_mps",
+        label: "Contact vertical speed limit (R1)",
+        unit: "m/s",
+        description: "Largest vertical speed at contact that R1 accepts. It changes only how the run is judged: the flight, the controller and every other verdict are unchanged. Not part of the pre-registered requirements when changed.",
+        min: 1.0,
+        max: 6.0,
+        step: 0.5,
+        default: 3.0,
+        group: "Requirements",
+        advanced: false,
+        influences: &["R1_vertical_speed"],
     },
 ];
 
@@ -133,13 +277,14 @@ pub fn parameters() -> Vec<ParameterSpec> {
             label: p.label.into(),
             description: p.description.into(),
             unit: p.unit.into(),
-            group: "Controller tuning".into(),
-            advanced: true,
+            group: p.group.into(),
+            advanced: p.advanced,
             min: p.min,
             max: p.max,
             step: p.step,
             default: p.default,
             integer: false,
+            influences: strings(p.influences),
         })
         .collect()
 }
@@ -240,7 +385,7 @@ pub fn requirements() -> Vec<RequirementSpec> {
             "R5_position",
             "Distance from pad centre",
             r,
-            "The nozzle plane touches down within 10 m of the pad centre.",
+            "The nozzle plane touches down within 10 m of the pad centre (the Landing-zone radius parameter can change the limit).",
         ),
         requirement(
             "R6_propellant_margin",
@@ -282,25 +427,25 @@ pub fn requirements() -> Vec<RequirementSpec> {
 }
 
 pub fn catalog() -> DomainCatalog {
-    let gains = [
-        "ignition_fraction",
-        "throttle_gain",
-        "cutoff_altitude_m",
-        "lateral_position_gain",
-        "tilt_max_tan",
-        "altimeter_residual_threshold_m",
-    ];
+    // Every parameter applies to both templates: they share the initial state, sensors and
+    // requirements, and differ only in the policies they hold.
+    let gains: Vec<&str> = PARAMS.iter().map(|p| p.id).collect();
     let scenario = |id: &str,
                     label: &str,
                     description: &str,
                     controllers: &[&str],
                     parameters: Vec<String>,
                     default: &str| {
+        let vehicle = match id {
+            HEAVY => "heavy-return-stage",
+            LIGHT => "light-demonstrator",
+            _ => "landing-stage",
+        };
         ScenarioSpec {
             id: id.into(),
             label: label.into(),
             description: description.into(),
-            vehicle: "landing-stage".into(),
+            vehicle: vehicle.into(),
             controllers: strings(controllers),
             parameters,
             default_controller: default.into(),
@@ -314,11 +459,23 @@ pub fn catalog() -> DomainCatalog {
             unit: "s".into(),
             label: "Time since the start of the simulation".into(),
         },
-        vehicles: vec![item(
-            "landing-stage",
-            "22 t landing stage",
-            "A rocket stage of 22 t dry mass and 8 t of propellant that falls from about 3 km at 200 m/s and brakes with one gimballed engine to a 1.5 m/s descent over the pad. The initial state is dispersed by the seed.",
-        )],
+        vehicles: vec![
+            item(
+                "landing-stage",
+                "22 t landing stage",
+                "A rocket stage of 22 t dry mass and 8 t of propellant that falls from about 3 km at 200 m/s and brakes with one gimballed engine to a 1.5 m/s descent over the pad. The initial state is dispersed by the seed.",
+            ),
+            item(
+                "heavy-return-stage",
+                "41 t heavy return stage (exploratory)",
+                "A heavier stage, 30 t dry and 11 t of propellant, with a 760 kN engine (thrust over full-load weight 1.89, against 2.87 for the 22 t stage), Isp 300 s and a throttle floor of 55 %. Less braking margin and less throttle range. Illustrative values of the order of a reusable first stage near landing, not a real vehicle.",
+            ),
+            item(
+                "light-demonstrator",
+                "7.7 t light demonstrator stage (exploratory)",
+                "A small stage, 5.5 t dry and 2.2 t of propellant, with a 230 kN engine (thrust over full-load weight 3.05), Isp 265 s, a 30 % throttle floor and a faster throttle. Illustrative values of the order of a suborbital test vehicle, not a real vehicle.",
+            ),
+        ],
         scenarios: vec![
             scenario(
                 M9,
@@ -335,6 +492,22 @@ pub fn catalog() -> DomainCatalog {
                 &["guarded", "baseline_guarded"],
                 strings(&gains),
                 "guarded",
+            ),
+            scenario(
+                HEAVY,
+                "Heavy return stage (exploratory)",
+                "The M9 mission, initial state, sensors, requirements and gains with the 41 t heavy return stage (case schema v2, exploratory). The controller is told the new vehicle; its gains stay those tuned for the 22 t stage.",
+                &["baseline", "robust", "guarded", "baseline_guarded"],
+                strings(&gains),
+                "robust",
+            ),
+            scenario(
+                LIGHT,
+                "Light demonstrator stage (exploratory)",
+                "The M9 mission, initial state, sensors, requirements and gains with the 7.7 t light demonstrator stage (case schema v2, exploratory). The controller is told the new vehicle; its gains stay those tuned for the 22 t stage.",
+                &["baseline", "robust", "guarded", "baseline_guarded"],
+                strings(&gains),
+                "robust",
             ),
         ],
         controllers: controllers(),

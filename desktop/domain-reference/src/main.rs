@@ -298,6 +298,7 @@ fn int_param(id: &str, label: &str, unit: &str, range: (f64, f64), default: f64)
         step: 1.0,
         default,
         integer: true,
+        influences: Vec::new(),
     }
 }
 

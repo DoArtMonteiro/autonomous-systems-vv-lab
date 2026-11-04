@@ -6,6 +6,13 @@
 //! evidence stays self-describing and a threshold cannot be moved to make a case pass. Only the
 //! controller policy and gains, the faults (within their ranges), the duration, the sampling
 //! interval and the name are free.
+//!
+//! Schema `vv-rocket-landing.v2` (M17, exploratory) is the same model with a declared, bounded
+//! freedom: the vehicle and its actuator limits, the nominal initial position and velocity, the
+//! radar altimeter and GNSS position noise and the R1 and R5 limits may differ from the
+//! pre-registered values within the ranges of `check_exploratory`. Everything else stays pinned as
+//! in v1. A v2 case is never evidence for the pre-registered claims: its schema says it is
+//! exploratory, and a v1 case keeps the v1 rules unchanged.
 
 use serde::{Deserialize, Serialize};
 
@@ -17,6 +24,8 @@ use crate::model::{
 use crate::prng::{SplitMix64, source};
 
 pub const LANDING_SCHEMA: &str = "vv-rocket-landing.v1";
+/// Exploratory case schema of the Experiment Lab (M17): bounded freedom, see the module notes.
+pub const LANDING_SCHEMA_V2: &str = "vv-rocket-landing.v2";
 pub const CONTROL_PERIOD_STEPS: u64 = 2;
 pub const GNSS_PERIOD_CYCLES: u64 = 5;
 pub const MAX_FAULTS: usize = 10;
@@ -506,8 +515,134 @@ macro_rules! pin_fields {
 /// Validates a landing case and applies the dispersions of `seed`. Seed 0 is the nominal case:
 /// no dispersion draws are made (sensor noise, in `landing_sensors`, stays on and is seeded by 0).
 pub fn prepare_landing(case: &LandingCase, seed: u64) -> Result<PreparedLanding, String> {
-    check_registered(case)?;
+    if case.schema == LANDING_SCHEMA_V2 {
+        check_exploratory(case)?;
+    } else {
+        check_registered(case)?;
+    }
     prepare_unpinned(case, seed)
+}
+
+/// The rules of an exploratory (v2) case: the free fields within physical, bounded ranges, every
+/// other value pinned as in v1.
+fn check_exploratory(case: &LandingCase) -> Result<(), String> {
+    require_equal(&case.dispersion, &Dispersion::registered(), "dispersion")?;
+    let req = &case.requirements;
+    within(
+        req.r1_vertical_speed_mps,
+        "requirements.r1_vertical_speed_mps",
+        0.5,
+        10.0,
+    )?;
+    within(req.r5_position_m, "requirements.r5_position_m", 1.0, 100.0)?;
+    let pinned = Requirements {
+        r1_vertical_speed_mps: Requirements::registered().r1_vertical_speed_mps,
+        r5_position_m: Requirements::registered().r5_position_m,
+        ..req.clone()
+    };
+    require_equal(&pinned, &Requirements::registered(), "requirements")?;
+    let s = &case.sensors;
+    within(s.altimeter_sigma_m, "sensors.altimeter_sigma_m", 0.01, 5.0)?;
+    within(
+        s.gnss_position_sigma_m,
+        "sensors.gnss_position_sigma_m",
+        0.05,
+        10.0,
+    )?;
+    pin_fields!(
+        case.sensors,
+        Sensors::registered(),
+        "sensors",
+        [
+            gnss_velocity_sigma_mps,
+            imu_attitude_sigma_rad,
+            imu_rate_sigma_radps,
+            imu_accel_sigma_mps2,
+            control_period_steps,
+            gnss_period_cycles,
+        ]
+    );
+    let v = &case.vehicle;
+    within(v.dry_mass_kg, "vehicle.dry_mass_kg", 1000.0, 200_000.0)?;
+    within(
+        v.propellant_mass_kg,
+        "vehicle.propellant_mass_kg",
+        100.0,
+        200_000.0,
+    )?;
+    within(v.dry_cm_station_m, "vehicle.dry_cm_station_m", 0.5, 60.0)?;
+    within(
+        v.propellant_cm_station_m,
+        "vehicle.propellant_cm_station_m",
+        0.5,
+        60.0,
+    )?;
+    for (i, x) in v.dry_inertia_kgm2.iter().enumerate() {
+        within(*x, &format!("vehicle.dry_inertia_kgm2[{i}]"), 10.0, 1e9)?;
+    }
+    for (i, x) in v.propellant_inertia_kgm2.iter().enumerate() {
+        within(
+            *x,
+            &format!("vehicle.propellant_inertia_kgm2[{i}]"),
+            1.0,
+            1e9,
+        )?;
+    }
+    within(v.isp_s, "vehicle.isp_s", 150.0, 450.0)?;
+    within(v.drag_coefficient, "vehicle.drag_coefficient", 0.1, 2.0)?;
+    within(v.reference_area_m2, "vehicle.reference_area_m2", 0.5, 100.0)?;
+    within(v.throttle_min, "vehicle.throttle_min", 0.1, 0.9)?;
+    within(
+        v.throttle_rate_per_s,
+        "vehicle.throttle_rate_per_s",
+        0.1,
+        5.0,
+    )?;
+    within(v.gimbal_max_tan, "vehicle.gimbal_max_tan", 0.02, 0.2)?;
+    within(
+        v.gimbal_rate_tan_per_s,
+        "vehicle.gimbal_rate_tan_per_s",
+        0.05,
+        2.0,
+    )?;
+    // Thrust over the full-load weight: a stage that cannot brake, or one whose engine at its
+    // lowest throttle is many times its weight, is outside what this model and controller cover.
+    let weight = (v.dry_mass_kg + v.propellant_mass_kg) * GRAVITY_MPS2;
+    within(v.max_thrust_n, "vehicle.max_thrust_n", 1.0, 1e8)?;
+    within(
+        v.max_thrust_n / weight,
+        "vehicle.max_thrust_n over the full-load weight",
+        1.2,
+        6.0,
+    )?;
+    let env = &case.environment;
+    require_equal(&env.gravity_mps2, &GRAVITY_MPS2, "environment.gravity_mps2")?;
+    require_equal(
+        &env.atmosphere
+            .as_ref()
+            .map(|a| (a.density_kgpm3, a.scale_height_m)),
+        &Some((SEA_LEVEL_DENSITY_KGPM3, Some(SCALE_HEIGHT_M))),
+        "environment.atmosphere (density_kgpm3, scale_height_m)",
+    )?;
+    let i = &case.initial;
+    within(i.position_m[0], "initial.position_m[0]", -2000.0, 2000.0)?;
+    within(i.position_m[1], "initial.position_m[1]", -2000.0, 2000.0)?;
+    within(i.position_m[2], "initial.position_m[2]", 500.0, 10_000.0)?;
+    within(i.velocity_mps[0], "initial.velocity_mps[0]", -60.0, 60.0)?;
+    within(i.velocity_mps[1], "initial.velocity_mps[1]", -60.0, 60.0)?;
+    within(i.velocity_mps[2], "initial.velocity_mps[2]", -400.0, -50.0)?;
+    require_equal(&i.attitude, &NOMINAL_ATTITUDE, "initial.attitude")?;
+    require_equal(
+        &i.angular_velocity_radps,
+        &NOMINAL_ANGULAR_VELOCITY_RADPS,
+        "initial.angular_velocity_radps",
+    )?;
+    require_equal(&case.dt_s, &DT_S, "dt_s")?;
+    require_equal(
+        &case.controller.target_vertical_speed_mps,
+        &TARGET_VERTICAL_SPEED_MPS,
+        "controller.target_vertical_speed_mps",
+    )
 }
 
 /// Rejects every pre-registered value that differs, naming the field.
@@ -589,8 +724,10 @@ fn check_registered(case: &LandingCase) -> Result<(), String> {
 /// the simulation use it to run scenarios the registered case cannot express (an empty tank, a
 /// start close to the ground); the public entry point is `prepare_landing`.
 pub(crate) fn prepare_unpinned(case: &LandingCase, seed: u64) -> Result<PreparedLanding, String> {
-    if case.schema != LANDING_SCHEMA {
-        return Err(format!("schema must be {LANDING_SCHEMA}"));
+    if case.schema != LANDING_SCHEMA && case.schema != LANDING_SCHEMA_V2 {
+        return Err(format!(
+            "schema must be {LANDING_SCHEMA} or {LANDING_SCHEMA_V2}"
+        ));
     }
     if case.record_every == 0 || !case.record_every.is_multiple_of(CONTROL_PERIOD_STEPS) {
         return Err(format!(

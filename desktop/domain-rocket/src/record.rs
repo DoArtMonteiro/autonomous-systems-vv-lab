@@ -846,8 +846,11 @@ pub fn build(request: &RunRequest, out: &Path) -> Result<RunRecord, String> {
             .map(|(id, v)| format!("{id} = {v}"))
             .collect();
         if !changed.is_empty() {
-            notes.push(format!("Controller tuning differs from the pre-registered configuration: {}. The results are exploratory.", changed.join(", ")));
+            notes.push(format!("Parameters differ from the pre-registered configuration: {}. The results are exploratory.", changed.join(", ")));
         }
+    }
+    if case["schema"] == crate::case::EXPLORATORY_SCHEMA {
+        notes.push("Exploratory case (vv-rocket-landing.v2): the vehicle, the initial state, the sensor noise or a requirement limit differs from the pre-registered M9 case, within the bounded ranges the simulator accepts. It is not evidence for any pre-registered claim.".to_string());
     }
 
     let reproduce = vec![

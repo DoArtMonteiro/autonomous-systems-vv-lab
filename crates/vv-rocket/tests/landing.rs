@@ -1810,3 +1810,61 @@ fn replay_refuses_stored_artifacts_over_the_size_cap() {
         assert!(detail.contains("exceeds"), "{name}: {detail}");
     }
 }
+
+// ------------------------------------------------------------------ M17 exploratory case (v2)
+
+#[test]
+fn a_v1_case_still_rejects_every_moved_registered_value() {
+    let mut case = value_of("nominal.json");
+    case["vehicle"]["dry_mass_kg"] = json!(30000.0);
+    assert!(run_value(&case, 5).unwrap_err().contains("pre-registered"));
+    let mut case = value_of("nominal.json");
+    case["initial"]["position_m"][0] = json!(0.0);
+    assert!(run_value(&case, 5).unwrap_err().contains("pre-registered"));
+}
+
+#[test]
+fn a_v2_case_with_the_registered_values_simulates_exactly_like_v1() {
+    let v1 = value_of("nominal-robust.json");
+    let mut v2 = v1.clone();
+    v2["schema"] = json!("vv-rocket-landing.v2");
+    let (t1, r1) = run_value(&v1, 5000).unwrap();
+    let (t2, r2) = run_value(&v2, 5000).unwrap();
+    assert_eq!(t1["samples"], t2["samples"]);
+    assert_eq!(r1["requirements"], r2["requirements"]);
+}
+
+#[test]
+fn a_v2_case_accepts_bounded_changes_and_rejects_the_rest() {
+    let mut case = value_of("nominal.json");
+    case["schema"] = json!("vv-rocket-landing.v2");
+    case["initial"]["position_m"][0] = json!(-150.0);
+    case["requirements"]["r5_position_m"] = json!(20.0);
+    run_value(&case, 5000).unwrap();
+    // A thrust that cannot hold the full-load weight with margin is outside the covered range.
+    let mut weak = case.clone();
+    weak["vehicle"]["max_thrust_n"] = json!(300000.0);
+    assert!(
+        run_value(&weak, 5000)
+            .unwrap_err()
+            .contains("full-load weight")
+    );
+    // The dispersions, the safety limits and the attitude stay pinned.
+    let mut moved = case.clone();
+    moved["requirements"]["s2_keep_out_m"] = json!(80.0);
+    assert!(
+        run_value(&moved, 5000)
+            .unwrap_err()
+            .contains("requirements")
+    );
+    let mut moved = case.clone();
+    moved["dispersion"]["position_m"][0] = json!(0.0);
+    assert!(run_value(&moved, 5000).unwrap_err().contains("dispersion"));
+    let mut moved = case;
+    moved["initial"]["position_m"][2] = json!(200.0);
+    assert!(
+        run_value(&moved, 5000)
+            .unwrap_err()
+            .contains("initial.position_m[2]")
+    );
+}
