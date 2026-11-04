@@ -465,7 +465,7 @@ export class GeoRocket extends CinemaRocket {
     if (!this.terrain) return;
     // Daylight scene regardless of the interface theme: the image is a daylight photograph.
     this.grid.visible = false;
-    this.s.fog = new THREE.Fog(HORIZON.clone(), 4000, 42000);
+    this.s.fog = new THREE.Fog(HORIZON.clone(), 3000, 34000);
     this.s.background = HORIZON.clone();
     this.groundTrack.material.color = new THREE.Color(0xffffff);
     this.errSeg.material.color = new THREE.Color(this.cssColour('--est', '#e6cf55'));

@@ -291,3 +291,4 @@
 .mc-bottom .pl-analysis { position: absolute; right: 0; bottom: 0; height: 22px; font-size: 11px; }
 .mc-left > *, .mc-right > * { min-width: 0; }
 .mc-left, .mc-right { overflow-x: hidden; }
+.pl-env-cat { padding: 0 6px; white-space: nowrap; }

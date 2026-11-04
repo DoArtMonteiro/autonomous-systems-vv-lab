@@ -2,12 +2,12 @@
 
 O M16 acrescenta ao Studio duas formas de ver a mesma reprodução: uma vista geoespacial, que coloca uma aterragem do foguetão numa paisagem real a partir de dados públicos com licença, e o Mission Control, uma disposição de operações com telemetria específica do domínio, veredictos ao longo do tempo, eventos com evidência e uma faixa temporal com os ramos das execuções comparadas. O motor de simulação continua a ser a fonte de verdade; as vistas novas leem os registos e não mudam nenhum.
 
-Estado: implementado, testado no Studio instalado nesta máquina e proposto num PR em rascunho, empilhado sobre o PR #24 (M15), que também não está integrado. Nada do M16 foi integrado em `main`. Nenhum resultado científico mudou: os anfitriões de domínio, os registos e os hashes canónicos são os do M15.
+Estado: implementado, testado no Studio instalado nesta máquina e proposto num PR em rascunho, empilhado sobre o PR #24 (M15), que também não está integrado. A revisão visual do responsável ao 0.16.0 levou ao M16.1 (Studio 0.16.1, `docs/m16-1-visual-quality.md`): andar à escala, câmaras que não derivam, pacotes v2 com uma camada de pormenor de 0,5 m, três ambientes com catálogo, fontes num painel compacto e nenhum resultado antes do tempo. As secções abaixo descrevem o 0.16.0; onde o 0.16.1 as altera, o documento do M16.1 prevalece. Nada do M16 foi integrado em `main`. Nenhum resultado científico mudou: os anfitriões de domínio, os registos e os hashes canónicos são os do M15.
 
 ## O que mudou para quem abre o Studio
 
 - **Três vistas no leitor de missões.** Engenharia (a cena 3D leve do M15, sem dados geográficos), Geoespacial (a mesma reprodução numa paisagem) e Mission Control. Mudar de vista não volta a correr nada, não relê as execuções e mantém o instante da reprodução; o teste compara o hash de cada registo antes e depois.
-- **Duas paisagens instaladas.** A costa de Cabo Canaveral (Florida, plana) e a ilha de Santa Maria (Açores, com relevo). Cada uma tem terreno Copernicus DEM GLO-30 e uma imagem Sentinel-2 L2A, com fontes, licenças, atribuição, precisão e tamanho visíveis em Definições.
+- **Duas paisagens instaladas** (três no 0.16.1). A costa de Cabo Canaveral (Florida, plana) e a ilha de Santa Maria (Açores, com relevo). Cada uma tem terreno Copernicus DEM GLO-30 e uma imagem Sentinel-2 L2A, com fontes, licenças, atribuição, precisão e tamanho visíveis em Definições.
 - **Na cena geoespacial**, a legenda separa o que é simulado (trajetória, atitude, acelerador, estimativa, eventos), o que é contexto geográfico (terreno e imagem) e o que é ilustração (corpo do andar, pluma, céu, sol, sombras). A atribuição das fontes está sempre no ecrã.
 - **Mission Control** tem dois modos: cinematográfico (cena, relógio, quatro valores e faixa temporal) e técnico (grupos de telemetria, requisitos, invariantes, sensores, eventos, comparação e entradas para a análise). Cada valor indica a origem: T estado verdadeiro, E estimativa do controlador, O observação do sensor, C comando, D derivado, G colocação geográfica. A etiqueta vem do tipo do canal no registo, não de uma tabela da interface.
 - **Faixa temporal.** Uma pista por execução com as fases derivadas do canal do motor, as falhas injetadas, as deteções, as violações, o contacto e o ponto onde as execuções se separam. Eventos coincidentes partilham um marcador. Clicar num evento pausa nesse instante e abre um cartão com a evidência e as ligações para Analisar nesse instante, Comparar e Desafiar a afirmação.
@@ -63,7 +63,7 @@ A simulação assume solo plano no plano da plataforma e não calcula nada contr
 | Sentinel-2 L2A (Comissão Europeia, ESA), cópia COG da Element 84 | Aviso legal dos dados Sentinel: acesso livre, completo e aberto, incluindo adaptação | «Contains modified Copernicus Sentinel data 2025» |
 | EGM2008 (NGA) pela grelha `us_nga_egm08_25` do PROJ | Domínio público (obra do governo dos EUA) | «EGM2008, NGA» |
 
-Os textos das licenças foram lidos nas páginas e PDF oficiais (`docs/evidence/m16/renderer-research.md`, secção 6). Foram excluídos: as imagens EOX Sentinel-2 cloudless (uso comercial pago), os mosaicos do OpenStreetMap (proíbem uso offline e descarga em massa) e o NAIP no AWS (pagamento pelo requerente). Cada pacote ocupa cerca de 1,1 MB; os dois vão no instalador.
+Os textos das licenças foram lidos nas páginas e PDF oficiais (`docs/evidence/m16/renderer-research.md`, secção 6). Foram excluídos: as imagens EOX Sentinel-2 cloudless (uso comercial pago), os mosaicos do OpenStreetMap (proíbem uso offline e descarga em massa) e o NAIP no AWS (pagamento pelo requerente). Cada pacote ocupa cerca de 1,1 MB; os dois vão no instalador. No 0.16.1 o NAIP vem da cópia do Microsoft Planetary Computer, que responde a pedidos anónimos, e os pacotes passam a 3,5 a 4,9 MB (`docs/m16-1-visual-quality.md`).
 
 ## Verificação
 
@@ -120,11 +120,7 @@ Uma revisão de agente não substitui um teste de usabilidade com pessoas, que n
 
 ## Pendente
 
-- A faixa de fases do leitor do M15 continua a marcar as violações desde o início; no Mission Control só são nomeadas quando a reprodução lá chega.
-- Os grupos de rádio não têm navegação por setas (só Tab).
-- Uma terceira execução de desempenho do M16.
-- Revisão visual por agente (corrigida em grande parte depois): a 1024x640 os distintivos dos veredictos ficam cortados na margem do painel direito.
-- As medições de desempenho foram feitas antes das últimas correções visuais (só CSS e o cartão de evidência); as jornadas e o `--self-test` foram repetidos no instalador final.
+Os quatro pontos pendentes do 0.16.0 foram resolvidos no 0.16.1: as violações, deteções e separações só aparecem quando a reprodução lá chega (com um modo de análise explícito), os grupos de rádio têm navegação por setas, há três execuções de desempenho no Studio instalado e os distintivos dos veredictos já não ficam cortados a 1024x640. O que fica pendente está em `docs/m16-1-visual-quality.md`.
 
 ## Próxima expansão de domínio
 
