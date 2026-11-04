@@ -579,6 +579,24 @@ fn self_test(report_path: &Path) -> i32 {
         ok &= pass;
         checks.push(check(name, pass, detail));
     }
+    // Geographic environments (M16): every bundled pack validates, check points included.
+    let mut env_roots = env_dirs("VVLAB_ENVIRONMENTS");
+    if env_roots.is_empty() {
+        env_roots.push(exe_dir.join("environments"));
+    }
+    for root in env_roots {
+        let (good, bad) = vv_geo::environment::discover(&root);
+        let pass = !good.is_empty() && bad.is_empty();
+        ok &= pass;
+        checks.push(check(
+            "environment packs",
+            pass,
+            json!({
+                "accepted": good.iter().map(|e| json!({"id": e.id, "bytes": e.bytes(), "worst_check_m": e.worst_check_m()})).collect::<Vec<_>>(),
+                "rejected": bad.iter().map(|(f, r)| json!({"folder": f, "reason": r})).collect::<Vec<_>>(),
+            }),
+        ));
+    }
     let report = json!({ "schema": "vv-studio-self-test.v1", "version": VERSION, "pass": ok, "checks": checks });
     let _ = fs::write(
         report_path,
