@@ -186,6 +186,29 @@ async function openPalette() {
   palette(() => items);
 }
 
+/** Arrow keys move between the options of a radio group and choose the next one (WAI-ARIA radio group). */
+function radioArrow(e) {
+  if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return false;
+  const r = e.target && e.target.closest && e.target.closest('[role="radio"]');
+  const g = r && r.closest('[role="radiogroup"]');
+  if (!g) return false;
+  const opts = [...g.querySelectorAll('[role="radio"]')].filter((x) => x.closest('[role="radiogroup"]') === g && x.getAttribute('aria-disabled') !== 'true' && !x.disabled && !x.hidden);
+  const i = opts.indexOf(r);
+  if (i < 0 || opts.length < 2) return false;
+  const step = e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 1;
+  const next = opts[(i + step + opts.length) % opts.length];
+  next.focus();
+  next.click();
+  // Choosing may rebuild the view (the view switch does): keep the focus on the chosen option.
+  if (!next.isConnected) {
+    const label = g.getAttribute('aria-label');
+    const again = [...document.querySelectorAll('[role="radiogroup"]')].find((x) => x.getAttribute('aria-label') === label && x.isConnected);
+    const chosen = again && again.querySelector('[role="radio"][aria-checked="true"]');
+    if (chosen) chosen.focus();
+  }
+  return true;
+}
+
 document.addEventListener('keydown', (e) => {
   if (!document.getElementById('modal-root').hidden) return;
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openPalette(); return; }
@@ -193,6 +216,7 @@ document.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (typing(e)) return;
   if (e.key === '?') { e.preventDefault(); showHelp(); return; }
+  if (radioArrow(e)) { e.preventDefault(); return; }
   if (/^[1-8]$/.test(e.key) && !(e.target && e.target.closest && e.target.closest('[role="slider"], input[type="range"]'))) { navigate(VIEWS[Number(e.key) - 1]); e.preventDefault(); return; }
   if (e.target && e.target.closest && (e.target.closest('button, a, [role="tab"], [role="radio"], summary') && (e.key === ' ' || e.key === 'Enter'))) return;
   if (e.target && e.target.closest && e.target.closest('.r3d canvas') && e.key.startsWith('Arrow')) return;
