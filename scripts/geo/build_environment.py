@@ -61,11 +61,17 @@ ENVIRONMENTS = {
     },
     "santa-maria-azores": {
         "name": "Santa Maria, Azores",
-        "summary": "Volcanic island with cliffs and a plateau. The relief breaks the flat-ground assumption of the simulation, which the Studio states.",
-        "lat": 36.99000, "lon": -25.10000,
+        "summary": "Volcanic island with cliffs and a plateau. The simulation's pad centre is placed in an open pasture on the eastern uplands, read from the 2024 orthophoto; the slopes around it break the flat-ground assumption of the simulation, which the Studio states. No launch or landing facility is there or is implied.",
+        "lat": 36.98645, "lon": -25.10763,
         "half_extent_m": 9000.0, "dem_spacing_m": 30.0, "image_spacing_m": 10.0,
         "s2_items": ["S2A_T26SPF_20250423T123128_L2A", "S2A_T26SPG_20250423T123128_L2A"],
         "heading_deg": 0.0,
+        # Detail layer: the 2024 orthophoto of the Azores government (8 cm flight) rendered at 0.5 m
+        # by its WMS; heights stay those of Copernicus GLO-30 (no keyless high-resolution DEM).
+        "detail": {"half_extent_m": 1024.0, "dem_spacing_m": 8.0, "image_spacing_m": 0.5, "blend_m": 192.0,
+                   "dem": {"kind": "base"},
+                   "imagery": {"kind": "wms", "licence": "azores-orto-2024", "year": 2024,
+                               "url": "https://ambiente.azores.gov.pt/qgisserver/sma/orto2024/qgis_mapserv.fcgi", "layer": "ortofotomapa_2024_sma"}},
     },
 }
 
@@ -96,6 +102,14 @@ LICENCES = {
 }
 
 DETAIL_LICENCES = {
+    "azores-orto-2024": {
+        "provider": "Secretaria Regional do Ambiente e Ação Climática, Governo dos Açores (SRAAC), through its WMS",
+        "product": "Ortofotomapa de Santa Maria 2024 (flight of July and August 2024, 8 cm ground sampling), rendered by the WMS at the texel size",
+        "licence": "CC BY 4.0, as stated in the ISO metadata record 3dbb1054-1690-43a5-b7d7-1835d5f64ef5 of the IDEiA catalogue (sma.idea.azores.gov.pt/geonetwork): \"Acesso público sem restrições\"; \"Licença de utilização - CC-BY-4.0 (https://creativecommons.org/licenses/by/4.0/)\". No separate terms page was found; the licence comes from that record only.",
+        "attribution": "Ortofotomapa de Santa Maria 2024 © SRAAC/Governo dos Açores, CC BY 4.0, modified (resampled and colour-balanced)",
+        "credit": "Ortofoto 2024 © SRAAC/Governo dos Açores, CC BY 4.0",
+        "access": "WMS 1.3.0 https://ambiente.azores.gov.pt/qgisserver/sma/orto2024/qgis_mapserv.fcgi, layer ortofotomapa_2024_sma (no account)",
+    },
     "tnm-1m": {
         "provider": "U.S. Geological Survey, 3D Elevation Program (3DEP), through The National Map",
         "product": "USGS 1 m lidar digital elevation model (bare earth; heights NAVD88, converted here to NAD83(2011) ellipsoidal heights with the NOAA GEOID18 model)",
@@ -546,6 +560,12 @@ def main():
             lic["credit"] = lic["credit"].format(year=", ".join(years))
             extra_sources.append({**lic, "layer": "detail", "items": imagery.items})
             extra_accuracy.append(f"Detail image: NAIP {', '.join(years)} at {det['image_spacing_m']:g} m per texel (source {imagery.items[0]['gsd_m']} m). NAIP and 3DEP are on NAD83(2011) and are read here as WGS84, a horizontal offset of about 1 to 2 m.")
+        if det["imagery"]["kind"] == "wms":
+            lic = DETAIL_LICENCES[det["imagery"]["licence"]]
+            extra_sources.append({**lic, "layer": "detail", "requests": len(imagery.requests), "request_example": imagery.requests[0]})
+            extra_accuracy.append(f"Detail image: the {det['imagery']['year']} orthophoto rendered by its WMS at {det['image_spacing_m']:g} m per texel, in EPSG:4326 tiles resampled onto the ENU grid. Its georeferencing is the publisher's; a residual offset of a few metres against the base layers cannot be excluded.")
+        if det["dem"]["kind"] == "base":
+            extra_accuracy.append(f"Detail heights are the base Copernicus GLO-30 surface sampled every {det['dem_spacing_m']:g} m: the detail layer adds image resolution, not terrain resolution.")
         extra_accuracy.append(f"Within {det['blend_m']:g} m of the edge of the detail layer the drawn heights blend into the base grid and the detail image fades into the base image; this display adjustment is the only change made to the context data.")
     manifest = {
         "schema": "vv-geo-environment.v2" if det else "vv-geo-environment.v1",
