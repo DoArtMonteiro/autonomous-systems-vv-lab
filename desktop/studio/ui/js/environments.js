@@ -1,8 +1,8 @@
 // Geographic environments (M16), as the interface sees them. The shell validates every pack (sizes,
 // SHA-256, grid, attributed sources and the pack's own geodetic check points) before it lists it,
 // and re-hashes each file it hands over. Nothing here touches the network: bytes arrive over IPC.
-// What is cached: the listing, the decoded height grid and the image blob of a pack (CPU memory,
-// about 2 MB each), and placed tracks per run. GPU resources belong to the scene that uses them
+// What is cached: the listing, the decoded height grids, image blobs and world layer of a pack
+// (CPU memory, a few MB each), and placed tracks per run. GPU resources belong to the scene that uses them
 // and are released when it is disposed.
 
 import { api, logUiError } from './api.js';
@@ -49,14 +49,44 @@ export function loadPack(id) {
         return { up, cols: h.columns, rows: h.rows, s: h.spacing_m, x0: h.first_node_m[0], y0: h.first_node_m[1], image: new Blob([bytesOf(ib)], { type: 'image/jpeg' }) };
       };
       const d = (m.layers || []).find((l) => l.role === 'detail');
-      const [base, detail] = await Promise.all([layer(m.height, 'height.u16', 'image.jpg'), d ? layer(d.height, 'detail-height.u16', 'detail-image.jpg') : null]);
+      const [base, detail, world] = await Promise.all([layer(m.height, 'height.u16', 'image.jpg'), d ? layer(d.height, 'detail-height.u16', 'detail-image.jpg') : null, worldOf(id, m.world)]);
       if (detail) Object.assign(detail, { half: d.extent_m, blend: d.blend_m, m: d });
-      return { id, m, ...base, detail };
+      return { id, m, ...base, detail, world };
     })();
     p.catch((e) => { packs.delete(id); logUiError(`environment ${id}: ${e && e.message ? e.message : JSON.stringify(e)}`); });
     packs.set(id, p);
   }
   return packs.get(id);
+}
+
+/** The world layer of a v3 pack (buildings, structures, vegetation), decoded; null when it has none. */
+async function worldOf(id, w) {
+  if (!w || (!w.features && !w.vegetation)) return null;
+  const [fb, vb] = await Promise.all([w.features ? api.environmentFile(id, 'features.json') : null, w.vegetation ? api.environmentFile(id, 'vegetation.bin') : null]);
+  const features = fb ? JSON.parse(new TextDecoder().decode(bytesOf(fb))) : null;
+  if (features && !(Array.isArray(features.buildings) && Array.isArray(features.lidar_structures) && Array.isArray(features.structures))) {
+    throw { kind: 'invalid', message: 'features.json does not have the declared lists.' };
+  }
+  return { features, vegetation: vb ? parseVegetation(bytesOf(vb)) : null, m: w };
+}
+
+/** Parses vegetation.bin (12-byte little-endian records, see the manifest) into typed arrays. */
+export function parseVegetation(buf) {
+  const dv = new DataView(buf);
+  const n = Math.floor(buf.byteLength / 12);
+  const out = { n, x: new Float32Array(n), y: new Float32Array(n), h: new Float32Array(n), r: new Float32Array(n), kind: new Uint8Array(n), rgb: new Uint8Array(n * 3) };
+  for (let i = 0; i < n; i++) {
+    const o = i * 12;
+    out.x[i] = dv.getInt16(o, true) / 10;
+    out.y[i] = dv.getInt16(o + 2, true) / 10;
+    out.h[i] = dv.getUint16(o + 4, true) / 100;
+    out.r[i] = dv.getUint8(o + 6) / 10;
+    out.kind[i] = dv.getUint8(o + 7);
+    out.rgb[3 * i] = dv.getUint8(o + 8);
+    out.rgb[3 * i + 1] = dv.getUint8(o + 9);
+    out.rgb[3 * i + 2] = dv.getUint8(o + 10);
+  }
+  return out;
 }
 
 /** Weight of the detail layer at (east, north): 1 inside, falling linearly to 0 over its blend margin. */

@@ -7,31 +7,44 @@
 // - simulated (from the record): every position, attitude, throttle, estimate and event;
 // - geographic context (from the pack): terrain heights and the image; the simulation assumes flat
 //   ground at z = 0 and computes nothing against this terrain;
-// - illustrative rendering: the stage (stage-model.js), plume, sky, sun direction, shadows, the
-//   water shading where the pack's heights are at mean sea level and its image is dark, the pad
-//   surface, the neutral plane beyond the pack and the lift of the pad rings onto the terrain.
+// - world layer (schema v3 packs, world-layer.js): buildings, structures and vegetation with the
+//   source of every height; their shapes and materials are illustrative;
+// - illustrative rendering: the stage (stage-model.js), plume, sky, haze, sun direction, shadows,
+//   the water shading where the pack's heights are at mean sea level and its image is dark, the
+//   fine grain on the ground near the camera, the glow and dust where the plume meets the ground,
+//   the pad surface, the neutral plane beyond the pack and the lift of the pad rings onto the
+//   terrain.
 //
 // Model x, y, z are east, north, up of the pack frame (heading 0), so scene coordinates are model
 // coordinates. The shell's vv-geo crate checks the pack origin and gives geodetic readouts.
 //
 // Cameras: each preset is a rule that gives a pose from the playback state (never from the
-// previous frame), so a played descent cannot drift the camera. Terrain clearance is applied to the
+// previous frame), so a played descent cannot drift the camera. "Auto" picks one of the
+// other rules from the stage's height above the pad, so it is a rule of the playback state too. Terrain clearance is applied to the
 // drawn pose only. Changing preset eases between poses unless reduced motion is requested.
 
 import * as THREE from '../../vendor/three/three.module.min.js';
 import { CinemaRocket } from './rocket-cinema.js';
-import { channelsOf, circlePoints } from './rocket.js';
+import { channelsOf, circlePoints, hexColour } from './rocket.js';
 import { STAGE } from './stage-model.js';
 import { lowerIndex, sampleAt } from '../dom.js';
 import { terrainAt } from '../environments.js';
+import { buildWorld } from './world-layer.js';
 
 // Illustrative sun: no date or time of day is part of the model.
 const SUN_AZIMUTH_DEG = 128; // clockwise from north
-const SUN_ELEVATION_DEG = 34;
-const HORIZON = new THREE.Color(0xc3d0db);
-const ZENITH = new THREE.Color(0x2f5f93);
-// The sky shader writes its colour straight to the screen: give it the sRGB values unconverted.
-const raw = (hex) => new THREE.Color().setHex(hex, THREE.LinearSRGBColorSpace);
+const SUN_ELEVATION_DEG = 27;
+// Sky, haze and fog share these linear colours and go through the same tone mapping, so the
+// landscape fades into the sky it is drawn against.
+const HAZE = new THREE.Color(0xc4d4e4).multiplyScalar(1.3);
+const ZENITH = new THREE.Color(0x2e64b4).multiplyScalar(1.25);
+const SUN_HAZE = new THREE.Color(0xf6e3c2).multiplyScalar(1.45);
+// Aerial perspective: fraction of haze 1 - exp(-d * AERIAL_K * exp(-h / AERIAL_H)), with h the mean
+// height of the camera and the point above the pad: near the ground about 2.4 % at 2 km, 11 % at
+// 10 km and 30 % at 30 km; thinner air above, so a view from 2 km up is hazed less.
+const AERIAL_K = 1.2e-5;
+const AERIAL_H = 2500;
+const glsl3 = (c) => `vec3(${(c.isVector3 ? [c.x, c.y, c.z] : [c.r, c.g, c.b]).map((v) => v.toFixed(4)).join(', ')})`;
 const EARTH_R = 6371000;
 const deg = (d) => (d * Math.PI) / 180;
 
@@ -46,17 +59,20 @@ function bearing(az, el) {
   return new THREE.Vector3(Math.sin(deg(az)) * Math.cos(deg(el)), Math.cos(deg(az)) * Math.cos(deg(el)), Math.sin(deg(el)));
 }
 
-const SKY_FRAG = `uniform vec3 sun; uniform vec3 zenith; uniform vec3 horizon; varying vec3 vDir;
+const SKY_FRAG = `uniform vec3 sun; uniform vec3 zenith; uniform vec3 horizon; uniform vec3 sunHaze; varying vec3 vDir;
   void main() {
     vec3 d = normalize(vDir);
     float h = clamp(d.z, -0.2, 1.0);
-    vec3 c = mix(horizon, zenith, pow(max(h, 0.0), 0.5));
-    // A brighter haze band at the horizon and a soft halo around the sun (illustration).
-    c = mix(c, horizon * 1.08, exp(-max(h, 0.0) * 18.0) * 0.6);
     float mu = max(dot(d, sun), 0.0);
-    c += vec3(1.0, 0.93, 0.80) * (0.18 * pow(mu, 6.0) + 0.35 * pow(mu, 60.0) + 1.2 * pow(mu, 1600.0));
-    if (h < 0.0) c = mix(horizon, horizon * 0.8, clamp(-h * 5.0, 0.0, 1.0));
+    // Zenith to a hazy horizon, warmer towards the sun, with a halo and a disc (illustration).
+    vec3 c = mix(horizon, zenith, pow(max(h, 0.0), 0.36));
+    vec3 hz = mix(horizon, sunHaze, pow(mu, 5.0) * 0.6);
+    c = mix(c, hz, exp(-max(h, 0.0) * 14.0));
+    c += sunHaze * (0.10 * pow(mu, 8.0) + 0.35 * pow(mu, 80.0)) + vec3(4.0, 3.7, 3.2) * pow(mu, 2400.0);
+    if (h < 0.0) c = mix(hz, horizon * 0.85, clamp(-h * 5.0, 0.0, 1.0));
     gl_FragColor = vec4(c, 1.0);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
   }`;
 const SKY_VERT = 'varying vec3 vDir; void main() { vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
 
@@ -68,7 +84,7 @@ function skyMaterial(depthTest) {
     // not share the depth encoding of the other materials.
     depthTest,
     fog: false,
-    uniforms: { sun: { value: sunDirection() }, zenith: { value: raw(ZENITH.getHex()) }, horizon: { value: raw(HORIZON.getHex()) } },
+    uniforms: { sun: { value: sunDirection() }, zenith: { value: ZENITH.clone() }, horizon: { value: HAZE.clone() }, sunHaze: { value: SUN_HAZE.clone() } },
     vertexShader: SKY_VERT,
     fragmentShader: SKY_FRAG,
   });
@@ -78,6 +94,42 @@ function skyDome(radius) {
   const m = new THREE.Mesh(new THREE.SphereGeometry(radius, 48, 24), skyMaterial(false));
   m.renderOrder = -10;
   m.frustumCulled = false;
+  return m;
+}
+
+/**
+ * Adds aerial perspective to a lit material's shaders: the fragment fades towards the haze colour
+ * of the sky in its view direction with distance (illustration; replaces three.js fog for the
+ * landscape so that it matches the sky dome).
+ */
+function aerial(sh) {
+  const sun = sunDirection();
+  sh.vertexShader = sh.vertexShader
+    .replace('#include <common>', '#include <common>\nvarying vec3 vAerialW;')
+    .replace('#include <project_vertex>', '#include <project_vertex>\nvAerialW = (vec4(mvPosition.xyz, 0.0) * viewMatrix).xyz;');
+  sh.fragmentShader = sh.fragmentShader
+    .replace('#include <common>', '#include <common>\nvarying vec3 vAerialW;')
+    // Applied to the linear light before tone mapping, as the sky dome is.
+    .replace('#include <opaque_fragment>', `{
+      float fd = length(vAerialW);
+      vec3 vd = vAerialW / max(fd, 1e-3);
+      float hm = max(0.0, cameraPosition.z + 0.5 * vAerialW.z);
+      float fk = 1.0 - exp(-fd * ${AERIAL_K.toExponential(3)} * exp(-hm / ${AERIAL_H.toFixed(1)}));
+      float mu = max(dot(vd, ${glsl3(sun)}), 0.0);
+      vec3 fc = mix(${glsl3(HAZE)}, ${glsl3(SUN_HAZE)}, pow(mu, 5.0) * 0.6);
+      outgoingLight = mix(outgoingLight, fc, fk);
+    }
+    #include <opaque_fragment>`)
+    .replace('#include <fog_fragment>', '');
+}
+
+/** Wraps a material's onBeforeCompile so that `aerial` is applied after it. */
+function withAerial(m) {
+  const prev = m.onBeforeCompile;
+  m.fog = false;
+  m.onBeforeCompile = (sh, r) => { if (prev) prev.call(m, sh, r); aerial(sh); };
+  const key = m.customProgramCacheKey ? m.customProgramCacheKey.bind(m) : () => '';
+  m.customProgramCacheKey = () => `${key()}|aerial-3`;
   return m;
 }
 
@@ -133,10 +185,19 @@ function terrainMaterial(envMap, detail, role, baseL) {
   const blend = detail ? Math.max(detail.blend, 1e-3).toFixed(3) : '1.0';
   const L = (baseL || 1).toFixed(3);
   m.userData.baseMap = { value: null };
+  // The detail layer also gets a fine grain near the camera, so the 0.5 m texels do not read as
+  // blur at a few tens of metres (illustration, at most +-7 % of the image colour).
   const fade = role === 'detail' ? `
         float dIn = ${half} - max(abs(vXY.x), abs(vXY.y));
         vec4 under = texture2D(baseMap, (vXY + ${L}) / (2.0 * ${L}));
-        diffuseColor.rgb = mix(under.rgb, diffuseColor.rgb, clamp(dIn / ${blend}, 0.0, 1.0));` : '';
+        diffuseColor.rgb = mix(under.rgb, diffuseColor.rgb, clamp(dIn / ${blend}, 0.0, 1.0));
+        float gk = (1.0 - smoothstep(40.0, 320.0, length(vViewPosition))) * 0.07;
+        float gn = vvNoise(vXY * 2.3) * 0.55 + vvNoise(vXY * 7.9) * 0.3 + vvNoise(vXY * 23.0) * 0.15;
+        diffuseColor.rgb *= 1.0 + gk * (gn - 0.5) * 2.0;` : '';
+  const noise = role === 'detail' ? `
+float vvHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float vvNoise(vec2 p) { vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(vvHash(i), vvHash(i + vec2(1.0, 0.0)), f.x), mix(vvHash(i + vec2(0.0, 1.0)), vvHash(i + vec2(1.0, 1.0)), f.x), f.y); }` : '';
   // Two metres of overlap hide the hairline where the two triangulations meet.
   const clip = detail && role !== 'detail' ? `if (max(abs(vXY.x), abs(vXY.y)) < ${half} - 2.0) discard;` : '';
   m.onBeforeCompile = (sh) => {
@@ -145,17 +206,19 @@ function terrainMaterial(envMap, detail, role, baseL) {
       .replace('#include <common>', '#include <common>\nattribute float sea;\nvarying float vSea;\nvarying vec2 vXY;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSea = sea;\nvXY = position.xy;');
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', `#include <common>\nvarying float vSea;\nvarying vec2 vXY;\nfloat waterMask = 0.0;\n${role === 'detail' ? 'uniform sampler2D baseMap;' : ''}`)
+      .replace('#include <common>', `#include <common>\nvarying float vSea;\nvarying vec2 vXY;\nfloat waterMask = 0.0;\n${role === 'detail' ? 'uniform sampler2D baseMap;' : ''}${noise}`)
       .replace('#include <alphatest_fragment>', `#include <alphatest_fragment>\n${clip}`)
-      .replace('#include <map_fragment>', `#include <map_fragment>${fade}
+      .replace('#include <map_fragment>', `#include <map_fragment>
+        // Aerial images are exposed brightly: bring their colours towards ground albedos.
+        diffuseColor.rgb *= 0.8;${fade}
         float lum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
         waterMask = smoothstep(0.5, 0.95, vSea) * (1.0 - smoothstep(0.035, 0.11, lum));
         diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.35 + vec3(0.006, 0.026, 0.042), waterMask);`)
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.14, waterMask);')
-      .replace('#include <lights_fragment_maps>', '#include <lights_fragment_maps>\nradiance *= mix(1.0, 1.9, waterMask);');
+      .replace('#include <lights_fragment_maps>', '#include <lights_fragment_maps>\nradiance *= mix(1.0, 1.25, waterMask);');
   };
-  m.customProgramCacheKey = () => `vv-terrain-4-${role || 'base'}-${half}-${blend}-${L}`;
-  return m;
+  m.customProgramCacheKey = () => `vv-terrain-5-${role || 'base'}-${half}-${blend}-${L}`;
+  return withAerial(m);
 }
 
 /** Ground beyond the pack (illustration): vertex colours from the pack's edge, water where `sea`. */
@@ -174,14 +237,12 @@ varying float vSea;
 float waterMask = 0.0;`)
       .replace('#include <color_fragment>', `#include <color_fragment>
 waterMask = smoothstep(0.5, 0.95, vSea);
-diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.006, 0.026, 0.042), waterMask);`)
+diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.5 + vec3(0.008, 0.03, 0.05), waterMask);`)
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-roughnessFactor = mix(roughnessFactor, 0.14, waterMask);`)
-      .replace('#include <lights_fragment_maps>', `#include <lights_fragment_maps>
-radiance *= mix(1.0, 1.9, waterMask);`);
+roughnessFactor = mix(roughnessFactor, 0.45, waterMask);`);
   };
   m.customProgramCacheKey = () => 'vv-beyond-1';
-  return m;
+  return withAerial(m);
 }
 
 /** Colour of `bitmap` (flipped: row 0 south) at the pack points `edge` (x, y pairs), as linear RGB. */
@@ -249,15 +310,19 @@ const ease = (k) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
 
 export class GeoRocket extends CinemaRocket {
   lights(s) {
-    this.hemi = new THREE.HemisphereLight(0xdfe9f5, 0x4a4438, 0.7);
+    this.hemi = new THREE.HemisphereLight(0xdfe9f5, 0x4a4438, 0.62);
     s.add(this.hemi);
-    this.sun = new THREE.DirectionalLight(0xfff1df, 2.6);
+    this.sun = new THREE.DirectionalLight(0xfff0dc, 2.9);
     this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(2048, 2048);
+    // One 4096-texel shadow map that follows the subject: about 0.19 m a texel over the 780 m
+    // around the stage (and the ground along its sun ray), or 0.68 m over the 2.8 km around the
+    // pad in the wide presets (see setTime).
+    this.sun.shadow.mapSize.set(4096, 4096);
     const sc = this.sun.shadow.camera;
-    sc.left = -90; sc.right = 90; sc.top = 90; sc.bottom = -90; sc.near = 10; sc.far = 4000;
-    this.sun.shadow.bias = -0.0003;
-    this.sun.shadow.normalBias = 0.4;
+    sc.left = -390; sc.right = 390; sc.top = 390; sc.bottom = -390; sc.near = 10; sc.far = 6000;
+    // Bias in depth units of the 6 km frustum: about 0.3 m; normal bias in metres.
+    this.sun.shadow.bias = -0.00005;
+    this.sun.shadow.normalBias = 0.15;
     s.add(this.sun, this.sun.target);
   }
 
@@ -299,6 +364,28 @@ export class GeoRocket extends CinemaRocket {
       this.detail.receiveShadow = true;
       s.add(this.detail);
     }
+    // World layer: buildings, structures and lidar vegetation (schema v3 packs).
+    this.world = buildWorld(p, env, withAerial);
+    if (this.world) s.add(this.world.group);
+    // Where the plume meets the ground: a warm glow and a pale dust disc (illustration, from the
+    // applied throttle and the nozzle's height above the drawn terrain only).
+    this.groundGlow = new THREE.PointLight(0xffa860, 0, 140, 1.6);
+    s.add(this.groundGlow);
+    const dust = document.createElement('canvas');
+    dust.width = dust.height = 128;
+    const dg = dust.getContext('2d');
+    const gr = dg.createRadialGradient(64, 64, 8, 64, 64, 64);
+    gr.addColorStop(0, 'rgba(235,225,205,0.0)');
+    gr.addColorStop(0.45, 'rgba(235,225,205,0.75)');
+    gr.addColorStop(1, 'rgba(235,225,205,0)');
+    dg.fillStyle = gr;
+    dg.fillRect(0, 0, 128, 128);
+    this.dustTex = new THREE.CanvasTexture(dust);
+    this.dustTex.colorSpace = THREE.SRGBColorSpace;
+    this.dust = new THREE.Mesh(new THREE.CircleGeometry(1, 48), new THREE.MeshBasicMaterial({ map: this.dustTex, transparent: true, depthWrite: false, opacity: 0 }));
+    this.dust.renderOrder = 3;
+    this.dust.visible = false;
+    s.add(this.dust);
     // Beyond the pack there is no data. The ground continues as an extension of the pack's own
     // edge (illustration): open water at mean sea level where the edge is sea, elsewhere the edge
     // height and the colour of the image at the nearest edge point. Fog hides it with distance.
@@ -419,6 +506,7 @@ export class GeoRocket extends CinemaRocket {
     this.controls.addEventListener('end', () => { this.dragging = false; });
     this.controls.addEventListener('change', () => {
       if (this.dragging && this.mode === 'follow') this.followOffset = this.camera.position.clone().sub(this.controls.target);
+      if (this.world) this.world.update(this.camera.position);
     });
     this.applyTheme();
   }
@@ -465,8 +553,9 @@ export class GeoRocket extends CinemaRocket {
     if (!this.terrain) return;
     // Daylight scene regardless of the interface theme: the image is a daylight photograph.
     this.grid.visible = false;
-    this.s.fog = new THREE.Fog(HORIZON.clone(), 3000, 34000);
-    this.s.background = HORIZON.clone();
+    // Fog for what the aerial perspective does not cover (the stage, lines, markers).
+    this.s.fog = new THREE.FogExp2(HAZE.clone(), 2.6e-5);
+    this.s.background = HAZE.clone();
     this.groundTrack.material.color = new THREE.Color(0xffffff);
     this.errSeg.material.color = new THREE.Color(this.cssColour('--est', '#e6cf55'));
     for (const m of this.eventMarks) m.material.color = new THREE.Color(this.cssColour(m.userData.token, '#ffffff'));
@@ -491,6 +580,7 @@ export class GeoRocket extends CinemaRocket {
 
   /** Pose {pos, target, fov} of preset `mode` at the current playback state. */
   pose(mode) {
+    if (mode === 'director') return this.pose(this.directorShot || this.directorPick());
     const aim = this.aimPoint();
     const pad = new THREE.Vector3(this.pad.cx, this.pad.cy, 0);
     if (mode === 'follow') {
@@ -510,10 +600,20 @@ export class GeoRocket extends CinemaRocket {
     if (mode === 'closeup') {
       // At the pad: a raised camera beside the landing area, for the touchdown at full scale with
       // the ground around the pad in view.
-      const at = pad.clone().addScaledVector(bearing(205, 0), 115);
-      at.z = this.ground(at.x, at.y) + 26;
-      const tgt = new THREE.Vector3(this.pad.cx, this.pad.cy, this.ground(this.pad.cx, this.pad.cy) + 14);
-      return { pos: at, target: tgt, fov: 36 };
+      // From the north-east, 20 m up (about 8 degrees above the pad, so the pad surface and the
+      // stage's shadow read), with a longer lens: the sun on the camera's left, the shadow
+      // across the frame and the land behind the pad in view.
+      const at = pad.clone().addScaledVector(bearing(38, 0), 150);
+      at.z = this.ground(at.x, at.y) + 20;
+      // The pad waits in the lower half of the frame while the stage is high (it enters from
+      // the top); the view then follows it down and settles on it at the pad.
+      const g0 = this.ground(this.pad.cx, this.pad.cy);
+      const tgt = aim.clone();
+      tgt.z = Math.min(Math.max(tgt.z, g0 + 17), g0 + 24);
+      tgt.x = this.pad.cx + (tgt.x - this.pad.cx) * 0.5;
+      tgt.y = this.pad.cy + (tgt.y - this.pad.cy) * 0.5;
+      const fov = Math.min(40, (2 * Math.atan((STAGE.length * 0.95) / at.distanceTo(tgt)) * 180) / Math.PI);
+      return { pos: at, target: tgt, fov };
     }
     if (mode === 'wide') {
       // An elevated oblique view: the whole descent above the landscape it is placed on.
@@ -526,6 +626,52 @@ export class GeoRocket extends CinemaRocket {
     return { pos: new THREE.Vector3(this.pad.cx, this.pad.cy - span * 0.02, span / (2 * Math.tan(deg(20)))), target: pad, fov: 40 };
   }
 
+  /** Height of the stage's nozzle plane above the drawn terrain under it (m), or null. */
+  nozzleHeight() {
+    if (!this.vehicle) return null;
+    const p = this.vehicle.position;
+    return p.z - this.ground(p.x, p.y);
+  }
+
+  /** Glow and dust where the plume meets the ground (illustration from throttle and height). */
+  groundEffect() {
+    if (!this.dust) return;
+    const h = this.nozzleHeight();
+    const len = this.plumeLength || 0;
+    const reach = 70;
+    const on = h !== null && len > 0 && h < reach;
+    this.dust.visible = on;
+    this.groundGlow.intensity = 0;
+    if (!on) return;
+    const p = this.vehicle.position;
+    const k = (1 - Math.max(0, h) / reach) * Math.min(1, len / 28);
+    const g = this.ground(p.x, p.y);
+    const r = 8 + 34 * k;
+    this.dust.position.set(p.x, p.y, g + 0.25);
+    this.dust.scale.set(r, r, 1);
+    this.dust.material.opacity = 0.55 * k;
+    this.groundGlow.position.set(p.x, p.y, g + Math.max(2, Math.min(h, 30) * 0.4));
+    this.groundGlow.intensity = 9000 * k;
+  }
+
+  /** The shot "Auto" uses at the current playback state, from the stage's height above the pad. */
+  directorPick() {
+    const h = this.vehicle ? this.vehicle.position.z - this.ground(this.pad.cx, this.pad.cy) : 0;
+    if (h > 1400) return 'wide';
+    if (h > 260) return 'follow';
+    if (h > 55) return 'pad';
+    return 'closeup';
+  }
+
+  /** Tallest vegetation record within `r` m of (x, y) in the world layer, or 0. */
+  canopyAt(x, y, r) {
+    const v = this.opts.pack.world && this.opts.pack.world.vegetation;
+    if (!v) return 0;
+    let h = 0;
+    for (let i = 0; i < v.n; i++) if (Math.abs(v.x[i] - x) < r && Math.abs(v.y[i] - y) < r && v.h[i] > h) h = v.h[i];
+    return h;
+  }
+
   /** Ground observer for the "From the ground" camera: 420 m out, 10 m up (a mast or a roof), on the first clear bearing. */
   observerPoint() {
     if (this.observer) return this.observer.clone();
@@ -534,7 +680,8 @@ export class GeoRocket extends CinemaRocket {
     let pick = null;
     for (const b of BEARINGS) {
       const at = new THREE.Vector3(this.pad.cx, this.pad.cy, 0).addScaledVector(bearing(b, 0), 420);
-      at.z = this.ground(at.x, at.y) + 10;
+      // Stand clear of the vegetation: 12 m above the ground or 8 m above the canopy within 40 m.
+      at.z = this.ground(at.x, at.y) + Math.max(12, this.canopyAt(at.x, at.y, 40) + 8);
       let clear = true;
       for (let k = 1; k < 40 && clear; k++) {
         const q = at.clone().lerp(pad, k / 40);
@@ -555,7 +702,7 @@ export class GeoRocket extends CinemaRocket {
 
   preset(mode, initial) {
     if (!this.ok) return;
-    const known = ['follow', 'pad', 'closeup', 'wide', 'overhead'];
+    const known = ['director', 'follow', 'pad', 'closeup', 'wide', 'overhead'];
     const next = known.includes(mode) ? mode : 'follow';
     const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (next === 'follow') this.followOffset = null;
@@ -574,7 +721,16 @@ export class GeoRocket extends CinemaRocket {
   /** Puts the camera at the current preset's pose (eased from the previous one while it changes). */
   place() {
     if (this.dragging) return;
-    const free = this.userMoved && this.mode !== 'follow' && this.mode !== 'pad' && !this.transition;
+    if (this.mode === 'director') {
+      // A change of shot eases like a change of preset (unless reduced motion is requested).
+      const shot = this.directorPick();
+      if (this.directorShot && shot !== this.directorShot && !this.transition) {
+        const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (!reduce) this.transition = { from: { pos: this.camera.position.clone(), target: this.controls.target.clone(), fov: this.camera.fov }, t0: performance.now(), dur: 1100 };
+      }
+      this.directorShot = shot;
+    }
+    const free = this.userMoved && this.mode !== 'follow' && this.mode !== 'pad' && this.mode !== 'closeup' && this.mode !== 'director' && !this.transition;
     if (free) return; // a static preset the user has orbited stays where the user left it
     const want = this.pose(this.mode);
     let { pos, target, fov } = want;
@@ -596,6 +752,8 @@ export class GeoRocket extends CinemaRocket {
     this.camera.fov = fov;
     this.camera.updateProjectionMatrix();
     this.controls.update();
+    // Vegetation detail follows the drawn camera, including during a transition.
+    if (this.world) this.world.update(this.camera.position);
   }
 
   animate() {
@@ -618,12 +776,22 @@ export class GeoRocket extends CinemaRocket {
     const ch = this.ch;
     const times = ch.times;
     const at = (a) => (a ? sampleAt(times, a, t) : null);
-    // Sun and its shadow frustum follow the stage.
+    // Sun and its shadow frustum: around the stage (which also covers the ground along its sun
+    // ray), or around the pad for the wide presets.
     const cur = this.cur || new THREE.Vector3();
     const dir = sunDirection();
-    this.sun.target.position.copy(cur);
-    this.sun.position.copy(cur).addScaledVector(dir, 1500);
+    const wideMode = this.mode === 'wide' || this.mode === 'overhead' || (this.mode === 'director' && this.directorShot === 'wide');
+    const ext = wideMode ? 1400 : 390;
+    const sc = this.sun.shadow.camera;
+    if (sc.right !== ext) {
+      sc.left = -ext; sc.right = ext; sc.top = ext; sc.bottom = -ext;
+      sc.updateProjectionMatrix();
+    }
+    const centre = wideMode ? new THREE.Vector3(this.pad.cx, this.pad.cy, this.ground(this.pad.cx, this.pad.cy)) : cur;
+    this.sun.target.position.copy(centre);
+    this.sun.position.copy(centre).addScaledVector(dir, 3000);
     this.sun.target.updateMatrixWorld();
+    this.groundEffect();
     // Estimate error at the cursor, when an estimate sample exists.
     const ex = at(ch.ex); const ey = at(ch.ey); const ez = at(ch.ez);
     this.errSeg.visible = ex !== null && ey !== null && ez !== null;
@@ -641,6 +809,10 @@ export class GeoRocket extends CinemaRocket {
       dp.needsUpdate = true;
       this.drop.computeLineDistances();
     }
+    // At the end of a run whose requirements failed, the pad ring takes the failure colour: the
+    // upright stage is drawn for orientation, the contact itself is not modelled.
+    const failed = this.model.record && this.model.record.outcome && this.model.record.outcome.status !== 'success';
+    if (this.padRing) this.padRing.material.color = hexColour(failed && t >= times[times.length - 1] - 1e-9 ? '--fail' : '--pass');
     // An event marker appears when the playback reaches its instant.
     for (const m of this.eventMarks) m.visible = t >= m.userData.t - 1e-9;
     this.place();
@@ -668,6 +840,8 @@ export class GeoRocket extends CinemaRocket {
     if (this.terrainMat && this.terrainMat.map) this.terrainMat.map.dispose();
     if (this.padSurface) this.padSurface.material.map.dispose();
     if (this.detailMat && this.detailMat.map) this.detailMat.map.dispose();
+    if (this.world) this.world.dispose();
+    if (this.dustTex) this.dustTex.dispose();
     for (const b of this.bitmaps || []) b.close();
     super.dispose();
     // The context is gone: no late frame (an image decode or a cursor tick) may render again.
@@ -699,7 +873,8 @@ export function mountGeo(host, models, active, cursor, colours, pack) {
     get mode() { return r3.mode; },
     stats: () => ({
       renders: r3.rendered || 0, triangles: r3.renderer.info.render.triangles, geometries: r3.renderer.info.memory.geometries, textures: r3.renderer.info.memory.textures,
-      camera: r3.ok ? { mode: r3.mode, position: v3(r3.camera.position), target: v3(r3.controls.target), fov: Math.round(r3.camera.fov * 10) / 10, distance: r3.cur ? Math.round(r3.camera.position.distanceTo(r3.cur)) : null, stageFraction: (() => { const f = r3.stageScreenFraction(); return f === null ? null : Math.round(f * 1000) / 1000; })(), observer: r3.observerInfo || null } : null,
+      camera: r3.ok ? { mode: r3.mode, position: v3(r3.camera.position), target: v3(r3.controls.target), fov: Math.round(r3.camera.fov * 10) / 10, distance: r3.cur ? Math.round(r3.camera.position.distanceTo(r3.cur)) : null, stageFraction: (() => { const f = r3.stageScreenFraction(); return f === null ? null : Math.round(f * 1000) / 1000; })(), observer: r3.observerInfo || null, shot: r3.mode === 'director' ? r3.directorShot || null : null } : null,
+      world: r3.world ? r3.world.stats() : null,
     }),
   };
 }

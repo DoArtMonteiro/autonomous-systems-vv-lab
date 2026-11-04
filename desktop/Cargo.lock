@@ -4184,7 +4184,7 @@ dependencies = [
 
 [[package]]
 name = "vv-geo"
-version = "0.16.0"
+version = "0.16.2"
 dependencies = [
  "serde",
  "serde_json",
@@ -4212,7 +4212,7 @@ dependencies = [
 
 [[package]]
 name = "vv-studio"
-version = "0.16.1"
+version = "0.16.2"
 dependencies = [
  "serde",
  "serde_json",

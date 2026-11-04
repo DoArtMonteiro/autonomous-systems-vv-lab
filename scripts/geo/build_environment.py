@@ -8,6 +8,9 @@ anything; packs are built here, on purpose, by a person who runs this command.
     python -m venv .geovenv && .geovenv\Scripts\pip install rasterio pyproj numpy pillow
     .geovenv\Scripts\python scripts/geo/build_environment.py --env cape-canaveral --out desktop/environments
 
+The environments it can build are the entries of catalogue.json next to this script; the world
+layer (buildings, structures, lidar vegetation) is added afterwards by build_features.py --env <id>.
+
 Sources (fetched over HTTPS from public AWS Open Data buckets, no account or key):
   - Copernicus DEM GLO-30 (copernicus-dem-30m), a digital surface model, heights relative to EGM2008.
   - Sentinel-2 L2A true-colour image (TCI) of one scene, located with the Earth Search STAC API.
@@ -46,45 +49,10 @@ import detail_sources  # noqa: E402
 DEM_URL = "https://copernicus-dem-30m.s3.amazonaws.com/{t}/{t}.tif"
 STAC = "https://earth-search.aws.element84.com/v1/search"
 
-ENVIRONMENTS = {
-    "cape-canaveral": {
-        "name": "Cape Canaveral coast, Florida",
-        "summary": "Low, flat barrier coast on the Atlantic. The simulation's pad centre is placed at the centre of a circular hard-standing visible in the detail image, measured on that image (about 2 m). The facility is not modelled and the simulated pad is not that facility.",
-        "site_note": "The detail image is an aerial photograph of an existing landing facility. The simulated vehicle, pad and mission are generic: they are not that facility, its operations or its operator, and imply no affiliation.",
-        "lat": 28.48573, "lon": -80.54302,
-        "half_extent_m": 9000.0, "dem_spacing_m": 30.0, "image_spacing_m": 10.0,
-        "s2_items": ["S2B_T17RNM_20251115T160505_L2A"],
-        "heading_deg": 0.0,
-        # Detail layer: USGS 3DEP 1 m lidar DEM sampled every 4 m and NAIP 2023 (0.3 m) at 0.5 m.
-        "detail": {"half_extent_m": 1024.0, "dem_spacing_m": 4.0, "image_spacing_m": 0.5, "blend_m": 192.0,
-                   "dem": {"kind": "tnm-1m"}, "imagery": {"kind": "naip", "year": 2023}},
-    },
-    "santa-maria-azores": {
-        "name": "Santa Maria, Azores",
-        "summary": "Volcanic island with cliffs and a plateau. The simulation's pad centre is placed in an open pasture on the eastern uplands, read from the 2024 orthophoto; the slopes around it break the flat-ground assumption of the simulation, which the Studio states. No launch or landing facility is there or is implied.",
-        "lat": 36.98645, "lon": -25.10763,
-        "half_extent_m": 9000.0, "dem_spacing_m": 30.0, "image_spacing_m": 10.0,
-        "s2_items": ["S2A_T26SPF_20250423T123128_L2A", "S2A_T26SPG_20250423T123128_L2A"],
-        "heading_deg": 0.0,
-        # Detail layer: the 2024 orthophoto of the Azores government (8 cm flight) rendered at 0.5 m
-        # by its WMS; heights stay those of Copernicus GLO-30 (no keyless high-resolution DEM).
-        "detail": {"half_extent_m": 1024.0, "dem_spacing_m": 8.0, "image_spacing_m": 0.5, "blend_m": 192.0,
-                   "dem": {"kind": "base"},
-                   "imagery": {"kind": "wms", "licence": "azores-orto-2024", "year": 2024,
-                               "url": "https://ambiente.azores.gov.pt/qgisserver/sma/orto2024/qgis_mapserv.fcgi", "layer": "ortofotomapa_2024_sma"}},
-    },
-    "spaceport-america": {
-        "name": "Spaceport America, New Mexico",
-        "summary": "High desert basin of the Jornada del Muerto at about 1400 m. The simulation's pad centre is placed on open desert ground, read from the detail image. Nearly flat around the pad, so the flat-ground assumption of the simulation holds well here.",
-        "site_note": "The detail image covers part of an existing commercial spaceport. The simulated vehicle, pad and mission are generic: they are not that spaceport, its facilities or its operations, and imply no affiliation.",
-        "lat": 32.99000, "lon": -106.96000,
-        "half_extent_m": 9000.0, "dem_spacing_m": 30.0, "image_spacing_m": 10.0,
-        "s2_items": ["S2C_T13SCS_20250430T180009_L2A", "S2B_T13SCS_20250415T180113_L2A"],
-        "heading_deg": 0.0,
-        "detail": {"half_extent_m": 1024.0, "dem_spacing_m": 4.0, "image_spacing_m": 0.5, "blend_m": 192.0,
-                   "dem": {"kind": "tnm-1m"}, "imagery": {"kind": "naip", "year": 2022}},
-    },
-}
+# Environment definitions live in catalogue.json next to this script (one entry per pack).
+CATALOGUE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "catalogue.json")
+with open(CATALOGUE, encoding="utf-8") as _f:
+    ENVIRONMENTS = json.load(_f)["environments"]
 
 LICENCES = {
     "copernicus-dem": {

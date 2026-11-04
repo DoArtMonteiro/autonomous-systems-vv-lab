@@ -5,6 +5,8 @@
 //! height grid and image (`detail-height.u16`, `detail-image.jpg`). Where a detail layer covers a
 //! point it is the terrain there; within `blend_m` of its edge its heights blend linearly into the
 //! base grid so the drawn surfaces meet. The origin (z = 0) is on the finest layer.
+//! Schema v3 adds an optional world layer (see [`crate::world`]): building footprints, lidar
+//! structures, point structures and lidar vegetation, each with the source of its height.
 //!
 //! A pack is untrusted input until [`Environment::open`] accepts it: fixed file names, bounded
 //! sizes, matching SHA-256, a consistent grid, attributed sources, and the pack's check points
@@ -21,9 +23,11 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
 use crate::wgs84::{Enu, Geodetic};
+use crate::world::{self, FEATURES_FILE, VEGETATION_FILE, World};
 
 pub const SCHEMA: &str = "vv-geo-environment.v1";
 pub const SCHEMA_V2: &str = "vv-geo-environment.v2";
+pub const SCHEMA_V3: &str = "vv-geo-environment.v3";
 pub const MANIFEST: &str = "environment.json";
 pub const HEIGHT_FILE: &str = "height.u16";
 pub const IMAGE_FILE: &str = "image.jpg";
@@ -53,6 +57,10 @@ impl std::fmt::Display for GeoError {
 
 fn invalid<T>(m: impl Into<String>) -> Result<T, GeoError> {
     Err(GeoError::Invalid(m.into()))
+}
+
+pub(crate) fn invalid_err<T>(m: impl Into<String>) -> Result<T, GeoError> {
+    invalid(m)
 }
 
 #[derive(Deserialize)]
@@ -199,6 +207,7 @@ pub struct Environment {
     pub geoid_undulation_m: f64,
     base: Grid,
     detail: Option<Detail>,
+    world: World,
     summary: Value,
     bytes: u64,
     image_sha: String,
@@ -229,7 +238,7 @@ fn finite(v: f64, what: &str) -> Result<f64, GeoError> {
     }
 }
 
-fn read_bounded(path: &Path, max: u64) -> Result<Vec<u8>, GeoError> {
+pub(crate) fn read_bounded(path: &Path, max: u64) -> Result<Vec<u8>, GeoError> {
     let meta = fs::symlink_metadata(path)
         .map_err(|e| GeoError::Io(format!("{}: {e}", file_name(path))))?;
     if !meta.is_file() {
@@ -400,9 +409,9 @@ impl Environment {
             .map_err(|e| GeoError::Invalid(format!("{MANIFEST}: {e}")))?;
         let m: Manifest = serde_json::from_value(full.clone())
             .map_err(|e| GeoError::Invalid(format!("{MANIFEST}: {e}")))?;
-        if m.schema != SCHEMA && m.schema != SCHEMA_V2 {
+        if m.schema != SCHEMA && m.schema != SCHEMA_V2 && m.schema != SCHEMA_V3 {
             return invalid(format!(
-                "schema {} is not {SCHEMA} or {SCHEMA_V2}",
+                "schema {} is not {SCHEMA}, {SCHEMA_V2} or {SCHEMA_V3}",
                 m.schema
             ));
         }
@@ -447,9 +456,9 @@ impl Environment {
         let mut bytes = (raw.len() + hb.len() + ib.len()) as u64;
 
         // Optional layers (schema v2): at most one detail layer, nested inside the base.
-        let v2 = m.schema == SCHEMA_V2;
+        let v2 = m.schema == SCHEMA_V2 || m.schema == SCHEMA_V3;
         if !v2 && !m.layers.is_empty() {
-            return invalid(format!("layers need schema {SCHEMA_V2}"));
+            return invalid(format!("layers need schema {SCHEMA_V2} or later"));
         }
         let mut detail = None;
         for l in &m.layers {
@@ -478,6 +487,16 @@ impl Environment {
             });
         }
 
+        // Optional world layer (schema v3). Vegetation lies within the detail layer when there is
+        // one (it comes from the lidar there), else within the base.
+        let wm = world::manifest_of(&full)?;
+        if m.schema != SCHEMA_V3 && (wm.features.is_some() || wm.vegetation.is_some()) {
+            return invalid(format!("a world layer needs schema {SCHEMA_V3}"));
+        }
+        let veg_half = detail.as_ref().map(|d| d.grid.half()).unwrap_or(extent);
+        let world = world::open(dir, &wm, extent, veg_half)?;
+        bytes += world.bytes;
+
         if m.sources.is_empty()
             || m.sources.iter().any(|x| {
                 x.provider.trim().is_empty()
@@ -503,6 +522,7 @@ impl Environment {
             geoid_undulation_m: n0,
             base,
             detail,
+            world,
             summary: Value::Null,
             bytes,
             image_sha: m.image.sha256.clone(),
@@ -584,6 +604,12 @@ impl Environment {
         if self.detail.is_some() {
             v.extend([DETAIL_HEIGHT_FILE, DETAIL_IMAGE_FILE]);
         }
+        if self.world.features_sha.is_some() {
+            v.push(FEATURES_FILE);
+        }
+        if self.world.vegetation_sha.is_some() {
+            v.push(VEGETATION_FILE);
+        }
         v
     }
 
@@ -637,6 +663,14 @@ impl Environment {
                     .map(|d| d.image_sha.clone())
                     .unwrap_or_default(),
             ),
+            FEATURES_FILE if self.world.features_sha.is_some() => (
+                world::MAX_FEATURES_BYTES,
+                self.world.features_sha.clone().unwrap_or_default(),
+            ),
+            VEGETATION_FILE if self.world.vegetation_sha.is_some() => (
+                world::MAX_VEGETATION_BYTES,
+                self.world.vegetation_sha.clone().unwrap_or_default(),
+            ),
             _ => return invalid(format!("{name:?} is not a file of this environment pack")),
         };
         let b = read_bounded(&self.dir.join(name), max)?;
@@ -675,6 +709,7 @@ fn summary_of(full: &Value, env: &Environment) -> Value {
         "accuracy": pick("accuracy"),
         "sources": pick("sources"),
         "built": pick("built"),
+        "world": pick("world"),
         "bytes": env.bytes,
         "checks": full.get("checks").and_then(Value::as_array).map(|a| a.len()).unwrap_or(0),
         "worst_check_m": env.worst_check_m,
@@ -744,6 +779,26 @@ mod tests {
             );
             assert_eq!(e.terrain_up(0.0, 0.0).map(|u| u.abs() < 0.011), Some(true));
             assert!(e.summary()["sources"].as_array().unwrap().len() >= 2);
+        }
+    }
+
+    #[test]
+    fn shipped_packs_carry_a_valid_world_layer() {
+        // Cape Canaveral and Spaceport America have lidar vegetation; Santa Maria has OSM
+        // buildings and, without lidar, no vegetation at all.
+        for (id, veg) in [
+            ("cape-canaveral", true),
+            ("spaceport-america", true),
+            ("santa-maria-azores", false),
+        ] {
+            let e = Environment::open(&packs().join(id)).unwrap_or_else(|e| panic!("{id}: {e}"));
+            let w = &e.summary()["world"];
+            assert_eq!(e.summary()["schema"], json!(SCHEMA_V3), "{id}");
+            assert!(w["features"]["buildings"].as_u64().unwrap() > 0, "{id}");
+            assert_eq!(w["vegetation"].is_object(), veg, "{id}");
+            assert!(e.files().contains(&FEATURES_FILE));
+            assert_eq!(e.files().contains(&VEGETATION_FILE), veg);
+            assert!(e.file(FEATURES_FILE).is_ok(), "{id}");
         }
     }
 
@@ -1054,6 +1109,121 @@ mod tests {
         edit(&dir, |m| m["layers"][0]["height"] = h);
         let e = Environment::open(&dir).unwrap_err().to_string();
         assert!(e.contains("origin"), "{e}");
+        let _ = fs::remove_dir_all(root);
+    }
+
+    // ------------------------------------------------------------------ world layer (v3)
+
+    fn veg_record(x: i16, y: i16, h_cm: u16, crown: u8, kind: u8) -> Vec<u8> {
+        let mut r = Vec::with_capacity(12);
+        r.extend_from_slice(&x.to_le_bytes());
+        r.extend_from_slice(&y.to_le_bytes());
+        r.extend_from_slice(&h_cm.to_le_bytes());
+        r.extend_from_slice(&[crown, kind, 90, 110, 70, 0]);
+        r
+    }
+
+    /// Writes a world layer (one building, one lidar structure, one tower, two plants) and
+    /// declares it in the manifest as schema v3.
+    fn add_world(dir: &Path, features: Value, veg: &[u8]) {
+        let fb = serde_json::to_vec(&features).unwrap();
+        fs::write(dir.join(FEATURES_FILE), &fb).unwrap();
+        fs::write(dir.join(VEGETATION_FILE), veg).unwrap();
+        let n = |k: &str| features[k].as_array().map(|a| a.len()).unwrap_or(0);
+        let (b, l, s) = (n("buildings"), n("lidar_structures"), n("structures"));
+        edit(dir, |m| {
+            m["schema"] = json!(SCHEMA_V3);
+            m["world"] = json!({
+                "features": {"file": FEATURES_FILE, "bytes": fb.len(), "sha256": sha256_hex(&fb),
+                             "buildings": b, "lidar_structures": l, "structures": s},
+                "vegetation": {"file": VEGETATION_FILE, "bytes": veg.len(), "sha256": sha256_hex(veg), "count": veg.len() / 12},
+            });
+        });
+    }
+
+    fn features() -> Value {
+        json!({
+            "schema": world::FEATURES_SCHEMA, "units": "dm", "osm_timestamp": "2026-11-04T00:00:00Z",
+            "buildings": [{"id": "w1", "kind": "yes", "h_dm": 60, "hs": "lidar", "roof": [120, 118, 110], "ring_dm": [100, 100, 300, 100, 300, 300, 100, 300]}],
+            "lidar_structures": [{"id": "lidar-1", "kind": "lidar-structure", "h_dm": 40, "hs": "lidar", "roof": [90, 90, 90], "ring_dm": [-300, -300, -200, -300, -200, -200]}],
+            "structures": [{"id": "n1", "kind": "tower", "x_dm": 500, "y_dm": -500, "h_dm": 300, "r_dm": 15, "hs": "default", "name": null}],
+        })
+    }
+
+    #[test]
+    fn a_v3_world_layer_opens_and_its_files_are_served_by_hash() {
+        let (root, dir) = synthetic("syn-v3", true);
+        let veg = [
+            veg_record(100, -100, 450, 25, 1),
+            veg_record(-200, 50, 150, 12, 0),
+        ]
+        .concat();
+        add_world(&dir, features(), &veg);
+        let e = Environment::open(&dir).unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(e.files().len(), 7);
+        assert!(e.file(FEATURES_FILE).is_ok() && e.file(VEGETATION_FILE).is_ok());
+        assert_eq!(e.summary()["world"]["vegetation"]["count"], json!(2));
+        // Changed after validation: refused when handed over.
+        fs::write(
+            dir.join(VEGETATION_FILE),
+            [veg.clone(), veg_record(0, 0, 100, 10, 0)].concat(),
+        )
+        .unwrap();
+        assert!(
+            e.file(VEGETATION_FILE)
+                .unwrap_err()
+                .to_string()
+                .contains("changed on disk")
+        );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn world_layer_rules_are_enforced() {
+        let (root, dir) = synthetic("syn-v3-rules", true);
+        let reason = |d: &Path| Environment::open(d).unwrap_err().to_string();
+        let ok_veg = veg_record(100, -100, 450, 25, 1);
+        // A world layer needs schema v3.
+        add_world(&dir, features(), &ok_veg);
+        edit(&dir, |m| m["schema"] = json!(SCHEMA_V2));
+        assert!(reason(&dir).contains("v3"));
+        // Clockwise footprint.
+        let mut f = features();
+        f["buildings"][0]["ring_dm"] = json!([100, 100, 100, 300, 300, 300, 300, 100]);
+        add_world(&dir, f, &ok_veg);
+        assert!(reason(&dir).contains("counter-clockwise"));
+        // Unknown height source.
+        let mut f = features();
+        f["buildings"][0]["hs"] = json!("guess");
+        add_world(&dir, f, &ok_veg);
+        assert!(reason(&dir).contains("height source"));
+        // A lidar structure must carry a lidar height.
+        let mut f = features();
+        f["lidar_structures"][0]["hs"] = json!("default");
+        add_world(&dir, f, &ok_veg);
+        assert!(reason(&dir).contains("lidar height"));
+        // Unknown fields are refused.
+        let mut f = features();
+        f["buildings"][0]["script"] = json!("x");
+        add_world(&dir, f, &ok_veg);
+        assert!(reason(&dir).contains("features.json"));
+        // Vegetation outside the detail layer (100 m), or with an unknown kind.
+        add_world(&dir, features(), &veg_record(1500, 0, 450, 25, 1));
+        assert!(reason(&dir).contains("out of range"));
+        add_world(&dir, features(), &veg_record(10, 0, 450, 25, 7));
+        assert!(reason(&dir).contains("out of range"));
+        // Count mismatch.
+        add_world(&dir, features(), &ok_veg);
+        edit(&dir, |m| m["world"]["features"]["buildings"] = json!(5));
+        assert!(reason(&dir).contains("counts"));
+        // Tampered file.
+        add_world(&dir, features(), &ok_veg);
+        let mut b = fs::read(dir.join(FEATURES_FILE)).unwrap();
+        b[5] ^= 1;
+        fs::write(dir.join(FEATURES_FILE), b).unwrap();
+        assert!(reason(&dir).contains("SHA-256"));
+        add_world(&dir, features(), &ok_veg);
+        assert!(Environment::open(&dir).is_ok());
         let _ = fs::remove_dir_all(root);
     }
 }

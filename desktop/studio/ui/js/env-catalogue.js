@@ -9,6 +9,18 @@ import { modal } from './ui.js';
 import { mb } from './environments.js';
 import { shortCredits } from './sources-info.js';
 
+const n = (v) => Number(v || 0).toLocaleString('en');
+
+/** One line on the pack's world layer (v3), or null. */
+function worldLine(e) {
+  const w = e.world;
+  if (!w) return null;
+  const bits = [];
+  if (w.features) bits.push(`${n(w.features.buildings + (w.features.lidar_structures || 0))} buildings and structures`);
+  if (w.vegetation) bits.push(`${n(w.vegetation.count)} lidar trees and shrubs`);
+  return bits.length ? `3D: ${bits.join(', ')}` : null;
+}
+
 const thumbs = new Map(); // id -> Promise of an object URL
 
 function bytesOf(b) {
@@ -64,6 +76,7 @@ export function envCard(e, { current, onUse } = {}) {
       h('ul', { class: 'envc-facts' },
         ...resolutionLines(e).map((x) => h('li', null, x)),
         relief(e) ? h('li', null, relief(e)) : null,
+        worldLine(e) ? h('li', null, worldLine(e)) : null,
         h('li', null, `${mb(e.bytes)} on disk, offline`)),
       h('p', { class: 'envc-credit' }, shortCredits(e).join(' · ')),
       onUse ? h('div', { class: 'envc-actions' }, chosen
@@ -77,7 +90,7 @@ export function openCatalogue(envs, current, onUse) {
   let m = null;
   for (const e of envs) grid.append(envCard(e, { current, onUse: (id) => { if (m) m.close(); onUse(id); } }));
   const body = h('div', { class: 'envc-wrap' },
-    h('p', { class: 'small dim' }, 'Every environment is a validated local pack: its files are hashed and its geodetic check points recomputed before it is listed. The simulation runs on flat ground in every case; the landscape is context. Packs are built with ', h('code', null, 'scripts/geo/build_environment.py'), ' and imported in Settings, Environments.'),
+    h('p', { class: 'small dim' }, 'Every environment is a validated local pack: its files are hashed and its geodetic check points recomputed before it is listed. The simulation runs on flat ground in every case; the landscape is context. Packs are built with ', h('code', null, 'scripts/geo/build_environment.py'), ', with buildings and lidar vegetation added by ', h('code', null, 'scripts/geo/build_features.py'), ', and imported in Settings, Environments.'),
     grid);
   m = modal({ title: 'Environments', body, wide: true, label: 'Environment catalogue' });
   m.box.classList.add('envc-modal');

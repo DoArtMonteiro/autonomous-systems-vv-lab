@@ -21,7 +21,7 @@ import { claimStatus, forgetClaims } from '../claims.js';
 import { mountCinema } from '../scenes/rocket-cinema.js';
 import { ground2d } from '../scenes/ground.js';
 import { openRequest } from './prepare.js';
-import { phasesOf, divergence, readouts, hudNum, ROCKET_METRICS, KIND_WORD } from '../session.js';
+import { phasesOf, divergence, readouts, hudNum, ROCKET_METRICS, KIND_WORD, metricValue } from '../session.js';
 import { mountGeo } from '../scenes/geo.js';
 import { listEnvironments, loadPack, trackOf, mb } from '../environments.js';
 import { buildControl } from './control.js';
@@ -237,7 +237,12 @@ function phaseAt(t) {
   const end = t >= run.model.t1 - 1e-9;
   const td = run.record.scene && run.record.scene.touchdown;
   const met = run.record.outcome.status === 'success';
-  if (end) return { text: td ? (met ? 'Touchdown' : 'Touchdown, requirements not met') : 'End of run', kind: met ? 'end' : 'end-bad', end: true };
+  if (end) {
+    // A failed contact says how hard it was and that the impact itself is not drawn.
+    const vz = td && !met ? metricValue(run, 'touchdown_vertical_speed') : null;
+    const bad = vz !== null && Number.isFinite(vz) ? `Contact at ${Math.abs(vz).toFixed(1)} m/s, requirements not met; impact not modelled` : 'Touchdown, requirements not met';
+    return { text: td ? (met ? 'Touchdown' : bad) : 'End of run', kind: met ? 'end' : 'end-bad', end: true };
+  }
   return { text: ph ? ph.label : '', kind: ph ? ph.kind : '', end: false };
 }
 
@@ -264,7 +269,7 @@ function openEnvSettings() {
 
 function cameraButtons() {
   if (pl.kind !== 'rocket-3d') return null;
-  const modes = [['follow', 'Follow'], ['pad', 'From the ground'], ...(wantGeo() ? [['closeup', 'At the pad']] : []), ['wide', 'Whole descent'], ...(wantGeo() ? [['overhead', 'Overhead']] : [])];
+  const modes = [...(wantGeo() ? [['director', 'Auto']] : []), ['follow', 'Follow'], ['pad', 'From the ground'], ...(wantGeo() ? [['closeup', 'At the pad']] : []), ['wide', 'Whole descent'], ...(wantGeo() ? [['overhead', 'Overhead']] : [])];
   return h('div', { class: 'seg pl-cams', role: 'radiogroup', 'aria-label': 'Camera' },
     modes.map(([m, text]) => h('button', { type: 'button', role: 'radio', class: 'seg-btn', 'aria-checked': String(m === 'follow'), dataset: { cam: m },
       onclick: (e) => { for (const b of e.currentTarget.parentElement.children) b.setAttribute('aria-checked', String(b === e.currentTarget)); if (pl.scene && pl.scene.preset) pl.scene.preset(m); } }, text)));

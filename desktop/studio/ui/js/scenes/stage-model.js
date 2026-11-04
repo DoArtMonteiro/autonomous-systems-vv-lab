@@ -23,7 +23,7 @@ function canvasTexture(w, h, draw) {
   return t;
 }
 
-/** Faint panel seams and a roughness variation on the tank paint (illustration). */
+/** Faint panel seams and soot streaks on the tank paint (illustration). */
 function tankTextures() {
   const map = canvasTexture(256, 1024, (g, w, h) => {
     g.fillStyle = '#eef1f4';
@@ -33,6 +33,24 @@ function tankTextures() {
     g.fillRect(Math.round(w * 0.25), 0, 2, h); // raceway seam
     g.fillStyle = 'rgba(40, 48, 56, 0.55)';
     g.fillRect(Math.round(w * 0.25) - 3, 0, 8, h); // cable raceway
+    // Weathering of a returning stage (illustration): soot rising from the engine end in uneven
+    // streaks, heaviest near the engines. Deterministic: fixed pseudo-random sequence.
+    const soot = g.createLinearGradient(0, h, 0, h * 0.45);
+    soot.addColorStop(0, 'rgba(52, 44, 38, 0.62)');
+    soot.addColorStop(0.35, 'rgba(60, 52, 46, 0.28)');
+    soot.addColorStop(1, 'rgba(60, 52, 46, 0)');
+    g.fillStyle = soot;
+    g.fillRect(0, 0, w, h);
+    let seed = 4242;
+    const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+    for (let k = 0; k < 70; k++) {
+      const x = rnd() * w; const top = h * (0.35 + 0.6 * rnd()); const wd = 2 + rnd() * 9;
+      const st = g.createLinearGradient(0, h, 0, top);
+      st.addColorStop(0, `rgba(48, 40, 34, ${0.12 + 0.22 * rnd()})`);
+      st.addColorStop(1, 'rgba(48, 40, 34, 0)');
+      g.fillStyle = st;
+      g.fillRect(x, top, wd, h - top);
+    }
   });
   map.wrapS = THREE.RepeatWrapping;
   return { map };

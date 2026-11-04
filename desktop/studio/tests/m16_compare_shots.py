@@ -23,7 +23,7 @@ from m16_journeys import launch, open_mission  # noqa: E402
 from m15_journeys import S  # noqa: E402
 
 MISSION = "lying-altimeter"
-CAMERAS = ["follow", "pad", "closeup", "wide", "overhead"]
+CAMERAS = ["follow", "pad", "closeup", "wide", "overhead", "director"]
 SIZES = [(1440, 900), (1280, 720), (1024, 640)]
 
 

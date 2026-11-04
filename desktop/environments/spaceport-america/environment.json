@@ -1,5 +1,5 @@
 {
-  "schema": "vv-geo-environment.v2",
+  "schema": "vv-geo-environment.v3",
   "id": "spaceport-america",
   "name": "Spaceport America, New Mexico",
   "summary": "High desert basin of the Jornada del Muerto at about 1400 m. The simulation's pad centre is placed on open desert ground, read from the detail image. Nearly flat around the pad, so the flat-ground assumption of the simulation holds well here.",
@@ -10,7 +10,9 @@
     "pyproj": "3.8.0",
     "proj": "9.8.1",
     "rasterio": "1.5.2",
-    "gdal": "3.12.2"
+    "gdal": "3.12.2",
+    "features_by": "scripts/geo/build_features.py",
+    "features_date": "2026-11-04"
   },
   "origin": {
     "lat_deg": 32.99,
@@ -457,6 +459,33 @@
           "crs": "EPSG:26913"
         }
       ]
+    },
+    {
+      "provider": "OpenStreetMap contributors, through the Overpass API",
+      "product": "Building footprints and tall structures (OpenStreetMap data as of the recorded timestamp)",
+      "licence": "Open Data Commons Open Database License (ODbL) 1.0. features.json is a derived database of OpenStreetMap data and is made available under the ODbL. https://www.openstreetmap.org/copyright",
+      "attribution": "Buildings and structures: © OpenStreetMap contributors, ODbL 1.0",
+      "credit": "© OpenStreetMap contributors",
+      "access": "Overpass API https://overpass-api.de/api/interpreter (no account)",
+      "layer": "world:osm"
+    },
+    {
+      "provider": "U.S. Geological Survey, 3D Elevation Program, lidar point cloud; Entwine Point Tile copy on AWS Open Data",
+      "product": "Lidar point cloud NM_SouthCentral_B7_2018 (heights above the lidar ground, 1 m cells)",
+      "licence": "U.S. Public Domain: \"USGS-authored or produced data and information are considered to be in the U.S. Public Domain.\" https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+      "attribution": "Lidar: U.S. Geological Survey, 3D Elevation Program",
+      "credit": "USGS 3DEP lidar",
+      "access": "s3://usgs-lidar-public (Entwine Point Tiles, no account)",
+      "layer": "world:3dep-lpc"
+    },
+    {
+      "provider": "USDA Farm Production and Conservation Business Center, Geospatial Enterprise Operations (NAIP); Planetary Computer copy",
+      "product": "NAIP 2022 red and near-infrared bands (vegetation index only; not drawn)",
+      "licence": "Public domain under the FSA web policy (see the detail image source).",
+      "attribution": "Imagery: USDA FPAC Business Center, Geospatial Enterprise Operations, NAIP 2022",
+      "credit": "USDA NAIP 2022",
+      "access": "Planetary Computer STAC, collection naip (anonymous range requests)",
+      "layer": "world:naip-nir"
     }
   ],
   "checks": [
@@ -604,5 +633,46 @@
       "layer": "detail"
     }
   ],
-  "check_note": "Geodetic points of grid nodes and their ENU coordinates computed with pyproj; the Rust georeference crate must reproduce them within 1 mm."
+  "check_note": "Geodetic points of grid nodes and their ENU coordinates computed with pyproj; the Rust georeference crate must reproduce them within 1 mm.",
+  "world": {
+    "features": {
+      "file": "features.json",
+      "bytes": 3831,
+      "sha256": "3f5ead80c33e438636c8a54f62413f3f83854e709863a44818d07093ec586c2b",
+      "buildings": 16,
+      "lidar_structures": 0,
+      "structures": 3,
+      "height_sources": {
+        "default": 16
+      },
+      "osm_radius_m": 4500.0,
+      "osm_timestamp": "2026-11-04T21:18:01Z",
+      "osm_skipped": 0,
+      "licence": "ODbL 1.0 (derived database of OpenStreetMap data)",
+      "accuracy": "OSM footprints as mapped by contributors (typically 1 to 3 m). Lidar heights are the 90th percentile of first-surface heights above the lidar ground inside the footprint, from 1 m cells; the lidar date may differ from the image and OSM dates. Walls, roof shapes and materials are illustrative; roof colours are sampled from the pack image."
+    },
+    "lidar": {
+      "source": "3dep-lpc",
+      "project": "NM_SouthCentral_B7_2018",
+      "ept": "https://s3-us-west-2.amazonaws.com/usgs-lidar-public/NM_SouthCentral_B7_2018",
+      "max_depth": 10,
+      "half_extent_m": 1024.0,
+      "cell_m": 1.0,
+      "points": 13885423,
+      "nodes": 429,
+      "covered_fraction": 0.9914,
+      "vegetation_rule": "canopy height >= 0.6 m and (NAIP NDVI >= 0.18, or >= 30 % multiple returns, or a canopy roughness >= 0.45 m in 3 x 3 cells); a lidar structure is a raised region (>= 2.5 m, >= 16 m2) outside OSM footprints whose cells are at least 60 % smooth (roughness < 0.35 m), single-return (< 20 % multiple returns) and not green",
+      "horizontal_note": "The point cloud is used in EPSG:3857 as published; heights above ground are differences within the point cloud, so its vertical datum cancels."
+    },
+    "vegetation": {
+      "file": "vegetation.bin",
+      "bytes": 29472,
+      "sha256": "43db070f8e412a0ce0e57efca196bca32b0927c40d85945a018b4b2dd9b18784",
+      "record": "12 bytes, little-endian: int16 x dm, int16 y dm, uint16 height cm, uint8 crown radius dm, uint8 kind (0 shrub clump, 1 tree), uint8 r, g, b (image colour at the point), uint8 0",
+      "count": 2456,
+      "trees": 1,
+      "shrubs": 2455,
+      "accuracy": "Positions and heights from the lidar canopy height model (1 m cells); trees are local maxima in a 7 m window, shrubs one clump per 3 m block with at least 3 vegetated cells; a tall top whose 5 x 5 cells are less than half filled, or with fewer than 6 cells above half its height (a wire or a pole), or, with NAIP near-infrared, a top whose 5 x 5 cells have a mean NDVI below 0.12 (a lattice pylon), is not a tree. Species, crown shape and colour detail are illustrative."
+    }
+  }
 }

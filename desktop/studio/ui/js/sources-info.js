@@ -9,7 +9,32 @@ let seq = 0;
 
 /** Short visible credit for each source: the pack's `credit` when given, else its attribution. */
 export function shortCredits(m) {
-  return (m.sources || []).map((s) => s.credit || s.attribution).filter(Boolean);
+  return [...new Set((m.sources || []).map((s) => s.credit || s.attribution).filter(Boolean))];
+}
+
+const n = (v) => Number(v || 0).toLocaleString('en');
+
+/** What the pack's world layer (schema v3) puts on the ground, with the source of each height. */
+export function worldText(env) {
+  const w = env.world;
+  if (!w || (!w.features && !w.vegetation)) return null;
+  const parts = [];
+  const f = w.features;
+  if (f) {
+    const hs = f.height_sources || {};
+    const by = [['lidar', 'from lidar'], ['osm-height', 'from the OSM height tag'], ['osm-levels', 'from OSM building levels'], ['default', 'estimated (a default height per kind)']]
+      .filter(([k]) => hs[k]).map(([k, t]) => `${n(hs[k])} ${t}`);
+    parts.push(`${n(f.buildings)} building footprints from OpenStreetMap${by.length ? ` (heights: ${by.join(', ')})` : ''}`);
+    if (f.lidar_structures) parts.push(`${n(f.lidar_structures)} structures outlined from lidar cells with surveyed heights`);
+    if (f.structures) parts.push(`${n(f.structures)} towers and masts at OSM positions`);
+  }
+  const v = w.vegetation;
+  if (v) parts.push(`${n(v.trees)} trees and ${n(v.shrubs)} shrub clumps at lidar positions and heights`);
+  else parts.push('no vegetation (this pack has no lidar, and none is invented)');
+  const known = f ? Object.entries(f.height_sources || {}).filter(([k]) => k !== 'default').reduce((a, [, v]) => a + v, 0) : 0;
+  const est = f ? (f.height_sources || {}).default || 0 : 0;
+  const heights = f ? ` Building heights are data for ${n(known)} of ${n(f.buildings)}; the other ${n(est)} are estimates and are drawn low, in a paler tone.` : '';
+  return `${parts.join('; ')}. Footprints and plant positions are data; walls, roofs and plant shapes are drawn.${heights}`;
 }
 
 const km = (m) => `${(m / 1000).toLocaleString('en', { maximumFractionDigits: 1 })} km`;
@@ -42,8 +67,9 @@ export function sourcesInfo(env, { warn, onSettings } = {}) {
     h('dl', { class: 'si-kinds' },
       h('div', null, h('dt', null, h('span', { class: 'prov prov-sim' }, 'Simulated')), h('dd', null, 'Trajectory, attitude, throttle, estimate and events, from the run record.')),
       h('div', null, h('dt', null, h('span', { class: 'prov prov-ctx' }, 'Context')), h('dd', null, `${env.name}: ${contextText(env, h1, im)} The model assumes flat ground at the pad; nothing is computed against this terrain.`)),
+      worldText(env) ? h('div', null, h('dt', null, h('span', { class: 'prov prov-ctx' }, 'On the ground')), h('dd', null, worldText(env))) : null,
       env.site_note ? h('div', null, h('dt', null, h('span', { class: 'prov prov-ctx' }, 'Site')), h('dd', null, env.site_note)) : null,
-      h('div', null, h('dt', null, h('span', { class: 'prov prov-ill' }, 'Illustrative')), h('dd', null, 'Stage shape, legs, fins, plume, sky, sun, shadows, water finish and pad surface: drawn for legibility, not modelled.'))),
+      h('div', null, h('dt', null, h('span', { class: 'prov prov-ill' }, 'Illustrative')), h('dd', null, `Stage shape, weathering, legs, fins, plume, the glow and dust where it meets the ground, sky, haze, sun, shadows, water finish, fine ground grain${env.world ? ', building walls and roofs, and the shapes and leaves of plants' : ''} and pad surface: drawn for legibility, not modelled.`))),
     warn ? h('p', { class: 'si-warn' }, warn) : null,
     (env.accuracy || []).length ? h('p', { class: 'si-h' }, 'Accuracy') : null,
     (env.accuracy || []).length ? h('ul', { class: 'si-list' }, env.accuracy.map((a) => h('li', null, a))) : null,

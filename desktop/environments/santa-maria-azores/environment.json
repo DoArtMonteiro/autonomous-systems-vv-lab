@@ -1,5 +1,5 @@
 {
-  "schema": "vv-geo-environment.v2",
+  "schema": "vv-geo-environment.v3",
   "id": "santa-maria-azores",
   "name": "Santa Maria, Azores",
   "summary": "Volcanic island with cliffs and a plateau. The simulation's pad centre is placed in an open pasture on the eastern uplands, read from the 2024 orthophoto; the slopes around it break the flat-ground assumption of the simulation, which the Studio states. No launch or landing facility is there or is implied.",
@@ -9,7 +9,9 @@
     "pyproj": "3.8.0",
     "proj": "9.8.1",
     "rasterio": "1.5.2",
-    "gdal": "3.12.2"
+    "gdal": "3.12.2",
+    "features_by": "scripts/geo/build_features.py",
+    "features_date": "2026-11-04"
   },
   "origin": {
     "lat_deg": 36.98645,
@@ -425,6 +427,15 @@
       "layer": "detail",
       "requests": 9,
       "request_example": "https://ambiente.azores.gov.pt/qgisserver/sma/orto2024/qgis_mapserv.fcgi?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=ortofotomapa_2024_sma&STYLES=&CRS=EPSG%3A4326&BBOX=36.98878282509962%2C-25.122066469510198%2C36.99798153153153%2C-25.110550493113273&WIDTH=2048&HEIGHT=2048&FORMAT=image%2Fjpeg"
+    },
+    {
+      "provider": "OpenStreetMap contributors, through the Overpass API",
+      "product": "Building footprints and tall structures (OpenStreetMap data as of the recorded timestamp)",
+      "licence": "Open Data Commons Open Database License (ODbL) 1.0. features.json is a derived database of OpenStreetMap data and is made available under the ODbL. https://www.openstreetmap.org/copyright",
+      "attribution": "Buildings and structures: © OpenStreetMap contributors, ODbL 1.0",
+      "credit": "© OpenStreetMap contributors",
+      "access": "Overpass API https://overpass-api.de/api/interpreter (no account)",
+      "layer": "world:osm"
     }
   ],
   "checks": [
@@ -572,5 +583,25 @@
       "layer": "detail"
     }
   ],
-  "check_note": "Geodetic points of grid nodes and their ENU coordinates computed with pyproj; the Rust georeference crate must reproduce them within 1 mm."
+  "check_note": "Geodetic points of grid nodes and their ENU coordinates computed with pyproj; the Rust georeference crate must reproduce them within 1 mm.",
+  "world": {
+    "features": {
+      "file": "features.json",
+      "bytes": 608827,
+      "sha256": "daab90e4e12527bcb58173078e791b4a66b1c97d33cd5a7a06aa991c98e45497",
+      "buildings": 4081,
+      "lidar_structures": 0,
+      "structures": 14,
+      "height_sources": {
+        "default": 4078,
+        "osm-height": 2,
+        "osm-levels": 1
+      },
+      "osm_radius_m": 4500.0,
+      "osm_timestamp": "2026-11-04T21:19:02Z",
+      "osm_skipped": 0,
+      "licence": "ODbL 1.0 (derived database of OpenStreetMap data)",
+      "accuracy": "OSM footprints as mapped by contributors (typically 1 to 3 m). Lidar heights are the 90th percentile of first-surface heights above the lidar ground inside the footprint, from 1 m cells; the lidar date may differ from the image and OSM dates. Walls, roof shapes and materials are illustrative; roof colours are sampled from the pack image."
+    }
+  }
 }

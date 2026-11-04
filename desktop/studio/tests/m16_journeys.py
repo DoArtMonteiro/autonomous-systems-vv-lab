@@ -74,6 +74,18 @@ def geospatial(s):
         s.page.click(f".pl-cams [data-cam='{cam}']")
         time.sleep(0.8)
         s.shot(f"m16-geo-cape-{cam}-dark")
+    # M16.2: the world layer (buildings, structures, lidar vegetation) and the cinematic camera.
+    w = (player(s).get("geoStats") or {}).get("world") or {}
+    check("World: the Cape pack draws OSM buildings and lidar vegetation", w.get("buildings", 0) > 100 and w.get("trees", 0) > 1000 and w.get("shrubs", 0) > 10000, json.dumps(w)[:200])
+    s.page.click(".pl-cams [data-cam='closeup']")
+    time.sleep(1.0)
+    tiers = (player(s)["geoStats"]["world"] or {}).get("vegetation_tiers") or [0, 0, 0]
+    check("World: vegetation near the pad camera is drawn in full detail", tiers[0] > 0, str(tiers))
+    s.page.click(".pl-cams [data-cam='director']")
+    time.sleep(1.2)
+    cam_ = player(s)["geoStats"]["camera"]
+    check("Auto camera: the camera picks a shot from the playback state", cam_["mode"] == "director" and cam_["shot"] in ("wide", "follow", "pad", "closeup"), str(cam_.get("shot")))
+    s.shot("m16-geo-cape-cinematic-dark")
     s.page.click(".pl-cams [data-cam='follow']")
     if player(s)["playing"]:
         s.page.click(".pl-play")
@@ -141,6 +153,7 @@ def sources_control(s):
     check("Sources: the panel says what is simulated, context and illustrative", all(w in txt.lower() for w in ("simulated", "context", "illustrative")))
     check("Sources: the panel carries the full Copernicus DEM notice and the Sentinel notice", "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018" in txt and "Copernicus Sentinel data" in txt)
     check("Sources: the panel states the flat-ground limitation", "flat ground" in txt)
+    check("Sources: the panel states where buildings, heights and vegetation come from", "on the ground" in txt.lower() and "OpenStreetMap" in txt and "lidar" in txt and "ODbL" in txt)
     s.shot("m16-geo-sources-panel-dark")
     s.page.keyboard.press("Escape")
     time.sleep(0.2)
