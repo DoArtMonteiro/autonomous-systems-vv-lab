@@ -7,9 +7,19 @@ import { h } from './dom.js';
 
 let seq = 0;
 
-/** Short visible credit for each source: the pack's `credit` when given, else its attribution. */
+/** Short credit for each source: the pack's `credit` when given, else its attribution. */
 export function shortCredits(m) {
   return [...new Set((m.sources || []).map((s) => s.credit || s.attribution).filter(Boolean))];
+}
+
+/**
+ * Credits that stay on the map itself. Only the ODbL asks for attribution in view of the map
+ * (OSMF attribution guidelines); the Copernicus DEM (Art. 6), Sentinel and CC BY notices are met by
+ * the panel one press away, Settings, the installed NOTICE and every exported evidence package, and
+ * public-domain sources ask for none. The full text of every notice stays in the panel.
+ */
+export function mapCredits(m) {
+  return [...new Set((m.sources || []).filter((s) => /\bODbL\b/.test(s.licence || '')).map((s) => s.credit || s.attribution).filter(Boolean))];
 }
 
 const n = (v) => Number(v || 0).toLocaleString('en');
@@ -82,8 +92,10 @@ export function sourcesInfo(env, { warn, onSettings } = {}) {
         h('p', { class: 'si-lic' }, (s.licence || '').replace(url || '\u0000', '').trim(), url ? h('span', { class: 'si-url mono' }, ` ${url}`) : null));
     })),
     onSettings ? h('button', { type: 'button', class: 'link small si-more', onclick: () => { close(); onSettings(); } }, 'Environment details in Settings') : null);
-  const credit = h('p', { class: 'si-credit' }, shortCredits(env).join(' · '));
-  const wrap = h('div', { class: 'si' }, h('div', { class: 'si-row' }, btn, warn ? h('span', { class: 'si-chip', title: warn }, 'Path below terrain') : null, h('span', { class: 'si-chip si-flat', title: 'The model assumes flat ground at the pad; nothing is computed against this terrain.' }, 'Terrain is context only')), credit, panel);
+  const others = shortCredits(env).length - mapCredits(env).length;
+  const credit = h('p', { class: 'si-credit', title: shortCredits(env).join(' · ') },
+    mapCredits(env).join(' · '), others > 0 ? h('span', { class: 'si-more-n' }, `${mapCredits(env).length ? ' · ' : ''}${others} more in Sources`) : null);
+  const wrap = h('div', { class: 'si' }, h('div', { class: 'si-row' }, btn, warn ? h('span', { class: 'si-chip', title: warn }, 'Path below terrain') : null, h('span', { class: 'si-chip si-flat', title: 'The model assumes flat ground at the pad; nothing is computed against this terrain.' }, 'Terrain is context only'), credit), panel);
 
   let open = false;
   let pinned = false;

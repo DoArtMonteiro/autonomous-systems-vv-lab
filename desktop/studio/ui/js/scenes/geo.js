@@ -595,6 +595,16 @@ export class GeoRocket extends CinemaRocket {
       const at = this.observerPoint();
       const d = at.distanceTo(aim);
       const fov = Math.min(40, Math.max(3, (2 * Math.atan((STAGE.length * 1.2) / d) * 180) / Math.PI));
+      // While the stage is low over the horizon, frame the horizon too: the stage sits in the upper
+      // third and the landscape gives it scale. Higher up an observer only sees sky, which is kept.
+      const flat = Math.hypot(aim.x - at.x, aim.y - at.y);
+      const elev = (Math.atan2(aim.z - at.z, flat) * 180) / Math.PI;
+      if (elev > 0 && elev < 22) {
+        const wide = Math.max(fov, Math.min(40, elev * 1.9 + 6));
+        const down = ((elev - wide * 0.18) * Math.PI) / 180;
+        const target = new THREE.Vector3(aim.x, aim.y, at.z + Math.tan(Math.max(0, down)) * flat);
+        return { pos: at, target, fov: wide };
+      }
       return { pos: at, target: aim, fov };
     }
     if (mode === 'closeup') {
@@ -843,6 +853,20 @@ export class GeoRocket extends CinemaRocket {
     if (this.world) this.world.dispose();
     if (this.dustTex) this.dustTex.dispose();
     for (const b of this.bitmaps || []) b.close();
+    // The 4096 shadow map is a render target the light owns and every texture a material holds is
+    // its own GPU allocation; neither goes with geometry and material disposal (M16.2 left about
+    // 65 MB of GPU memory behind after leaving the scene).
+    if (this.sun && this.sun.shadow && this.sun.shadow.map) { this.sun.shadow.map.dispose(); this.sun.shadow.map = null; }
+    if (this.s) {
+      const seen = new Set();
+      this.s.traverse((o) => {
+        for (const m of Array.isArray(o.material) ? o.material : o.material ? [o.material] : []) {
+          for (const v of Object.values(m)) if (v && v.isTexture && !seen.has(v)) { seen.add(v); v.dispose(); }
+          for (const u of Object.values(m.uniforms || {})) if (u && u.value && u.value.isTexture && !seen.has(u.value)) { seen.add(u.value); u.value.dispose(); }
+        }
+      });
+    }
+    if (this.renderer) this.renderer.renderLists.dispose();
     super.dispose();
     // The context is gone: no late frame (an image decode or a cursor tick) may render again.
     this.ok = false;
