@@ -968,5 +968,7 @@ pub fn build(request: &RunRequest, policy: &Policy, native: &Native) -> R<RunRec
             "The seed only drives random GPS dropout and noise, packet loss and probabilistic actuator faults. These missions and the faults of this domain use none of them, so a different seed changes the recorded seed and the run identity but not the trajectory.".into(),
             "Actuator effects are listed in the events only where a failed contract cites them; the full actuator trace is only hashed by the simulator.".into(),
         ],
+        entities: None,
+        mission: None,
     })
 }
