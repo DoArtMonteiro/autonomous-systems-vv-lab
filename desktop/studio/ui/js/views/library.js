@@ -127,7 +127,7 @@ function drawRows() {
   const count = root.querySelector('#lib-count');
   if (count) count.textContent = `${list.length} of ${runs.length} runs`;
   if (!list.length) {
-    tbody.append(h('tr', null, h('td', { colspan: '11', class: 'empty' }, runs.length ? 'No run matches the search and filters.' : 'The library has no runs yet. Run a mission or a demonstration from Prepare.')));
+    tbody.append(h('tr', null, h('td', { colspan: '11', class: 'empty' }, runs.length ? 'No run matches the search and filters.' : 'The library has no runs yet. Run a mission from the library or configure one.')));
     return;
   }
   for (const m of list) {
@@ -203,7 +203,7 @@ function drawDetail() {
       h('button', { type: 'button', class: 'btn', onclick: () => navigate('run', { runId: m.run_id, meta: m }) }, 'Open run'),
       h('button', { type: 'button', class: 'btn btn-quiet', onclick: async () => {
         try { const rec = await api.record(m.run_id); openRequest(rec.request); } catch (e) { toast(errorText(e), 'error'); }
-      } }, 'Prepare a variant')),
+      } }, 'Configure a variant')),
     h('label', { class: 'field' }, h('span', { class: 'field-label' }, 'Label'), label),
     h('label', { class: 'field' }, h('span', { class: 'field-label' }, 'Notes'), notes),
     h('label', { class: 'field' }, h('span', { class: 'field-label' }, 'Tags'), tags),
@@ -214,7 +214,7 @@ function drawDetail() {
 function savedList(items, kind) {
   const host = h('div', { class: 'lib-list' });
   if (!items.length) {
-    host.append(h('p', { class: 'empty' }, kind === 'scenario' ? 'No saved scenario. Save one from Prepare.' : 'No saved comparison. Save one from a comparison.'));
+    host.append(h('p', { class: 'empty' }, kind === 'scenario' ? 'No saved scenario. Save one from Configure.' : 'No saved comparison. Save one from a comparison.'));
     return host;
   }
   for (const it of items) {
@@ -224,7 +224,7 @@ function savedList(items, kind) {
     host.append(h('div', { class: 'lib-row' },
       h('div', { class: 'grow' }, h('div', { class: 'run-label' }, it.name), h('div', { class: 'dim small mono' }, sub), it.notes ? h('div', { class: 'small' }, it.notes) : null, h('div', { class: 'dim small mono' }, it.created_utc)),
       kind === 'scenario'
-        ? h('button', { type: 'button', class: 'btn', onclick: () => openSaved(it) }, 'Open in Prepare')
+        ? h('button', { type: 'button', class: 'btn', onclick: () => openSaved(it) }, 'Open in Configure')
         : h('button', { type: 'button', class: 'btn', onclick: () => navigate('compare', { runIds: it.run_ids, name: it.name }) }, 'Open comparison'),
       h('button', { type: 'button', class: 'btn btn-quiet btn-danger', onclick: async () => {
         try {

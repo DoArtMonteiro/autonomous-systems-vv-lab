@@ -468,7 +468,15 @@ fn held_out_seeds_of_the_m6_experiment_are_protected() {
     let manifest: DomainManifest =
         serde_json::from_slice(&fs::read(crate_dir().join("domain.json")).unwrap()).unwrap();
     let range = &manifest.seeds.protected[0];
-    assert_eq!(manifest.seeds.protected.len(), 1);
+    // The second range is the confirmation reserve, checked by the_confirmation_reserve_is_refused.
+    assert_eq!(manifest.seeds.protected.len(), 2);
+    assert_eq!(
+        (
+            manifest.seeds.protected[1].start,
+            manifest.seeds.protected[1].end
+        ),
+        (44_000, 44_999)
+    );
     assert_eq!(held, (range.start..=range.end).collect::<Vec<_>>());
 }
 
@@ -508,7 +516,7 @@ fn the_manifest_and_catalog_are_consistent() {
     let c = catalog();
     assert_eq!(c.time.unit, "tick");
     assert_eq!(c.max_faults, 2);
-    assert_eq!(c.scenarios.len(), 3);
+    assert_eq!(c.scenarios.len(), 4);
     for s in &c.scenarios {
         assert!(s.controllers.contains(&s.default_controller));
         for p in &s.parameters {
@@ -828,4 +836,55 @@ fn a_native_manifest_with_a_protected_seed_never_reaches_the_simulator() {
         !report.checks.iter().any(|c| c.name.contains("replay-m4")),
         "the simulator replay must not run"
     );
+}
+
+#[test]
+fn demo_corridor_gps_noise_enters_the_zone_only_without_an_arrival_radius() {
+    let runs = run_demo("corridor-gps-noise");
+    let failed = |r: &RunRecord| -> Vec<String> {
+        r.requirements
+            .iter()
+            .filter(|q| q.status == "fail")
+            .map(|q| q.id.clone())
+            .collect()
+    };
+    assert_eq!(
+        (
+            runs[0].outcome.code.as_str(),
+            runs[0].safety.status.as_str()
+        ),
+        ("completed", "safe")
+    );
+    assert!(failed(&runs[0]).is_empty());
+    assert_eq!(
+        (
+            runs[1].outcome.code.as_str(),
+            runs[1].safety.status.as_str()
+        ),
+        ("incomplete", "unsafe")
+    );
+    assert_eq!(
+        status(&runs[1], "restricted_zone"),
+        ("fail".into(), Some(21.0))
+    );
+    assert_eq!(
+        (
+            runs[2].outcome.code.as_str(),
+            runs[2].safety.status.as_str()
+        ),
+        ("completed", "safe")
+    );
+    assert!(failed(&runs[2]).is_empty());
+}
+
+#[test]
+fn the_confirmation_reserve_is_refused() {
+    for seed in [44_000u64, 44_500, 44_999] {
+        let r = request("nominal_stop", "dominant_axis", seed, vec![]);
+        assert_eq!(code(&validate(&r)), EXIT_INVALID_REQUEST, "seed {seed}");
+    }
+    for seed in [43_999u64, 45_000] {
+        let r = request("nominal_stop", "dominant_axis", seed, vec![]);
+        assert_eq!(code(&validate(&r)), 0, "seed {seed}");
+    }
 }

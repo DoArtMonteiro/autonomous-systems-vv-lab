@@ -33,8 +33,8 @@ export async function showCompare(opts) {
   } else if (!cmp) {
     clear(root).append(h('div', { class: 'settings' },
       h('h1', null, 'Nothing to compare yet'),
-      h('p', { class: 'dim' }, 'Tick several controllers in Prepare, run a multi-run demonstration, or select up to eight runs in the Library.'),
-      h('div', { class: 'row' }, h('button', { type: 'button', class: 'btn btn-primary', onclick: () => navigate('prepare') }, 'Prepare'), h('button', { type: 'button', class: 'btn', onclick: () => navigate('library') }, 'Library'))));
+      h('p', { class: 'dim' }, 'Tick several controllers in Configure, run a multi-run mission or demonstration, or select up to eight runs in Records.'),
+      h('div', { class: 'row' }, h('button', { type: 'button', class: 'btn btn-primary', onclick: () => navigate('prepare') }, 'Configure'), h('button', { type: 'button', class: 'btn', onclick: () => navigate('library') }, 'Records'))));
   } else {
     requestAnimationFrame(() => resizeCharts());
   }

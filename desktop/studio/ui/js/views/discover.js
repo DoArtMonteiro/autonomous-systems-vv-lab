@@ -33,7 +33,7 @@ const st = {
 };
 
 // Plain words for the engine's status codes. Unknown codes are shown as they are.
-const WORDS = {
+export const WORDS = {
   refuted: ['Refuted', 'bad', 'A reproduced counterexample breaks the claim beyond its tolerance.'],
   refuted_without_byte_reproduction: ['Refuted, not byte-reproduced', 'bad', 'The counterexample fails on fresh seeds, but the canonical writer did not reproduce its trace byte for byte.'],
   counterexample_within_tolerance: ['Counterexample within tolerance', 'warn', 'A violation was found, but its rate does not exceed the claim tolerance with confidence.'],
@@ -97,7 +97,7 @@ export function initDiscover(root) {
   }
 }
 
-export async function showDiscover() {
+export async function showDiscover(opts) {
   try {
     const [claims, packages] = await Promise.all([api.claims(), api.packages()]);
     st.claims = claims;
@@ -107,6 +107,8 @@ export async function showDiscover() {
     st.packages = [];
     toast(errorText(e), 'error');
   }
+  const wanted = opts && opts.claimId && st.claims.find((c) => c.claim && c.claim.id === opts.claimId);
+  if (wanted && !st.running) { st.claimFile = wanted.file; st.pkgName = null; st.data = null; }
   if (!st.claimFile && st.claims.length) st.claimFile = st.claims[0].file;
   render();
 }
@@ -135,7 +137,7 @@ function failedCheck(p) {
   return Boolean(p.verification && !p.verification.stale && !p.verification.report.pass);
 }
 
-function verdictOf(p) {
+export function verdictOf(p) {
   return failedCheck(p) ? 'withdrawn' : p.verdict && p.verdict.claim;
 }
 
@@ -219,7 +221,12 @@ function renderClaim() {
         h('span', { class: 'dl-chip warn' }, glyph('warn'), c.evidence_grade === 'exploratory' ? 'Exploratory grade' : c.evidence_grade)),
       h('div', { class: 'dl-actions' },
         h('button', { type: 'button', class: 'btn btn-primary dl-cta', onclick: () => challenge(entry) }, 'Challenge this claim'),
-        h('span', { class: 'dim small' }, `At most ${runs.toLocaleString('en')} simulations, as planned by the engine from the budget, on development seeds. Each one is logged and recomputable.`))),
+        h('span', { class: 'dim small' }, `At most ${runs.toLocaleString('en')} simulations, as planned by the engine from the budget, on development seeds. Each one is logged and recomputable.`)),
+      h('ol', { class: 'dl-howto', 'aria-label': 'What a challenge does' },
+        h('li', null, h('b', null, 'Search'), 'The engine tries conditions inside the declared envelope, looking for runs where the claim stops holding.'),
+        h('li', null, h('b', null, 'Reproduce'), 'A counterexample counts only if it fails again on fresh seeds the search never saw.'),
+        h('li', null, h('b', null, 'Explain'), 'Declared interventions test what causes the failure, one factor at a time.'),
+        h('li', null, h('b', null, 'Mitigate and verify'), 'Candidate fixes are tested for the failure and for new regressions; every verdict is recomputed from scratch.'))),
     section('Where the claim comes from', h('p', { class: 'dl-prose' }, c.origin)),
     section('Assumptions and envelope', h('p', { class: 'dl-prose dim' }, 'The challenge varies these and only these, inside the declared box. The registered value is where the claim was originally supported.'),
       h('div', { class: 'dl-assume' }, c.assumptions.map((a) => assumptionRow(a)))),

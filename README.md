@@ -2,7 +2,7 @@
 
 A Rust and Python laboratory for repeatable autonomous-mission simulation, fault injection and verification.
 
-**Status:** M9 and M9.1 are integrated in `main`. The M10.0 resilient-navigation design was merged through [PR #13](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/13). The M10 implementation is in draft [PR #15](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/15) and has not been accepted. The M11 desktop application and the M12 experiment engine are proposed for integration by this branch, without M10, pending review.
+**Status:** M9 and M9.1 are integrated in `main`. The M10.0 resilient-navigation design was merged through [PR #13](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/13). The M10 implementation is in draft [PR #15](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/15) and has not been accepted. The M11 desktop application, the M12 experiment engine, the M14 research and the M13 Discovery Lab were integrated without M10 through PRs [#21](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/21), [#22](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/22) and [#23](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/23). M15 (mission experience and simulation library) is proposed on its own branch. Every M13 and M14 finding remains exploratory.
 
 The main simulator models a two-dimensional ground vehicle. A separate, idealised six-degree-of-freedom rocket model supports the M8 and M9 research campaigns. Neither model controls real hardware, and the rocket model has no flight-data validation.
 
@@ -92,7 +92,7 @@ A Windows 11 application that packages the simulators behind a versioned domain 
 powershell -ExecutionPolicy Bypass -File desktop\build.ps1   # builds the NSIS installer in desktop\target\release\bundle\nsis
 ```
 
-See [docs/m11-desktop.md](docs/m11-desktop.md) for the architecture and how to add a domain, and [docs/m11-acceptance.md](docs/m11-acceptance.md) for installation and acceptance. The UI smoke test has not yet been run on this branch. The developer CLI and the local Mission Control remain supported.
+See [docs/m11-desktop.md](docs/m11-desktop.md) for the architecture and how to add a domain, and [docs/m11-acceptance.md](docs/m11-acceptance.md) for installation and acceptance. The UI tests (`desktop/studio/tests/ui_smoke.py`, `desktop/studio/tests/m15_journeys.py`) drive the real window. The developer CLI and the local Mission Control remain supported.
 
 ### vv-exec experiment engine (M12)
 
@@ -106,9 +106,15 @@ exec/target/release/vv-exec verify exec/target/m12-dev/throughput --threads 16
 
 See [docs/m12-exec.md](docs/m12-exec.md). Its development-seed verdicts are engine evidence, not evaluation results.
 
-### M13 Discovery Lab: challenge a safety claim (proposed for integration)
+### M15 mission experience and simulation library (proposed)
 
-V&V Lab Studio opens on a Discovery Lab workspace. Pick a bounded safety claim, press "Challenge this claim", and the bundled engine (`vv-exec investigate`) checks it at its registered conditions, searches its declared envelope for a counterexample, minimises and replicates it on fresh seeds, attributes it with paired counterfactuals, maps where the claim holds, tests mechanism hypotheses declared before the run (at the counterexample and over the whole envelope), and judges each candidate mitigation against the unmitigated system, including regressions, trade-offs and a fresh adversarial re-challenge. `vv-exec investigate-verify` then recomputes every number from scratch; a package that fails, or changed since, has its verdicts withdrawn in the app. Claim verdict, mechanism, mitigation, evidence integrity and evidence grade are separate results.
+Studio now opens on a home screen that says what the platform does and starts a first rocket landing in one click. A mission library presents ten curated missions over both domains (a nominal landing, an altimeter that reads 50 m high, the late smaller GNSS bias that breaks G3's R1, a 1 m threshold that removes the hard landing and moves the failure to R5, 1 mm of GPS noise that sends the ground vehicle into a restricted zone, and five more). Each mission is a demonstration shipped and tested by its domain host. A mission player replays the run records in a 3D view of the true state, with labelled readouts (true state, controller estimate, derived), a phase band derived from the engine channel, event markers, the instant where two runs part, the result per run, the reason, and links to the full analysis, the comparison, an editable request and the claim behind the mission in Investigate. Seeds 44000 to 44999 are now refused by Studio, the domain hosts and every `vv-exec` run, not only by investigations; the developer command `vv-rocket land` still has no seed guard of its own.
+
+See [docs/m15-mission-experience.md](docs/m15-mission-experience.md). The usability evidence is scripted checks in the real window, not observations of users. The candidate confirmation protocol for the G3 onset finding is [docs/m15-g3-onset-protocol.md](docs/m15-g3-onset-protocol.md); it awaits the owner and nothing has run on its seeds.
+
+### M13 Discovery Lab: challenge a safety claim
+
+The Investigate workspace of V&V Lab Studio (formerly the Discovery Lab). Pick a bounded safety claim, press "Challenge this claim", and the bundled engine (`vv-exec investigate`) checks it at its registered conditions, searches its declared envelope for a counterexample, minimises and replicates it on fresh seeds, attributes it with paired counterfactuals, maps where the claim holds, tests mechanism hypotheses declared before the run (at the counterexample and over the whole envelope), and judges each candidate mitigation against the unmitigated system, including regressions, trade-offs and a fresh adversarial re-challenge. `vv-exec investigate-verify` then recomputes every number from scratch; a package that fails, or changed since, has its verdicts withdrawn in the app. Claim verdict, mechanism, mitigation, evidence integrity and evidence grade are separate results.
 
 Flagship result, simulation only, development seeds: the M9.1 criterion G3 holds as registered (GNSS bias from 0 s), but the same bias starting after the first GNSS fix breaks R1 in 30 of 30 fresh runs for magnitudes up to about 12 m. The supported mechanism is that the altimeter residual stays under the rejection threshold, so rule 1 never engages; disabling rejection at the registered conditions breaks G3 in 30 of 30. An independent estimator model with no fitted parameter, written after the coarse 10 to 15 m transition had been seen, predicted the boundary at 11.99 m before the test; the simulator gave 11.89 m on fresh seeds. A 1 m threshold removes the failure inside the envelope with no new safety violation, but 41 paired runs gain other requirement violations and the masked band moves below the 5 m floor instead of disappearing. The same workflow rediscovers and explains the M14 corridor fragility on the ground vehicle.
 
@@ -120,7 +126,7 @@ exec/target/release/vv-exec investigate-verify exec/target/m13/g3
 
 See [docs/m13-discovery-lab.md](docs/m13-discovery-lab.md) and [docs/evidence/m13/](docs/evidence/m13/). Exploratory evidence: the hypotheses were written after hand exploration and revised after an independent agent review; a confirmation protocol awaits the owner ([docs/m14-g3-onset-protocol-draft.md](docs/m14-g3-onset-protocol-draft.md)).
 
-### M14 evidence robustness (proposed for integration)
+### M14 evidence robustness
 
 M14 asks whether the platform's findings hold up: on a second physical domain, on failure mechanisms the method never saw, and under small changes to the assumptions behind a published claim.
 
@@ -145,6 +151,7 @@ See [docs/m14-evidence-robustness.md](docs/m14-evidence-robustness.md) (case stu
 - **25/10/2026:** M7 Mission Control and the simulator-adapter contract integrated through [PR #9](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/9), merged as commit [`ec2a2ab`](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/commit/ec2a2ab8e237d51c65df96aa7ca99b1c465ec624).
 - **25/10/2026:** the six-degree-of-freedom rocket model and reference verification added in [commit `8b04960`](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/commit/8b04960).
 - **29/10/2026:** M9 and M9.1 integrated through [PR #12](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/12).
+- **03/11/2026:** M11, M12, M14 and M13 integrated without M10 through PRs [#21](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/21), [#22](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/22) and [#23](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/23).
 
 Dates above are commit or merge dates, not operational acceptance dates.
 

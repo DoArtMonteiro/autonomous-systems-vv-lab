@@ -2,7 +2,7 @@
   "schema": "vv-domain-manifest.v1",
   "id": "ground-vehicle",
   "name": "Ground vehicle (2D kinematic)",
-  "version": "0.11.0",
+  "version": "0.15.0",
   "description": "A generic unarmed ground vehicle driving to a waypoint in a 2D world. The controller sees only noisy or missing GPS observations; the lab injects GPS dropouts and actuator faults and checks temporal contracts and safety invariants on the true position.",
   "contract": { "name": "vv-domain", "major": 1, "minor": 0 },
   "host": {
@@ -20,6 +20,11 @@
         "start": 101,
         "end": 112,
         "reason": "held-out seeds of the M6 controller repair experiment (scenarios/m6/experiment.json); running them here would spend the evaluation set"
+      },
+      {
+        "start": 44000,
+        "end": 44999,
+        "reason": "reserved for a future preregistered confirmation; never run before the owner freezes and authorises that protocol"
       }
     ]
   },

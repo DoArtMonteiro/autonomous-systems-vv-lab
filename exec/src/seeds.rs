@@ -25,6 +25,11 @@ pub const ROCKET_PROTECTED: &[Protected] = &[
         end: 6099,
         reason: "M10 reserve seeds",
     },
+    Protected {
+        start: 44_000,
+        end: 44_999,
+        reason: "M13 reserve for a future preregistered confirmation; needs owner approval",
+    },
 ];
 
 /// Seeds the ground domain refuses. 100 to 129 is the hand-written M12 timing loop that ran without
@@ -41,6 +46,11 @@ pub const GROUND_PROTECTED: &[Protected] = &[
         start: 201,
         end: 212,
         reason: "M6 confirmation seeds",
+    },
+    Protected {
+        start: 44_000,
+        end: 44_999,
+        reason: "M13 reserve for a future preregistered confirmation; needs owner approval",
     },
     Protected {
         start: 7349,
@@ -311,6 +321,16 @@ mod tests {
             common: true,
         };
         assert_eq!(d.seeds_for(9, 0), d.seeds_for(9, 77));
+    }
+
+    #[test]
+    fn both_domains_refuse_the_confirmation_reserve() {
+        for p in [ROCKET_PROTECTED, GROUND_PROTECTED] {
+            assert!(check(p, 44_000).is_err());
+            assert!(check(p, 44_999).is_err());
+            assert!(check(p, 43_999).is_ok());
+            assert!(check(p, 45_000).is_ok());
+        }
     }
 
     #[test]
