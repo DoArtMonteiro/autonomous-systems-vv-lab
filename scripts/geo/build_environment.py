@@ -50,12 +50,13 @@ ENVIRONMENTS = {
     "cape-canaveral": {
         "name": "Cape Canaveral coast, Florida",
         "summary": "Low, flat barrier coast on the Atlantic. The simulation's pad centre is placed at the centre of a circular hard-standing visible in the detail image, measured on that image (about 2 m). The facility is not modelled and the simulated pad is not that facility.",
+        "site_note": "The detail image is an aerial photograph of an existing landing facility. The simulated vehicle, pad and mission are generic: they are not that facility, its operations or its operator, and imply no affiliation.",
         "lat": 28.48573, "lon": -80.54302,
         "half_extent_m": 9000.0, "dem_spacing_m": 30.0, "image_spacing_m": 10.0,
         "s2_items": ["S2B_T17RNM_20251115T160505_L2A"],
         "heading_deg": 0.0,
         # Detail layer: USGS 3DEP 1 m lidar DEM sampled every 4 m and NAIP 2023 (0.3 m) at 0.5 m.
-        "detail": {"half_extent_m": 1024.0, "dem_spacing_m": 4.0, "image_spacing_m": 0.5, "blend_m": 64.0,
+        "detail": {"half_extent_m": 1024.0, "dem_spacing_m": 4.0, "image_spacing_m": 0.5, "blend_m": 192.0,
                    "dem": {"kind": "tnm-1m"}, "imagery": {"kind": "naip", "year": 2023}},
     },
     "santa-maria-azores": {
@@ -270,7 +271,7 @@ def lattice_geodetic(frame, h_of, L, sp, step):
     return n, rows, err
 
 
-def build_detail(cfg, frame, hd, imagery, out):
+def build_detail(cfg, frame, hd, imagery, out, base_img):
     """Writes detail-height.u16 and detail-image.jpg; returns the layer block, checks and grid."""
     d = cfg["detail"]
     L = d["half_extent_m"]
@@ -300,9 +301,43 @@ def build_detail(cfg, frame, hd, imagery, out):
         la, lo = rows(r0, min(n, r0 + 256))
         v, ok = imagery.sample(la, lo)
         img[r0:r0 + la.shape[0]] = np.clip(np.round(v), 0, 255).astype(np.uint8).transpose(1, 2, 0)
-        have[r0:r0 + la.shape[0]] = ok
-    if (~have).mean() > 0.001:
-        raise SystemExit(f"the detail imagery leaves {(~have).mean():.2%} of the texels empty")
+        # Near-black texels are the source's padding (often JPEG-compressed, so not exactly 0).
+        have[r0:r0 + la.shape[0]] = ok & (v.sum(axis=0) >= 24)
+    # The base image under every detail texel (bilinear on the base ENU grid).
+    Lb, sb = base_img["half"], base_img["spacing"]
+    ax = -L + si / 2 + np.arange(n) * si
+    col = (ax + Lb) / sb - 0.5
+    row = (Lb - ax) / sb - 0.5
+    bimg = base_img["rgb"].astype(np.float32).transpose(2, 0, 1)
+    under = np.zeros((n, n, 3), dtype=np.float32)
+    for r0 in range(0, n, 256):
+        R, C = np.meshgrid(row[r0:r0 + 256], col, indexing="ij")
+        bv, _ok = detail_sources.bilinear(bimg, C, R)
+        under[r0:r0 + R.shape[0]] = bv.transpose(1, 2, 0)
+    # Colour balance: per-channel tone curves that give the detail image, averaged on 10 m blocks,
+    # the distribution of the base image there, so the two meet without a change of tone. Texels the detail
+    # source does not cover take the base image.
+    blk = max(1, int(round(sb / si)))
+    m = (n // blk) * blk
+    def blocks(a):
+        return a[:m, :m].reshape(m // blk, blk, m // blk, blk, -1).mean(axis=(1, 3))
+    dv = blocks(img.astype(np.float32))
+    bv = blocks(under)
+    hv = blocks(have[..., None].astype(np.float32))[..., 0] > 0.99
+    fit = []
+    out_img = img.astype(np.float32)
+    qs = np.linspace(0, 100, 33)
+    for c in range(3):
+        # Histogram matching of the 10 m blocks: a monotone tone curve per channel, applied to
+        # every texel, keeps the detail and takes the tones of the base image.
+        xq = np.percentile(dv[..., c][hv], qs)
+        yq = np.percentile(bv[..., c][hv], qs)
+        xq = np.maximum.accumulate(xq + np.arange(len(xq)) * 1e-6)
+        fit.append([[round(float(a), 2) for a in xq], [round(float(b), 2) for b in yq]])
+        out_img[..., c] = np.interp(out_img[..., c], xq, yq)
+    out_img[~have] = under[~have]
+    img = np.clip(np.round(out_img), 0, 255).astype(np.uint8)
+    filled = float((~have).mean())
     buf = io.BytesIO()
     Image.fromarray(img, "RGB").save(buf, "JPEG", quality=86, optimize=True, progressive=True)
     ibytes = buf.getvalue()
@@ -317,8 +352,8 @@ def build_detail(cfg, frame, hd, imagery, out):
                    "order": "row-major, row 0 at the north edge, column 0 at the west edge", "bytes": len(hbytes), "sha256": sha256(hbytes),
                    "min_up_m": round(float(U.min()), 2), "max_up_m": round(float(U.max()), 2)},
         "image": {"file": "detail-image.jpg", "columns": n, "rows": n, "spacing_m": si, "first_texel_centre_m": [-L + si / 2, L - si / 2],
-                  "nodata_fraction": round(float((~have).mean()), 5), "bytes": len(ibytes), "sha256": sha256(ibytes),
-                  "processing": "Area-averaged to the texel size from the source, then bilinear resampling onto the ENU grid, JPEG quality 86. No colour editing.",
+                  "nodata_fraction": 0.0, "base_fill_fraction": round(filled, 5), "colour_fit": fit, "bytes": len(ibytes), "sha256": sha256(ibytes),
+                  "processing": "Area-averaged to the texel size from the source, bilinear resampling onto the ENU grid, per-channel tone curves (colour_fit: 33 percentiles of the detail and of the base image on 10 m blocks, linearly interpolated) matching the detail image to the base image, texels without source data filled from the base image, JPEG quality 86.",
                   "geodetic_lattice_residual_mm": round(ierr * 1000, 3)},
         "note": f"Within {d['blend_m']:g} m of the edge of this layer the drawn heights blend linearly into the base grid and the image fades into the base image, so the two surfaces meet. That margin is a display adjustment of the context data.",
     }
@@ -407,14 +442,6 @@ def main():
     for (r, c) in [(0, 0), (0, 2 * k), (2 * k, 0), (2 * k, 2 * k), (k, k), (k // 2, k + k // 3), (k + k // 4, k // 5)]:
         checks.append({"lat_deg": float(lat[r, c]), "lon_deg": float(lon[r, c]), "h_ellipsoid_m": float(H[r, c] + N0),
                        "enu_m": [float(E[r, c]), float(Nn[r, c]), float(U[r, c])]})
-    layers = []
-    if det:
-        layer, dchecks, (Ed, Nd, Ud, dlat_g, dlon_g) = build_detail(cfg, frame, hd, imagery, out)
-        det_fill = float(1.0 - src.win.sample(dlat_g, dlon_g)[1].mean()) if det_dem_items is not None else 0.0
-        layers.append(layer)
-        for c in checks:
-            c["layer"] = "base"
-        checks += dchecks
 
     # Image: the first item that has data at a texel wins; the next items fill its gaps.
     items = [stac_item(i) for i in cfg["s2_items"]]
@@ -461,6 +488,15 @@ def main():
     ibytes = buf.getvalue()
     with open(os.path.join(out, "image.jpg"), "wb") as f:
         f.write(ibytes)
+
+    layers = []
+    if det:
+        layer, dchecks, (Ed, Nd, Ud, dlat_g, dlon_g) = build_detail(cfg, frame, hd, imagery, out, {"rgb": img, "half": L, "spacing": si})
+        det_fill = float(1.0 - src.win.sample(dlat_g, dlon_g)[1].mean()) if det_dem_items is not None else 0.0
+        layers.append(layer)
+        for c in checks:
+            c["layer"] = "base"
+        checks += dchecks
 
     # Registration check: the DEM land mask against the image water mask, best shift within 300 m.
     land = dem.sample(ilat, ilon) > 1.0
@@ -516,6 +552,7 @@ def main():
         "id": a.env,
         "name": cfg["name"],
         "summary": cfg["summary"],
+        **({"site_note": cfg["site_note"]} if cfg.get("site_note") else {}),
         "built": {"by": "scripts/geo/build_environment.py", "date": datetime.date.today().isoformat(),
                   "pyproj": pyproj.__version__, "proj": pyproj.proj_version_str, "rasterio": rasterio.__version__, "gdal": rasterio.__gdal_version__},
         "origin": {

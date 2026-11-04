@@ -12,6 +12,16 @@ export function shortCredits(m) {
   return (m.sources || []).map((s) => s.credit || s.attribution).filter(Boolean);
 }
 
+const km = (m) => `${(m / 1000).toLocaleString('en', { maximumFractionDigits: 1 })} km`;
+
+/** Resolution of each layer, finest first, from the validated manifest. */
+function contextText(env, h1, im) {
+  const d = (env.layers || []).find((l) => l.role === 'detail');
+  const base = `terrain ${h1.spacing_m || '?'} m and image ${im.spacing_m || '?'} m per pixel`;
+  if (!d) return `${base}, from the validated pack.`;
+  return `within the ${km(2 * d.extent_m)} square around the pad, terrain ${d.height.spacing_m} m and image ${d.image.spacing_m} m per pixel; beyond it, out to ${km(2 * env.extent_m)}, ${base}. From the validated pack; the ${d.blend_m} m margin where the layers meet is blended for display.`;
+}
+
 function licenceUrl(text) {
   const m = /(https?:\/\/\S+)/.exec(text || '');
   return m ? m[1].replace(/[.,;)]+$/, '') : null;
@@ -31,7 +41,8 @@ export function sourcesInfo(env, { warn, onSettings } = {}) {
     h('p', { class: 'si-h' }, 'What the scene shows'),
     h('dl', { class: 'si-kinds' },
       h('div', null, h('dt', null, h('span', { class: 'prov prov-sim' }, 'Simulated')), h('dd', null, 'Trajectory, attitude, throttle, estimate and events, from the run record.')),
-      h('div', null, h('dt', null, h('span', { class: 'prov prov-ctx' }, 'Context')), h('dd', null, `${env.name}: terrain ${h1.spacing_m || '?'} m, image ${im.spacing_m || '?'} m per pixel, from the validated pack. The model assumes flat ground at the pad; nothing is computed against this terrain.`)),
+      h('div', null, h('dt', null, h('span', { class: 'prov prov-ctx' }, 'Context')), h('dd', null, `${env.name}: ${contextText(env, h1, im)} The model assumes flat ground at the pad; nothing is computed against this terrain.`)),
+      env.site_note ? h('div', null, h('dt', null, h('span', { class: 'prov prov-ctx' }, 'Site')), h('dd', null, env.site_note)) : null,
       h('div', null, h('dt', null, h('span', { class: 'prov prov-ill' }, 'Illustrative')), h('dd', null, 'Stage shape, legs, fins, plume, sky, sun, shadows, water finish and pad surface: drawn for legibility, not modelled.'))),
     warn ? h('p', { class: 'si-warn' }, warn) : null,
     (env.accuracy || []).length ? h('p', { class: 'si-h' }, 'Accuracy') : null,

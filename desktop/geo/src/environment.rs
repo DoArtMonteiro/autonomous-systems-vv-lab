@@ -664,6 +664,7 @@ fn summary_of(full: &Value, env: &Environment) -> Value {
         "id": env.id,
         "name": pick("name"),
         "summary": pick("summary"),
+        "site_note": pick("site_note"),
         "origin": pick("origin"),
         "frame": pick("frame"),
         "extent_m": pick("extent_m"),

@@ -123,52 +123,83 @@ function terrainGeometry(p, g0 = p, L = p.m.extent_m, heightAt = (i) => g0.up[i]
 }
 
 /** Terrain material: the image, plus a smooth reflective finish where the sea flag is set and the image is dark. */
-// `detail`: {half, blend} of the pack's detail layer. The base discards its fragments inside the
-// detail interior; the detail layer fades out over its blend margin, where its heights already
-// meet the base (see terrainAt), so the two surfaces join without a step.
-function terrainMaterial(envMap, detail, role) {
-  const m = new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0, color: 0xffffff, envMap, envMapIntensity: 0.55, transparent: role === 'detail', polygonOffset: role === 'detail', polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+// `detail`: {half, blend} of the pack's detail layer and `baseL` the base half-extent. The base
+// discards its fragments inside the detail square; the detail layer is opaque and, over its blend
+// margin, crossfades its image into the base image with the same weight as its heights blend into
+// the base grid (see terrainAt), so surfaces and colours meet at the edge.
+function terrainMaterial(envMap, detail, role, baseL) {
+  const m = new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0, color: 0xffffff, envMap, envMapIntensity: 0.55 });
   const half = detail ? detail.half.toFixed(3) : '0.0';
   const blend = detail ? Math.max(detail.blend, 1e-3).toFixed(3) : '1.0';
-  const clip = !detail ? '' : role === 'detail'
-    ? `float dIn = ${half} - max(abs(vXY.x), abs(vXY.y)); diffuseColor.a *= clamp(dIn / ${blend}, 0.0, 1.0);`
-    : `if (max(abs(vXY.x), abs(vXY.y)) < ${half} - ${blend} - 0.5) discard;`;
+  const L = (baseL || 1).toFixed(3);
+  m.userData.baseMap = { value: null };
+  const fade = role === 'detail' ? `
+        float dIn = ${half} - max(abs(vXY.x), abs(vXY.y));
+        vec4 under = texture2D(baseMap, (vXY + ${L}) / (2.0 * ${L}));
+        diffuseColor.rgb = mix(under.rgb, diffuseColor.rgb, clamp(dIn / ${blend}, 0.0, 1.0));` : '';
+  // Two metres of overlap hide the hairline where the two triangulations meet.
+  const clip = detail && role !== 'detail' ? `if (max(abs(vXY.x), abs(vXY.y)) < ${half} - 2.0) discard;` : '';
   m.onBeforeCompile = (sh) => {
+    if (role === 'detail') sh.uniforms.baseMap = m.userData.baseMap;
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute float sea;\nvarying float vSea;\nvarying vec2 vXY;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSea = sea;\nvXY = position.xy;');
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying float vSea;\nvarying vec2 vXY;\nfloat waterMask = 0.0;')
+      .replace('#include <common>', `#include <common>\nvarying float vSea;\nvarying vec2 vXY;\nfloat waterMask = 0.0;\n${role === 'detail' ? 'uniform sampler2D baseMap;' : ''}`)
       .replace('#include <alphatest_fragment>', `#include <alphatest_fragment>\n${clip}`)
-      .replace('#include <map_fragment>', `#include <map_fragment>
+      .replace('#include <map_fragment>', `#include <map_fragment>${fade}
         float lum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
         waterMask = smoothstep(0.5, 0.95, vSea) * (1.0 - smoothstep(0.035, 0.11, lum));
         diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.35 + vec3(0.006, 0.026, 0.042), waterMask);`)
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.14, waterMask);')
       .replace('#include <lights_fragment_maps>', '#include <lights_fragment_maps>\nradiance *= mix(1.0, 1.9, waterMask);');
   };
-  m.customProgramCacheKey = () => `vv-terrain-3-${role || 'base'}-${half}-${blend}`;
+  m.customProgramCacheKey = () => `vv-terrain-4-${role || 'base'}-${half}-${blend}-${L}`;
   return m;
 }
 
-/** Open water beyond a pack whose border is sea (illustration: there is no data past the pack). */
-function waterMaterial(envMap) {
-  return new THREE.MeshStandardMaterial({ color: new THREE.Color(0x0b2a3d), roughness: 0.14, metalness: 0, envMap, envMapIntensity: 1.05 });
+/** Ground beyond the pack (illustration): vertex colours from the pack's edge, water where `sea`. */
+function beyondMaterial(envMap) {
+  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, envMap, envMapIntensity: 0.55 });
+  m.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', `#include <common>
+attribute float sea;
+varying float vSea;`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+vSea = sea;`);
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+varying float vSea;
+float waterMask = 0.0;`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+waterMask = smoothstep(0.5, 0.95, vSea);
+diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.006, 0.026, 0.042), waterMask);`)
+      .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+roughnessFactor = mix(roughnessFactor, 0.14, waterMask);`)
+      .replace('#include <lights_fragment_maps>', `#include <lights_fragment_maps>
+radiance *= mix(1.0, 1.9, waterMask);`);
+  };
+  m.customProgramCacheKey = () => 'vv-beyond-1';
+  return m;
 }
 
-/** Mean colour of the image border, for the neutral plane beyond the pack (illustration). */
-async function edgeColour(bitmap) {
+/** Colour of `bitmap` (flipped: row 0 south) at the pack points `edge` (x, y pairs), as linear RGB. */
+function edgeColours(bitmap, edge, L, out) {
+  const n = 128;
   const c = document.createElement('canvas');
-  c.width = c.height = 32;
+  c.width = c.height = n;
   const g = c.getContext('2d', { willReadFrequently: true });
-  g.drawImage(bitmap, 0, 0, 32, 32);
-  const d = g.getImageData(0, 0, 32, 32).data;
-  let r = 0; let gg = 0; let b = 0; let n = 0;
-  for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
-    if (x > 0 && y > 0 && x < 31 && y < 31) continue;
-    const i = (y * 32 + x) * 4; r += d[i]; gg += d[i + 1]; b += d[i + 2]; n++;
+  g.drawImage(bitmap, 0, 0, n, n);
+  const d = g.getImageData(0, 0, n, n).data;
+  const col = new THREE.Color();
+  for (let i = 0; i < edge.length / 2; i++) {
+    const u = (edge[2 * i] + L) / (2 * L); const v = (edge[2 * i + 1] + L) / (2 * L);
+    const px = Math.min(n - 1, Math.max(0, Math.floor(u * n))); const py = Math.min(n - 1, Math.max(0, Math.floor(v * n)));
+    const k = (py * n + px) * 4;
+    col.setRGB(d[k] / 255, d[k + 1] / 255, d[k + 2] / 255, THREE.SRGBColorSpace);
+    out[3 * i] = col.r; out[3 * i + 1] = col.g; out[3 * i + 2] = col.b;
   }
-  return new THREE.Color(`rgb(${Math.round(r / n)}, ${Math.round(gg / n)}, ${Math.round(b / n)})`);
 }
 
 /** Concrete with faint joints and the painted R5 circle, for the illustrative pad surface. */
@@ -257,38 +288,31 @@ export class GeoRocket extends CinemaRocket {
     for (const o of [this.groundDisc, this.spokes, this.cross, ...(this.rings || [])]) if (o) o.visible = false;
     // Terrain.
     const env = this.envRT ? this.envRT.texture : null;
-    this.terrainMat = terrainMaterial(env, p.detail, 'base');
+    this.terrainMat = terrainMaterial(env, p.detail, 'base', p.m.extent_m);
     this.terrain = new THREE.Mesh(terrainGeometry(p), this.terrainMat);
     this.terrain.receiveShadow = true;
     s.add(this.terrain);
     if (p.detail) {
       // The detail layer, with the heights the shell uses (blended into the base at its edge).
-      this.detailMat = terrainMaterial(env, p.detail, 'detail');
+      this.detailMat = terrainMaterial(env, p.detail, 'detail', p.m.extent_m);
       this.detail = new THREE.Mesh(terrainGeometry(p, p.detail, p.detail.half, (i, e, n) => terrainAt(p, e, n)), this.detailMat);
       this.detail.receiveShadow = true;
-      this.detail.renderOrder = 1;
       s.add(this.detail);
     }
-    // Beyond the pack: a neutral plane at the lowest edge height (no data there).
-    let edgeMin = Infinity;
-    for (let c = 0; c < p.cols; c++) edgeMin = Math.min(edgeMin, p.up[c], p.up[(p.rows - 1) * p.cols + c]);
-    for (let r = 0; r < p.rows; r++) edgeMin = Math.min(edgeMin, p.up[r * p.cols], p.up[r * p.cols + p.cols - 1]);
-    // A border that is mostly sea continues as open water at mean sea level; otherwise as a
-    // neutral plane in the border's mean colour. Both are illustrations: the pack ends here.
+    // Beyond the pack there is no data. The ground continues as an extension of the pack's own
+    // edge (illustration): open water at mean sea level where the edge is sea, elsewhere the edge
+    // height and the colour of the image at the nearest edge point. Fog hides it with distance.
     const sea = this.terrain.geometry.getAttribute('sea').array;
-    let seaEdge = 0; let nEdge = 0;
-    for (let c = 0; c < p.cols; c++) { seaEdge += sea[c] + sea[(p.rows - 1) * p.cols + c]; nEdge += 2; }
-    for (let r = 0; r < p.rows; r++) { seaEdge += sea[r * p.cols] + sea[r * p.cols + p.cols - 1]; nEdge += 2; }
-    this.beyondIsSea = seaEdge / nEdge > 0.8;
-    this.beyondMat = this.beyondIsSea ? waterMaterial(this.envRT ? this.envRT.texture : null) : new THREE.MeshStandardMaterial({ roughness: 1, color: 0x4d5a63 });
-    // Four quads around the square pack, out to the horizon.
     const L = p.m.extent_m;
     const big = 90000;
     const quads = [[-big, L, big, big], [-big, -big, big, -L], [-big, -L, -L, L], [L, -L, big, L]];
     const h0 = p.m.origin && Number.isFinite(p.m.origin.orthometric_height_m) ? p.m.origin.orthometric_height_m : 0;
-    // Open water follows the curvature of the tangent plane, as the pack's own sea heights do.
-    const zOf = (x, y) => (this.beyondIsSea ? -h0 - (x * x + y * y) / (2 * EARTH_R) - 0.25 : edgeMin - 0.6);
-    const qp = [];
+    const edgeNode = (x, y) => {
+      const c = Math.round((Math.min(L, Math.max(-L, x)) - p.x0) / p.s);
+      const r = Math.round((p.y0 - Math.min(L, Math.max(-L, y))) / p.s);
+      return Math.min(p.rows - 1, Math.max(0, r)) * p.cols + Math.min(p.cols - 1, Math.max(0, c));
+    };
+    const qp = []; const qs = []; const qe = [];
     const seg = 40;
     for (const [x0, y0, x1, y1] of quads) {
       // Geometric spacing: dense near the pack, sparse towards the horizon.
@@ -303,12 +327,22 @@ export class GeoRocket extends CinemaRocket {
       }
       for (let i = 0; i < seg; i++) for (let j = 0; j < seg; j++) {
         const a0 = [gx[i], gy[j]]; const a1 = [gx[i + 1], gy[j]]; const a2 = [gx[i + 1], gy[j + 1]]; const a3 = [gx[i], gy[j + 1]];
-        for (const [x, y] of [a0, a1, a2, a0, a2, a3]) qp.push(x, y, zOf(x, y));
+        for (const [x, y] of [a0, a1, a2, a0, a2, a3]) {
+          const k = edgeNode(x, y);
+          const w = sea[k];
+          // Water follows the curvature of the tangent plane, as the pack's own sea heights do.
+          const z = w ? -h0 - (x * x + y * y) / (2 * EARTH_R) - 0.25 : p.up[k] - 0.3;
+          qp.push(x, y, z); qs.push(w); qe.push(Math.min(L, Math.max(-L, x)), Math.min(L, Math.max(-L, y)));
+        }
       }
     }
     const qg = new THREE.BufferGeometry();
     qg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(qp), 3));
+    qg.setAttribute('sea', new THREE.BufferAttribute(new Float32Array(qs), 1));
+    qg.setAttribute('color', new THREE.BufferAttribute(new Float32Array(qs.length * 3).fill(0.3), 3));
     qg.computeVertexNormals();
+    this.beyondEdge = new Float32Array(qe);
+    this.beyondMat = beyondMaterial(this.envRT ? this.envRT.texture : null);
     this.beyond = new THREE.Mesh(qg, this.beyondMat);
     s.add(this.beyond);
     // Sky.
@@ -400,6 +434,9 @@ export class GeoRocket extends CinemaRocket {
     tex.minFilter = THREE.LinearMipmapLinearFilter;
     tex.needsUpdate = true;
     (this.bitmaps = this.bitmaps || []).push(bitmap);
+    // Once on the GPU the decoded image is not needed again (the scene never re-uploads it):
+    // release it so the CPU copy of a 4096-texel image does not stay in memory.
+    tex.onUpdate = () => { bitmap.close(); };
     return tex;
   }
 
@@ -408,13 +445,15 @@ export class GeoRocket extends CinemaRocket {
     if (!tex) return;
     this.terrainMat.map = tex;
     this.terrainMat.needsUpdate = true;
-    const edge = await edgeColour(tex.image);
+    const cattr = this.beyond.geometry.getAttribute('color');
+    edgeColours(tex.image, this.beyondEdge, pack.m.extent_m, cattr.array);
+    cattr.needsUpdate = true;
     if (this.disposed) return;
-    if (!this.beyondIsSea) this.beyondMat.color = edge;
     if (this.detail && pack.detail) {
       const dt = await this.texture(pack.detail.image);
       if (!dt) return;
       this.detailMat.map = dt;
+      this.detailMat.userData.baseMap.value = tex;
       this.detailMat.needsUpdate = true;
     }
     this.renderer.compile(this.s, this.camera);
