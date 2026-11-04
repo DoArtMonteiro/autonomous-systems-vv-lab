@@ -1,12 +1,12 @@
 PASS Settings: the installed environments are listed with sources and size  [cape-canaveral,santa-maria-azores]
 PASS Settings: Studio says it makes no network request
 PASS Geo: the player offers Engineering, Geospatial and Mission Control
-PASS Geo: the geospatial view loads from the local pack  [0.14 s]
+PASS Geo: the geospatial view loads from the local pack  [0.12 s]
 PASS Geo: an environment is selected  [cape-canaveral]
 PASS Geo: switching view keeps the same runs
 PASS Geo: the scene says what is simulated, context and illustrative  [SIMULATED trajectory, attitude, throttle, estimate, events CONTEXT Cape Canaveral coast, Florida: terrain 30 m, image 10]
 PASS Geo: the attribution of the sources is visible
-PASS Geo to Mission Control keeps the playback time  [8.068277999999923 -> 8.068277999999923]
+PASS Geo to Mission Control keeps the playback time  [8.060799999999919 -> 8.060799999999919]
 PASS Mission Control keeps the landscape
 PASS Mission Control to Engineering keeps the playback time
 PASS Geo: placing the run on a landscape changes no record
@@ -38,7 +38,7 @@ PASS Layout 1024x640: every control has a name
 PASS No environment: Geospatial is disabled and says why  [{"off": "true", "title": "No validated geographic environment is installed. See Settings, Environments."}]
 PASS No environment: the engineering scene plays offline
 PASS No environment: Mission Control works on the engineering scene
-PASS Tampered pack: it is rejected with the reason  [MB in total. Imported packs are kept in %USERPROFILE%\AppData\Local\Temp\vv-m16-lib-fo2ltdip\environments.  Import a pack folder… Open the imported packs folder]
+PASS Tampered pack: it is rejected with the reason  [MB in total. Imported packs are kept in %USERPROFILE%\AppData\Local\Temp\vv-m16-lib-iddh4ziz\environments.  Import a pack folder… Open the imported packs folder]
 PASS Tampered pack: Geospatial is disabled and says why  [{"off": "true", "title": "No validated geographic environment is installed. See Settings, Environments."}]
 PASS Tampered pack: the engineering scene plays offline
 PASS Tampered pack: Mission Control works on the engineering scene

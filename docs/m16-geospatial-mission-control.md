@@ -106,11 +106,11 @@ O ecrã limita a 165 fotogramas por segundo, por isso o p99 de 6,2 ms é o limit
 
 ## Instalação e reversão
 
-O instalador `VV Lab Studio_0.16.0_x64-setup.exe` (sha256 `aa9c540109722f9cb012c9329b7ddb3053092cd7d0765c40add5895c6159fcaf`) instala por utilizador por cima da 0.15.0; o `--self-test` passa, incluindo a validação dos pacotes, e as jornadas M16 (45 de 45) e M15 (48 de 48) passam no Studio instalado (`docs/evidence/m16/installed/`). Para voltar à 0.15.0, desinstalar e correr o instalador da 0.15.0 (sha256 `b76db8857a6b5f241860f2eda7672543fe821caa1272bfe911aa92c1dade30b7`, artefacto do PR #24). As bibliotecas, os pacotes importados e as preferências não são apagados.
+O instalador `VV Lab Studio_0.16.0_x64-setup.exe` (sha256 `984f677f7ed831b2398826406c770a5b09e1c816d34faa119c40748333bda10d`) instala por utilizador por cima da 0.15.0; o `--self-test` passa, incluindo a validação dos pacotes, e as jornadas M16 (45 de 45) e M15 (48 de 48) passam no Studio instalado (`docs/evidence/m16/installed/`). Para voltar à 0.15.0, desinstalar e correr o instalador da 0.15.0 (sha256 `b76db8857a6b5f241860f2eda7672543fe821caa1272bfe911aa92c1dade30b7`, artefacto do PR #24). As bibliotecas, os pacotes importados e as preferências não são apagados.
 
 ## Revisões independentes
 
-Três revisões por agentes, cada uma sobre o código e não sobre as conclusões deste texto:
+Quatro revisões por agentes (a quarta, visual e de acessibilidade, sobre as capturas do Studio instalado), as três primeiras sobre o código e não sobre as conclusões deste texto:
 
 - **Geodésia e coerência com a física.** Confirmou as fórmulas WGS84 e ENU, o registo da imagem (sem desvio de meio texel nem inversão norte-sul), a orientação da grelha nas três linguagens e o datum; recalculou os pontos de controlo com o pipeline topocêntrico do PROJ (pior diferença 0,26 mm). Corrigido em `e907602`: pacotes com rumo diferente de zero recusados (o renderizador ainda não roda o referencial), interpolação nos triângulos desenhados, planos de recorte depois de mudar de câmara, extensões exatas, linha vertical abaixo de z = 0, falha do geoide no script.
 - **Segurança e licenças.** Sem problema explorável. Corrigido em `da4f543`: tamanho real do JPEG igual ao declarado, nomes de dispositivos do Windows recusados, limpeza da importação falhada. Atribuições conferidas com o texto das licenças.
@@ -123,6 +123,8 @@ Uma revisão de agente não substitui um teste de usabilidade com pessoas, que n
 - A faixa de fases do leitor do M15 continua a marcar as violações desde o início; no Mission Control só são nomeadas quando a reprodução lá chega.
 - Os grupos de rádio não têm navegação por setas (só Tab).
 - Uma terceira execução de desempenho do M16.
+- Revisão visual por agente (corrigida em grande parte depois): a 1024x640 os distintivos dos veredictos ficam cortados na margem do painel direito.
+- As medições de desempenho foram feitas antes das últimas correções visuais (só CSS e o cartão de evidência); as jornadas e o `--self-test` foram repetidos no instalador final.
 
 ## Próxima expansão de domínio
 
