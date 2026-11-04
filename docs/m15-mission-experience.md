@@ -56,17 +56,17 @@ Estas verificações são guiões automáticos sobre o que o ecrã mostra. **Nã
 
 Medido fora da simulação com `desktop/studio/tests/perf_probe.py`, na máquina de desenvolvimento (processador AMD da família 25 modelo 97, Radeon RX 7700 XT por ANGLE/Direct3D 11, Windows 11, ecrã a cerca de 165 Hz), três execuções por versão, janela de 1440x900. A versão 0.11 é a instalada antes do M15.
 
-| Medida (média de 3) | 0.11 instalada | 0.15 preparada |
+| Medida (média de 3) | 0.11 instalada | 0.15 instalada |
 | --- | --- | --- |
-| Arranque até à plataforma pronta | 2,00 s (1,19 a 3,28) | 0,98 s (0,95 a 1,03) |
+| Arranque até à plataforma pronta | 2,00 s (1,19 a 3,28) | 0,99 s (0,95 a 1,06) |
 | Cliques desde o ecrã pronto até uma aterragem | 3 (Prepare, domínio, demonstração) | 1 (Início) |
-| Clique até à aterragem no ecrã, incluindo a simulação | 0,79 s | 0,26 s |
-| Intervalo entre fotogramas durante a reprodução, mediana | 6,1 ms | 7,8 ms |
+| Clique até à aterragem no ecrã, incluindo a simulação | 0,79 s | 0,24 s |
+| Intervalo entre fotogramas durante a reprodução, mediana | 6,1 ms | 7,7 ms |
 | Idem, percentil 95 / 99 | 12,1 / 18,3 ms | 8,3 / 8,6 ms |
 | Fotogramas acima de 33 ms em 5 s | 0 | 0 |
-| Memória durante a reprodução (conjunto de trabalho / privada) | 528 / 382 MB | 449 / 320 MB |
+| Memória durante a reprodução (conjunto de trabalho / privada) | 528 / 382 MB | 453 / 318 MB |
 
-A mediana do intervalo entre fotogramas subiu porque a vista 3D do leitor ocupa quase todo o ecrã (cerca de 127 fotogramas por segundo contra os 165 do ecrã); a cauda melhorou. A 0.11 foi medida instalada e a 0.15 a partir da pasta de compilação, o que pode favorecer ligeiramente o arranque da 0.15. Os ficheiros estão em `docs/evidence/m15/`.
+A mediana do intervalo entre fotogramas subiu porque a vista 3D do leitor ocupa quase todo o ecrã (cerca de 127 fotogramas por segundo contra os 165 do ecrã); a cauda melhorou. As duas versões foram medidas instaladas; a 0.15 também foi medida a partir da pasta de compilação, com valores iguais dentro da variação. Os ficheiros estão em `docs/evidence/m15/`.
 
 O arranque e a memória são do processo `vv-studio` e de todos os processos WebView2 descendentes. O tempo «até à aterragem no ecrã» é o tempo da máquina; não inclui o tempo que uma pessoa leva a encontrar o caminho, que na 0.11 começava no Discovery Lab sem nenhuma aterragem visível.
 
