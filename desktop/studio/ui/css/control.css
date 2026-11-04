@@ -199,3 +199,5 @@
 .mct-count { position: absolute; top: -7px; right: -6px; min-width: 12px; height: 12px; padding: 0 3px; border-radius: 6px; background: var(--fg-2); color: var(--bg-0); font: 600 8.5px/12px var(--mono); }
 .mc-ev-group { display: grid; gap: 3px; margin: 6px 0 4px; font-size: 12.5px; }
 .mc-ev-group .mc-ev-label { margin: 0; font-size: 12.5px; }
+.mct-mark.is-future { color: var(--fg-3); }
+.kind-\? { color: var(--fail); border-style: dashed; }

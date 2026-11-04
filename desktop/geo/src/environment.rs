@@ -196,13 +196,50 @@ pub fn sha256_hex(b: &[u8]) -> String {
     d.iter().map(|x| format!("{x:02x}")).collect()
 }
 
-/// Environment ids are folder names: lower-case letters, digits and hyphens, 1 to 48 characters.
+/// Environment ids are folder names: lower-case letters, digits and hyphens, 1 to 48 characters,
+/// and never a Windows device name.
 pub fn valid_id(id: &str) -> bool {
+    const RESERVED: [&str; 4] = ["con", "prn", "aux", "nul"];
+    let device = RESERVED.contains(&id)
+        || ((id.starts_with("com") || id.starts_with("lpt"))
+            && id.len() == 4
+            && id.as_bytes()[3].is_ascii_digit());
     (1..=48).contains(&id.len())
         && id
             .bytes()
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
         && !id.starts_with('-')
+        && !device
+}
+
+/// Width and height from the first start-of-frame marker of a JPEG (baseline, extended or
+/// progressive), or `None` when the stream has none before the image data.
+pub fn jpeg_size(b: &[u8]) -> Option<(usize, usize)> {
+    let mut i = 2;
+    while i + 4 <= b.len() {
+        if b[i] != 0xFF {
+            return None;
+        }
+        let marker = b[i + 1];
+        if marker == 0xFF {
+            i += 1;
+            continue;
+        }
+        let len = u16::from_be_bytes([b[i + 2], b[i + 3]]) as usize;
+        if (0xC0..=0xC2).contains(&marker) {
+            if i + 9 > b.len() {
+                return None;
+            }
+            let h = u16::from_be_bytes([b[i + 5], b[i + 6]]) as usize;
+            let w = u16::from_be_bytes([b[i + 7], b[i + 8]]) as usize;
+            return Some((w, h));
+        }
+        if marker == 0xDA || len < 2 {
+            return None;
+        }
+        i += 2 + len;
+    }
+    None
 }
 
 impl Environment {
@@ -312,6 +349,16 @@ impl Environment {
         }
         if !ib.starts_with(&[0xFF, 0xD8, 0xFF]) {
             return invalid(format!("{IMAGE_FILE} is not a JPEG file"));
+        }
+        // The decoded size is what the web view allocates: it must be the declared one.
+        match jpeg_size(&ib) {
+            Some((w, hh)) if w == im.columns && hh == im.rows => {}
+            other => {
+                return invalid(format!(
+                    "{IMAGE_FILE} is {other:?} pixels, the manifest declares {}x{}",
+                    im.columns, im.rows
+                ));
+            }
         }
 
         if m.sources.is_empty()
@@ -625,6 +672,34 @@ mod tests {
                 .contains("schema")
         );
         assert!(!valid_id("-x") && !valid_id("a/b") && !valid_id("") && valid_id("cape-canaveral"));
+        assert!(
+            !valid_id("con")
+                && !valid_id("nul")
+                && !valid_id("com1")
+                && !valid_id("lpt9")
+                && valid_id("console")
+        );
+        let _ = fs::remove_dir_all(d);
+    }
+
+    #[test]
+    fn an_image_whose_real_size_differs_from_the_manifest_is_rejected() {
+        let d = scratch("jpeg-size");
+        let p = copy_pack("cape-canaveral", &d);
+        let mut b = fs::read(p.join(IMAGE_FILE)).unwrap();
+        assert_eq!(jpeg_size(&b), Some((1800, 1800)));
+        // Forge the start-of-frame height to 65535 and update the manifest hash to match.
+        let i = (2..b.len() - 9)
+            .find(|&i| b[i] == 0xFF && (0xC0..=0xC2).contains(&b[i + 1]))
+            .unwrap();
+        b[i + 5] = 0xFF;
+        b[i + 6] = 0xFF;
+        fs::write(p.join(IMAGE_FILE), &b).unwrap();
+        let mut m: Value = serde_json::from_slice(&fs::read(p.join(MANIFEST)).unwrap()).unwrap();
+        m["image"]["sha256"] = json!(sha256_hex(&b));
+        fs::write(p.join(MANIFEST), serde_json::to_vec(&m).unwrap()).unwrap();
+        let e = Environment::open(&p).unwrap_err();
+        assert!(e.to_string().contains("pixels"), "{e}");
         let _ = fs::remove_dir_all(d);
     }
 

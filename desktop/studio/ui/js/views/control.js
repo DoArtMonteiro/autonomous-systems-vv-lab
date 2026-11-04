@@ -7,7 +7,7 @@
 // C controller command, D derived, G geographic placement. Verdicts come from the record and are
 // shown as judged only once the playback reaches their decisive instant.
 
-import { h, clear, icon, prose, timeText } from '../dom.js';
+import { h, clear, icon, prose, timeText, lowerIndex } from '../dom.js';
 import { pref, setPref } from '../store.js';
 import { telemetry, verdictsAt, fmt, TAG_WORD } from '../session.js';
 
@@ -41,7 +41,7 @@ export function eventsOf(pl, runIndex) {
   }
   for (const f of run.record.request.faults || []) {
     // The host may already record the onset as a fault event; do not show it twice.
-    if (out.some((e) => e.sev === 'fault' && Math.abs(e.t - f.start) < 1e-9)) continue;
+    if (out.some((e) => e.sev === 'fault' && Math.abs(e.t - f.start) < 1e-9 && e.label.includes(f.kind))) continue;
     const mag = f.magnitude !== null && f.magnitude !== undefined ? ` (magnitude ${f.magnitude})` : '';
     out.push({ t: f.start, sev: 'onset', label: `Injected fault ${f.kind} starts${mag}, until ${timeText(f.end, pl.unit)}`, source: 'fault injection', run: runIndex });
   }
@@ -80,8 +80,7 @@ export function buildControl(pl, ctx) {
       h('span', { class: 'pl-swatch', style: { background: r.colour } }), r.label))) : null;
   const tl = buildTimeline(pl, (ev) => select(ev));
   const evidence = h('section', { class: 'mc-evidence', hidden: true, 'aria-live': 'polite', 'aria-label': 'Selected event' });
-  const tags = ['T', 'E', 'O', 'C', 'D', ...(ctx.geoActive() ? ['G'] : [])];
-  const legend = h('p', { class: 'mc-legend' }, ...tags.map((k) => h('span', { title: TAG_WORD[k] }, h('abbr', { class: `kind kind-${k}` }, k), ` ${TAG_WORD[k].split(',')[0]}`)));
+  const legend = h('p', { class: 'mc-legend' });
   const el = h('div', { class: ['mc', `mc-${density}`], dataset: { density } }, viewport, top, left, right, strip, runs, evidence, h('footer', { class: 'mc-bottom' }, tl.el, legend), ctx.sceneNote());
 
   function setDensity(d) {
@@ -91,8 +90,7 @@ export function buildControl(pl, ctx) {
     el.classList.toggle('mc-technical', d === 'technical');
     el.dataset.density = d;
     for (const b of densitySeg.children) b.setAttribute('aria-checked', String(b.dataset.density === d));
-    lastSlow = -1;
-    update(pl.cursor.t);
+    update(pl.cursor.t, true);
   }
 
   function select(ev) {
@@ -102,7 +100,7 @@ export function buildControl(pl, ctx) {
     pl.cursor.set(ev.t);
     renderEvidence();
     tl.highlight(ev);
-    lastSlow = -1;
+    update(pl.cursor.t, true);
   }
 
   function renderEvidence() {
@@ -127,80 +125,178 @@ export function buildControl(pl, ctx) {
     evidence.hidden = false;
   }
 
-  function valueNode(r, cls) {
-    return h('span', { class: cls }, fmt(r.value, r.digits), r.value !== null && typeof r.value === 'number' && r.unit ? h('span', { class: 'mc-unit' }, ` ${r.unit}`) : null);
-  }
+  // Panels are built once (and again only when their shape changes) and then updated in place, so
+  // a button under the pointer or with keyboard focus is never replaced during playback.
+  const allEvents = pl.runs.flatMap((_, i) => eventsOf(pl, i)).sort((a, b) => a.t - b.t);
+  const valueSet = (node, r) => {
+    const text = fmt(r.value, r.digits);
+    const unit = r.value !== null && typeof r.value === 'number' && r.unit ? ` ${r.unit}` : '';
+    if (node.firstChild && node.firstChild.nodeValue === text && node.dataset.unit === unit) return;
+    node.dataset.unit = unit;
+    node.replaceChildren(text, ...(unit ? [h('span', { class: 'mc-unit' }, unit)] : []));
+  };
+  const valueNode = (r, cls) => { const n = h('span', { class: cls }); valueSet(n, r); return n; };
 
+  let leftSig = '';
+  const leftRows = new Map();
   function telemetryPanel(t) {
-    const run = pl.runs[pl.active];
-    return telemetry(run, t, rocket, ctx.geo()).map((g) => h('section', { class: 'mc-group', dataset: { group: g.id } },
-      h('h2', { class: 'mc-h' }, g.title),
-      g.note ? h('p', { class: 'mc-note' }, g.note) : null,
-      h('dl', { class: 'mc-dl' }, g.rows.map((r) => h('div', { class: 'mc-row', title: r.title, dataset: { channel: r.id } },
-        h('dt', null, h('abbr', { class: `kind kind-${r.tag}`, title: TAG_WORD[r.tag] }, r.tag), r.label),
-        h('dd', { class: 'mono' }, valueNode(r, 'mc-val')))))));
+    const groups = telemetry(pl.runs[pl.active], t, rocket, ctx.geo());
+    const sig = groups.map((g) => `${g.id}:${g.rows.map((r) => `${r.id}/${r.tag}`).join(',')}`).join('|');
+    if (sig !== leftSig) {
+      leftSig = sig;
+      leftRows.clear();
+      left.replaceChildren(...groups.map((g) => h('section', { class: 'mc-group', dataset: { group: g.id } },
+        h('h2', { class: 'mc-h' }, g.title),
+        g.note ? h('p', { class: 'mc-note' }, g.note) : null,
+        h('dl', { class: 'mc-dl' }, g.rows.map((r) => {
+          const dd = valueNode(r, 'mc-val');
+          leftRows.set(r.id, dd);
+          return h('div', { class: 'mc-row', title: r.title, dataset: { channel: r.id } },
+            h('dt', null, h('abbr', { class: `kind kind-${r.tag}`, title: TAG_WORD[r.tag] }, r.tag), r.label),
+            h('dd', { class: 'mono' }, dd));
+        })))));
+      return;
+    }
+    for (const g of groups) for (const r of g.rows) { const n = leftRows.get(r.id); if (n) valueSet(n, r); }
   }
 
-  function statusPanel(t) {
-    const out = [];
+  // Status: verdict lines, events, comparison and the ways into analysis.
+  const vLines = new Map();
+  const evButtons = [];
+  const cmpCells = [];
+  function verdictLine(q) {
+    const li = h('li', { class: 'mc-v', dataset: { req: q.id } }, h('span', { class: 'mc-v-id mono' }, q.id.split('_')[0]), h('span', { class: 'mc-v-l' }, q.label), h('span', { class: 'mc-v-s' }));
+    vLines.set(q.id, li);
+    return li;
+  }
+  function buildStatus() {
+    vLines.clear();
+    evButtons.length = 0;
+    cmpCells.length = 0;
     const run = pl.runs[pl.active];
-    const vs = verdictsAt(run, t);
-    const line = (v) => h('li', { class: `mc-v v-${VSTATE[v.state].tone}`, dataset: { req: v.q.id, state: v.state }, title: `${v.q.label}: expected ${v.q.expected}, observed ${v.q.observed}${Number.isFinite(v.q.t) ? ` (decisive instant ${timeText(v.q.t, pl.unit)})` : ''}` },
-      h('span', { class: 'mc-v-id mono' }, v.q.id.split('_')[0]),
-      h('span', { class: 'mc-v-l' }, v.q.label),
-      h('span', { class: 'mc-v-s' }, VSTATE[v.state].word));
-    out.push(h('section', { class: 'mc-group', dataset: { group: 'requirements' } }, h('h2', { class: 'mc-h' }, 'Mission requirements'), h('ul', { class: 'mc-vlist' }, vs.filter((v) => v.q.category !== 'invariant').map(line)),
-      h('p', { class: 'mc-note' }, 'Judged at their decisive instant, usually contact; pending until then.')));
-    out.push(h('section', { class: 'mc-group', dataset: { group: 'invariants' } }, h('h2', { class: 'mc-h' }, 'Safety invariants'), h('ul', { class: 'mc-vlist' }, vs.filter((v) => v.q.category === 'invariant').map(line)),
-      h('p', { class: 'mc-note' }, 'Judged on the true state throughout the run.')));
-    const evs = pl.runs.flatMap((_, i) => eventsOf(pl, i)).sort((a, b) => a.t - b.t);
-    out.push(h('section', { class: 'mc-group', dataset: { group: 'events' } }, h('h2', { class: 'mc-h' }, 'Events'),
-      evs.length ? h('ol', { class: 'mc-evlist' }, evs.slice(0, 30).map((e) => h('li', null, h('button', { type: 'button', class: ['mc-evbtn', e.t <= t + 1e-9 ? 'is-past' : '', sameEvent(selected, e) ? 'is-sel' : ''], onclick: () => select(e) },
-        h('span', { class: `mc-glyph sev-${e.sev}`, 'aria-hidden': 'true' }, (SEVERITY[e.sev] || SEVERITY.info).glyph),
-        h('span', { class: 'mc-ev-t mono' }, timeText(e.t, pl.unit)),
-        pl.runs.length > 1 ? h('span', { class: 'pl-swatch', style: { background: pl.runs[e.run].colour } }) : null,
-        h('span', { class: 'mc-ev-l' }, e.label))))) : h('p', { class: 'mc-note' }, 'No event recorded.')));
+    const reqs = run.record.requirements || [];
+    const out = [
+      h('section', { class: 'mc-group', dataset: { group: 'requirements' } }, h('h2', { class: 'mc-h' }, 'Mission requirements'), h('ul', { class: 'mc-vlist' }, reqs.filter((q) => q.category !== 'invariant').map(verdictLine)),
+        h('p', { class: 'mc-note' }, 'Judged at their decisive instant, usually contact; pending until then.')),
+      h('section', { class: 'mc-group', dataset: { group: 'invariants' } }, h('h2', { class: 'mc-h' }, 'Safety invariants'), h('ul', { class: 'mc-vlist' }, reqs.filter((q) => q.category === 'invariant').map(verdictLine)),
+        h('p', { class: 'mc-note' }, 'Judged on the true state throughout the run.')),
+      h('section', { class: 'mc-group', dataset: { group: 'events' } }, h('h2', { class: 'mc-h' }, `Events (${allEvents.length})`),
+        allEvents.length ? h('ol', { class: 'mc-evlist' }, allEvents.map((e) => {
+          const label = h('span', { class: 'mc-ev-l' });
+          const glyph = h('span', { class: `mc-glyph sev-${e.sev}`, 'aria-hidden': 'true' });
+          const b = h('button', { type: 'button', class: 'mc-evbtn', onclick: () => select(e) }, glyph, h('span', { class: 'mc-ev-t mono' }, timeText(e.t, pl.unit)),
+            pl.runs.length > 1 ? h('span', { class: 'pl-swatch', style: { background: pl.runs[e.run].colour } }) : null, label);
+          evButtons.push({ e, b, label, glyph, shown: null });
+          return h('li', null, b);
+        })) : h('p', { class: 'mc-note' }, 'No event recorded.')),
+    ];
     if (pl.runs.length > 1) {
-      const pick = (r) => { const g = telemetry(r, t, rocket, null); return g[0] ? g[0].rows.slice(0, 2) : []; };
-      const heads = pick(pl.runs[0]).map((x) => h('th', { scope: 'col' }, h('abbr', { class: `kind kind-${x.tag}` }, x.tag), ` ${x.label}`));
-      const rows = pl.runs.map((r) => h('tr', null, h('th', { scope: 'row' }, h('span', { class: 'pl-swatch', style: { background: r.colour } }), ` ${r.label}`), ...pick(r).map((x) => h('td', { class: 'mono', title: x.title }, valueNode(x, 'mc-val')))));
+      const first = (r) => { const g = telemetry(r, pl.cursor.t, rocket, null); return g[0] ? g[0].rows.slice(0, 2) : []; };
+      const heads = first(pl.runs[0]).map((x) => h('th', { scope: 'col' }, h('abbr', { class: `kind kind-${x.tag}` }, x.tag), ` ${x.label}`));
+      const rows = pl.runs.map((r, i) => h('tr', null, h('th', { scope: 'row' }, h('span', { class: 'pl-swatch', style: { background: r.colour } }), ` ${r.label}`),
+        ...first(r).map((x, k) => { const n = valueNode(x, 'mc-val'); cmpCells.push({ i, k, n }); return h('td', { class: 'mono', title: x.title }, n); })));
       out.push(h('section', { class: 'mc-group', dataset: { group: 'compare' } }, h('h2', { class: 'mc-h' }, 'Runs at this instant'), h('table', { class: 'mc-cmp' }, h('thead', null, h('tr', null, h('th', null, h('span', { class: 'sr-only' }, 'Run')), ...heads)), h('tbody', null, rows))));
     }
     out.push(h('section', { class: 'mc-group mc-go' }, h('h2', { class: 'mc-h' }, 'Investigate'),
       h('div', { class: 'mc-go-row' },
-        h('button', { type: 'button', class: 'btn btn-sm', dataset: { action: 'analyse-here' }, onclick: () => ctx.navigate('run', { runId: run.runId, t: pl.cursor.t }) }, 'Analyse this run here'),
+        h('button', { type: 'button', class: 'btn btn-sm', dataset: { action: 'analyse-here' }, onclick: () => ctx.navigate('run', { runId: pl.runs[pl.active].runId, t: pl.cursor.t }) }, 'Analyse this run here'),
         pl.runs.length > 1 ? h('button', { type: 'button', class: 'btn btn-sm btn-quiet', onclick: () => ctx.navigate('compare', { runIds: pl.runs.map((r) => r.runId), demo: pl.demo }) }, 'Compare in detail') : null,
         pl.exp.claim ? h('button', { type: 'button', class: 'btn btn-sm btn-quiet', onclick: () => ctx.navigate('discover', { claimId: pl.exp.claim }) }, 'Challenge the claim') : null)));
-    return out;
+    right.replaceChildren(...out);
   }
 
+  function statusPanel(t) {
+    const run = pl.runs[pl.active];
+    for (const v of verdictsAt(run, t)) {
+      const li = vLines.get(v.q.id);
+      if (!li) continue;
+      const st = VSTATE[v.state];
+      li.className = `mc-v v-${st.tone}`;
+      li.dataset.state = v.state;
+      li.lastChild.textContent = st.word;
+      // Expected and observed values only once the verdict is reached: no result before its time.
+      const reached = v.decided || v.state === 'held';
+      const at = Number.isFinite(v.q.t) ? ` (decisive instant ${timeText(v.q.t, pl.unit)})` : '';
+      li.title = reached ? `${v.q.label}: expected ${v.q.expected}, observed ${v.q.observed}${at}` : `${v.q.label}: ${st.word}`;
+    }
+    for (const x of evButtons) {
+      const shown = !hiddenUntilReached(x.e, t);
+      x.b.classList.toggle('is-past', x.e.t <= t + 1e-9);
+      x.b.classList.toggle('is-sel', sameEvent(selected, x.e));
+      if (x.shown === shown) continue;
+      x.shown = shown;
+      x.label.textContent = shown ? x.e.label : 'Verifier finding, shown when the playback reaches it';
+      x.glyph.textContent = shown ? (SEVERITY[x.e.sev] || SEVERITY.info).glyph : '○';
+      x.glyph.className = `mc-glyph ${shown ? `sev-${x.e.sev}` : 'sev-info'}`;
+    }
+    for (const c of cmpCells) {
+      const g = telemetry(pl.runs[c.i], t, rocket, null);
+      const r = g[0] && g[0].rows[c.k];
+      if (r) valueSet(c.n, r);
+    }
+  }
+
+  const kv = new Map();
   function keyValues(t) {
     const flat = telemetry(pl.runs[pl.active], t, rocket, ctx.geo()).flatMap((x) => x.rows);
     const ids = rocket ? ['altitude', 'vel_z', 'touchdown_vertical_speed', 'act_throttle', 'err_z'] : ['truth_x_mm', 'truth_y_mm', 'goal_distance_mm', 'confidence_permille'];
-    return ids.map((id) => flat.find((r) => r.id === id)).filter(Boolean).slice(0, 4).map((r) => h('div', { class: 'mc-kv', title: r.title, dataset: { channel: r.id } },
-      h('span', { class: 'mc-kv-l' }, h('abbr', { class: `kind kind-${r.tag}` }, r.tag), r.label),
-      valueNode(r, 'mc-kv-v mono')));
+    const rows = ids.map((id) => flat.find((r) => r.id === id)).filter(Boolean).slice(0, 4);
+    const sig = rows.map((r) => r.id).join(',');
+    if (strip.dataset.sig !== sig) {
+      strip.dataset.sig = sig;
+      kv.clear();
+      strip.replaceChildren(...rows.map((r) => {
+        const n = valueNode(r, 'mc-kv-v mono');
+        kv.set(r.id, n);
+        return h('div', { class: 'mc-kv', title: r.title, dataset: { channel: r.id } }, h('span', { class: 'mc-kv-l' }, h('abbr', { class: `kind kind-${r.tag}` }, r.tag), r.label), n);
+      }));
+      return;
+    }
+    for (const r of rows) valueSet(kv.get(r.id), r);
   }
 
-  let lastSlow = -1;
-  function update(t) {
+  function buildLegend() {
+    const tags = ['T', 'E', 'O', 'C', 'D', ...(ctx.geoActive() && pl.track ? ['G'] : [])];
+    legend.replaceChildren(...tags.map((k) => h('span', { title: TAG_WORD[k] }, h('abbr', { class: `kind kind-${k}` }, k), ` ${TAG_WORD[k].split(',')[0]}`)));
+  }
+
+  // Values change only from one recorded sample to the next: refresh them then, not every frame.
+  let lastKey = null;
+  function update(t, force) {
     clock.textContent = pl.unit === 'tick' ? String(Math.floor(t)) : `T+${t.toFixed(1)} s`;
     const ph = ctx.phaseAt(t);
     phase.textContent = ph.text;
     phase.className = `mc-phase ph-${ph.kind}`;
-    strip.replaceChildren(...keyValues(t));
-    // The panels are heavier: refresh them at most every 100 ms of wall time while playing.
-    const now = performance.now();
-    if (density === 'technical' && (!pl.cursor.playing || now - lastSlow > 100)) {
-      lastSlow = now;
-      left.replaceChildren(...telemetryPanel(t));
-      right.replaceChildren(...statusPanel(t));
+    tl.update(t);
+    const m = pl.runs[pl.active].model;
+    const key = `${pl.active}|${lowerIndex(m.timebases[m.primary] || [], t)}|${t >= m.t1 - 1e-9}|${density}|${selected ? selected.t : ''}`;
+    if (!force && key === lastKey) return;
+    lastKey = key;
+    keyValues(t);
+    if (density === 'technical') {
+      telemetryPanel(t);
+      statusPanel(t);
     }
     if (runs) for (const b of runs.children) b.setAttribute('aria-checked', String(Number(b.dataset.run) === pl.active));
-    tl.update(t);
   }
 
-  return { el, viewport, update, refresh: () => { lastSlow = -1; tl.redraw(); update(pl.cursor.t); }, dispose: () => tl.dispose() };
+  function refresh() {
+    leftSig = '';
+    strip.dataset.sig = '';
+    buildStatus();
+    buildLegend();
+    tl.redraw();
+    update(pl.cursor.t, true);
+  }
+
+  buildStatus();
+  buildLegend();
+  return { el, viewport, update, refresh, dispose: () => tl.dispose() };
+}
+
+/** Verifier findings (violations, warnings) stay unnamed until the playback reaches them. */
+export function hiddenUntilReached(e, t) {
+  return (e.sev === 'violation' || e.sev === 'warning') && e.t > t + 1e-9;
 }
 
 // ----------------------------------------------------------------------------- signature timeline
@@ -214,7 +310,9 @@ function buildTimeline(pl, onSelect) {
   const play = h('button', { type: 'button', class: 'mct-play', 'aria-label': 'Play', title: 'Play or pause (Space)', onclick: () => { if (c.t >= c.t1) c.set(c.t0); c.toggle(); } }, icon('play'));
   const prev = h('button', { type: 'button', class: 'mct-btn', 'aria-label': 'Previous event', title: 'Previous event', onclick: () => c.prevEvent() }, '‹');
   const next = h('button', { type: 'button', class: 'mct-btn', 'aria-label': 'Next event', title: 'Next event', onclick: () => c.nextEvent() }, '›');
-  const unplay = c.onPlayState((p) => { play.replaceChildren(icon(p ? 'pause' : 'play')); play.setAttribute('aria-label', p ? 'Pause' : 'Play'); });
+  const onPlay = (p) => { play.replaceChildren(icon(p ? 'pause' : 'play')); play.setAttribute('aria-label', p ? 'Pause' : 'Play'); };
+  const unplay = c.onPlayState(onPlay);
+  onPlay(c.playing);
   const labels = h('div', { class: 'mct-labels' });
   const el = h('section', { class: 'mct', 'aria-label': 'Mission timeline' }, h('div', { class: 'mct-controls' }, prev, play, next), labels, h('div', { class: 'mct-track' }, ticks, lanes, head, range));
   const span = () => c.t1 - c.t0 || 1;
@@ -258,7 +356,7 @@ function buildTimeline(pl, onSelect) {
         const text = g.map((x) => `${(SEVERITY[x.sev] || SEVERITY.info).word}, ${timeText(x.t, pl.unit)}: ${x.label}`).join('; ');
         const b = h('button', { type: 'button', class: `mct-mark sev-${lead.sev}`, style: { left: pos(lead.t) }, 'aria-label': `${text} (${run.label})`, title: g.map((x) => `${timeText(x.t, pl.unit)} · ${x.label}`).join(' | '), onclick: () => onSelect(ev) },
           h('span', { 'aria-hidden': 'true' }, s2.glyph), g.length > 1 ? h('span', { class: 'mct-count', 'aria-hidden': 'true' }, String(g.length)) : null);
-        marks.push({ ev, b });
+        marks.push({ ev, b, glyph: b.firstChild, text: `${text} (${run.label})`, tip: b.title, hidden: null });
         lane.append(b);
       }
       lanes.append(lane);
@@ -268,6 +366,16 @@ function buildTimeline(pl, onSelect) {
 
   function update(t) {
     head.style.left = pos(t);
+    // A verifier finding is marked but not named until the playback reaches it.
+    for (const m of marks) {
+      const hidden = m.ev.group.every((x) => hiddenUntilReached(x, t) || x.sev === 'info') && m.ev.group.some((x) => hiddenUntilReached(x, t));
+      if (hidden === m.hidden) continue;
+      m.hidden = hidden;
+      m.glyph.textContent = hidden ? '○' : (SEVERITY[m.ev.sev] || SEVERITY.info).glyph;
+      m.b.classList.toggle('is-future', hidden);
+      m.b.setAttribute('aria-label', hidden ? `Verifier finding at ${timeText(m.ev.t, pl.unit)}, named when the playback reaches it` : m.text);
+      m.b.title = hidden ? `${timeText(m.ev.t, pl.unit)} · verifier finding (shown when reached)` : m.tip;
+    }
     if (Number(range.value) !== t) range.value = String(t);
     range.setAttribute('aria-valuetext', timeText(t, pl.unit));
     for (const l of [...lanes.children, ...labels.children]) l.classList.toggle('is-active', Number(l.dataset.run) === pl.active);

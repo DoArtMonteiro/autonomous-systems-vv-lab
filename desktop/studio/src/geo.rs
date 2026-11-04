@@ -315,9 +315,15 @@ pub async fn import_environment(
         }
         let staged = geo.paths.imported.join(format!(".import-{}", env.id));
         let _ = fs::remove_dir_all(&staged);
-        copy_pack(&src, &staged)?;
+        if let Err(e) = copy_pack(&src, &staged) {
+            let _ = fs::remove_dir_all(&staged);
+            return Err(e);
+        }
         let check = staged.with_file_name(&env.id);
-        fs::rename(&staged, &check).map_err(err)?;
+        if let Err(e) = fs::rename(&staged, &check) {
+            let _ = fs::remove_dir_all(&staged);
+            return Err(err(e));
+        }
         if let Err(e) = Environment::open(&check) {
             let _ = fs::remove_dir_all(&check);
             return Err(geo_err(e));

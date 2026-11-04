@@ -83,8 +83,8 @@ export function readouts(run, t, rocket) {
     if (contact) {
       return [
         ['Altitude', 0, 'm', 'T', 'Contact: the nozzle exit plane reached the ground'],
-        ['Descent rate', metricValue(run, 'touchdown_vertical_speed'), 'm/s', 'T', 'Vertical speed at the contact instant, from the verifier'],
-        ['Horizontal speed', metricValue(run, 'touchdown_horizontal_speed'), 'm/s', 'T', 'Horizontal speed at the contact instant, from the verifier'],
+        ['Descent rate', metricValue(run, 'touchdown_vertical_speed'), 'm/s', 'D', 'Vertical speed at the contact instant, computed by the verifier from the true state'],
+        ['Horizontal speed', metricValue(run, 'touchdown_horizontal_speed'), 'm/s', 'D', 'Horizontal speed at the contact instant, computed by the verifier from the true state'],
         ['Tilt', v('tilt_deg'), '°', 'T', 'Last recorded sample'],
         ['Throttle', thr === null ? null : 100 * thr, '%', 'T', 'Last recorded sample'],
         ['From pad centre', metricValue(run, 'touchdown_pad_distance'), 'm', 'D', 'Distance of the nozzle plane from the pad centre at contact'],
@@ -128,14 +128,14 @@ export function hudNum(v) {
 
 /** Origin tag of a channel, read from the kind the record declares (never assumed). */
 export const KIND_TAG = { truth: 'T', observation: 'O', estimate: 'E', command: 'C', metric: 'D', limit: 'L', uncertainty: 'U' };
-export const TAG_WORD = { T: 'true state', O: 'sensor observation', E: 'controller estimate', C: 'controller command', D: 'derived', L: 'declared limit', U: 'uncertainty', G: 'geographic placement, derived from the environment pack' };
+export const TAG_WORD = { T: 'true state', O: 'sensor observation', E: 'controller estimate', C: 'controller command', D: 'derived', L: 'declared limit', U: 'uncertainty', G: 'geographic placement, derived from the environment pack', '?': 'kind not recorded' };
 
 function row(run, id, t, label, opts = {}) {
   const c = run.model.byId.get(id);
   if (!c) return null;
   let v = value(run, id, t);
   if (v !== null && opts.map) v = opts.map(v);
-  const tag = KIND_TAG[c.kind] || 'D';
+  const tag = KIND_TAG[c.kind] || '?';
   const note = opts.note ? ` · ${opts.note}` : '';
   return { id, label, value: v, unit: opts.unit !== undefined ? opts.unit : c.unit, tag, digits: opts.digits, title: `${c.label || id} · channel ${id} · ${TAG_WORD[tag]}${note}` };
 }
@@ -150,9 +150,11 @@ export function telemetry(run, t, rocket, geo) {
   const groups = [];
   if (rocket) {
     const contact = t >= run.model.t1 - 1e-9 && metricValue(run, 'touchdown_vertical_speed') !== null;
-    const atContact = (id, label) => ({ id, label, value: metricValue(run, id), unit: 'm/s', tag: 'T', title: `${label} at the contact instant, from the verifier` });
+    // At contact the speeds are the verifier's values at the contact instant (derived from the
+    // true state), not the last 0.1 s sample.
+    const atContact = (id, label) => ({ id, label, value: metricValue(run, id), unit: 'm/s', tag: 'D', title: `${label} at the contact instant, computed by the verifier from the true state` });
     groups.push({ id: 'motion', title: 'Flight', rows: [
-      r('altitude', 'Altitude', { note: 'nozzle exit plane above the flat ground of the model' }),
+      contact ? { id: 'altitude', label: 'Altitude', value: 0, unit: 'm', tag: 'T', title: 'Contact: the nozzle exit plane reached the ground' } : r('altitude', 'Altitude', { note: 'nozzle exit plane above the flat ground of the model' }),
       contact ? atContact('touchdown_vertical_speed', 'Descent rate') : r('vel_z', 'Descent rate', { map: (v) => -v, note: 'positive downward' }),
       contact ? atContact('touchdown_horizontal_speed', 'Horizontal speed') : r('vel_h', 'Horizontal speed'),
       r('tilt_deg', 'Tilt', { unit: '°' }),
@@ -221,7 +223,7 @@ export function verdictsAt(run, t) {
     const at = Number.isFinite(q.t) ? q.t : null;
     const decided = at !== null ? t >= at - 1e-9 : end;
     let state;
-    if (q.status === 'not_evaluated') state = 'not-evaluated';
+    if (q.status !== 'pass' && q.status !== 'fail') state = 'not-evaluated';
     else if (q.category === 'invariant') state = q.status === 'fail' ? (decided ? 'violated' : 'holding') : end ? 'held' : 'holding';
     else state = !decided ? 'pending' : q.status === 'pass' ? 'met' : 'failed';
     return { q, state, decided };

@@ -71,9 +71,9 @@ export function leavePlayer() {
   pl.cursor.pause();
   // The geospatial scene holds the terrain mesh, the image and a shadow map on the GPU: release
   // them while another view is shown (the decoded pack stays cached, so returning is quick).
-  if (pl.scene && (pl.renderer === 'geospatial' || pl.renderer === 'loading')) {
+  if (pl.renderer === 'geospatial' || pl.renderer === 'loading') {
     pl.mountToken = null;
-    pl.scene.dispose();
+    if (pl.scene) pl.scene.dispose();
     pl.scene = null;
     pl.renderer = 'suspended';
     pl.suspended = true;
@@ -159,6 +159,7 @@ async function load(id) {
   pl = { exp, demo: r.demo, domain: r.domain, runs, cursor, active: 0, scene: null, revealed: false, unit, kind, envs, envId, view: 'engineering', lastView: 'engineering', mounts: 0 };
   const want = pref('missionView');
   if (want === 'control' || (want === 'geospatial' && geoPossible())) pl.view = want;
+  if (pl.view === 'geospatial' && !pl.envId) pl.envId = envs[0].id;
   build();
   cursor.set(t0);
   if (visible && !matchMedia('(prefers-reduced-motion: reduce)').matches) cursor.play();
@@ -189,9 +190,9 @@ function viewSwitch() {
   return h('div', { class: 'seg pl-views', role: 'radiogroup', 'aria-label': 'View' },
     VIEWS.map(([v, text]) => {
       const off = v === 'geospatial' && !geoPossible();
-      return h('button', { type: 'button', role: 'radio', class: 'seg-btn', 'aria-checked': String(pl.view === v), 'aria-disabled': off ? 'true' : null, title: off ? geoReason() : null, dataset: { view: v },
+      return h('button', { type: 'button', role: 'radio', class: 'seg-btn', 'aria-checked': String(pl.view === v), 'aria-disabled': off ? 'true' : null, 'aria-describedby': off ? 'pl-geo-reason' : null, title: off ? geoReason() : null, dataset: { view: v },
         onclick: () => { if (!off) setView(v); } }, text);
-    }));
+    }), geoPossible() ? null : h('span', { class: 'sr-only', id: 'pl-geo-reason' }, geoReason()));
 }
 
 function envSelect() {
@@ -361,6 +362,9 @@ async function mountScene() {
   const token = {};
   pl.mountToken = token;
   pl.mounts = (pl.mounts || 0) + 1;
+  pl.track = null;
+  // A new scene starts on the follow camera: say so on the camera buttons.
+  for (const b of document.querySelectorAll('#view-mission .pl-cams [data-cam]')) b.setAttribute('aria-checked', String(b.dataset.cam === 'follow'));
   const geo = wantGeo();
   try {
     if (geo) {
@@ -452,7 +456,9 @@ function buildTransport() {
     SPEEDS.map((x) => h('option', { value: String(x), selected: x === c.speed }, `${x}×`)));
   const skip = h('button', { type: 'button', class: 'btn btn-quiet pl-reveal', onclick: () => revealNow() }, 'Skip to the result');
   pl.tr = { play, range, band, marks, time };
-  pl.unplay = c.onPlayState((p) => { play.replaceChildren(icon(p ? 'pause' : 'play')); play.setAttribute('aria-label', p ? 'Pause' : 'Play'); });
+  const onPlay = (p) => { play.replaceChildren(icon(p ? 'pause' : 'play')); play.setAttribute('aria-label', p ? 'Pause' : 'Play'); };
+  pl.unplay = c.onPlayState(onPlay);
+  onPlay(c.playing);
   return h('section', { class: 'pl-transport', 'aria-label': 'Playback' },
     h('div', { class: 'pl-tcontrols' }, play, restart, time),
     h('div', { class: 'pl-track' }, band, marks, range),

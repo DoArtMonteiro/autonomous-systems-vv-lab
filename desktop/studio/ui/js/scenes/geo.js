@@ -317,6 +317,8 @@ export class GeoRocket extends CinemaRocket {
       dp.needsUpdate = true;
       this.drop.computeLineDistances();
     }
+    // An event marker appears when the playback reaches its instant.
+    for (const m of this.eventMarks) m.visible = t >= m.userData.t - 1e-9;
     this.keepAboveTerrain();
     this.lastIndex = lowerIndex(times, t);
   }
