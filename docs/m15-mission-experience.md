@@ -78,6 +78,17 @@ O arranque e a memória são do processo `vv-studio` e de todos os processos Web
 - Os textos de `experiences.js` citam números das demonstrações (por exemplo 0,1 s e tick 21). Os testes do domínio verificam esses valores no anfitrião; o texto da interface não é gerado a partir do registo.
 - A barra lateral de Configurar continua a listar as demonstrações com os títulos do domínio.
 
+## Instalação e reversão
+
+O instalador `VV Lab Studio_0.15.0_x64-setup.exe` (sha256 `b76db8857a6b5f241860f2eda7672543fe821caa1272bfe911aa92c1dade30b7`) instala por utilizador por cima da 0.11.0 e o `--self-test` passa. Para voltar à 0.11.0, desinstalar e correr o instalador da 0.11.0 publicado como artefacto `vv-lab-studio-installer` da execução de CI 41725479542 (PR #23). As bibliotecas de execuções e as preferências do utilizador não são apagadas pela desinstalação.
+
+## Pendente depois das revisões
+
+- A cena não muda num contacto falhado. É deliberado: o modelo não tem dinâmica de contacto e desenhar danos seria inventar; o estado do contacto está na etiqueta da fase e no cartão de resultado.
+- A barra lateral de Configurar mostra os títulos das demonstrações do domínio, não os da biblioteca.
+- O texto do anfitrião terrestre diz «1 of 1 waypoint(s) reached; 0 mm from the goal» numa missão incompleta (a missão falha por não confirmar a chegada); o texto do anfitrião não foi alterado.
+- O estado da barra superior continua a dizer «domains ready».
+
 ## Expansão de domínios
 
 Um domínio novo só entra com pressupostos de modelo explícitos, correção numérica verificada contra uma referência, requisitos com sentido e reprodução determinística. Ordem recomendada, pelo valor para a generalidade da plataforma:
