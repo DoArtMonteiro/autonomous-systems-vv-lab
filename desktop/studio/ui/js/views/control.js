@@ -78,7 +78,9 @@ export function buildControl(pl, ctx) {
   const runs = pl.runs.length > 1 ? h('div', { class: 'mc-runs', role: 'radiogroup', 'aria-label': 'Run shown in the scene' },
     pl.runs.map((r, i) => h('button', { type: 'button', role: 'radio', class: 'mc-run', 'aria-checked': String(i === pl.active), dataset: { run: String(i) }, onclick: () => ctx.setActive(i) },
       h('span', { class: 'pl-swatch', style: { background: r.colour } }), r.label))) : null;
+  evidenceIsOpen = ctx.evidenceOpen || (() => false);
   const tl = buildTimeline(pl, (ev) => select(ev));
+  if (ctx.analysisToggle) tl.el.querySelector('.mct-controls').append(ctx.analysisToggle());
   const evidence = h('section', { class: 'mc-evidence', hidden: true, 'aria-live': 'polite', 'aria-label': 'Selected event' });
   const legend = h('p', { class: 'mc-legend' });
   const el = h('div', { class: ['mc', `mc-${density}`], dataset: { density } }, viewport, top, left, right, strip, runs, evidence, h('footer', { class: 'mc-bottom' }, tl.el, legend), ctx.sceneNote());
@@ -181,10 +183,10 @@ export function buildControl(pl, ctx) {
         h('p', { class: 'mc-note' }, 'Judged at their decisive instant, usually contact; pending until then.')),
       h('section', { class: 'mc-group', dataset: { group: 'invariants' } }, h('h2', { class: 'mc-h' }, 'Safety invariants'), h('ul', { class: 'mc-vlist' }, reqs.filter((q) => q.category === 'invariant').map(verdictLine)),
         h('p', { class: 'mc-note' }, 'Judged on the true state throughout the run.')),
-      h('section', { class: 'mc-group', dataset: { group: 'events' } }, h('h2', { class: 'mc-h' }, `Events (${allEvents.length})`),
+      h('section', { class: 'mc-group', dataset: { group: 'events' } }, h('h2', { class: 'mc-h' }, 'Events'),
         allEvents.length ? h('ol', { class: 'mc-evlist' }, allEvents.map((e) => {
-          const label = h('span', { class: 'mc-ev-l' });
-          const glyph = h('span', { class: `mc-glyph sev-${e.sev}`, 'aria-hidden': 'true' });
+          const label = h('span', { class: 'mc-ev-l' }, e.label);
+          const glyph = h('span', { class: `mc-glyph sev-${e.sev}`, 'aria-hidden': 'true' }, (SEVERITY[e.sev] || SEVERITY.info).glyph);
           const b = h('button', { type: 'button', class: 'mc-evbtn', onclick: () => select(e) }, glyph, h('span', { class: 'mc-ev-t mono' }, timeText(e.t, pl.unit)),
             pl.runs.length > 1 ? h('span', { class: 'pl-swatch', style: { background: pl.runs[e.run].colour } }) : null, label);
           evButtons.push({ e, b, label, glyph, shown: null });
@@ -226,9 +228,8 @@ export function buildControl(pl, ctx) {
       x.b.classList.toggle('is-sel', sameEvent(selected, x.e));
       if (x.shown === shown) continue;
       x.shown = shown;
-      x.label.textContent = shown ? x.e.label : 'Verifier finding, shown when the playback reaches it';
-      x.glyph.textContent = shown ? (SEVERITY[x.e.sev] || SEVERITY.info).glyph : '○';
-      x.glyph.className = `mc-glyph ${shown ? `sev-${x.e.sev}` : 'sev-info'}`;
+      // A later finding is not listed at all before its time.
+      x.b.parentElement.hidden = !shown;
     }
     for (const c of cmpCells) {
       const g = telemetry(pl.runs[c.i], t, rocket, null);
@@ -303,9 +304,15 @@ export function buildControl(pl, ctx) {
   return { el, viewport, update, refresh, dispose: () => tl.dispose() };
 }
 
-/** Verifier findings (violations, warnings) stay unnamed until the playback reaches them. */
-export function hiddenUntilReached(e, t) {
-  return (e.sev === 'violation' || e.sev === 'warning') && e.t > t + 1e-9;
+let evidenceIsOpen = () => false;
+const GATED = new Set(['violation', 'warning', 'detection', 'diverge']);
+
+/**
+ * Findings and outcomes (violations, warnings, detections, where the runs part) are not shown
+ * until the playback reaches them, unless analysis mode is on or the result has been shown.
+ */
+export function hiddenUntilReached(e, t, open = evidenceIsOpen()) {
+  return !open && GATED.has(e.sev) && e.t > t + 1e-9;
 }
 
 // ----------------------------------------------------------------------------- signature timeline
@@ -375,15 +382,12 @@ function buildTimeline(pl, onSelect) {
 
   function update(t) {
     head.style.left = pos(t);
-    // A verifier finding is marked but not named until the playback reaches it.
+    // A finding is not drawn until the playback reaches it (see hiddenUntilReached).
     for (const m of marks) {
       const hidden = m.ev.group.every((x) => hiddenUntilReached(x, t) || x.sev === 'info') && m.ev.group.some((x) => hiddenUntilReached(x, t));
       if (hidden === m.hidden) continue;
       m.hidden = hidden;
-      m.glyph.textContent = hidden ? '○' : (SEVERITY[m.ev.sev] || SEVERITY.info).glyph;
-      m.b.classList.toggle('is-future', hidden);
-      m.b.setAttribute('aria-label', hidden ? `Verifier finding at ${timeText(m.ev.t, pl.unit)}, named when the playback reaches it` : m.text);
-      m.b.title = hidden ? `${timeText(m.ev.t, pl.unit)} · verifier finding (shown when reached)` : m.tip;
+      m.b.hidden = hidden;
     }
     if (Number(range.value) !== t) range.value = String(t);
     range.setAttribute('aria-valuetext', timeText(t, pl.unit));

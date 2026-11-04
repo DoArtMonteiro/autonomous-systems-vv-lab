@@ -23,8 +23,9 @@ import { ground2d } from '../scenes/ground.js';
 import { openRequest } from './prepare.js';
 import { phasesOf, divergence, readouts, hudNum, ROCKET_METRICS, KIND_WORD } from '../session.js';
 import { mountGeo } from '../scenes/geo.js';
-import { listEnvironments, loadPack, trackOf, creditOf, mb } from '../environments.js';
+import { listEnvironments, loadPack, trackOf, mb } from '../environments.js';
 import { buildControl } from './control.js';
+import { sourcesInfo } from '../sources-info.js';
 
 let root;
 let navigate = () => {};
@@ -43,7 +44,7 @@ export function initPlayer(el, nav) {
 /** Read-only facts for tests. */
 export function playerState() {
   if (!pl) return null;
-  return { experience: pl.exp.id, runs: pl.runs.map((r) => r.runId), active: pl.active, t: pl.cursor.t, t1: pl.cursor.t1, revealed: pl.revealed, playing: pl.cursor.playing, scene: pl.scene ? (pl.scene.ok === false ? 'fallback' : pl.kind) : null,
+  return { experience: pl.exp.id, runs: pl.runs.map((r) => r.runId), active: pl.active, t: pl.cursor.t, t1: pl.cursor.t1, revealed: pl.revealed, analysis: !!pl.analysis, playing: pl.cursor.playing, scene: pl.scene ? (pl.scene.ok === false ? 'fallback' : pl.kind) : null,
     view: pl.view, environment: pl.envId, renderer: pl.renderer || null, geoError: pl.geoError || null, geoStats: pl.scene && pl.scene.stats ? pl.scene.stats() : null, mounts: pl.mounts || 0 };
 }
 
@@ -241,14 +242,8 @@ function sceneNote() {
   const note = h('div', { class: 'pl-scene-note', id: 'pl-scene-note' });
   if (wantGeo()) {
     const env = pl.envs.find((x) => x.id === pl.envId);
-    note.append(...[
-      h('p', { class: 'pl-provenance' },
-        h('span', { class: 'prov prov-sim', title: 'From the run record' }, 'Simulated'), ' trajectory, attitude, throttle, estimate, events ',
-        h('span', { class: 'prov prov-ctx', title: 'From the environment pack' }, 'Context'), ` ${env ? env.name : ''}: terrain 30 m, image 10 m per pixel `,
-        h('span', { class: 'prov prov-ill', title: 'Drawn for legibility only' }, 'Illustrative'), ' stage body, plume, sky, sun, shadows. ',
-        h('span', { class: 'pl-flat' }, 'The model assumes flat ground at the pad; nothing is computed against this terrain.')),
-      env ? h('p', { class: 'pl-credit' }, creditOf(env).join(' · ')) : null].filter(Boolean));
-    if (pl.geoWarn) note.append(h('p', { class: 'pl-geo-warn' }, pl.geoWarn));
+    note.classList.add('is-geo');
+    if (env) note.append(sourcesInfo(env, { warn: pl.geoWarn, onSettings: openEnvSettings }));
   } else {
     note.append(h('p', null, rocket
       ? (pl.runs.length > 1 ? 'Shown run: true trajectory (solid), the controller’s estimated position (dashed yellow) and the stage. Other runs: their true trajectories as coloured lines. ' : 'True trajectory (solid), the controller’s estimated position (dashed yellow) and the stage. ') + 'Sampled every 0.1 s and interpolated for display; the stage body is drawn for orientation, the model has no length.'
@@ -258,9 +253,14 @@ function sceneNote() {
   return note;
 }
 
+function openEnvSettings() {
+  navigate('settings');
+  requestAnimationFrame(() => { const el = document.getElementById('env-settings'); if (el) el.scrollIntoView({ block: 'start' }); });
+}
+
 function cameraButtons() {
   if (pl.kind !== 'rocket-3d') return null;
-  const modes = [['follow', 'Follow'], ['pad', 'From the ground'], ['wide', 'Whole descent'], ...(wantGeo() ? [['overhead', 'Overhead']] : [])];
+  const modes = [['follow', 'Follow'], ['pad', 'From the ground'], ...(wantGeo() ? [['closeup', 'At the pad']] : []), ['wide', 'Whole descent'], ...(wantGeo() ? [['overhead', 'Overhead']] : [])];
   return h('div', { class: 'seg pl-cams', role: 'radiogroup', 'aria-label': 'Camera' },
     modes.map(([m, text]) => h('button', { type: 'button', role: 'radio', class: 'seg-btn', 'aria-checked': String(m === 'follow'), dataset: { cam: m },
       onclick: (e) => { for (const b of e.currentTarget.parentElement.children) b.setAttribute('aria-checked', String(b === e.currentTarget)); if (pl.scene && pl.scene.preset) pl.scene.preset(m); } }, text)));
@@ -283,7 +283,7 @@ function build() {
   if (pl.view === 'control') {
     const ctx = {
       domainName: DOMAIN_NAMES[exp.domain] || exp.domain,
-      setView, setActive, navigate, viewSwitch, envSelect, sceneNote, phaseAt,
+      setView, setActive, navigate, viewSwitch, envSelect, sceneNote, phaseAt, analysisToggle, evidenceOpen,
       geoActive: () => wantGeo(),
       geo: () => (wantGeo() && pl.track ? { track: pl.track } : null),
     };
@@ -462,7 +462,7 @@ function buildTransport() {
   return h('section', { class: 'pl-transport', 'aria-label': 'Playback' },
     h('div', { class: 'pl-tcontrols' }, play, restart, time),
     h('div', { class: 'pl-track' }, band, marks, range),
-    h('div', { class: 'pl-tend' }, h('label', { class: 'small dim' }, 'Speed ', speed), skip),
+    h('div', { class: 'pl-tend' }, h('label', { class: 'small dim' }, 'Speed ', speed), analysisToggle(), skip),
     h('p', { class: 'pl-legend' },
       pl.kind === 'rocket-3d' ? h('span', null, h('i', { class: 'lg-powered' }), 'engine on') : null,
       h('span', null, h('i', { class: 'lg-onset' }), 'injected fault starts'),
@@ -480,24 +480,56 @@ function drawBand() {
   for (const p of pl.phases[pl.active]) band.append(h('span', { class: `pl-seg ${p.kind}`, style: { left: pos(p.t0), width: `${(100 * Math.max(p.t1 - p.t0, span / 400)) / span}%` }, title: `${p.label} (derived from the recorded engine or mode channel)` }));
   clear(marks);
   const run = pl.runs[pl.active];
-  const mark = (cls, t, label) => marks.append(h('button', { type: 'button', class: `pl-mark ${cls}`, style: { left: pos(t) }, 'aria-label': label, title: label, onclick: () => { c.pause(); c.set(t); } }));
+  // Findings and outcomes (detections, violations, warnings, where the runs part) appear when the
+  // playback reaches them, unless the result is shown or analysis mode is on. Injected fault onsets
+  // are part of the configured scenario and are always shown.
+  const mark = (cls, t, label, gated) => marks.append(h('button', { type: 'button', class: `pl-mark ${cls}`, style: { left: pos(t) }, 'aria-label': label, title: label, dataset: gated ? { t: String(t), gated: '1' } : {}, onclick: () => { c.pause(); c.set(t); } }));
   const seen = new Set();
   for (const e of run.model.events || []) {
     if (!['fault', 'detection', 'violation', 'warning'].includes(e.severity) || !Number.isFinite(e.t)) continue;
     const key = `${e.severity}@${e.t}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    mark(`sev-${e.severity}`, e.t, `${timeText(e.t, pl.unit)}: ${prose(e.label)}`);
+    mark(`sev-${e.severity}`, e.t, `${timeText(e.t, pl.unit)}: ${prose(e.label)}`, true);
   }
   for (const f of run.record.request.faults || []) mark('sev-onset', f.start, `${timeText(f.start, pl.unit)}: injected fault ${f.kind} starts`);
   for (let i = 1; i < pl.div.length; i++) {
     const d = pl.div[i];
-    if (d && d.t !== null) mark('sev-diverge', d.t, `${timeText(d.t, pl.unit)}: ${pl.runs[i].label} departs from ${pl.runs[0].label} by more than ${d.tol} ${d.unit} (derived)`);
+    if (d && d.t !== null) mark('sev-diverge', d.t, `${timeText(d.t, pl.unit)}: ${pl.runs[i].label} departs from ${pl.runs[0].label} by more than ${d.tol} ${d.unit} (derived)`, true);
   }
+  gateMarks(c.t);
+}
+
+/** Whether everything recorded may be shown regardless of the playback time. */
+export function evidenceOpen() {
+  return !!(pl && (pl.analysis || pl.revealed));
+}
+
+function gateMarks(t) {
+  if (!pl || !pl.tr) return;
+  const open = evidenceOpen();
+  for (const b of pl.tr.marks.querySelectorAll('[data-gated]')) b.hidden = !open && Number(b.dataset.t) > t + 1e-9;
+}
+
+function setAnalysis(on) {
+  if (!pl) return;
+  pl.analysis = on;
+  for (const b of document.querySelectorAll('#view-mission [data-action="analysis"]')) b.setAttribute('aria-pressed', String(on));
+  if (on) reveal();
+  if (pl.control) pl.control.refresh();
+  else gateMarks(pl.cursor.t);
+}
+
+/** The analysis-mode switch, shared by the player and Mission Control. */
+export function analysisToggle() {
+  return h('button', { type: 'button', class: 'btn btn-quiet btn-sm pl-analysis', dataset: { action: 'analysis' }, 'aria-pressed': String(!!(pl && pl.analysis)),
+    title: 'Analysis mode: show every finding and the result now, including those later in the run. Ordinary playback shows them only when it reaches them.',
+    onclick: () => setAnalysis(!(pl && pl.analysis)) }, 'Analysis mode');
 }
 
 function updateTransport(t) {
   const { range, time } = pl.tr;
+  gateMarks(t);
   if (Number(range.value) !== t) range.value = String(t);
   time.textContent = pl.unit === 'tick' ? `tick ${Math.floor(t)} / ${pl.cursor.t1}` : `${t.toFixed(1)} / ${pl.cursor.t1.toFixed(1)} s`;
 }
@@ -531,6 +563,7 @@ function reveal() {
   if (!pl || pl.revealed) return;
   pl.revealed = true;
   renderSide();
+  gateMarks(pl.cursor.t);
 }
 
 function tone(status) {

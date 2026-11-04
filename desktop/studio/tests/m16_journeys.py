@@ -64,9 +64,7 @@ def geospatial(s):
     p = player(s)
     check("Geo: an environment is selected", bool(p["environment"]), str(p["environment"]))
     check("Geo: switching view keeps the same runs", p["runs"] == runs)
-    note = s.js("document.getElementById('pl-scene-note').innerText")
-    check("Geo: the scene says what is simulated, context and illustrative", all(w in note.lower() for w in ("simulated", "context", "illustrative")), note[:120])
-    check("Geo: the attribution of the sources is visible", "Copernicus WorldDEM-30" in note and "Copernicus Sentinel data" in note)
+    sources_control(s)
     s.page.keyboard.press("Home")
     time.sleep(0.3)
     s.page.keyboard.press("Space")
@@ -104,6 +102,108 @@ def geospatial(s):
     wait_renderer(s, "geospatial", 30)
 
 
+def panel_open(s):
+    return s.js("(() => { const p = document.querySelector('.si-panel'); const b = document.querySelector('.si-btn'); return !!p && !p.hidden && b.getAttribute('aria-expanded') === 'true'; })()")
+
+
+def tap(s):
+    # Synthetic touch-type pointer event and click: the attached WebView2 has no touch screen.
+    s.js("(() => { const b = document.querySelector('.si-btn'); b.dispatchEvent(new PointerEvent('pointerenter', { pointerType: 'touch' })); b.click(); })()")
+    time.sleep(0.2)
+
+
+def sources_control(s):
+    """The compact sources control: visible short credit, full notices on hover, click, keyboard and touch-type pointers."""
+    note = s.js("document.getElementById('pl-scene-note').innerText")
+    check("Sources: a short credit for every source stays visible", "Copernicus" in note and "Sentinel" in note and "NGA" in note, note[:160].replace("\n", " "))
+    hgt = s.js("document.getElementById('pl-scene-note').getBoundingClientRect().height")
+    check("Sources: the closed control takes little room (under 64 px tall)", hgt < 64, f"{hgt:.0f} px")
+    check("Sources: the panel is closed by default", not panel_open(s))
+    s.page.focus(".si-btn")
+    s.page.keyboard.press("Enter")
+    time.sleep(0.2)
+    check("Sources: Enter opens the panel", panel_open(s))
+    txt = s.js("document.querySelector('.si-panel').innerText")
+    check("Sources: the panel says what is simulated, context and illustrative", all(w in txt.lower() for w in ("simulated", "context", "illustrative")))
+    check("Sources: the panel carries the full Copernicus DEM notice and the Sentinel notice", "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018" in txt and "Copernicus Sentinel data" in txt)
+    check("Sources: the panel states the flat-ground limitation", "flat ground" in txt)
+    s.shot("m16-geo-sources-panel-dark")
+    s.page.keyboard.press("Escape")
+    time.sleep(0.2)
+    check("Sources: Escape closes the panel and keeps the focus on the button", not panel_open(s) and s.js("!!document.activeElement && document.activeElement.classList.contains('si-btn')"))
+    s.page.keyboard.press("Space")
+    time.sleep(0.2)
+    check("Sources: Space on the button opens the panel", panel_open(s))
+    s.page.keyboard.press("Space")
+    time.sleep(0.2)
+    check("Sources: Space again closes it", not panel_open(s))
+    s.page.hover(".si-btn")
+    time.sleep(0.3)
+    check("Sources: hovering opens the panel", panel_open(s))
+    s.page.mouse.move(900, 160)
+    time.sleep(0.5)
+    check("Sources: leaving closes an unpinned panel", not panel_open(s))
+    s.page.hover(".si-btn")
+    time.sleep(0.2)
+    s.page.click(".si-btn")
+    s.page.mouse.move(900, 160)
+    time.sleep(0.5)
+    check("Sources: a click pins the panel open", panel_open(s))
+    s.page.mouse.click(900, 160)
+    time.sleep(0.2)
+    check("Sources: a press outside closes it", not panel_open(s))
+    tap(s)
+    check("Sources: a tap opens the panel", panel_open(s))
+    tap(s)
+    check("Sources: a second tap closes it", not panel_open(s))
+    s.js("document.activeElement && document.activeElement.blur()")
+
+
+def set_frac(s, frac):
+    s.page.evaluate("(f) => { const r = document.querySelector('.pl-range'); r.value = String(Number(r.min) + f * (Number(r.max) - Number(r.min))); r.dispatchEvent(new Event('input', { bubbles: true })); }", frac)
+    time.sleep(0.4)
+
+
+def gating(s):
+    """Ordinary playback never shows a finding before its time; analysis mode shows everything."""
+    open_mission(s, "two-faults")
+    if s.js("!!document.querySelector('.mc')"):
+        s.page.click(".mc-back")
+        s.wait("document.querySelector('.pl-head')", 10, "player")
+    if player(s)["playing"]:
+        s.page.click(".pl-play")
+    set_frac(s, 0.3)
+    t = player(s)["t"] + 1e-6
+    later = f"[...document.querySelectorAll('.pl-mark[data-gated]')].filter((b) => Number(b.dataset.t) > {t}).length"
+    ahead = f"[...document.querySelectorAll('.pl-mark[data-gated]')].filter((b) => Number(b.dataset.t) > {t} && !b.hidden).length"
+    check("Gating: the run has findings later than the playback time", s.js(later) > 0, str(s.js(later)))
+    check("Gating: no later finding is shown on the player timeline", s.js(ahead) == 0)
+    check("Gating: the result is not shown yet", s.js("!!document.querySelector('.pl-pending') && !document.querySelector('.pl-result')"))
+    s.shot("m16-gating-player-before-dark")
+    s.page.click(".pl-tend [data-action='analysis']")
+    time.sleep(0.4)
+    check("Gating: analysis mode shows the later findings and the result", s.js(ahead) > 0 and s.js("!!document.querySelector('.pl-result')"))
+    check("Gating: the analysis switch says it is on", s.js("document.querySelector(\".pl-tend [data-action='analysis']\").getAttribute('aria-pressed')") == "true")
+    s.shot("m16-gating-player-analysis-dark")
+    open_mission(s, "lying-altimeter")
+    if not s.js("!!document.querySelector('.mc')"):
+        s.page.click(".pl-views [data-view='control']")
+        s.wait("document.querySelector('.mc')", 20, "mission control")
+    if player(s)["playing"]:
+        s.page.click(".mct-play")
+    s.page.keyboard.press("Home")
+    time.sleep(0.4)
+    vis = "[...document.querySelectorAll('.mct-mark')].filter((b) => !b.hidden && /sev-(violation|warning|detection)/.test(b.className)).length"
+    allv = "[...document.querySelectorAll('.mct-mark')].filter((b) => /sev-(violation|warning|detection)/.test(b.className)).length"
+    check("Gating MC: findings exist in the run", s.js(allv) > 0, str(s.js(allv)))
+    check("Gating MC: none is drawn at the start of the playback", s.js(vis) == 0)
+    check("Gating MC: the event list does not list them either", s.js("[...document.querySelectorAll('.mc-evlist li')].filter((l) => !l.hidden && /sev-(violation|warning|detection)/.test(l.innerHTML)).length") == 0)
+    s.page.click(".mct-controls [data-action='analysis']")
+    time.sleep(0.4)
+    check("Gating MC: analysis mode draws them", s.js(vis) == s.js(allv))
+    s.page.click(".mct-controls [data-action='analysis']")
+
+
 def control_rocket(s):
     open_mission(s, "late-gnss")
     if not s.js("!!document.querySelector('.mc')"):
@@ -124,6 +224,9 @@ def control_rocket(s):
     check("MC rocket: two runs on the timeline", s.js("document.querySelectorAll('.mct-lane').length") == 2)
     check("MC rocket: the timeline marks where the runs part", s.js("document.querySelectorAll('.mct-fork').length >= 1"))
     s.shot("m16-control-rocket-technical-dark")
+    # Later findings are drawn only once reached or in analysis mode.
+    s.page.click(".mct-controls [data-action='analysis']")
+    time.sleep(0.4)
     marks = s.js("[...document.querySelectorAll('.mct-mark')].map((b) => b.getAttribute('aria-label'))")
     det = next((i for i, m in enumerate(marks) if "Controller detection" in m), None)
     check("MC rocket: a controller detection is on the timeline", det is not None, "; ".join(marks[:6]))
@@ -275,7 +378,7 @@ def main():
     env["VVLAB_CONFIG"] = tempfile.mkdtemp(prefix="vv-m16-cfg-")
     env["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = f"--remote-debugging-port={a.port}"
     only = [x for x in a.only.split(",") if x]
-    parts = [p for p in (home_and_library, geospatial, control_rocket, control_ground, layout) if not only or p.__name__ in only]
+    parts = [p for p in (home_and_library, geospatial, gating, control_rocket, control_ground, layout) if not only or p.__name__ in only]
     if parts:
         proc = launch(exe, env, a.port)
         try:

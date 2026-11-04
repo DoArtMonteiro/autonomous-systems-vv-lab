@@ -69,6 +69,7 @@ LICENCES = {
         "licence": "Licence for the use of the Copernicus WorldDEM-30: free of charge; reproduction, distribution, communication to the public and adaptation are permitted (Art. 4, 5), with the notices of Art. 6; no endorsement may be implied and later users are bound by the same obligations. https://documentation.dataspace.copernicus.eu/APIs/SentinelHub/Data/DEM/resources/license/License-COPDEM-30.pdf",
         "attribution": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved. The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
         "access": "AWS Open Data, s3://copernicus-dem-30m (no account)",
+        "credit": "Copernicus WorldDEM-30 © DLR e.V. 2010-2014, © Airbus 2014-2018",
     },
     "sentinel-2": {
         "provider": "European Union, Copernicus Sentinel-2 (ESA), Level-2A processing; cloud-optimised copy by Element 84 on AWS Open Data",
@@ -83,6 +84,7 @@ LICENCES = {
         "licence": "Public domain (U.S. Government work); PROJ-data grid redistributed under its stated terms. https://cdn.proj.org",
         "attribution": "EGM2008, NGA",
         "access": "PROJ network grid (cdn.proj.org)",
+        "credit": "EGM2008, NGA",
     },
 }
 
@@ -339,6 +341,7 @@ def main():
     years = sorted({u["acquired"][:4] for u in used})
     s2 = dict(LICENCES["sentinel-2"])
     s2["attribution"] = s2["attribution"].format(year=", ".join(years))
+    s2["credit"] = s2["attribution"]
     manifest = {
         "schema": "vv-geo-environment.v1",
         "id": a.env,

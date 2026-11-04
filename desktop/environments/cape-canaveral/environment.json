@@ -113,7 +113,8 @@
       },
       "absent_tiles": [],
       "sea_fill_fraction": 0.0,
-      "sea_fill_note": "The product has no tile for a degree square of open sea; those squares are filled with 0 m above EGM2008."
+      "sea_fill_note": "The product has no tile for a degree square of open sea; those squares are filled with 0 m above EGM2008.",
+      "credit": "Copernicus WorldDEM-30 © DLR e.V. 2010-2014, © Airbus 2014-2018"
     },
     {
       "provider": "European Union, Copernicus Sentinel-2 (ESA), Level-2A processing; cloud-optimised copy by Element 84 on AWS Open Data",
@@ -130,14 +131,16 @@
           "crs": "EPSG:32617",
           "texel_fraction": 1.0
         }
-      ]
+      ],
+      "credit": "Contains modified Copernicus Sentinel data 2025"
     },
     {
       "provider": "U.S. National Geospatial-Intelligence Agency, EGM2008, through the PROJ data grid us_nga_egm08_25",
       "product": "Geoid undulation at the origin (EGM2008 to the WGS84 ellipsoid)",
       "licence": "Public domain (U.S. Government work); PROJ-data grid redistributed under its stated terms. https://cdn.proj.org",
       "attribution": "EGM2008, NGA",
-      "access": "PROJ network grid (cdn.proj.org)"
+      "access": "PROJ network grid (cdn.proj.org)",
+      "credit": "EGM2008, NGA"
     }
   ],
   "checks": [
