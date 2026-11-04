@@ -20,6 +20,9 @@ vv-platform.workspace = true
 vv-geo.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
+# Same version and features as the platform's evidence export: no new crate in the lock file.
+zip = { version = "2.6.1", default-features = false, features = ["deflate"] }
 tauri = { version = "2.11", features = [] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
