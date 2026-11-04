@@ -221,4 +221,10 @@
   .mc-runs, .mc-evidence { max-width: calc(100% - 520px); }
   .mc .pl-scene-note { width: calc(100% - 380px); }
   .mc-row dt, .mc-v-l { font-size: 11.5px; }
+  .mc-left, .mc-right { top: 150px; bottom: 262px; overflow-x: hidden; }
+}
+.mc-left, .mc-right { overflow-x: hidden; }
+@media (max-height: 720px) {
+  .mc .pl-provenance .pl-flat { display: none; }
+  .mc .pl-credit { font-size: 9.5px; }
 }
