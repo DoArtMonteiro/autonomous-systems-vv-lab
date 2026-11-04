@@ -165,7 +165,8 @@ export function buildControl(pl, ctx) {
   const evButtons = [];
   const cmpCells = [];
   function verdictLine(q) {
-    const li = h('li', { class: 'mc-v', dataset: { req: q.id } }, h('span', { class: 'mc-v-id mono' }, q.id.split('_')[0]), h('span', { class: 'mc-v-l' }, q.label), h('span', { class: 'mc-v-s' }));
+    const code = /^[A-Z]\d+_/.test(q.id) ? q.id.split('_')[0] : '';
+    const li = h('li', { class: 'mc-v', dataset: { req: q.id } }, h('span', { class: 'mc-v-id mono', title: q.id }, code), h('span', { class: 'mc-v-l' }, q.label), h('span', { class: 'mc-v-s' }));
     vLines.set(q.id, li);
     return li;
   }
@@ -241,11 +242,13 @@ export function buildControl(pl, ctx) {
     const flat = telemetry(pl.runs[pl.active], t, rocket, ctx.geo()).flatMap((x) => x.rows);
     const ids = rocket ? ['altitude', 'vel_z', 'touchdown_vertical_speed', 'act_throttle', 'err_z'] : ['truth_x_mm', 'truth_y_mm', 'goal_distance_mm', 'confidence_permille'];
     const rows = ids.map((id) => flat.find((r) => r.id === id)).filter(Boolean).slice(0, 4);
-    const sig = rows.map((r) => r.id).join(',');
+    const run = pl.runs[pl.active];
+    const sig = `${pl.active}:${rows.map((r) => r.id).join(',')}`;
     if (strip.dataset.sig !== sig) {
       strip.dataset.sig = sig;
       kv.clear();
-      strip.replaceChildren(...rows.map((r) => {
+      const who = pl.runs.length > 1 ? [h('div', { class: 'mc-kv mc-kv-run' }, h('span', { class: 'mc-kv-l' }, 'Run shown'), h('span', { class: 'mc-kv-who' }, h('span', { class: 'pl-swatch', style: { background: run.colour } }), ` ${run.label}`))] : [];
+      strip.replaceChildren(...who, ...rows.map((r) => {
         const n = valueNode(r, 'mc-kv-v mono');
         kv.set(r.id, n);
         return h('div', { class: 'mc-kv', title: r.title, dataset: { channel: r.id } }, h('span', { class: 'mc-kv-l' }, h('abbr', { class: `kind kind-${r.tag}` }, r.tag), r.label), n);
@@ -272,6 +275,12 @@ export function buildControl(pl, ctx) {
     const key = `${pl.active}|${lowerIndex(m.timebases[m.primary] || [], t)}|${t >= m.t1 - 1e-9}|${density}|${selected ? selected.t : ''}`;
     if (!force && key === lastKey) return;
     lastKey = key;
+    // The evidence card belongs to its instant: it closes once the playback moves away.
+    if (selected && Math.abs(t - selected.t) > Math.max(0.5, (pl.cursor.t1 - pl.cursor.t0) / 100)) {
+      selected = null;
+      renderEvidence();
+      tl.highlight(null);
+    }
     keyValues(t);
     if (density === 'technical') {
       telemetryPanel(t);
