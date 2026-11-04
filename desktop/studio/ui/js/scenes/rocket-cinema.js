@@ -2,13 +2,14 @@
 // the mission player. It draws exactly what Rocket3D draws (true trajectory, navigation estimate,
 // pad R5 and keep-out S2, the stage at the cursor from the recorded true state and applied throttle)
 // plus the true trajectories of the other runs of the same mission as reference lines. The ground
-// disc and range rings are a backdrop for scale, not model data. The stage body is an illustration:
-// the model has no vehicle length. Position and attitude are interpolated between the 0.1 s samples
-// for display only.
+// disc and range rings are a backdrop for scale, not model data. The stage (stage-model.js) is an
+// illustration: the model has no vehicle length, gear or fins. Position and attitude are interpolated
+// between the 0.1 s samples for display only.
 
 import * as THREE from '../../vendor/three/three.module.min.js';
 import { Rocket3D, channelsOf, circlePoints, hexColour } from './rocket.js';
 import { lowerIndex, sampleAt } from '../dom.js';
+import { buildStage } from './stage-model.js';
 
 const RINGS_M = [25, 50, 100, 250, 500, 1000, 2000];
 
@@ -80,6 +81,11 @@ export class CinemaRocket extends Rocket3D {
     glow.translate(-0.5, 0, 0);
     this.glow = new THREE.Mesh(glow, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
     this.vehicle.add(this.glow);
+    // The illustrative stage replaces the plain body; the plain meshes stay for the theme code.
+    this.envRT = this.environmentMap();
+    this.stage = buildStage(this.envRT ? this.envRT.texture : null);
+    for (const o of [this.bodyMesh, this.noseMesh, this.band, this.plume, this.glow]) o.visible = false;
+    this.vehicle.add(this.stage.group);
     // Reference runs: their true centre-of-mass trajectories and a marker at the cursor.
     this.ghosts = (this.opts.ghosts || []).map((g) => {
       const n = g.ch.times.length;
@@ -94,6 +100,22 @@ export class CinemaRocket extends Rocket3D {
     });
     this.applyTheme();
     this.preset(this.opts.preset || 'follow', true);
+  }
+
+  /** A prefiltered environment for the stage's paint and metal: a soft studio gradient here. */
+  environmentMap() {
+    const pm = new THREE.PMREMGenerator(this.renderer);
+    const env = new THREE.Scene();
+    const mat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      vertexShader: 'varying vec3 vDir; void main() { vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: 'varying vec3 vDir; void main() { float h = vDir.z; vec3 c = mix(vec3(0.10, 0.11, 0.13), vec3(0.78, 0.84, 0.92), smoothstep(-0.2, 0.9, h)); gl_FragColor = vec4(c, 1.0); }',
+    });
+    env.add(new THREE.Mesh(new THREE.SphereGeometry(10, 32, 16), mat));
+    const rt = pm.fromScene(env, 0.02);
+    env.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+    pm.dispose();
+    return rt;
   }
 
   applyTheme() {
@@ -138,6 +160,13 @@ export class CinemaRocket extends Rocket3D {
     }
   }
 
+  dispose() {
+    if (!this.ok) return;
+    if (this.stage) for (const m of this.stage.materials) for (const k of ['map', 'alphaMap']) if (m[k]) m[k].dispose();
+    if (this.envRT) this.envRT.dispose();
+    super.dispose();
+  }
+
   track() {
     const target = this.cur ? this.cur.clone() : new THREE.Vector3(this.pad.cx, this.pad.cy, 70);
     target.z = Math.max(target.z, 8);
@@ -152,8 +181,9 @@ export class CinemaRocket extends Rocket3D {
     super.setTime(t);
     if (!this.ok || !this.glow) return;
     if (this.mode === 'pad') this.track();
-    this.glow.visible = this.plume.visible;
-    this.glow.scale.copy(this.plume.scale);
+    this.glow.visible = false;
+    this.plume.visible = false;
+    this.stage.setThrottle(this.plumeLength || 0);
     for (const g of this.ghosts) {
       const at = (a) => (a ? sampleAt(g.ch.times, a, t) : null);
       const x = at(g.ch.px); const y = at(g.ch.py); const z = at(g.ch.pz);

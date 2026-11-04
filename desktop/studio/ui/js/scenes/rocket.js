@@ -285,6 +285,7 @@ export class Rocket3D {
     const thr = ch.throttle ? ch.throttle[i] : null;
     const on = ch.engine ? ch.engine[i] === 1 : thr > 0;
     const len = on && thr ? 6 + 22 * thr : 0;
+    this.plumeLength = len;
     this.plume.visible = len > 0;
     this.plume.scale.set(len || 1, 1, 1);
     this.cur = new THREE.Vector3(px ?? nx ?? 0, py ?? ny ?? 0, pz ?? nz ?? 0);

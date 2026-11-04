@@ -1,0 +1,327 @@
+{
+ "exe": "vv-studio.exe",
+ "mission": "lying-altimeter",
+ "shots": [
+  {
+   "file": "santa-maria-azores-follow-end-1440x900.jpg",
+   "environment": "santa-maria-azores",
+   "camera": "follow",
+   "t": 23.3361272857644,
+   "size": [
+    1440,
+    900
+   ],
+   "geo": {
+    "renders": 424,
+    "triangles": 722600,
+    "geometries": 23,
+    "textures": 2
+   }
+  },
+  {
+   "file": "santa-maria-azores-follow-end-1280x720.jpg",
+   "environment": "santa-maria-azores",
+   "camera": "follow",
+   "t": 23.3361272857644,
+   "size": [
+    1280,
+    720
+   ],
+   "geo": {
+    "renders": 426,
+    "triangles": 722600,
+    "geometries": 23,
+    "textures": 2
+   }
+  },
+  {
+   "file": "santa-maria-azores-follow-end-1024x640.jpg",
+   "environment": "santa-maria-azores",
+   "camera": "follow",
+   "t": 23.3361272857644,
+   "size": [
+    1024,
+    640
+   ],
+   "geo": {
+    "renders": 428,
+    "triangles": 722600,
+    "geometries": 23,
+    "textures": 2
+   }
+  },
+  {
+   "file": "santa-maria-azores-pad-end-1440x900.jpg",
+   "environment": "santa-maria-azores",
+   "camera": "pad",
+   "t": 23.3361272857644,
+   "size": [
+    1440,
+    900
+   ],
+   "geo": {
+    "renders": 430,
+    "triangles": 722600,
+    "geometries": 23,
+    "textures": 2
+   }
+  },
+  {
+   "file": "santa-maria-azores-wide-end-1440x900.jpg",
+   "environment": "santa-maria-azores",
+   "camera": "wide",
+   "t": 23.3361272857644,
+   "size": [
+    1440,
+    900
+   ],
+   "geo": {
+    "renders": 431,
+    "triangles": 722600,
+    "geometries": 23,
+    "textures": 2
+   }
+  },
+  {
+   "file": "santa-maria-azores-overhead-end-1440x900.jpg",
+   "environment": "santa-maria-azores",
+   "camera": "overhead",
+   "t": 23.3361272857644,
+   "size": [
+    1440,
+    900
+   ],
+   "geo": {
+    "renders": 432,
+    "triangles": 722600,
+    "geometries": 23,
+    "textures": 2
+   }
+  },
+  {
+   "file": "santa-maria-azores-follow-mid-1440x900.jpg",
+   "environment": "santa-maria-azores",
+   "camera": "follow",
+   "t": 12.8348700071704,
+   "size": [
+    1440,
+    900
+   ],
+   "geo": {
+    "renders": 434,
+    "triangles": 722536,
+    "geometries": 23,
+    "textures": 2
+   }
+  },
+  {
+   "file": "santa-maria-azores-pad-mid-1440x900.jpg",
+   "environment": "santa-maria-azores",
+   "camera": "pad",
+   "t": 12.8348700071704,
+   "size": [
+    1440,
+    900
+   ],
+   "geo": {
+    "renders": 435,
+    "triangles": 722536,
+    "geometries": 23,
+    "textures": 2
+   }
+  },
+  {
+   "file": "santa-maria-azores-wide-mid-1440x900.jpg",
+   "environment": "santa-maria-azores",
+   "camera": "wide",
+   "t": 12.8348700071704,
+   "size": [
+    1440,
+    900
+   ],
+   "geo": {
+    "renders": 436,
+    "triangles": 722600,
+    "geometries": 23,
+    "textures": 2
+   }
+  },
+  {
+   "file": "santa-maria-azores-overhead-mid-1440x900.jpg",
+   "environment": "santa-maria-azores",
+   "camera": "overhead",
+   "t": 12.8348700071704,
+   "size": [
+    1440,
+    900
+   ],
+   "geo": {
+    "renders": 437,
+    "triangles": 722600,
+    "geometries": 23,
+    "textures": 2
+   }
+  },
+  {
+   "file": "cape-canaveral-follow-end-1440x900.jpg",
+   "environment": "cape-canaveral",
+   "camera": "follow",
+   "t": 23.3361272857644,
+   "size": [
+    1440,
+    900
+   ],
+   "geo": {
+    "renders": 423,
+    "triangles": 722600,
+    "geometries": 23,
+    "textures": 2
+   }
+  },
+  {
+   "file": "cape-canaveral-follow-end-1280x720.jpg",
+   "environment": "cape-canaveral",
+   "camera": "follow",
+   "t": 23.3361272857644,
+   "size": [
+    1280,
+    720
+   ],
+   "geo": {
+    "renders": 425,
+    "triangles": 722600,
+    "geometries": 23,
+    "textures": 2
+   }
+  },
+  {
+   "file": "cape-canaveral-follow-end-1024x640.jpg",
+   "environment": "cape-canaveral",
+   "camera": "follow",
+   "t": 23.3361272857644,
+   "size": [
+    1024,
+    640
+   ],
+   "geo": {
+    "renders": 427,
+    "triangles": 722600,
+    "geometries": 23,
+    "textures": 2
+   }
+  },
+  {
+   "file": "cape-canaveral-pad-end-1440x900.jpg",
+   "environment": "cape-canaveral",
+   "camera": "pad",
+   "t": 23.3361272857644,
+   "size": [
+    1440,
+    900
+   ],
+   "geo": {
+    "renders": 429,
+    "triangles": 722600,
+    "geometries": 23,
+    "textures": 2
+   }
+  },
+  {
+   "file": "cape-canaveral-wide-end-1440x900.jpg",
+   "environment": "cape-canaveral",
+   "camera": "wide",
+   "t": 23.3361272857644,
+   "size": [
+    1440,
+    900
+   ],
+   "geo": {
+    "renders": 430,
+    "triangles": 722600,
+    "geometries": 23,
+    "textures": 2
+   }
+  },
+  {
+   "file": "cape-canaveral-overhead-end-1440x900.jpg",
+   "environment": "cape-canaveral",
+   "camera": "overhead",
+   "t": 23.3361272857644,
+   "size": [
+    1440,
+    900
+   ],
+   "geo": {
+    "renders": 431,
+    "triangles": 722600,
+    "geometries": 23,
+    "textures": 2
+   }
+  },
+  {
+   "file": "cape-canaveral-follow-mid-1440x900.jpg",
+   "environment": "cape-canaveral",
+   "camera": "follow",
+   "t": 12.8348700071704,
+   "size": [
+    1440,
+    900
+   ],
+   "geo": {
+    "renders": 433,
+    "triangles": 722536,
+    "geometries": 23,
+    "textures": 2
+   }
+  },
+  {
+   "file": "cape-canaveral-pad-mid-1440x900.jpg",
+   "environment": "cape-canaveral",
+   "camera": "pad",
+   "t": 12.8348700071704,
+   "size": [
+    1440,
+    900
+   ],
+   "geo": {
+    "renders": 434,
+    "triangles": 722536,
+    "geometries": 23,
+    "textures": 2
+   }
+  },
+  {
+   "file": "cape-canaveral-wide-mid-1440x900.jpg",
+   "environment": "cape-canaveral",
+   "camera": "wide",
+   "t": 12.8348700071704,
+   "size": [
+    1440,
+    900
+   ],
+   "geo": {
+    "renders": 435,
+    "triangles": 722600,
+    "geometries": 23,
+    "textures": 2
+   }
+  },
+  {
+   "file": "cape-canaveral-overhead-mid-1440x900.jpg",
+   "environment": "cape-canaveral",
+   "camera": "overhead",
+   "t": 12.8348700071704,
+   "size": [
+    1440,
+    900
+   ],
+   "geo": {
+    "renders": 436,
+    "triangles": 722600,
+    "geometries": 23,
+    "textures": 2
+   }
+  }
+ ],
+ "version": "0.16.0"
+}
