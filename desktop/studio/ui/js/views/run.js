@@ -102,6 +102,7 @@ function build() {
       h('span', { class: 'mono dim small' }, `${d ? d.manifest.name : record.domain.id} · run ${ws.runId}`)),
     h('div', { class: 'run-actions' },
       h('button', { type: 'button', class: 'btn', onclick: () => { selectTab('prov'); const b = root.querySelector('[data-action="replay"]'); if (b) b.click(); } }, icon('replay'), 'Replay'),
+      h('button', { type: 'button', class: 'btn', title: 'Change the conditions of this run, run a new simulation and compare', onclick: () => navigate('lab', { runId: ws.runId }) }, 'Experiment from this run'),
       h('button', { type: 'button', class: 'btn btn-quiet', onclick: () => selectTab('prov') }, 'Provenance'),
       h('button', { type: 'button', class: 'btn btn-quiet', title: 'Open the run in the library to edit its label, notes and tags', onclick: () => navigate('library', { select: ws.runId }) }, 'Label and notes')),
     h('div', { class: 'verdicts' }, verdictBlocks(record)),

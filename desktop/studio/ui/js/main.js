@@ -14,10 +14,11 @@ import { initDiscover, showDiscover, rethemeDiscover } from './views/discover.js
 import { initHome, showHome } from './views/home.js';
 import { initMissions, showMissions } from './views/missions.js';
 import { initPlayer, showPlayer, leavePlayer, playerKey, rethemePlayer, playerState } from './views/player.js';
+import { initLab, showLab, labState } from './views/lab.js';
 import { EXPERIENCES } from './experiences.js';
 
 // Keyboard digits follow this order; `mission` (the player) has no digit and lights "Missions".
-const VIEWS = ['home', 'missions', 'discover', 'prepare', 'run', 'compare', 'library', 'settings', 'mission'];
+const VIEWS = ['home', 'missions', 'discover', 'prepare', 'run', 'compare', 'library', 'settings', 'mission', 'lab'];
 const NAV_OF = { mission: 'missions' };
 let currentView = null;
 
@@ -57,6 +58,7 @@ export async function navigate(view, opts) {
     else if (view === 'compare') await showCompare(opts);
     else if (view === 'library') await showLibrary(opts);
     else if (view === 'settings') showSettings();
+    else if (view === 'lab') await showLab(opts);
   } catch (e) {
     logUiError(`navigate ${view}: ${e && e.stack ? e.stack : JSON.stringify(e)}`);
     toast(errorText(e), 'error');
@@ -234,6 +236,7 @@ document.getElementById('open-palette').addEventListener('click', () => openPale
 initHome(document.getElementById('view-home'), navigate);
 initMissions(document.getElementById('view-missions'), navigate);
 initPlayer(document.getElementById('view-mission'), navigate);
+initLab(document.getElementById('view-lab'), navigate);
 initDiscover(document.getElementById('view-discover'));
 initPrepare(document.getElementById('view-prepare'), navigate);
 initRun(document.getElementById('view-run'), navigate);
@@ -248,6 +251,7 @@ document.addEventListener('vv-open-mission', (e) => navigate('mission', { experi
 window.__studio = {
   view: () => currentView,
   player: () => playerState(),
+  lab: () => labState(),
   run: () => { const w = runWorkspace(); return w ? { runId: w.runId, t: w.cursor.t, t0: w.model.t0, t1: w.model.t1, scene: w.record.scene.kind } : null; },
 };
 
