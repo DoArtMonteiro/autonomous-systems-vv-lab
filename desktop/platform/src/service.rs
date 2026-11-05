@@ -531,8 +531,11 @@ fn check_record(
             "the run record breaks the contract: {m}"
         )))
     };
-    if record.schema != RECORD_SCHEMA {
+    if record.schema != RECORD_SCHEMA && record.schema != RECORD_SCHEMA_V2 {
         return bad("schema");
+    }
+    if let Err(e) = record.check_entities() {
+        return bad(&e);
     }
     if &record.request != request {
         return bad("request differs from the validated request");

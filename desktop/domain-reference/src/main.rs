@@ -274,6 +274,8 @@ fn record_for(request: &RunRequest, trace: &Trace) -> RunRecord {
         }],
         scene: json!({ "kind": "none" }),
         notes: vec!["Reference domain: proves the contract, makes no physical claim.".into()],
+        entities: None,
+        mission: None,
     }
 }
 
