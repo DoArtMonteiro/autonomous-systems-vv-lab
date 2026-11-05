@@ -25,6 +25,8 @@ use crate::{AppState, blocking, err, log_line};
 pub const MAX_UNPACKED_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 /// Most entries an archive may hold.
 const MAX_ENTRIES: usize = 64;
+/// The licence notice a package may carry besides the files its manifest names.
+pub const NOTICE: &str = "NOTICE.md";
 /// Free space kept on the disk after an install.
 const DISK_RESERVE_BYTES: u64 = 1024 * 1024 * 1024;
 
@@ -245,8 +247,14 @@ pub fn install(
         }
     };
     // Every file of the archive must be a file the manifest names: nothing unvalidated stays.
+    // NOTICE.md is the one extra file a package may carry: some licences (the Norwegian Polar
+    // Institute's) require their text to travel with the data, so it is kept beside the pack.
     let named: Vec<&str> = env.files();
-    if let Some(extra) = plan.names.iter().find(|n| !named.contains(&n.as_str())) {
+    if let Some(extra) = plan
+        .names
+        .iter()
+        .find(|n| !named.contains(&n.as_str()) && n.as_str() != NOTICE)
+    {
         let _ = fs::remove_dir_all(&root);
         return Err(PlatformError::Invalid(format!(
             "the archive holds {extra}, which environment.json does not name"
@@ -415,5 +423,20 @@ mod tests {
         zip_of(&src, &refs, &d, &[]);
         assert!(install(&d, &lib, |_| false).is_err());
         assert!(!lib.exists() || fs::read_dir(&lib).unwrap().count() == 0);
+    }
+
+    /// Optional: installs real packages built by scripts/geo/package_environment.py, named in
+    /// VV_ENV_ZIPS (separated by ';'). Skipped when the variable is not set.
+    #[test]
+    fn real_packages_install_when_given() {
+        let Ok(list) = std::env::var("VV_ENV_ZIPS") else {
+            return;
+        };
+        let lib = temp("real");
+        for z in list.split(';').filter(|s| !s.is_empty()) {
+            let id = install(Path::new(z), &lib, |_| false).unwrap_or_else(|e| panic!("{z}: {e}"));
+            assert!(Environment::open(&lib.join(&id)).is_ok(), "{id}");
+            println!("installed {id}");
+        }
     }
 }
