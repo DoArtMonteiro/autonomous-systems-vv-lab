@@ -48,6 +48,7 @@ def run_and_wait(s, timeout=120):
 
 
 def set_param(s, pid, value):
+    s.js(f"(() => {{ const d = document.querySelector('[data-param=\"{pid}\"]').closest('details'); if (d) d.open = true; }})()")
     s.page.fill(f"#lab-p-{pid}", str(value))
     s.page.dispatch_event(f"#lab-p-{pid}", "change")
     time.sleep(0.2)
@@ -169,6 +170,29 @@ def judging(s, base_id):
     check("The Lab says only the judgement moved", "only the judgement moved" in why, why[:200])
 
 
+def ascent(s):
+    """Multi-entity mission: the ascent plays in the player and its failure is fixed in the Lab."""
+    open_mission(s, "to-orbit")
+    s.wait("(() => { const p = window.__studio.player(); return p && p.renderer === 'ascent'; })()", 40, "ascent scene")
+    time.sleep(1.0)
+    shown = s.js("window.__studio.player()")
+    rec = record(s, shown["runs"][shown["active"]])
+    ents = [e["id"] for e in rec.get("entities", [])]
+    check("Two stages to orbit: the record is vv-run.v2 with separate entities", rec["schema"] == "vv-run.v2" and len(ents) >= 2, ", ".join(ents))
+    s.shot("m17-ascent-player-dark")
+    open_mission(s, "too-heavy")
+    s.wait("document.querySelector('.pl-head [data-action=\"configure\"]')", 30, "change the conditions")
+    s.page.click(".pl-head [data-action='configure']")
+    s.wait("window.__studio.view() === 'lab' && document.querySelector('.lab-base')", 30, "lab")
+    base = record(s, lab(s)["base"])
+    check("One payload too many: the baseline does not reach orbit", base["outcome"]["status"] != "success", base["outcome"]["label"])
+    set_param(s, "small_payload_kg", 300)
+    exp_id = run_and_wait(s)
+    exp = record(s, exp_id)
+    check("One payload too many: a lighter payload reaches orbit in a new simulation", exp["outcome"]["status"] == "success", exp["outcome"]["label"])
+    s.shot("m17-ascent-lab-dark")
+
+
 def layout(s):
     s.resize(1024, 640)
     time.sleep(0.6)
@@ -214,6 +238,8 @@ def main():
                 vehicle(s)
                 judging(s, base_id)
                 layout(s)
+                if s.js("!!(window.__studio && document.querySelector('.nav-btn'))") and os.environ.get("VV_ASCENT", "1") == "1":
+                    ascent(s)
             except Exception as e:  # noqa: BLE001
                 check("Lab journeys completed", False, repr(e)[:300])
                 try:
