@@ -52,7 +52,8 @@ STAC = "https://earth-search.aws.element84.com/v1/search"
 # Environment definitions live in catalogue.json next to this script (one entry per pack).
 CATALOGUE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "catalogue.json")
 with open(CATALOGUE, encoding="utf-8") as _f:
-    ENVIRONMENTS = json.load(_f)["environments"]
+    _CAT = json.load(_f)
+ENVIRONMENTS = _CAT["environments"]
 
 LICENCES = {
     "copernicus-dem": {
@@ -106,6 +107,9 @@ DETAIL_LICENCES = {
         "access": "Planetary Computer STAC https://planetarycomputer.microsoft.com/api/stac/v1, collection naip (anonymous range requests)",
     },
 }
+# Licences of the other detail sources are data of the catalogue (key "licences"), each with an
+# `accuracy` sentence for the manifest.
+DETAIL_LICENCES.update(_CAT.get("licences", {}))
 
 GEOD = pyproj.CRS("EPSG:4979")
 ECEF = pyproj.CRS("EPSG:4978")
@@ -141,7 +145,7 @@ class Frame:
 class Dem:
     """Copernicus GLO-30 heights in a window, sampled bilinearly at pixel centres."""
 
-    def __init__(self, lat0, lon0, lat1, lon1, raw_dir):
+    def __init__(self, lat0, lon0, lat1, lon1, raw_dir, source="/vsicurl/" + DEM_URL):
         tiles = []
         for la in range(math.floor(lat0), math.floor(lat1) + 1):
             for lo in range(math.floor(lon0), math.floor(lon1) + 1):
@@ -152,7 +156,7 @@ class Dem:
         with Env(AWS_NO_SIGN_REQUEST="YES", GDAL_DISABLE_READDIR_ON_OPEN="EMPTY_DIR"):
             for t in tiles:
                 try:
-                    srcs.append(rasterio.open("/vsicurl/" + DEM_URL.format(t=t)))
+                    srcs.append(rasterio.open(source.format(t=t)))
                     found.append(t)
                 except rasterio.errors.RasterioIOError:
                     # The product has no tile where the whole degree square is open sea.
@@ -161,21 +165,21 @@ class Dem:
                 raise SystemExit("no DEM tile covers the extent")
             try:
                 # Bounds snapped to the source pixel grid, so the mosaic is not resampled.
+                # Above 50 degrees of latitude the product's longitude spacing is 1.5 to 10 times
+                # its latitude spacing: the two resolutions are kept apart, never resampled.
                 tr = srcs[0].transform
-                res = abs(tr.a)
-                pad = 4 * res
-                snap = lambda v, o: o + math.floor((v - o) / res) * res
-                left = snap(lon0 - pad, tr.c)
-                top = tr.f - math.floor((tr.f - (lat1 + pad)) / res) * res
-                right = snap(lon1 + pad, tr.c) + res
-                bottom = tr.f - math.ceil((tr.f - (lat0 - pad)) / res) * res
-                z, T = merge(srcs, bounds=(left, bottom, right, top), res=res, nodata=-32768.0)
+                rx, ry = abs(tr.a), abs(tr.e)
+                left = tr.c + math.floor((lon0 - 4 * rx - tr.c) / rx) * rx
+                right = tr.c + math.floor((lon1 + 4 * rx - tr.c) / rx) * rx + rx
+                top = tr.f - math.floor((tr.f - (lat1 + 4 * ry)) / ry) * ry
+                bottom = tr.f - math.ceil((tr.f - (lat0 - 4 * ry)) / ry) * ry
+                for s in srcs:
+                    if abs(abs(s.transform.a) - rx) > 1e-12 or abs(abs(s.transform.e) - ry) > 1e-12:
+                        raise SystemExit("DEM tiles with different resolutions")
+                z, T = merge(srcs, bounds=(left, bottom, right, top), res=(rx, ry), nodata=-32768.0)
                 self.z = z[0].astype(np.float64)
                 self.T = T
                 self.tags = srcs[0].tags()
-                for s in srcs:
-                    if abs(abs(s.transform.a) - res) > 1e-12:
-                        raise SystemExit("DEM tiles with different resolutions")
             finally:
                 for s in srcs:
                     s.close()
@@ -210,7 +214,7 @@ def surface_points(frame, dem, N, e, n):
     """Terrain points whose exact ENU east/north are (e, n). Returns lat, lon, H (EGM2008) and up."""
     ge, gn = e.astype(np.float64).copy(), n.astype(np.float64).copy()
     u = np.zeros_like(ge)
-    for _ in range(10):
+    for _ in range(40):  # see surface_points_h
         lat, lon, _h = frame.to_geod(ge, gn, u)
         H = dem.sample(lat, lon)
         enu = frame.to_enu(lat, lon, H + N)
@@ -227,7 +231,10 @@ def surface_points_h(frame, h_of, e, n):
     """As surface_points, for a source that gives ellipsoidal heights h_of(lat, lon) directly."""
     ge, gn = e.astype(np.float64).copy(), n.astype(np.float64).copy()
     u = np.zeros_like(ge)
-    for _ in range(10):
+    # On steep slopes far from the origin each step shrinks the error only by the slope times the
+    # tilt of the local vertical, so mountain packs need more iterations than flat ones; packs that
+    # converged within 10 give the same result.
+    for _ in range(40):
         lat, lon, _h = frame.to_geod(ge, gn, u)
         h = h_of(lat, lon)
         enu = frame.to_enu(lat, lon, h)
@@ -274,11 +281,12 @@ def build_detail(cfg, frame, hd, imagery, out, base_img):
     E, N = np.meshgrid(axis, axis[::-1])
     lat, lon, h, U, err = surface_points_h(frame, hd, E, N)
     print(f"detail grid {U.shape}, max horizontal residual {err * 1000:.3f} mm", file=sys.stderr)
-    scale = 0.01
+    # 1 cm steps cover 655 m of relief in 16 bits; mountain packs declare a coarser step.
+    scale = d.get("height_scale_m", 0.01)
     offset = float(math.floor(U.min()) - 1)
     q = np.round((U - offset) / scale)
     if q.max() > 65535:
-        raise SystemExit("detail relief exceeds the 16-bit range at 1 cm")
+        raise SystemExit(f"detail relief exceeds the 16-bit range at {scale} m (set detail.height_scale_m)")
     hbytes = q.astype("<u2").tobytes()
     with open(os.path.join(out, "detail-height.u16"), "wb") as f:
         f.write(hbytes)
@@ -403,12 +411,25 @@ def main():
             # Open water has no lidar value: there the base DEM (sea at 0 m above EGM2008) is used.
             hd = lambda la, lo: src.h_ellipsoid(la, lo, lambda a, b: dem.sample(a, b) + N0)  # noqa: E731
             det_dem_items = src.tiles
+        elif det["dem"]["kind"] in ("cog", "wcs"):
+            dd = det["dem"]
+            if dd["kind"] == "cog":
+                src = detail_sources.CogDem(dd["urls"], dd["vertical_crs"], dd["ellipsoidal_crs"], *box, raw)
+            else:
+                src = detail_sources.WcsDem(dd["url"], dd["coverage"], dd["vertical_crs"], dd["ellipsoidal_crs"], *box, raw)
+            # Where the DEM has no value (sea, gaps) the base DEM is used.
+            hd = lambda la, lo: src.h_ellipsoid(la, lo, lambda a, b: dem.sample(a, b) + N0)  # noqa: E731
+            det_dem_items = src.tiles
         else:
             hd = lambda la, lo: dem.sample(la, lo) + N0  # noqa: E731
-        if det["imagery"]["kind"] == "naip":
-            imagery = detail_sources.NaipImagery(*box, det["imagery"]["year"], det["image_spacing_m"], raw)
+        im = det["imagery"]
+        if im["kind"] == "naip":
+            imagery = detail_sources.NaipImagery(*box, im["year"], det["image_spacing_m"], raw)
+        elif im["kind"] == "cog":
+            imagery = detail_sources.CogImagery(im["urls"], *box, det["image_spacing_m"], raw, bands=tuple(im.get("bands", [1, 2, 3])))
+        elif im["kind"] == "arcgis":
+            imagery = detail_sources.ArcgisExportImagery(im["url"], im["crs"], *box, det["image_spacing_m"], raw)
         else:
-            im = det["imagery"]
             imagery = detail_sources.WmsImagery(im["url"], im["layer"], *box, det["image_spacing_m"], raw)
         h_ell0 = float(hd(np.array([lat0]), np.array([lon0]))[0])
         H0 = h_ell0 - N0
@@ -421,11 +442,11 @@ def main():
     E, Nn = np.meshgrid(axis, axis[::-1])  # row 0 is the north edge
     lat, lon, H, U, err = surface_points(frame, dem, N0, E, Nn)
     print(f"height grid {U.shape}, max horizontal residual {err * 1000:.3f} mm", file=sys.stderr)
-    scale = 0.01
+    scale = cfg.get("height_scale_m", 0.01)
     offset = float(math.floor(U.min()) - 1)
     q = np.round((U - offset) / scale)
     if q.max() > 65535:
-        raise SystemExit("relief exceeds the 16-bit range at 1 cm")
+        raise SystemExit(f"relief exceeds the 16-bit range at {scale} m (set height_scale_m)")
     hbytes = q.astype("<u2").tobytes()
     with open(os.path.join(out, "height.u16"), "wb") as f:
         f.write(hbytes)
@@ -539,10 +560,35 @@ def main():
             lic["credit"] = lic["credit"].format(year=", ".join(years))
             extra_sources.append({**lic, "layer": "detail", "items": imagery.items})
             extra_accuracy.append(f"Detail image: NAIP {', '.join(years)} at {det['image_spacing_m']:g} m per texel (source {imagery.items[0]['gsd_m']} m). NAIP and 3DEP are on NAD83(2011) and are read here as WGS84, a horizontal offset of about 1 to 2 m.")
+        if det["dem"]["kind"] in ("cog", "wcs"):
+            lic = dict(DETAIL_LICENCES[det["dem"]["licence"]])
+            acc = lic.pop("accuracy", None)
+            extra_sources.append({**lic, "layer": "detail", "items": det_dem_items, "vertical_crs": src.vertical_crs,
+                                  "ellipsoidal_crs": src.ellipsoidal_crs, "vertical_transformation": src.description,
+                                  "fill_fraction": round(det_fill, 4),
+                                  "fill_note": "Detail nodes where the DEM has no value (sea, gaps) take the base DEM height there."})
+            extra_accuracy.append(f"Detail layer ({2 * det['half_extent_m'] / 1000:g} km square around the origin): heights from {lic['product']}, sampled every {det['dem_spacing_m']:g} m and converted from {src.vertical_crs} to {src.ellipsoidal_crs} ellipsoidal heights with PROJ ({src.description}); those are used as WGS84 heights. The origin is on this surface.")
+            if acc:
+                extra_accuracy.append(acc)
+        if det["imagery"]["kind"] in ("cog", "arcgis"):
+            lic = dict(DETAIL_LICENCES[det["imagery"]["licence"]])
+            acc = lic.pop("accuracy", None)
+            if det["imagery"]["kind"] == "cog":
+                extra_sources.append({**lic, "layer": "detail", "items": imagery.items})
+                src_gsd = f"source {imagery.items[0]['gsd_m']} m"
+            else:
+                extra_sources.append({**lic, "layer": "detail", "requests": len(imagery.requests), "request_example": imagery.requests[0]})
+                src_gsd = "rendered by the server at the texel size"
+            extra_accuracy.append(f"Detail image: {lic['product']} at {det['image_spacing_m']:g} m per texel ({src_gsd}), resampled onto the ENU grid.")
+            if acc:
+                extra_accuracy.append(acc)
         if det["imagery"]["kind"] == "wms":
-            lic = DETAIL_LICENCES[det["imagery"]["licence"]]
+            lic = dict(DETAIL_LICENCES[det["imagery"]["licence"]])
+            acc = lic.pop("accuracy", None)
             extra_sources.append({**lic, "layer": "detail", "requests": len(imagery.requests), "request_example": imagery.requests[0]})
             extra_accuracy.append(f"Detail image: the {det['imagery']['year']} orthophoto rendered by its WMS at {det['image_spacing_m']:g} m per texel, in EPSG:4326 tiles resampled onto the ENU grid. Its georeferencing is the publisher's; a residual offset of a few metres against the base layers cannot be excluded.")
+            if acc:
+                extra_accuracy.append(acc)
         if det["dem"]["kind"] == "base":
             extra_accuracy.append(f"Detail heights are the base Copernicus GLO-30 surface sampled every {det['dem_spacing_m']:g} m: the detail layer adds image resolution, not terrain resolution.")
         extra_accuracy.append(f"Within {det['blend_m']:g} m of the edge of the detail layer the drawn heights blend into the base grid and the detail image fades into the base image; this display adjustment is the only change made to the context data.")
