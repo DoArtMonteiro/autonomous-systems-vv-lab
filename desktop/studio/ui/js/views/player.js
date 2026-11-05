@@ -3,6 +3,11 @@
 // read from the records; phases and the divergence instant are derived from recorded channels and
 // labelled as derived. Playback moves a display cursor over stored samples; it never runs or changes
 // a simulation. Analysis, comparison and the claim behind the mission are one click away.
+//
+// M16: the same replay has three views that share the runs and the cursor. Engineering (the
+// lightweight Three.js scene of M15, no geographic data), Geospatial (the same scene placed on a
+// validated environment pack) and Mission Control (an operations layout over either renderer).
+// Switching view remounts only the presentation; the records, the cursor time and the results stay.
 
 import { h, clear, icon, num, prose, lowerIndex, timeText } from '../dom.js';
 import { loadRecord, emit, pref, setPref } from '../store.js';
@@ -16,6 +21,12 @@ import { claimStatus, forgetClaims } from '../claims.js';
 import { mountCinema } from '../scenes/rocket-cinema.js';
 import { ground2d } from '../scenes/ground.js';
 import { openRequest } from './prepare.js';
+import { phasesOf, divergence, readouts, hudNum, ROCKET_METRICS, KIND_WORD, metricValue } from '../session.js';
+import { mountGeo } from '../scenes/geo.js';
+import { listEnvironments, loadPack, trackOf, mb } from '../environments.js';
+import { buildControl } from './control.js';
+import { sourcesInfo } from '../sources-info.js';
+import { openCatalogue } from '../env-catalogue.js';
 
 let root;
 let navigate = () => {};
@@ -24,9 +35,7 @@ let loading = null; // {id} of the load in progress; a newer load replaces it
 let visible = false;
 
 const SPEEDS = [0.5, 1, 2, 4];
-const ENGINE = ['Engine off', 'Engine on', 'Engine cut', 'Flameout'];
-const ROCKET_METRICS = ['touchdown_vertical_speed', 'touchdown_horizontal_speed', 'touchdown_pad_distance'];
-const KIND_WORD = { T: 'true state', E: 'controller estimate', O: 'sensor observation', D: 'derived' };
+const VIEWS = [['engineering', 'Engineering'], ['geospatial', 'Geospatial'], ['control', 'Mission Control']];
 
 export function initPlayer(el, nav) {
   root = el;
@@ -36,7 +45,8 @@ export function initPlayer(el, nav) {
 /** Read-only facts for tests. */
 export function playerState() {
   if (!pl) return null;
-  return { experience: pl.exp.id, runs: pl.runs.map((r) => r.runId), active: pl.active, t: pl.cursor.t, t1: pl.cursor.t1, revealed: pl.revealed, playing: pl.cursor.playing, scene: pl.scene ? (pl.scene.ok === false ? 'fallback' : pl.kind) : null };
+  return { experience: pl.exp.id, runs: pl.runs.map((r) => r.runId), active: pl.active, t: pl.cursor.t, t1: pl.cursor.t1, revealed: pl.revealed, analysis: !!pl.analysis, playing: pl.cursor.playing, scene: pl.scene ? (pl.scene.ok === false ? 'fallback' : pl.kind) : null,
+    view: pl.view, environment: pl.envId, renderer: pl.renderer || null, geoError: pl.geoError || null, geoStats: pl.scene && pl.scene.stats ? pl.scene.stats() : null, mounts: pl.mounts || 0 };
 }
 
 export async function showPlayer(opts) {
@@ -50,7 +60,8 @@ export async function showPlayer(opts) {
   } else if (pl) {
     // A challenge run elsewhere may have changed what the claim card should say.
     forgetClaims();
-    renderSide();
+    if (!pl.control) renderSide();
+    if (pl.suspended) { pl.suspended = false; mountScene(); }
     if (pl.scene && pl.scene.redraw) requestAnimationFrame(() => { if (pl && pl.scene && pl.scene.redraw) pl.scene.redraw(); });
   }
 }
@@ -58,7 +69,17 @@ export async function showPlayer(opts) {
 /** Called when another view is shown: playback stops, nothing renders off screen. */
 export function leavePlayer() {
   visible = false;
-  if (pl) pl.cursor.pause();
+  if (!pl) return;
+  pl.cursor.pause();
+  // The geospatial scene holds the terrain mesh, the image and a shadow map on the GPU: release
+  // them while another view is shown (the decoded pack stays cached, so returning is quick).
+  if (pl.renderer === 'geospatial' || pl.renderer === 'loading') {
+    pl.mountToken = null;
+    if (pl.scene) pl.scene.dispose();
+    pl.scene = null;
+    pl.renderer = 'suspended';
+    pl.suspended = true;
+  }
 }
 
 function renderEmpty() {
@@ -73,6 +94,7 @@ function dispose() {
   if (!pl) return;
   if (pl.unsub) pl.unsub();
   if (pl.unplay) pl.unplay();
+  if (pl.control) pl.control.dispose();
   pl.cursor.dispose();
   if (pl.scene) pl.scene.dispose();
   pl = null;
@@ -130,127 +152,161 @@ async function load(id) {
   const cursor = new TimeCursor({ t0, t1, unit, samples: longest.model.primary ? longest.model.timebases[longest.model.primary] : [], events: runs.flatMap((x) => x.model.events) });
   const saved = Number(pref('missionSpeed'));
   cursor.speed = SPEEDS.includes(saved) ? saved : unit === 'tick' ? 0.5 : 1;
-  pl = { exp, demo: r.demo, domain: r.domain, runs, cursor, active: 0, scene: null, revealed: false, unit, kind: runs[0].record.scene && runs[0].record.scene.kind };
+  let envs = [];
+  try { envs = (await listEnvironments()).environments; } catch (e) { logUiError(`environments: ${errorText(e)}`); }
+  if (loading !== null && loading !== token) return;
+  const kind = runs[0].record.scene && runs[0].record.scene.kind;
+  const savedEnv = pref('missionEnvironment');
+  const envId = envs.some((x) => x.id === savedEnv) ? savedEnv : null;
+  pl = { exp, demo: r.demo, domain: r.domain, runs, cursor, active: 0, scene: null, revealed: false, unit, kind, envs, envId, view: 'engineering', lastView: 'engineering', mounts: 0 };
+  const want = pref('missionView');
+  if (want === 'control' || (want === 'geospatial' && geoPossible())) pl.view = want;
+  if (pl.view === 'geospatial' && !pl.envId) pl.envId = envs[0].id;
   build();
   cursor.set(t0);
   if (visible && !matchMedia('(prefers-reduced-motion: reduce)').matches) cursor.play();
 }
 
-// ----------------------------------------------------------------------------- derived views
-
-/** Phase segments of a run from its recorded channels (derived, not a simulator output). */
-function phasesOf(run) {
-  const m = run.model;
-  const eng = m.byId.get('engine_state');
-  const fb = m.byId.get('fallback');
-  const src = eng || fb;
-  if (!src) return [];
-  const times = m.timebases[src.timebase] || [];
-  const name = (v) => (eng ? ENGINE[v] || `Engine ${v}` : v === 1 ? 'Safety fallback' : 'Driving');
-  const out = [];
-  for (let i = 0; i < times.length; i++) {
-    const v = src.values[i];
-    if (v === null || v === undefined) continue;
-    const last = out[out.length - 1];
-    if (last && last.v === v) last.t1 = times[i];
-    else out.push({ v, t0: times[i], t1: times[i], label: name(v), kind: eng ? `eng-${v}` : v === 1 ? 'fallback' : 'drive' });
-  }
-  for (let i = 0; i + 1 < out.length; i++) out[i].t1 = out[i + 1].t0;
-  const td = run.record.scene && run.record.scene.touchdown;
-  if (td && Number.isFinite(td.t) && out.length) out[out.length - 1].t1 = Math.max(out[out.length - 1].t1, td.t);
-  return out;
-}
-
-/** First instant at which run b's true position departs from run a's by more than `tol` (derived). */
-function divergence(a, b, rocket) {
-  const ids = rocket ? ['pos_x', 'pos_y', 'pos_z'] : ['truth_x_mm', 'truth_y_mm'];
-  const tol = rocket ? 1.0 : 0.5;
-  const unit = rocket ? 'm' : 'mm';
-  const ca = ids.map((id) => a.model.byId.get(id));
-  const cb = ids.map((id) => b.model.byId.get(id));
-  if (ca.some((c) => !c) || cb.some((c) => !c)) return null;
-  const ta = a.model.timebases[ca[0].timebase] || [];
-  const tb = b.model.timebases[cb[0].timebase] || [];
-  const n = Math.min(ta.length, tb.length);
-  for (let i = 0; i < n; i++) {
-    if (ta[i] !== tb[i]) return null; // different sampling: not comparable sample by sample
-    let d2 = 0;
-    for (let k = 0; k < ids.length; k++) {
-      const x = ca[k].values[i];
-      const y = cb[k].values[i];
-      if (x === null || y === null) continue;
-      d2 += (x - y) * (x - y);
-    }
-    if (Math.sqrt(d2) > tol) return { t: ta[i], tol, unit };
-  }
-  return { t: null, tol, unit };
-}
-
-function value(run, id, t) {
-  const c = run.model.byId.get(id);
-  if (!c) return null;
-  const times = run.model.timebases[c.timebase] || [];
-  const i = lowerIndex(times, t);
-  if (i < 0) return null;
-  const v = c.values[i];
-  return v === undefined ? null : v;
-}
-
-function metricValue(run, id) {
-  const m = (run.record.metrics || []).find((x) => x.id === id);
-  return m && Number.isFinite(m.value) ? m.value : null;
-}
-
-function readouts(run, t, rocket) {
-  const v = (id) => value(run, id, t);
-  if (rocket) {
-    const vz = v('vel_z');
-    const thr = v('act_throttle');
-    const rej = v('altimeter_rejected');
-    // After touchdown the speeds are the verifier's values at the contact instant, not the last
-    // 0.1 s sample before it.
-    const contact = t >= run.model.t1 - 1e-9 && metricValue(run, 'touchdown_vertical_speed') !== null;
-    if (contact) {
-      return [
-        ['Altitude', 0, 'm', 'T', 'Contact: the nozzle exit plane reached the ground'],
-        ['Descent rate', metricValue(run, 'touchdown_vertical_speed'), 'm/s', 'T', 'Vertical speed at the contact instant, from the verifier'],
-        ['Horizontal speed', metricValue(run, 'touchdown_horizontal_speed'), 'm/s', 'T', 'Horizontal speed at the contact instant, from the verifier'],
-        ['Tilt', v('tilt_deg'), '°', 'T', 'Last recorded sample'],
-        ['Throttle', thr === null ? null : 100 * thr, '%', 'T', 'Last recorded sample'],
-        ['From pad centre', metricValue(run, 'touchdown_pad_distance'), 'm', 'D', 'Distance of the nozzle plane from the pad centre at contact'],
-        ['Altitude error', v('err_z'), 'm', 'D', 'Last recorded sample: vertical position the controller believes minus the true one'],
-        ['Altimeter', rej === null ? null : rej === 1 ? 'rejected' : 'in use', '', 'E', 'Whether the controller had rejected the radar altimeter'],
-      ];
-    }
-    return [
-      ['Altitude', v('altitude'), 'm', 'T', 'Nozzle exit plane above the ground, true state'],
-      ['Descent rate', vz === null ? null : -vz, 'm/s', 'T', 'Vertical speed, true state, positive downward'],
-      ['Horizontal speed', v('vel_h'), 'm/s', 'T', 'True state'],
-      ['Tilt', v('tilt_deg'), '°', 'T', 'Body axis from vertical, true state'],
-      ['Throttle', thr === null ? null : 100 * thr, '%', 'T', 'Throttle the engine really applied'],
-      ['From pad centre', v('pad_distance'), 'm', 'D', 'Distance of the nozzle plane from the pad centre, derived from the true state'],
-      ['Altitude error', v('err_z'), 'm', 'D', 'Vertical position the controller believes minus the true one'],
-      ['Altimeter', rej === null ? null : rej === 1 ? 'rejected' : 'in use', '', 'E', 'Whether the controller has rejected the radar altimeter'],
-    ];
-  }
-  const fb = v('fallback');
-  return [
-    ['East', v('truth_x_mm'), 'mm', 'T', 'True position'],
-    ['North', v('truth_y_mm'), 'mm', 'T', 'True position'],
-    ['GPS north', v('gps_y_mm'), 'mm', 'O', 'GPS sample, empty when no sample arrived'],
-    ['To goal', v('goal_distance_mm'), 'mm', 'D', 'Manhattan distance to the goal'],
-    ['Confidence', v('confidence_permille'), '‰', 'E', 'Confidence in the last accepted fix'],
-    ['Mode', fb === null ? null : fb === 1 ? 'fallback' : 'normal', '', 'D', 'Safety fallback of the controller'],
-  ];
-}
-
 // ----------------------------------------------------------------------------- layout
+
+/** A landscape can only carry a run recorded in a local east-north-up frame in metres. */
+function geoPossible() {
+  if (!pl || pl.kind !== 'rocket-3d') return false;
+  const sc = pl.runs[0].record.scene || {};
+  const f = sc.frame;
+  return !!(f && f.axes && f.axes.x === 'east' && f.axes.y === 'north' && sc.units === 'm') && pl.envs.length > 0;
+}
+
+function geoReason() {
+  if (pl.kind !== 'rocket-3d') return 'This mission is a millimetre-scale run in a local grid; placing it on a landscape would add nothing true.';
+  if (!pl.envs.length) return 'No validated geographic environment is installed. See Settings, Environments.';
+  return '';
+}
+
+/** Whether the scene of the current view is the geospatial renderer. */
+function wantGeo() {
+  return geoPossible() && !!pl.envId && (pl.view === 'geospatial' || pl.view === 'control');
+}
+
+function viewSwitch() {
+  return h('div', { class: 'seg pl-views', role: 'radiogroup', 'aria-label': 'View' },
+    VIEWS.map(([v, text]) => {
+      const off = v === 'geospatial' && !geoPossible();
+      return h('button', { type: 'button', role: 'radio', class: 'seg-btn', 'aria-checked': String(pl.view === v), 'aria-disabled': off ? 'true' : null, 'aria-describedby': off ? 'pl-geo-reason' : null, title: off ? geoReason() : null, dataset: { view: v },
+        onclick: () => { if (!off) setView(v); } }, text);
+    }), geoPossible() ? null : h('span', { class: 'sr-only', id: 'pl-geo-reason' }, geoReason()));
+}
+
+function envSelect() {
+  if (!geoPossible()) return h('span', { class: 'pl-env-none small dim', title: geoReason() }, pl.kind === 'rocket-3d' ? 'No environment installed' : 'Local grid, no landscape');
+  const sel = h('select', { class: 'select select-sm pl-env', 'aria-label': 'Geographic environment', onchange: (e) => setEnv(e.target.value || null) },
+    pl.view === 'control' ? h('option', { value: '', selected: !pl.envId }, 'No landscape (engineering scene)') : null,
+    pl.envs.map((x) => h('option', { value: x.id, selected: x.id === pl.envId }, x.name)));
+  const more = h('button', { type: 'button', class: 'btn btn-quiet btn-sm pl-env-cat', dataset: { action: 'environments' }, 'aria-haspopup': 'dialog', title: 'Browse the environments: resolution, relief, sources and size',
+    onclick: () => openCatalogue(pl.envs, pl.envId, (id) => { if (pl.view === 'engineering') setView('geospatial'); setEnv(id); }) }, 'Environments');
+  return h('span', { class: 'pl-env-tools' }, sel, more);
+}
+
+function setView(v) {
+  if (!pl || v === pl.view) return;
+  if (v === 'geospatial' && !geoPossible()) return;
+  if (pl.view !== 'control') pl.lastView = pl.view;
+  pl.view = v;
+  setPref('missionView', v);
+  if (v === 'geospatial' && !pl.envId && pl.envs.length) pl.envId = pl.envs[0].id;
+  const t = pl.cursor.t;
+  const playing = pl.cursor.playing;
+  build();
+  pl.cursor.set(t);
+  if (playing) pl.cursor.play();
+}
+
+function setEnv(id) {
+  if (!pl) return;
+  pl.envId = id;
+  setPref('missionEnvironment', id);
+  const t = pl.cursor.t;
+  build();
+  pl.cursor.set(t);
+}
+
+function phaseAt(t) {
+  const run = pl.runs[pl.active];
+  const phases = pl.phases[pl.active];
+  const ph = phases.find((p) => t >= p.t0 && t < p.t1) || phases[phases.length - 1];
+  const end = t >= run.model.t1 - 1e-9;
+  const td = run.record.scene && run.record.scene.touchdown;
+  const met = run.record.outcome.status === 'success';
+  if (end) {
+    // A failed contact says how hard it was and that the impact itself is not drawn.
+    const vz = td && !met ? metricValue(run, 'touchdown_vertical_speed') : null;
+    const bad = vz !== null && Number.isFinite(vz) ? `Contact at ${Math.abs(vz).toFixed(1)} m/s, requirements not met; impact not modelled` : 'Touchdown, requirements not met';
+    return { text: td ? (met ? 'Touchdown' : bad) : 'End of run', kind: met ? 'end' : 'end-bad', end: true };
+  }
+  return { text: ph ? ph.label : '', kind: ph ? ph.kind : '', end: false };
+}
+
+function sceneNote() {
+  const rocket = pl.kind === 'rocket-3d';
+  const note = h('div', { class: 'pl-scene-note', id: 'pl-scene-note' });
+  if (wantGeo()) {
+    const env = pl.envs.find((x) => x.id === pl.envId);
+    note.classList.add('is-geo');
+    if (env) note.append(sourcesInfo(env, { warn: pl.geoWarn, onSettings: openEnvSettings }));
+  } else {
+    note.append(h('p', null, rocket
+      ? (pl.runs.length > 1 ? 'Shown run: true trajectory (solid), the controller’s estimated position (dashed yellow) and the stage. Other runs: their true trajectories as coloured lines. ' : 'True trajectory (solid), the controller’s estimated position (dashed yellow) and the stage. ') + 'Sampled every 0.1 s and interpolated for display; the stage body is drawn for orientation, the model has no length.'
+      : 'True paths and GPS samples, one sample per tick. Top view, x east, y north.'));
+    if (pl.geoError) note.append(h('p', { class: 'pl-geo-warn' }, `Geospatial view unavailable: ${pl.geoError} The engineering scene is shown instead.`));
+  }
+  return note;
+}
+
+function openEnvSettings() {
+  navigate('settings');
+  requestAnimationFrame(() => { const el = document.getElementById('env-settings'); if (el) el.scrollIntoView({ block: 'start' }); });
+}
+
+function cameraButtons() {
+  if (pl.kind !== 'rocket-3d') return null;
+  const modes = [...(wantGeo() ? [['director', 'Auto']] : []), ['follow', 'Follow'], ['pad', 'From the ground'], ...(wantGeo() ? [['closeup', 'At the pad']] : []), ['wide', 'Whole descent'], ...(wantGeo() ? [['overhead', 'Overhead']] : [])];
+  return h('div', { class: 'seg pl-cams', role: 'radiogroup', 'aria-label': 'Camera' },
+    modes.map(([m, text]) => h('button', { type: 'button', role: 'radio', class: 'seg-btn', 'aria-checked': String(m === 'follow'), dataset: { cam: m },
+      onclick: (e) => { for (const b of e.currentTarget.parentElement.children) b.setAttribute('aria-checked', String(b === e.currentTarget)); if (pl.scene && pl.scene.preset) pl.scene.preset(m); } }, text)));
+}
 
 function build() {
   const { exp, runs, cursor } = pl;
   const rocket = pl.kind === 'rocket-3d';
   const grade = GRADES[exp.grade] || GRADES.demonstration;
+  if (pl.unsub) { pl.unsub(); pl.unsub = null; }
+  if (pl.unplay) { pl.unplay(); pl.unplay = null; }
+  if (pl.control) { pl.control.dispose(); pl.control = null; }
+  if (pl.scene) { pl.scene.dispose(); pl.scene = null; }
   clear(root);
+  pl.phases = runs.map((r) => phasesOf(r));
+  pl.div = runs.map((r, i) => (i === 0 ? null : divergence(runs[0], r, rocket)));
+  pl.geoWarn = null;
+  pl.track = null;
+
+  if (pl.view === 'control') {
+    const ctx = {
+      domainName: DOMAIN_NAMES[exp.domain] || exp.domain,
+      setView, setActive, navigate, viewSwitch, envSelect, sceneNote, phaseAt, analysisToggle, evidenceOpen,
+      geoActive: () => wantGeo(),
+      geo: () => (wantGeo() && pl.track ? { track: pl.track } : null),
+    };
+    pl.control = buildControl(pl, ctx);
+    root.append(h('div', { class: 'pl pl-control' }, pl.control.el));
+    pl.dom = { viewport: pl.control.viewport, note: pl.control.el.querySelector('#pl-scene-note') };
+    const cams = cameraButtons();
+    if (cams) { cams.classList.add('mc-cams'); pl.control.el.append(cams); }
+    mountScene();
+    pl.unsub = cursor.subscribe((t) => onTime(t));
+    onTime(cursor.t);
+    return;
+  }
+
   const stage = h('div', { class: 'pl-stage', id: 'pl-stage' });
   const viewport = h('div', { class: ['pl-viewport', rocket ? 'is-3d' : 'is-2d'], id: 'pl-viewport' });
   const hud = h('div', { class: 'pl-hud', role: 'group', 'aria-label': 'Readouts at the playback time' });
@@ -258,13 +314,8 @@ function build() {
   const runBar = runs.length > 1 ? h('div', { class: 'pl-runs', role: 'radiogroup', 'aria-label': 'Run shown in the scene' },
     runs.map((r, i) => h('button', { type: 'button', role: 'radio', class: 'pl-run', 'aria-checked': String(i === pl.active), dataset: { run: String(i) }, onclick: () => setActive(i) },
       h('span', { class: 'pl-swatch', style: { background: r.colour } }), r.label))) : null;
-  const cams = rocket ? h('div', { class: 'seg pl-cams', role: 'radiogroup', 'aria-label': 'Camera' },
-    [['follow', 'Follow'], ['pad', 'From the pad'], ['wide', 'Whole descent']].map(([m, text]) => h('button', { type: 'button', role: 'radio', class: 'seg-btn', 'aria-checked': String(m === 'follow'), dataset: { cam: m },
-      onclick: (e) => { for (const b of e.currentTarget.parentElement.children) b.setAttribute('aria-checked', String(b === e.currentTarget)); if (pl.scene && pl.scene.preset) pl.scene.preset(m); } }, text))) : null;
-  const note = h('p', { class: 'pl-scene-note' }, rocket
-    ? (runs.length > 1 ? 'Shown run: true trajectory (solid), the controller’s estimated position (dashed yellow) and the stage. Other runs: their true trajectories as coloured lines. ' : 'True trajectory (solid), the controller’s estimated position (dashed yellow) and the stage. ') + 'Sampled every 0.1 s and interpolated for display; the stage body is drawn for orientation, the model has no length.'
-    : 'True paths and GPS samples, one sample per tick. Top view, x east, y north.');
-  stage.append(...[viewport, phaseTag, hud, runBar, cams, note].filter(Boolean));
+  const note = sceneNote();
+  stage.append(...[viewport, phaseTag, hud, runBar, cameraButtons(), note].filter(Boolean));
 
   const head = h('header', { class: 'pl-head' },
     h('button', { type: 'button', class: 'pl-back', onclick: () => navigate('missions') }, h('span', { 'aria-hidden': 'true' }, '←'), ' Missions'),
@@ -272,17 +323,16 @@ function build() {
       h('p', { class: 'eyebrow' }, `${DOMAIN_NAMES[exp.domain] || exp.domain} · ${exp.kicker}`),
       h('h1', null, exp.title)),
     h('span', { class: `grade grade-${grade.tone}`, title: grade.text }, grade.label),
+    h('div', { class: 'pl-viewtools' }, viewSwitch(), pl.view === 'geospatial' ? envSelect() : null),
     h('div', { class: 'pl-head-actions' },
-      h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'analyse' }, title: 'Open the shown run with every channel, requirement and its provenance', onclick: () => navigate('run', { runId: pl.runs[pl.active].runId }) }, 'Analyse'),
+      h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'analyse' }, title: 'Open the shown run with every channel, requirement and its provenance', onclick: () => navigate('run', { runId: pl.runs[pl.active].runId, t: pl.cursor.t }) }, 'Analyse'),
       runs.length > 1 ? h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'compare' }, onclick: () => navigate('compare', { runIds: runs.map((r) => r.runId), demo: pl.demo }) }, 'Compare in detail') : null,
       h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'configure' }, title: 'Open the shown run as an editable request', onclick: () => { openRequest(pl.runs[pl.active].record.request); navigate('prepare'); } }, 'Change the conditions')));
 
   const side = h('aside', { class: 'pl-side', 'aria-label': 'Mission briefing and result' });
   const transport = buildTransport();
-  root.append(h('div', { class: 'pl' }, head, h('div', { class: 'pl-body' }, stage, side), transport));
-  pl.dom = { viewport, hud, phaseTag, side, runBar };
-  pl.phases = runs.map((r) => phasesOf(r));
-  pl.div = runs.map((r, i) => (i === 0 ? null : divergence(runs[0], r, rocket)));
+  root.append(h('div', { class: ['pl', pl.view === 'geospatial' ? 'pl-geo' : ''] }, head, h('div', { class: 'pl-body' }, stage, side), transport));
+  pl.dom = { viewport, hud, phaseTag, side, runBar, note };
   mountScene();
   renderSide();
   drawBand();
@@ -290,24 +340,79 @@ function build() {
   onTime(cursor.t);
 }
 
-function mountScene() {
+function refreshNote() {
+  if (!pl || !pl.dom || !pl.dom.note) return;
+  const fresh = sceneNote();
+  pl.dom.note.replaceWith(fresh);
+  pl.dom.note = fresh;
+}
+
+function mountEngineering(viewport, models, colours) {
+  if (pl.kind === 'rocket-3d') {
+    pl.scene = mountCinema(viewport, models, pl.active, pl.cursor, colours);
+    pl.renderer = 'engineering';
+    if (pl.scene.ok === false) viewport.classList.add('no-webgl');
+  } else if (pl.kind === 'ground-2d') {
+    pl.scene = models.length > 1 ? ground2d.compare(viewport, models, colours, pl.runs.map((r) => r.label), pl.cursor) : ground2d.mount(viewport, models[0], pl.cursor, { unit: pl.unit });
+    pl.renderer = 'ground-2d';
+  } else {
+    viewport.append(h('p', { class: 'pl-scene-note' }, 'This domain declares no scene; the result and the analysis are complete without one.'));
+    pl.renderer = null;
+  }
+}
+
+async function mountScene() {
   const { viewport } = pl.dom;
   if (pl.scene) { pl.scene.dispose(); pl.scene = null; }
   clear(viewport);
+  viewport.classList.remove('no-webgl');
   const models = pl.runs.map((r) => r.model);
   const colours = pl.runs.map((r) => r.colour);
+  const token = {};
+  pl.mountToken = token;
+  pl.mounts = (pl.mounts || 0) + 1;
+  pl.track = null;
+  // A new scene starts on the follow camera: say so on the camera buttons.
+  for (const b of document.querySelectorAll('#view-mission .pl-cams [data-cam]')) b.setAttribute('aria-checked', String(b.dataset.cam === 'follow'));
+  const geo = wantGeo();
   try {
-    if (pl.kind === 'rocket-3d') {
-      pl.scene = mountCinema(viewport, models, pl.active, pl.cursor, colours);
-      if (pl.scene.ok === false) viewport.classList.add('no-webgl');
-    } else if (pl.kind === 'ground-2d') {
-      pl.scene = models.length > 1 ? ground2d.compare(viewport, models, colours, pl.runs.map((r) => r.label), pl.cursor) : ground2d.mount(viewport, models[0], pl.cursor, { unit: pl.unit });
-    } else {
-      viewport.append(h('p', { class: 'pl-scene-note' }, 'This domain declares no scene; the result and the analysis are complete without one.'));
+    if (geo) {
+      const env = pl.envs.find((x) => x.id === pl.envId);
+      const wait = h('div', { class: 'pl-geo-loading', role: 'status' }, h('p', { class: 'eyebrow' }, 'Geospatial view'), h('p', null, `Loading ${env ? env.name : 'the environment'}: a validated local pack of ${env ? mb(env.bytes) : 'a few MB'}. No network is used.`));
+      viewport.append(wait);
+      pl.renderer = 'loading';
+      const run = pl.runs[pl.active];
+      const [pack, track] = await Promise.all([loadPack(pl.envId), trackOf(pl.envId, run.runId)]);
+      if (!pl || pl.mountToken !== token) return;
+      wait.remove();
+      pl.track = track;
+      pl.geoError = null;
+      pl.geoWarn = Number.isFinite(track.first_below_terrain_t) ? `On this landscape the drawn nozzle path passes below the terrain from ${timeText(track.first_below_terrain_t, pl.unit)}: the flat ground of the model does not match the relief here. The simulated landing is unchanged.` : null;
+      pl.scene = mountGeo(viewport, models, pl.active, pl.cursor, colours, pack);
+      pl.renderer = pl.scene.ok ? 'geospatial' : 'fallback';
+      if (!pl.scene.ok) viewport.classList.add('no-webgl');
+      refreshNote();
+      if (pl.control) pl.control.refresh();
+      await pl.scene.ready;
+      return;
     }
+    pl.track = null;
+    mountEngineering(viewport, models, colours);
   } catch (e) {
-    logUiError(`player scene: ${e && e.stack ? e.stack : e}`);
-    clear(viewport).append(h('p', { class: 'error-text' }, `The scene could not be drawn: ${e.message}`));
+    logUiError(`player scene: ${e && e.stack ? e.stack : errorText(e)}`);
+    if (!pl || pl.mountToken !== token) return;
+    if (geo) {
+      // A failing environment never breaks the mission: fall back to the engineering scene.
+      pl.geoError = errorText(e);
+      if (pl.scene) { pl.scene.dispose(); pl.scene = null; }
+      pl.envId = null;
+      if (pl.view === 'geospatial') { pl.view = 'engineering'; build(); return; }
+      clear(viewport);
+      mountEngineering(viewport, models, colours);
+      refreshNote();
+      return;
+    }
+    clear(viewport).append(h('p', { class: 'error-text' }, `The scene could not be drawn: ${errorText(e)}`));
     pl.scene = null;
   }
 }
@@ -317,45 +422,33 @@ function setActive(i) {
   pl.active = i;
   if (pl.dom.runBar) for (const b of pl.dom.runBar.children) b.setAttribute('aria-checked', String(Number(b.dataset.run) === i));
   if (pl.kind === 'rocket-3d') mountScene();
-  drawBand();
+  if (pl.control) pl.control.refresh();
+  else drawBand();
   onTime(pl.cursor.t);
 }
 
 function onTime(t) {
   if (!pl) return;
+  if (pl.control) { pl.control.update(t); return; }
   const run = pl.runs[pl.active];
   const rocket = pl.kind === 'rocket-3d';
-  const phases = pl.phases[pl.active];
-  const ph = phases.find((p) => t >= p.t0 && t < p.t1) || phases[phases.length - 1];
-  const end = t >= run.model.t1 - 1e-9;
+  const ph = phaseAt(t);
   const td = run.record.scene && run.record.scene.touchdown;
-  const met = run.record.outcome.status === 'success';
-  const endText = td ? (met ? 'Touchdown' : 'Touchdown, requirements not met') : 'End of run';
-  const phaseText = end ? endText : ph ? ph.label : '';
   const clock = pl.unit === 'tick' ? `tick ${Math.floor(t)}` : `T+${t.toFixed(1)} s`;
-  const ended = end && t > run.model.t1 + 1e-9 ? (pl.unit === 'tick' ? `run ended at tick ${run.model.t1}` : `${td ? 'touched down' : 'ended'} at ${run.model.t1.toFixed(1)} s`) : null;
+  const ended = ph.end && t > run.model.t1 + 1e-9 ? (pl.unit === 'tick' ? `run ended at tick ${run.model.t1}` : `${td ? 'touched down' : 'ended'} at ${run.model.t1.toFixed(1)} s`) : null;
   pl.dom.phaseTag.replaceChildren(...[
     h('span', { class: 'pl-clock mono' }, clock),
-    phaseText ? h('span', { class: ['pl-phase-name', `ph-${end ? (met ? 'end' : 'end-bad') : ph ? ph.kind : ''}`] }, phaseText) : null,
+    ph.text ? h('span', { class: ['pl-phase-name', `ph-${ph.kind}`] }, ph.text) : null,
     ended ? h('span', { class: 'pl-ended small' }, `${run.label} ${ended}`) : null].filter(Boolean));
-  pl.tr.range.setAttribute('aria-valuetext', `${timeText(t, pl.unit)}, ${phaseText || 'no phase'}`);
+  pl.tr.range.setAttribute('aria-valuetext', `${timeText(t, pl.unit)}, ${ph.text || 'no phase'}`);
   pl.dom.hud.replaceChildren(
-    h('p', { class: 'pl-hud-h' }, h('span', { class: 'pl-swatch', style: { background: run.colour } }), run.label, end && td ? h('span', { class: 'pl-hud-at' }, 'at contact') : null),
+    h('p', { class: 'pl-hud-h' }, h('span', { class: 'pl-swatch', style: { background: run.colour } }), run.label, ph.end && td ? h('span', { class: 'pl-hud-at' }, 'at contact') : null),
     h('dl', null, readouts(run, t, rocket).map(([k, v, u, kind, title]) => h('div', { class: 'pl-hud-row', title },
       h('dt', null, h('abbr', { class: `kind kind-${kind}`, title: KIND_WORD[kind] }, kind), k),
       h('dd', { class: 'mono' }, v === null ? '—' : typeof v === 'string' ? v : `${hudNum(v)}${u ? ` ${u}` : ''}`)))),
     h('p', { class: 'pl-hud-key' }, 'T true state · E controller estimate · O sensor · D derived'));
   updateTransport(t);
   if (!pl.revealed && t >= pl.cursor.t1 - 1e-9) reveal();
-}
-
-/** Fixed decimals for readouts, so digits do not jump while playing. */
-function hudNum(v) {
-  const a = Math.abs(v);
-  if (a < 0.005) return '0.00';
-  if (a >= 1000) return v.toFixed(0);
-  if (a >= 100) return v.toFixed(1);
-  return v.toFixed(2);
 }
 
 // ----------------------------------------------------------------------------- transport
@@ -372,11 +465,13 @@ function buildTransport() {
     SPEEDS.map((x) => h('option', { value: String(x), selected: x === c.speed }, `${x}×`)));
   const skip = h('button', { type: 'button', class: 'btn btn-quiet pl-reveal', onclick: () => revealNow() }, 'Skip to the result');
   pl.tr = { play, range, band, marks, time };
-  pl.unplay = c.onPlayState((p) => { play.replaceChildren(icon(p ? 'pause' : 'play')); play.setAttribute('aria-label', p ? 'Pause' : 'Play'); });
+  const onPlay = (p) => { play.replaceChildren(icon(p ? 'pause' : 'play')); play.setAttribute('aria-label', p ? 'Pause' : 'Play'); };
+  pl.unplay = c.onPlayState(onPlay);
+  onPlay(c.playing);
   return h('section', { class: 'pl-transport', 'aria-label': 'Playback' },
     h('div', { class: 'pl-tcontrols' }, play, restart, time),
     h('div', { class: 'pl-track' }, band, marks, range),
-    h('div', { class: 'pl-tend' }, h('label', { class: 'small dim' }, 'Speed ', speed), skip),
+    h('div', { class: 'pl-tend' }, h('label', { class: 'small dim' }, 'Speed ', speed), analysisToggle(), skip),
     h('p', { class: 'pl-legend' },
       pl.kind === 'rocket-3d' ? h('span', null, h('i', { class: 'lg-powered' }), 'engine on') : null,
       h('span', null, h('i', { class: 'lg-onset' }), 'injected fault starts'),
@@ -394,24 +489,56 @@ function drawBand() {
   for (const p of pl.phases[pl.active]) band.append(h('span', { class: `pl-seg ${p.kind}`, style: { left: pos(p.t0), width: `${(100 * Math.max(p.t1 - p.t0, span / 400)) / span}%` }, title: `${p.label} (derived from the recorded engine or mode channel)` }));
   clear(marks);
   const run = pl.runs[pl.active];
-  const mark = (cls, t, label) => marks.append(h('button', { type: 'button', class: `pl-mark ${cls}`, style: { left: pos(t) }, 'aria-label': label, title: label, onclick: () => { c.pause(); c.set(t); } }));
+  // Findings and outcomes (detections, violations, warnings, where the runs part) appear when the
+  // playback reaches them, unless the result is shown or analysis mode is on. Injected fault onsets
+  // are part of the configured scenario and are always shown.
+  const mark = (cls, t, label, gated) => marks.append(h('button', { type: 'button', class: `pl-mark ${cls}`, style: { left: pos(t) }, 'aria-label': label, title: label, dataset: gated ? { t: String(t), gated: '1' } : {}, onclick: () => { c.pause(); c.set(t); } }));
   const seen = new Set();
   for (const e of run.model.events || []) {
     if (!['fault', 'detection', 'violation', 'warning'].includes(e.severity) || !Number.isFinite(e.t)) continue;
     const key = `${e.severity}@${e.t}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    mark(`sev-${e.severity}`, e.t, `${timeText(e.t, pl.unit)}: ${prose(e.label)}`);
+    mark(`sev-${e.severity}`, e.t, `${timeText(e.t, pl.unit)}: ${prose(e.label)}`, true);
   }
   for (const f of run.record.request.faults || []) mark('sev-onset', f.start, `${timeText(f.start, pl.unit)}: injected fault ${f.kind} starts`);
   for (let i = 1; i < pl.div.length; i++) {
     const d = pl.div[i];
-    if (d && d.t !== null) mark('sev-diverge', d.t, `${timeText(d.t, pl.unit)}: ${pl.runs[i].label} departs from ${pl.runs[0].label} by more than ${d.tol} ${d.unit} (derived)`);
+    if (d && d.t !== null) mark('sev-diverge', d.t, `${timeText(d.t, pl.unit)}: ${pl.runs[i].label} departs from ${pl.runs[0].label} by more than ${d.tol} ${d.unit} (derived)`, true);
   }
+  gateMarks(c.t);
+}
+
+/** Whether everything recorded may be shown regardless of the playback time. */
+export function evidenceOpen() {
+  return !!(pl && (pl.analysis || pl.revealed));
+}
+
+function gateMarks(t) {
+  if (!pl || !pl.tr) return;
+  const open = evidenceOpen();
+  for (const b of pl.tr.marks.querySelectorAll('[data-gated]')) b.hidden = !open && Number(b.dataset.t) > t + 1e-9;
+}
+
+function setAnalysis(on) {
+  if (!pl) return;
+  pl.analysis = on;
+  for (const b of document.querySelectorAll('#view-mission [data-action="analysis"]')) b.setAttribute('aria-pressed', String(on));
+  if (on) reveal();
+  if (pl.control) pl.control.refresh();
+  else gateMarks(pl.cursor.t);
+}
+
+/** The analysis-mode switch, shared by the player and Mission Control. */
+export function analysisToggle() {
+  return h('button', { type: 'button', class: 'btn btn-quiet btn-sm pl-analysis', dataset: { action: 'analysis' }, 'aria-pressed': String(!!(pl && pl.analysis)),
+    title: 'Analysis mode: show every finding and the result now, including those later in the run. Ordinary playback shows them only when it reaches them.',
+    onclick: () => setAnalysis(!(pl && pl.analysis)) }, 'Analysis mode');
 }
 
 function updateTransport(t) {
   const { range, time } = pl.tr;
+  gateMarks(t);
   if (Number(range.value) !== t) range.value = String(t);
   time.textContent = pl.unit === 'tick' ? `tick ${Math.floor(t)} / ${pl.cursor.t1}` : `${t.toFixed(1)} / ${pl.cursor.t1.toFixed(1)} s`;
 }
@@ -445,6 +572,7 @@ function reveal() {
   if (!pl || pl.revealed) return;
   pl.revealed = true;
   renderSide();
+  gateMarks(pl.cursor.t);
 }
 
 function tone(status) {
@@ -498,6 +626,7 @@ function changeSummary() {
 }
 
 function renderSide() {
+  if (!pl.dom.side) return;
   const { exp, demo } = pl;
   const side = clear(pl.dom.side);
   side.append(

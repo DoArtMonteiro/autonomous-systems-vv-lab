@@ -1,0 +1,291 @@
+{
+ "channels": [
+  {
+   "group": "Position",
+   "id": "pos_x",
+   "kind": "truth",
+   "label": "Centre of mass x (east)",
+   "timebase": "trace",
+   "unit": "m",
+   "values": [
+    64.42044259793084,
+    63.33643124070317,
+    62.25507773060268
+   ]
+  },
+  {
+   "group": "Position",
+   "id": "pos_y",
+   "kind": "truth",
+   "label": "Centre of mass y (north)",
+   "timebase": "trace",
+   "unit": "m",
+   "values": [
+    29.734397998092632,
+    29.863826019112263,
+    29.992936700381204
+   ]
+  },
+  {
+   "group": "Position",
+   "id": "pos_z",
+   "kind": "truth",
+   "label": "Centre of mass z (up)",
+   "timebase": "trace",
+   "unit": "m",
+   "values": [
+    3030.505949614616,
+    3010.255761079827,
+    2989.957277191583
+   ]
+  },
+  {
+   "group": "Position",
+   "id": "base_x",
+   "kind": "truth",
+   "label": "Nozzle plane x (east)",
+   "timebase": "trace",
+   "unit": "m",
+   "values": [
+    64.42044259793084,
+    63.32832238847345,
+    62.238860028869816
+   ]
+  },
+  {
+   "group": "Position",
+   "id": "base_y",
+   "kind": "truth",
+   "label": "Nozzle plane y (north)",
+   "timebase": "trace",
+   "unit": "m",
+   "values": [
+    29.734397998092632,
+    29.865105369769765,
+    29.99549540126603
+   ]
+  },
+  {
+   "group": "Position",
+   "id": "altitude",
+   "kind": "truth",
+   "label": "Altitude of the nozzle plane",
+   "timebase": "trace",
+   "unit": "m",
+   "values": [
+    3016.348986438342,
+    2996.098800283662,
+    2975.800323535744
+   ]
+  },
+  {
+   "group": "Estimate",
+   "id": "est_x",
+   "kind": "estimate",
+   "label": "Estimated position x",
+   "timebase": "trace",
+   "unit": "m",
+   "values": [
+    64.07903094195429,
+    63.08412642204544,
+    62.00881558622872
+   ]
+  },
+  {
+   "group": "Estimate",
+   "id": "est_y",
+   "kind": "estimate",
+   "label": "Estimated position y",
+   "timebase": "trace",
+   "unit": "m",
+   "values": [
+    29.0484627754712,
+    29.368591849715845,
+    29.506718996048946
+   ]
+  },
+  {
+   "group": "Estimate",
+   "id": "est_z",
+   "kind": "estimate",
+   "label": "Estimated position z",
+   "timebase": "trace",
+   "unit": "m",
+   "values": [
+    3030.21605805367,
+    3010.0233074983444,
+    2989.748028699788
+   ]
+  }
+ ],
+ "domain": {
+  "contract": "vv-domain/1.0",
+  "id": "rocket-landing",
+  "version": "0.15.0"
+ },
+ "events": [],
+ "metrics": [],
+ "model_validity": "Idealised demonstrator; not flight software and not validated against flight data. No contact dynamics: touchdown is the instant the nozzle exit plane reaches the ground. Requirements, dispersions and sensor noise are assumed values, not those of a real vehicle.",
+ "notes": [
+  "Idealised demonstrator: not flight software and not validated against flight data. Requirements, dispersions and sensor noise are assumed values.",
+  "No contact dynamics: touchdown is the instant the nozzle exit plane reaches the ground, so speeds at contact are those of that instant and not of a landing-gear model.",
+  "The trace is sampled every 0.1 s (10 steps of 0.01 s); the touchdown sample is interpolated to the instant of contact. Verdicts are computed on every step, not on the samples.",
+  "Sensor channels show the latest observation of the control cycle; they are empty while a sensor delivers nothing."
+ ],
+ "outcome": {
+  "code": "landed",
+  "explanation": "The stage touched down at 23.42 s, 2.91 m from the pad centre, descending at 1.65 m/s with 0.29 m/s sideways. All six mission requirements were met.",
+  "label": "Landed",
+  "status": "success"
+ },
+ "provenance": {
+  "artifacts": [
+   {
+    "bytes": 2190,
+    "path": "case.json",
+    "sha256": "d97456ee88a265db52cb8871e5ca13e1a60a2830b568f888c6e95ebc6f9f18c0"
+   },
+   {
+    "bytes": 1111,
+    "path": "run.json",
+    "sha256": "8036dd4b47975071a6b695eb7ff675ce440e1ae6fddc7e066d724883d9051c5a"
+   },
+   {
+    "bytes": 366538,
+    "path": "trace.json",
+    "sha256": "5fb3ad7eadff59e696003ddc4386e9d876bd779ff53a20b304571d99e8061bb5"
+   },
+   {
+    "bytes": 3174,
+    "path": "verification.json",
+    "sha256": "c83081eb8d89f97e72df9a3f08b6b5a75f1584e8dcfe2576062c702f511641ec"
+   }
+  ],
+  "reproduce": [
+   "cargo run --release --manifest-path crates/vv-rocket/Cargo.toml -- land case.json --seed 5000 --output <dir>",
+   "cargo run --release --manifest-path crates/vv-rocket/Cargo.toml -- replay <dir>"
+  ],
+  "simulator": "vv-rocket",
+  "source_sha256": "12b276cb182b62ee3ecda602fe5f82edec2f40163afddaa12513fdc54edcbc05"
+ },
+ "request": {
+  "controller": "robust",
+  "domain": "rocket-landing",
+  "faults": [],
+  "parameters": {
+   "altimeter_residual_threshold_m": 3.0,
+   "cutoff_altitude_m": 15.0,
+   "ignition_fraction": 0.75,
+   "lateral_position_gain": 0.12,
+   "throttle_gain": 0.8,
+   "tilt_max_tan": 0.2
+  },
+  "scenario": "m9-landing",
+  "schema": "vv-run-request.v1",
+  "seed": 5000
+ },
+ "requirements": [],
+ "safety": {
+  "class": null,
+  "explanation": "All five safety invariants (S1 to S5) held on the true state.",
+  "status": "safe"
+ },
+ "scene": {
+  "channels": {
+   "attitude": [
+    "q_w",
+    "q_x",
+    "q_y",
+    "q_z"
+   ],
+   "engine_state": "engine_state",
+   "gimbal": [
+    "act_gimbal_y",
+    "act_gimbal_z"
+   ],
+   "nozzle_position": [
+    "base_x",
+    "base_y",
+    "altitude"
+   ],
+   "position": [
+    "pos_x",
+    "pos_y",
+    "pos_z"
+   ],
+   "thrust": "thrust_n",
+   "timebase": "trace"
+  },
+  "end_reason": "touchdown",
+  "fault_windows": [],
+  "frame": {
+   "axes": {
+    "x": "east",
+    "y": "north",
+    "z": "up"
+   },
+   "description": "Local flat non-rotating frame with the origin at the centre of the pad on the ground.",
+   "up_axis": "z"
+  },
+  "initial": {
+   "nominal_position_m": [
+    80.0,
+    0.0,
+    3000.0
+   ],
+   "note": "The seed disperses the nominal initial state.",
+   "nozzle_altitude_m": 3016.348986438342,
+   "position_m": [
+    64.42044259793084,
+    29.734397998092632,
+    3030.505949614616
+   ],
+   "velocity_mps": [
+    -10.853382392007104,
+    1.2958644713458818,
+    -202.25922521883365
+   ]
+  },
+  "kind": "rocket-3d",
+  "pad": {
+   "centre_m": [
+    0.0,
+    0.0
+   ],
+   "keep_out_radius_m": 50.0,
+   "landing_radius_m": 10.0
+  },
+  "sample_interval_s": 0.1,
+  "touchdown": {
+   "centre_of_mass_position_m": [
+    -0.5028113858131273,
+    3.02980005923634,
+    14.86579389367176
+   ],
+   "nozzle_position_m": [
+    -0.432203947045619,
+    2.879317187130705,
+    8.812275353875521e-10
+   ],
+   "t": 23.419152460857212
+  },
+  "units": "m",
+  "vehicle": {
+   "attitude": "Unit quaternion [w, x, y, z], scalar first, mapping body components to inertial ones.",
+   "body_axis": "x_B points from the nozzle to the nose; it points up at the start. Stations are measured from the nozzle exit plane along x_B. The model has no vehicle length.",
+   "dry_cm_station_m": 16.0,
+   "dry_mass_kg": 22000.0,
+   "position_is": "pos_x, pos_y and pos_z are the centre of mass; base_x, base_y and altitude are the nozzle exit plane, which touches the ground.",
+   "propellant_cm_station_m": 9.0,
+   "propellant_mass_kg": 8000.0
+  }
+ },
+ "schema": "vv-run.v1",
+ "timebases": {
+  "trace": [
+   0.0,
+   1.0,
+   2.0
+  ]
+ }
+}

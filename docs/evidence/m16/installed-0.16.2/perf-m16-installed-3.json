@@ -1,0 +1,197 @@
+{
+  "flow": "m16",
+  "exe": "vv-studio.exe",
+  "machine": {
+    "cpu": "AMD64 Family 25 Model 97 Stepping 2, AuthenticAMD",
+    "os": "Windows-11-10.0.26300-SP0",
+    "python": "3.14.6"
+  },
+  "cold_start_to_ready_s": 0.98,
+  "idle_memory": {
+    "processes": 7,
+    "working_set_mb": 393.8,
+    "private_mb": 211.9,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "idle_frames": {
+    "frames": 331,
+    "mean_ms": 6.06,
+    "p50_ms": 6.1,
+    "p95_ms": 6.2,
+    "p99_ms": 6.2,
+    "max_ms": 6.3,
+    "over_33ms": 0
+  },
+  "clicks_to_landing": 1,
+  "click_to_landing_on_screen_s": 0.27,
+  "machine_time_to_landing_s": 1.25,
+  "playback_detected": true,
+  "playback_frames": {
+    "frames": 825,
+    "mean_ms": 6.06,
+    "p50_ms": 6.1,
+    "p95_ms": 6.2,
+    "p99_ms": 6.2,
+    "max_ms": 6.2,
+    "over_33ms": 0
+  },
+  "playback_memory": {
+    "processes": 7,
+    "working_set_mb": 483.2,
+    "private_mb": 358.1,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "webgl": "ANGLE (AMD, AMD Radeon RX 7700 XT (0x0000747E) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "window_inner": [
+    1440,
+    900,
+    1
+  ],
+  "engineering_playback_cpu_percent_of_one_core": 54.6,
+  "engineering_gpu": {
+    "gpu_dedicated_mb": 137.6,
+    "gpu_3d_utilisation_percent": 4.1
+  },
+  "geo_switch_to_terrain_on_gpu_s": 0.447,
+  "geo_playback_frames": {
+    "frames": 825,
+    "mean_ms": 6.06,
+    "p50_ms": 6.1,
+    "p95_ms": 6.1,
+    "p99_ms": 6.2,
+    "max_ms": 6.4,
+    "over_33ms": 0
+  },
+  "geo_playback_cpu_percent_of_one_core": 82.3,
+  "geo_playback_memory": {
+    "processes": 7,
+    "working_set_mb": 865.0,
+    "private_mb": 1049.2,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "geo_gpu": {
+    "gpu_dedicated_mb": 454.6,
+    "gpu_3d_utilisation_percent": 62.8
+  },
+  "geo_scene": {
+    "renders": 1467,
+    "triangles": 4352762,
+    "geometries": 49,
+    "textures": 10,
+    "camera": {
+      "mode": "follow",
+      "position": [
+        88,
+        -163.4,
+        42.7
+      ],
+      "target": [
+        -0.5,
+        3.1,
+        19.5
+      ],
+      "fov": 30,
+      "distance": 190,
+      "stageFraction": 0.411,
+      "observer": null,
+      "shot": null
+    },
+    "world": {
+      "buildings": 687,
+      "lidar_structures": 8,
+      "structures": 39,
+      "trees": 8248,
+      "shrubs": 97479,
+      "tiles": 47,
+      "vegetation_in_range": 105727,
+      "vegetation_tiers": [
+        64104,
+        41623,
+        0
+      ]
+    }
+  },
+  "switch_to_control_s": 0.454,
+  "control_playback_frames": {
+    "frames": 826,
+    "mean_ms": 6.06,
+    "p50_ms": 6.1,
+    "p95_ms": 6.2,
+    "p99_ms": 6.2,
+    "max_ms": 6.3,
+    "over_33ms": 0
+  },
+  "control_playback_cpu_percent_of_one_core": 3.0,
+  "control_memory": {
+    "processes": 7,
+    "working_set_mb": 927.1,
+    "private_mb": 1118.1,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "after_leaving_memory": {
+    "processes": 7,
+    "working_set_mb": 626.2,
+    "private_mb": 552.3,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "after_leaving_gpu": {
+    "gpu_dedicated_mb": 154.6,
+    "gpu_3d_utilisation_percent": 0
+  },
+  "long_session_start_memory": {
+    "processes": 7,
+    "working_set_mb": 971.0,
+    "private_mb": 1479.2,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "long_session_s": 180,
+  "long_session_p99_ms_samples": [
+    6.2,
+    6.3,
+    6.2,
+    6.2,
+    6.2,
+    6.2,
+    6.2,
+    6.2,
+    6.3,
+    6.2,
+    6.2,
+    6.2,
+    6.2,
+    6.2,
+    6.2,
+    6.3,
+    6.2,
+    6.2
+  ],
+  "long_session_end_memory": {
+    "processes": 7,
+    "working_set_mb": 922.0,
+    "private_mb": 1072.0,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "webview_requests": 17,
+  "webview_requests_leaving_the_machine": []
+}

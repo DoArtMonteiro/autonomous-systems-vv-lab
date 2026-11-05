@@ -1,0 +1,89 @@
+[
+ {
+  "bench": {
+   "first_frame_ms": 118,
+   "frames": 1629,
+   "mean_ms": 6.14,
+   "p50_ms": 6.1,
+   "p95_ms": 6.2,
+   "p99_ms": 6.2,
+   "max_ms": 133.3,
+   "over_33ms": 1,
+   "heap_mb": 24.2
+  },
+  "tiles_loaded_ms": null,
+  "csp": [],
+  "errors": [],
+  "gl": "ANGLE (AMD, AMD Radeon RX 7700 XT (0x0000747E) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "run": 1,
+  "wall_to_bench_end_s": 10.2,
+  "processes": 9,
+  "working_set_mb": 532.0,
+  "private_mb": 444.3,
+  "gpu_process_private_mb": 276.7,
+  "requests": 9,
+  "non_local_requests": [],
+  "bytes_hint": null,
+  "console": [
+   "error: Failed to load resource: the server responded with a status of 404 (File not found)"
+  ]
+ },
+ {
+  "bench": {
+   "first_frame_ms": 160,
+   "frames": 1629,
+   "mean_ms": 6.14,
+   "p50_ms": 6.1,
+   "p95_ms": 6.1,
+   "p99_ms": 6.2,
+   "max_ms": 139.4,
+   "over_33ms": 1,
+   "heap_mb": 24.1
+  },
+  "tiles_loaded_ms": null,
+  "csp": [],
+  "errors": [],
+  "gl": "ANGLE (AMD, AMD Radeon RX 7700 XT (0x0000747E) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "run": 2,
+  "wall_to_bench_end_s": 10.21,
+  "processes": 9,
+  "working_set_mb": 530.3,
+  "private_mb": 435.4,
+  "gpu_process_private_mb": 269.7,
+  "requests": 9,
+  "non_local_requests": [],
+  "bytes_hint": null,
+  "console": [
+   "error: Failed to load resource: the server responded with a status of 404 (File not found)"
+  ]
+ },
+ {
+  "bench": {
+   "first_frame_ms": 165,
+   "frames": 1628,
+   "mean_ms": 6.14,
+   "p50_ms": 6.1,
+   "p95_ms": 6.2,
+   "p99_ms": 6.2,
+   "max_ms": 139.4,
+   "over_33ms": 1,
+   "heap_mb": 24
+  },
+  "tiles_loaded_ms": null,
+  "csp": [],
+  "errors": [],
+  "gl": "ANGLE (AMD, AMD Radeon RX 7700 XT (0x0000747E) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "run": 3,
+  "wall_to_bench_end_s": 10.21,
+  "processes": 9,
+  "working_set_mb": 529.3,
+  "private_mb": 441.4,
+  "gpu_process_private_mb": 276.7,
+  "requests": 9,
+  "non_local_requests": [],
+  "bytes_hint": null,
+  "console": [
+   "error: Failed to load resource: the server responded with a status of 404 (File not found)"
+  ]
+ }
+]

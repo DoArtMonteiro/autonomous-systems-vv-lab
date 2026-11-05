@@ -1,0 +1,124 @@
+/* V&V Lab Studio design tokens. Colours are colour-vision safe choices and are always paired with
+   a glyph or a word. Segoe UI Variable and Cascadia ship with Windows 11; nothing is downloaded. */
+
+:root {
+  --sans: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --display: "Segoe UI Variable Display", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --mono: "Cascadia Mono", "Cascadia Code", Consolas, "Courier New", monospace;
+  --r: 3px;
+  --bar-h: 44px;
+  --ease: cubic-bezier(.2, .7, .2, 1);
+}
+
+:root, :root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg-0: #07090c;
+  --bg-1: #0c0f14;
+  --bg-2: #12161c;
+  --bg-3: #1a1f27;
+  --rule: #1c222a;
+  --rule-strong: #2a323c;
+  --fg-1: #e4e9ef;
+  --fg-2: #b0bac5;
+  --fg-3: #7b8694;
+  --accent: #79c3d6;
+  --accent-ink: #06222a;
+  --accent-wash: rgba(121, 195, 214, .12);
+  --pass: #3dbf98;
+  --pass-wash: rgba(61, 191, 152, .14);
+  --fail: #e3a33b;
+  --fail-wash: rgba(227, 163, 59, .14);
+  --unsafe: #f06b4b;
+  --unsafe-wash: rgba(240, 107, 75, .15);
+  --fault: #d683b5;
+  --fault-wash: rgba(214, 131, 181, .13);
+  --neutral: #8a94a0;
+  --neutral-wash: rgba(138, 148, 160, .12);
+  --truth: #eef2f6;
+  --truth-dim: #5d6873;
+  --obs: #56b4e9;
+  --est: #e6cf55;
+  --limit: #f06b4b;
+  --vehicle: #d5dbe2;
+  --vehicle-band: #3a434d;
+  --plume: #ffb04a;
+  --scene-ground-in: #18202a;
+  --scene-ground-out: #0c1016;
+  --hud: rgba(9, 12, 16, .72);
+  --grade-explore: #b6a6ff;
+  --shadow: 0 12px 40px rgba(0, 0, 0, .55);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg-0: #eef0f3;
+  --bg-1: #fbfbfc;
+  --bg-2: #f3f5f7;
+  --bg-3: #e7eaee;
+  --rule: #dfe3e8;
+  --rule-strong: #c6cdd5;
+  --fg-1: #11161c;
+  --fg-2: #39434e;
+  --fg-3: #59636f;
+  --accent: #0a6b82;
+  --accent-ink: #ffffff;
+  --accent-wash: rgba(10, 107, 130, .09);
+  --pass: #007a57;
+  --pass-wash: rgba(0, 122, 87, .10);
+  --fail: #9c5c00;
+  --fail-wash: rgba(156, 92, 0, .10);
+  --unsafe: #c13c0b;
+  --unsafe-wash: rgba(193, 60, 11, .10);
+  --fault: #9d3f77;
+  --fault-wash: rgba(157, 63, 119, .10);
+  --neutral: #6b7581;
+  --neutral-wash: rgba(107, 117, 129, .10);
+  --truth: #11161c;
+  --truth-dim: #a3adb7;
+  --obs: #1d78ad;
+  --est: #866a00;
+  --limit: #c13c0b;
+  --vehicle: #56616d;
+  --vehicle-band: #2b333c;
+  --plume: #d07a1f;
+  --scene-ground-in: #e9edf1;
+  --scene-ground-out: #dde2e8;
+  --hud: rgba(251, 251, 252, .82);
+  --grade-explore: #5a46b8;
+  --shadow: 0 12px 40px rgba(20, 30, 40, .18);
+}
+
+
+/* M16 additions: one scale for space, type, motion and surfaces, plus the severity and evidence
+   vocabulary shared by the mission player, Mission Control, Analyse and Compare. */
+:root {
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --sp-6: 32px; --sp-7: 48px;
+  --t-micro: 600 10.5px/1.2 var(--sans);      /* uppercase labels, tracked .14em */
+  --t-small: 400 11.5px/1.45 var(--sans);
+  --t-body: 400 13px/1.5 var(--sans);
+  --t-title: 600 19px/1.15 var(--display);
+  --t-display: 300 44px/1 var(--mono);         /* mission clock */
+  --track-micro: .14em;
+  --dur-1: .12s; --dur-2: .2s; --dur-3: .36s;
+  --glass-blur: 14px;
+  /* Severity: always paired with a glyph and a word, never colour alone. */
+  --sev-fault: var(--fault); --sev-detection: var(--accent); --sev-violation: var(--unsafe); --sev-warning: var(--fail); --sev-diverge: var(--grade-explore); --sev-info: var(--fg-3);
+}
+:root, :root[data-theme="dark"] {
+  --glass: rgba(8, 11, 15, .66);
+  --glass-strong: rgba(8, 11, 15, .82);
+  --glass-rule: rgba(255, 255, 255, .08);
+  --scrim-top: linear-gradient(180deg, rgba(5, 7, 10, .72), rgba(5, 7, 10, 0));
+  --scrim-bottom: linear-gradient(0deg, rgba(5, 7, 10, .82), rgba(5, 7, 10, 0));
+  /* Evidence labels: what is simulated, what is geographic context, what is illustration. */
+  --prov-sim: #8fd3c0; --prov-ctx: #9cc4ec; --prov-ill: #c9b98f;
+}
+:root[data-theme="light"] {
+  --glass: rgba(251, 251, 252, .78);
+  --glass-strong: rgba(251, 251, 252, .9);
+  --glass-rule: rgba(17, 22, 28, .1);
+  --scrim-top: linear-gradient(180deg, rgba(238, 240, 243, .85), rgba(238, 240, 243, 0));
+  --scrim-bottom: linear-gradient(0deg, rgba(238, 240, 243, .9), rgba(238, 240, 243, 0));
+  --prov-sim: #0d6d58; --prov-ctx: #1d5f99; --prov-ill: #7a6326;
+}
+@media (prefers-reduced-motion: reduce) { :root { --dur-1: 0s; --dur-2: 0s; --dur-3: 0s; } }

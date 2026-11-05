@@ -4183,6 +4183,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "vv-geo"
+version = "0.16.2"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "vv-platform"
 version = "0.15.0"
 dependencies = [
@@ -4203,7 +4212,7 @@ dependencies = [
 
 [[package]]
 name = "vv-studio"
-version = "0.15.0"
+version = "0.16.2"
 dependencies = [
  "serde",
  "serde_json",
@@ -4212,6 +4221,7 @@ dependencies = [
  "tauri-plugin-dialog",
  "tauri-plugin-opener",
  "tauri-plugin-single-instance",
+ "vv-geo",
  "vv-platform",
 ]
 

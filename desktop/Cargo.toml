@@ -7,6 +7,7 @@ members = [
     "domain-rocket",
     "domain-ground",
     "domain-reference",
+    "geo",
     "studio",
 ]
 
@@ -22,6 +23,7 @@ serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.151"
 sha2 = "=0.10.9"
 vv-platform = { path = "platform" }
+vv-geo = { path = "geo" }
 
 [profile.release]
 codegen-units = 1
