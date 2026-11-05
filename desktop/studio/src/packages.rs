@@ -116,12 +116,12 @@ pub struct Plan {
 /// and total size.
 pub fn inspect(archive: &Path) -> Result<Plan, PlatformError> {
     let sha256 = sha256_file(archive)?;
-    if let Some(want) = sidecar_hash(archive)? {
-        if want != sha256 {
-            return Err(PlatformError::Invalid(format!(
-                "the archive's SHA-256 {sha256} differs from the {want} its .sha256 file states; it may be incomplete or altered"
-            )));
-        }
+    if let Some(want) = sidecar_hash(archive)?
+        && want != sha256
+    {
+        return Err(PlatformError::Invalid(format!(
+            "the archive's SHA-256 {sha256} differs from the {want} its .sha256 file states; it may be incomplete or altered"
+        )));
     }
     let f = fs::File::open(archive).map_err(err)?;
     let mut zip = zip::ZipArchive::new(f)
@@ -221,13 +221,13 @@ pub fn install(
 ) -> Result<String, PlatformError> {
     let plan = inspect(archive)?;
     fs::create_dir_all(library).map_err(err)?;
-    if let Some(free) = free_bytes(library) {
-        if free < plan.unpacked_bytes.saturating_add(DISK_RESERVE_BYTES) {
-            return Err(PlatformError::Invalid(format!(
-                "the disk has {free} bytes free; the package needs {} plus a 1 GiB reserve",
-                plan.unpacked_bytes
-            )));
-        }
+    if let Some(free) = free_bytes(library)
+        && free < plan.unpacked_bytes.saturating_add(DISK_RESERVE_BYTES)
+    {
+        return Err(PlatformError::Invalid(format!(
+            "the disk has {free} bytes free; the package needs {} plus a 1 GiB reserve",
+            plan.unpacked_bytes
+        )));
     }
     // vv-geo wants the folder named after the pack id, so the id is read first and the pack is
     // staged as `<library>/.package-<hash>/<id>`.
