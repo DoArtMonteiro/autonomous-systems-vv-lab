@@ -450,7 +450,9 @@ function renderEdit(cat, sc) {
   const specs = cat.parameters.filter((p) => sc && sc.parameters.includes(p.id));
   const groups = [...new Set([...GROUP_ORDER, ...specs.map((p) => p.group)])].filter((g) => specs.some((p) => p.group === g));
   for (const g of groups) {
-    const list = specs.filter((p) => p.group === g);
+    // Within a group the parameters listed for the focused failure come first.
+    const listed = (p) => p.group !== 'Requirements' && (p.influences || []).some((id) => lab.focus.has(id));
+    const list = specs.filter((p) => p.group === g).sort((x, y) => Number(listed(y)) - Number(listed(x)));
     const open = list.some((p) => (p.group !== 'Requirements' && (p.influences || []).some((id) => lab.focus.has(id))) || (lab.form.params[p.id] ?? p.default) !== paramValue(base, p));
     el.append(h('details', { class: 'lab-group', open },
       h('summary', null, g, h('span', { class: 'dim small' }, ` · ${list.length}`)),

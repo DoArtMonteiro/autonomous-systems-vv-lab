@@ -53,6 +53,34 @@ def set_param(s, pid, value):
     time.sleep(0.2)
 
 
+def pad_fix(s):
+    """The owner's case: a soft touchdown that misses the pad, fixed by a real new simulation."""
+    open_mission(s, "off-the-pad")
+    s.wait("document.querySelector('.pl-head [data-action=\"configure\"]')", 30, "change the conditions")
+    s.page.click(".pl-head [data-action='configure']")
+    s.wait("window.__studio.view() === 'lab' && document.querySelector('.lab-base')", 30, "lab")
+    base_id = lab(s)["base"]
+    base = record(s, base_id)
+    failed = [r["id"] for r in base["requirements"] if r["status"] == "fail"]
+    check("Off the pad: only R5 fails in the baseline", failed == ["R5_position"], ", ".join(failed))
+    hinted = s.js("[...document.querySelectorAll('.lab-field.is-hint')].map((e) => e.dataset.param)")
+    check("Off the pad: the lateral gain is among the listed parameters", "lateral_position_gain" in hinted, ", ".join(hinted))
+    check("Off the pad: no requirement limit is suggested as a fix", not any(p in hinted for p in ("landing_zone_radius_m", "contact_vertical_speed_limit_mps")))
+    s.shot("m17-lab-off-the-pad-baseline-dark")
+    set_param(s, "lateral_position_gain", 0.12)
+    exp_id = run_and_wait(s)
+    exp = record(s, exp_id)
+    r5 = next(r for r in exp["requirements"] if r["id"] == "R5_position")
+    check("Off the pad: the new run lands on the pad", exp["outcome"]["status"] == "success" and r5["status"] == "pass", f"{exp['outcome']['label']}, R5 {r5['observed']}")
+    check("Off the pad: the new run is a different, recomputed record", exp_id != base_id and exp["request"]["parameters"].get("lateral_position_gain") in (None, 0.12))
+    s.shot("m17-lab-off-the-pad-fixed-dark")
+    s.page.click(".lab-box [data-seeds='8']")
+    s.wait("(() => { const l = window.__studio.lab(); return l && !l.busy && l.gen; })()", 240, "seed check")
+    g = lab(s)["gen"]
+    check("Off the pad: the fix is checked on 8 seeds and reported as counts", g["n"] == 8 and g["exp"] >= g["base"], json.dumps(g))
+    s.shot("m17-lab-off-the-pad-seeds-dark")
+
+
 def from_player(s):
     open_mission(s, "lying-altimeter")
     s.wait("document.querySelector('.pl-head [data-action=\"configure\"]')", 30, "change the conditions")
@@ -178,6 +206,7 @@ def main():
         with sync_playwright() as pw:
             browser, s = session(pw, a.port, a.shots)
             try:
+                pad_fix(s)
                 base_id = from_player(s)
                 change_controller(s, base_id)
                 seeds(s)
