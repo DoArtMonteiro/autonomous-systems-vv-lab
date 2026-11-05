@@ -6,7 +6,7 @@
 use std::collections::BTreeMap;
 
 use serde_json::{Value, json};
-use vv_ascent::model::Case;
+use vv_ascent::model::{Case, TICKS_PER_S};
 use vv_ascent::run::{Outputs, TraceEntity, TraceSample};
 use vv_platform::contract::*;
 
@@ -216,6 +216,16 @@ pub fn build(request: &RunRequest, case: &Case, out: &Outputs) -> RunRecord {
         );
         entity_ids.push(entity_channels(e, &mut channels));
     }
+    // Mission clock: one instant per second from the hold to the end of the last entity, so the
+    // time cursor of the Studio can step through the whole flight, not only the stack's history.
+    let end_tick = trace.entities.iter().map(|e| e.end_tick).max().unwrap_or(0);
+    let mut clock: Vec<f64> = (0..=end_tick / TICKS_PER_S)
+        .map(|s| (s * TICKS_PER_S) as f64 * trace.dt_s)
+        .collect();
+    if !end_tick.is_multiple_of(TICKS_PER_S) {
+        clock.push(end_tick as f64 * trace.dt_s);
+    }
+    timebases.insert("mission".into(), clock);
     // Declared limits as flat channels on the timebase of the entity they bound.
     let limit = |id: &str, label: &str, unit: &str, tb: &str, value: f64| {
         let n = timebases.get(tb).map_or(0, Vec::len);
@@ -442,7 +452,7 @@ pub fn build(request: &RunRequest, case: &Case, out: &Outputs) -> RunRecord {
     ];
     let scene = json!({
         "kind": "ascent",
-        "channels": { "timebase": "stack" },
+        "channels": { "timebase": "mission" },
         "earth_radius_km": vv_ascent::model::R_EARTH / 1000.0,
         "target_altitude_km": case.mission.target_altitude_km,
         "recovery_zone_km": [case.mission.recovery_zone.downrange_min_km, case.mission.recovery_zone.downrange_max_km],

@@ -141,6 +141,11 @@ fn the_record_is_v2_with_three_entities_and_consistent_ownership() {
             .collect::<Vec<_>>()
     );
     assert_eq!(r.scene["kind"], "ascent");
+    // The mission clock spans the whole flight for the time cursor.
+    let clock = &r.timebases["mission"];
+    let last_end = e.iter().map(|x| x.t_end).fold(0.0, f64::max);
+    assert_eq!(*clock.last().unwrap(), last_end);
+    assert_eq!(r.scene["channels"]["timebase"], "mission");
     // The visual block reaches the scene only.
     assert_eq!(r.scene["visual"]["role"], vv_ascent::model::VISUAL_ROLE);
     for f in [

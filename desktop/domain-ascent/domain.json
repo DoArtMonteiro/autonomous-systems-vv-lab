@@ -2,7 +2,7 @@
   "schema": "vv-domain-manifest.v1",
   "id": "launch-ascent",
   "name": "Two-stage launch ascent",
-  "version": "0.17.0",
+  "version": "0.15.0",
   "description": "Deterministic planar ascent of an exploratory two-stage launcher to a target orbit: pitch programme and gravity turn, max-Q throttling, MECO and separation, then the booster and the upper stage integrated as separate entities (ballistic booster to impact, upper stage under explicit radial guidance to SECO and a coast). Requirements and invariants per entity and for the mission, judged on the true state; records vv-run.v2.",
   "contract": {
     "name": "vv-domain",
