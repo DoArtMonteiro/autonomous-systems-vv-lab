@@ -316,3 +316,4 @@
   .pl-head-actions { flex-wrap: nowrap; }
 }
 .pl-hud[hidden] { display: none; }
+.mc .pl-scene-note.is-entity { top: 150px; bottom: auto; left: 18px; width: 300px; }

@@ -180,6 +180,13 @@ def ascent(s):
     ents = [e["id"] for e in rec.get("entities", [])]
     check("Two stages to orbit: the record is vv-run.v2 with separate entities", rec["schema"] == "vv-run.v2" and len(ents) >= 2, ", ".join(ents))
     s.shot("m17-ascent-player-dark")
+    s.page.click(".pl-views [data-view='control']")
+    s.wait("document.querySelector('.mc')", 20, "mission control")
+    time.sleep(1.0)
+    check("Two stages to orbit: Mission Control opens on the ascent", s.js("!!document.querySelector('.mc')") and not errors, "; ".join(errors)[:200])
+    s.shot("m17-ascent-control-dark")
+    s.page.click(".mc-back")
+    s.wait("document.querySelector('.pl-head')", 10, "player")
     open_mission(s, "too-heavy")
     s.wait("document.querySelector('.pl-head [data-action=\"configure\"]')", 30, "change the conditions")
     s.page.click(".pl-head [data-action='configure']")

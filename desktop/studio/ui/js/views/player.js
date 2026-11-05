@@ -248,7 +248,7 @@ function phaseAt(t) {
 
 function sceneNote() {
   const rocket = pl.kind === 'rocket-3d';
-  const note = h('div', { class: 'pl-scene-note', id: 'pl-scene-note' });
+  const note = h('div', { class: ['pl-scene-note', pl.kind === 'ascent' ? 'is-entity' : ''], id: 'pl-scene-note' });
   if (wantGeo()) {
     const env = pl.envs.find((x) => x.id === pl.envId);
     note.classList.add('is-geo');
