@@ -21,6 +21,7 @@
 
 mod discovery;
 mod geo;
+mod packages;
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -686,6 +687,7 @@ fn main() {
             geo::environment_file,
             geo::geo_track,
             geo::import_environment,
+            packages::import_environment_package,
             geo::remove_environment,
             geo::reveal_environments,
         ])
