@@ -32,7 +32,7 @@ export const EXPERIENCES = [
     watch: ['The engine lights at about 4 s and the fall slows from 200 m/s to under 2 m/s.', 'The estimate the controller flies on stays close to the true position.'],
     learn: ['What an autonomous controller is asked to do', 'Why the mission result and safety are judged separately'],
     categories: ['start'], level: 'Explorer', minutes: 1, runs: ['Robust controller'],
-    grade: 'demonstration', claim: null, next: 'off-the-pad',
+    grade: 'demonstration', claim: null, next: 'lying-altimeter',
   },
   {
     id: 'off-the-pad', domain: 'rocket-landing', demo: 'soft-but-off-pad',
