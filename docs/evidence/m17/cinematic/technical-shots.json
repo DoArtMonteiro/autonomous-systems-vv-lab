@@ -1,0 +1,138 @@
+{
+ "exe": "vv-studio.exe",
+ "mission": "lying-altimeter",
+ "environment": "cape-canaveral",
+ "shots": [
+  {
+   "file": "technical-cape-canaveral-follow-7.31-1440x900.jpg",
+   "camera": "follow",
+   "t": 7.31,
+   "geo": {
+    "renders": 402,
+    "triangles": 1275518,
+    "geometries": 28,
+    "textures": 8,
+    "camera": {
+     "mode": "follow",
+     "position": [
+      85.7,
+      -130.7,
+      1541.7
+     ],
+     "target": [
+      -2.9,
+      35.8,
+      1518.6
+     ],
+     "fov": 30,
+     "distance": 191,
+     "stageFraction": 0.398,
+     "observer": null,
+     "shot": null
+    },
+    "world": {
+     "buildings": 687,
+     "lidar_structures": 8,
+     "structures": 39,
+     "trees": 8248,
+     "shrubs": 97479,
+     "tiles": 47,
+     "vegetation_in_range": 105727,
+     "vegetation_tiers": [
+      0,
+      105727,
+      0
+     ]
+    }
+   }
+  },
+  {
+   "file": "technical-cape-canaveral-follow-16.29-1440x900.jpg",
+   "camera": "follow",
+   "t": 16.29,
+   "geo": {
+    "renders": 461,
+    "triangles": 3260486,
+    "geometries": 47,
+    "textures": 9,
+    "camera": {
+     "mode": "follow",
+     "position": [
+      86.5,
+      -156.9,
+      342.3
+     ],
+     "target": [
+      -2,
+      9.6,
+      319.1
+     ],
+     "fov": 30,
+     "distance": 191,
+     "stageFraction": 0.411,
+     "observer": null,
+     "shot": null
+    },
+    "world": {
+     "buildings": 687,
+     "lidar_structures": 8,
+     "structures": 39,
+     "trees": 8248,
+     "shrubs": 97479,
+     "tiles": 47,
+     "vegetation_in_range": 105727,
+     "vegetation_tiers": [
+      55530,
+      50197,
+      0
+     ]
+    }
+   }
+  },
+  {
+   "file": "technical-cape-canaveral-closeup-23.336-1440x900.jpg",
+   "camera": "closeup",
+   "t": 23.336,
+   "geo": {
+    "renders": 520,
+    "triangles": 3684842,
+    "geometries": 70,
+    "textures": 10,
+    "camera": {
+     "mode": "closeup",
+     "position": [
+      92.3,
+      118.2,
+      19.2
+     ],
+     "target": [
+      -0.3,
+      1.5,
+      18.9
+     ],
+     "fov": 30,
+     "distance": 148,
+     "stageFraction": 0.53,
+     "observer": null,
+     "shot": null
+    },
+    "world": {
+     "buildings": 687,
+     "lidar_structures": 8,
+     "structures": 39,
+     "trees": 8248,
+     "shrubs": 97479,
+     "tiles": 47,
+     "vegetation_in_range": 105727,
+     "vegetation_tiers": [
+      55069,
+      50658,
+      0
+     ]
+    }
+   }
+  }
+ ],
+ "version": "0.16.2",
+ "run_id": "97ce54f83e561451"
+}
