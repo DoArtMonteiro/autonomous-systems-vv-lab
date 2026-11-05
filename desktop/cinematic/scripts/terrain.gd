@@ -73,6 +73,41 @@ static func grid_mesh(pack, g: Dictionary, heights: PackedFloat32Array, drop_ins
 	return mesh
 
 
+# Mean image colour (sRGB, as the sampler expects) of the base grid's land and sea nodes.
+static func _class_colours(pack) -> Array:
+	var g: Dictionary = pack.base
+	var img: Image = g["image"]
+	var L: float = pack.extent()
+	var h0: float = pack.orthometric_origin()
+	var sums := [Vector3.ZERO, Vector3.ZERO]
+	var counts := [0, 0]
+	for r in range(0, g["rows"], 6):
+		var nn: float = g["y0"] - r * g["s"]
+		for c in range(0, g["cols"], 6):
+			var e: float = g["x0"] + c * g["s"]
+			var z: float = g["up"][r * g["cols"] + c]
+			var sea := not is_nan(h0) and absf(z + h0 + (e * e + nn * nn) / (2.0 * EARTH_R)) < 0.6
+			var px := clampi(int((e + L) / (2.0 * L) * img.get_width()), 0, img.get_width() - 1)
+			var py := clampi(int((L - nn) / (2.0 * L) * img.get_height()), 0, img.get_height() - 1)
+			var col := img.get_pixel(px, py).srgb_to_linear()
+			var k := 1 if sea else 0
+			sums[k] += Vector3(col.r, col.g, col.b)
+			counts[k] += 1
+	var out := []
+	var edge_sea := 0.0
+	var edge_n := 0
+	for i in g["cols"]:
+		for r in [0, g["rows"] - 1]:
+			var z2: float = g["up"][r * g["cols"] + i]
+			edge_sea += 1.0 if (not is_nan(h0) and absf(z2 + h0 + (L * L + L * L) / (2.0 * EARTH_R)) < 0.8) else 0.0
+			edge_n += 1
+	for k in 2:
+		var v: Vector3 = sums[k] / maxf(1.0, counts[k]) if counts[k] > 0 else (Vector3(0.2, 0.2, 0.18) if k == 0 else Vector3(0.03, 0.06, 0.08))
+		out.append(Color(v.x, v.y, v.z).linear_to_srgb())
+	out.append(edge_sea / maxf(1.0, edge_n))
+	return out
+
+
 static func texture_of(img: Image) -> ImageTexture:
 	var im := img.duplicate()
 	if im.get_format() != Image.FORMAT_RGB8:
@@ -95,6 +130,10 @@ static func build(pack, parent: Node3D) -> Dictionary:
 	bm.set_shader_parameter("half_extent", L)
 	bm.set_shader_parameter("base_half", L)
 	bm.set_shader_parameter("detail_half", pack.detail["half"] if has_detail else 0.0)
+	var avg := _class_colours(pack)
+	bm.set_shader_parameter("land_avg", avg[0])
+	bm.set_shader_parameter("water_avg", avg[1])
+	bm.set_shader_parameter("beyond_sea", avg[2])
 	mats.append(bm)
 	var base_mesh := grid_mesh(pack, pack.base, pack.base["up"], pack.detail["half"] if has_detail else 0.0)
 	var base := MeshInstance3D.new()
@@ -129,16 +168,21 @@ static func build(pack, parent: Node3D) -> Dictionary:
 		parent.add_child(det)
 		out["detail"] = det
 		out["textures"].append(dt)
-	out["beyond"] = _beyond(pack, parent)
+	var beyond_mat: ShaderMaterial = bm.duplicate()
+	beyond_mat.set_shader_parameter("blur_lod", 6.0)
+	mats.append(beyond_mat)
+	out["beyond"] = _beyond(pack, parent, beyond_mat)
 	return out
 
 
 # Ground beyond the pack (illustration): the pack's edge continued outwards, water at mean sea level
 # where the edge is sea, otherwise the edge height and the image colour at the nearest edge point.
-static func _beyond(pack, parent: Node3D) -> MeshInstance3D:
+# It uses the base terrain material: the image is clamped at its edge texels, so colour, water
+# finish and lighting continue across the edge without a seam.
+static func _beyond(pack, parent: Node3D, bm: ShaderMaterial) -> MeshInstance3D:
 	var g: Dictionary = pack.base
 	var L: float = pack.extent()
-	var big := 90000.0
+	var big := 200000.0
 	var small: Image = g["image"].duplicate()
 	small.resize(128, 128, Image.INTERPOLATE_BILINEAR)
 	var h0: float = pack.orthometric_origin()
@@ -176,12 +220,10 @@ static func _beyond(pack, parent: Node3D) -> MeshInstance3D:
 	st.create_from_arrays(arrays)
 	st.generate_normals()
 	var mesh := st.commit()
-	var mat := ShaderMaterial.new()
-	mat.shader = load("res://shaders/beyond.gdshader")
 	var mi := MeshInstance3D.new()
 	mi.name = "BeyondPack"
 	mi.mesh = mesh
-	mi.material_override = mat
+	mi.material_override = bm
 	parent.add_child(mi)
 	return mi
 

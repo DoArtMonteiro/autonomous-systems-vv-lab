@@ -22,15 +22,17 @@ static func hash2(a: int, b: int) -> float:
 
 
 # Appends triangle (a, b, c) facing along `n` (Godot front faces are clockwise).
-static func _tri(v: PackedVector3Array, nv: PackedVector3Array, cv: PackedColorArray, a: Vector3, b: Vector3, c: Vector3, n: Vector3, col: Color, cb := Color(-1, 0, 0)) -> void:
+static func _tri(v: PackedVector3Array, nv: PackedVector3Array, cv: PackedColorArray, a: Vector3, b: Vector3, c: Vector3, n: Vector3, col: Color, foot_y := -INF) -> void:
 	if (b - a).cross(c - a).dot(n) > 0.0:
 		var t := b
 		b = c
 		c = t
 	v.append(a); v.append(b); v.append(c)
 	nv.append(n); nv.append(n); nv.append(n)
-	var base_col := col if cb.r < 0.0 else cb
-	cv.append(base_col); cv.append(col); cv.append(col)
+	for p in [a, b, c]:
+		var k := col
+		k.a = 0.0 if p.y <= foot_y + 0.001 else 1.0
+		cv.append(k)
 
 
 static func _mesh(v: PackedVector3Array, nv: PackedVector3Array, cv: PackedColorArray, uv := PackedVector2Array()) -> ArrayMesh:
@@ -93,8 +95,6 @@ static func _buildings(pack, group: Node3D, stats: Dictionary) -> void:
 		if est:
 			roof = roof.lerp(pale, 0.35)
 		var wall := roof.lerp(pale if est else concrete, 0.6)
-		var foot := wall * 0.6
-		foot.a = 1.0
 		for i in n:
 			var j := (i + 1) % n
 			var a2 := pts[i]
@@ -106,8 +106,8 @@ static func _buildings(pack, group: Node3D, stats: Dictionary) -> void:
 			var p1 := Vector3(b2.x, base, -b2.y)
 			var p2 := Vector3(b2.x, top, -b2.y)
 			var p3 := Vector3(a2.x, top, -a2.y)
-			_tri(v, nv, cv, p0, p1, p2, out, wall, foot)
-			_tri(v, nv, cv, p0, p2, p3, out, wall, foot)
+			_tri(v, nv, cv, p0, p1, p2, out, wall, base)
+			_tri(v, nv, cv, p0, p2, p3, out, wall, base)
 		var tris := Geometry2D.triangulate_polygon(pts)
 		for k in range(0, tris.size(), 3):
 			var q0 := pts[tris[k]]
@@ -135,10 +135,8 @@ static func _buildings(pack, group: Node3D, stats: Dictionary) -> void:
 			_tri(v, nv, cv, b0, t1, t0, dn, col)
 			_tri(v, nv, cv, Vector3(x, g + h, -y), t0, t1, Vector3.UP, col)
 		stats["structures"] += 1
-	var mat := StandardMaterial3D.new()
-	mat.vertex_color_use_as_albedo = true
-	mat.roughness = 0.86
-	mat.metallic_specular = 0.4
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://shaders/building.gdshader")
 	var mi := MeshInstance3D.new()
 	mi.name = "Footprints"
 	mi.mesh = _mesh(v, nv, cv)
@@ -262,9 +260,15 @@ static func _vegetation(pack, group: Node3D, st: Dictionary, stats: Dictionary) 
 	var lod_far: float = st.get("lod_far_m", 3200.0)
 	var cards_on: bool = st.get("foliage_cards", true)
 	var shadows_near: bool = st.get("vegetation_shadows", true)
+	# Crown archetypes (illustrative shapes; position, height and crown radius are data): trees as a
+	# rounded broadleaf, a conical conifer and a flat umbrella crown; shrubs as a mound and a low,
+	# spreading clump. The archetype is chosen from the lidar height and a hash of the position.
 	var arche := {
-		1: {"core": _plant_mesh(0.64, 0.36, 0.26, 1.7, 6, true, 0.6), "cards": _cards_mesh(14, 0.64, 0.5, 0.36, 4021), "far": _plant_mesh(0.64, 0.5, 0.36, 1.7, 4, true, 1.0)},
-		0: {"core": _plant_mesh(0.42, 0.36, 0.4, 0.4, 6, false, 0.6), "cards": _cards_mesh(10, 0.46, 0.5, 0.5, 733), "far": _plant_mesh(0.44, 0.5, 0.56, 0.4, 4, false, 1.0)},
+		"tree0": {"core": _plant_mesh(0.64, 0.36, 0.26, 1.7, 6, true, 0.6), "cards": _cards_mesh(14, 0.64, 0.5, 0.36, 4021), "far": _plant_mesh(0.64, 0.5, 0.36, 1.7, 4, true, 1.0)},
+		"tree1": {"core": _plant_mesh(0.6, 0.22, 0.36, 3.1, 6, true, 0.6), "cards": _cards_mesh(12, 0.6, 0.3, 0.4, 991), "far": _plant_mesh(0.6, 0.3, 0.4, 3.1, 4, true, 1.0)},
+		"tree2": {"core": _plant_mesh(0.78, 0.42, 0.14, 5.3, 6, true, 0.6), "cards": _cards_mesh(12, 0.78, 0.56, 0.18, 2203), "far": _plant_mesh(0.78, 0.56, 0.18, 5.3, 4, true, 1.0)},
+		"shrub0": {"core": _plant_mesh(0.42, 0.36, 0.4, 0.4, 6, false, 0.6), "cards": _cards_mesh(10, 0.46, 0.5, 0.5, 733), "far": _plant_mesh(0.44, 0.5, 0.56, 0.4, 4, false, 1.0)},
+		"shrub1": {"core": _plant_mesh(0.34, 0.44, 0.3, 2.2, 6, false, 0.6), "cards": _cards_mesh(10, 0.36, 0.56, 0.34, 1597), "far": _plant_mesh(0.34, 0.56, 0.34, 2.2, 4, false, 1.0)},
 	}
 	var crown_mat := StandardMaterial3D.new()
 	crown_mat.vertex_color_use_as_albedo = true
@@ -288,11 +292,22 @@ static func _vegetation(pack, group: Node3D, st: Dictionary, stats: Dictionary) 
 		if density < 1.0 and hash2(hx + 101, hy - 37) >= density:
 			continue
 		var key := Vector2i(int(floor(x / TILE)), int(floor(y / TILE)))
+		var hv := hash2(hx - 911, hy + 577)
+		var arch := ""
+		if veg["kind"][i] == 1:
+			if veg["h"][i] > 12.0:
+				arch = "tree1" if hv < 0.6 else "tree0"
+			else:
+				arch = "tree0" if hv < 0.45 else ("tree2" if hv < 0.75 else "tree1")
+		else:
+			arch = "shrub0" if hv < 0.6 else "shrub1"
 		if not tiles.has(key):
-			tiles[key] = {0: [], 1: []}
-		tiles[key][1 if veg["kind"][i] == 1 else 0].append(i)
+			tiles[key] = {}
+		if not tiles[key].has(arch):
+			tiles[key][arch] = []
+		tiles[key][arch].append(i)
 	for key in tiles:
-		for kind in [1, 0]:
+		for kind in tiles[key]:
 			var ids: Array = tiles[key][kind]
 			if ids.is_empty():
 				continue
@@ -315,9 +330,14 @@ static func _vegetation(pack, group: Node3D, st: Dictionary, stats: Dictionary) 
 				var g0 := lin(veg["rgb"][3 * i + 1])
 				var b0 := lin(veg["rgb"][3 * i + 2])
 				var lum := 0.2126 * r0 + 0.7152 * g0 + 0.0722 * b0
-				var k := minf(5.0, (FOLIAGE_LUM * (0.8 + 0.4 * hash2(hx + 7, hy - 3))) / maxf(lum, 1e-3))
-				mm_near.set_instance_color(j, Color(minf(1.0, r0 * k), minf(1.0, g0 * k), minf(1.0, b0 * k)))
-			stats["trees" if kind == 1 else "shrubs"] += ids.size()
+				var k := minf(5.0, (FOLIAGE_LUM * (0.7 + 0.6 * hash2(hx + 7, hy - 3))) / maxf(lum, 1e-3))
+				# Hue spread per plant (illustrative): towards yellow-green or blue-green.
+				var hs := hash2(hy + 13, hx - 29) - 0.5
+				var col := Color(minf(1.0, r0 * k * (1.0 + 0.25 * hs)), minf(1.0, g0 * k * (1.0 + 0.08 * hs)), minf(1.0, b0 * k * (1.0 - 0.3 * hs)))
+				if kind == "tree1":
+					col = col.darkened(0.2)
+				mm_near.set_instance_color(j, col)
+			stats["trees" if kind.begins_with("tree") else "shrubs"] += ids.size()
 			var parts := [["core", crown_mat, 0.0, lod_near, shadows_near], ["far", crown_mat, lod_near, lod_far, false]]
 			if cards_on:
 				parts.append(["cards", card_mat, 0.0, lod_near, shadows_near])

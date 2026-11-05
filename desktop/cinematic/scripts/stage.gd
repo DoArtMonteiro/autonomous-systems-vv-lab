@@ -193,27 +193,54 @@ static func build(vehicle: Node3D) -> Dictionary:
 	core.material_override = core_mat
 	core.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	plume.add_child(core)
+	# Nozzle glow (illustration): a camera-facing disc, visible whenever the engine is on.
+	var gi := Image.create(128, 128, true, Image.FORMAT_RGBA8)
+	for yy in 128:
+		for xx in 128:
+			var rr := Vector2(xx - 63.5, yy - 63.5).length() / 64.0
+			var a := clampf(1.0 - rr, 0.0, 1.0)
+			gi.set_pixel(xx, yy, Color(1.0, 0.82, 0.6, a * a))
+	gi.generate_mipmaps()
+	var gm := StandardMaterial3D.new()
+	gm.albedo_texture = ImageTexture.create_from_image(gi)
+	gm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	gm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	gm.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	gm.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	gm.albedo_color = Color(1.3, 1.0, 0.75)
+	var gq := QuadMesh.new()
+	gq.size = Vector2(8, 8)
+	var glow := MeshInstance3D.new()
+	glow.mesh = gq
+	glow.material_override = gm
+	glow.position = Vector3(0, 0.3, 0)
+	glow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	plume.add_child(glow)
 	var light := OmniLight3D.new()
 	light.light_color = Color(1.0, 0.7, 0.4)
 	light.omni_range = 120.0
 	light.omni_attenuation = 1.6
 	light.position = Vector3(0, -6, 0)
 	light.shadow_enabled = false
+	# The plume light must not light the volumetric fog (it made a glowing ball in the haze).
+	light.light_volumetric_fog_energy = 0.0
 	body.add_child(light)
 	return {"body": body, "plume": plume, "outer": outer, "core": core, "light": light, "materials": [outer_mat, core_mat]}
 
 
 # Plume length in metres (0 hides it), logical time for its turbulence.
-static func set_plume(s: Dictionary, length: float, logical_t: float) -> void:
+static func set_plume(s: Dictionary, length: float, logical_t: float, clear_m := INF) -> void:
 	var on := length > 0.0
 	s["plume"].visible = on
 	s["light"].visible = on
 	if not on:
 		return
 	# Cylinder meshes are centred: shift so they run from y = 0 to y = -length.
-	s["outer"].scale = Vector3(1, length, 1)
-	s["outer"].position = Vector3(0, -length / 2.0, 0)
-	var cl := maxf(3.0, length * 0.32)
+	# The axial flame stops at the ground (it would otherwise be drawn inside the terrain).
+	var shown := clampf(minf(length, clear_m + 1.0), 0.5, length)
+	s["outer"].scale = Vector3(1, shown, 1)
+	s["outer"].position = Vector3(0, -shown / 2.0, 0)
+	var cl := minf(maxf(3.0, length * 0.32), shown)
 	s["core"].scale = Vector3(1, cl, 1)
 	s["core"].position = Vector3(0, -cl / 2.0, 0)
 	s["light"].light_energy = 6.0 * minf(1.0, length / 28.0)

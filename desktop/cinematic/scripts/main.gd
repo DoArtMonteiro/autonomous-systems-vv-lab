@@ -20,7 +20,7 @@ const Hud := preload("res://scripts/hud.gd")
 const SUN_AZIMUTH_DEG := 128.0
 const SUN_ELEVATION_DEG := 27.0
 const STAGE_LENGTH := 42.0
-const CAMERAS := ["director", "follow", "pad", "closeup", "wide", "overhead"]
+const CAMERAS := ["director", "follow", "pad", "closeup", "wide", "overhead", "lowwide"]
 
 var cli
 var record
@@ -46,6 +46,9 @@ var transition := {}
 var observer = null
 var top_z := 3000.0
 var dust: MeshInstance3D
+var splash: MeshInstance3D
+var splash_mat: ShaderMaterial
+var drop: MeshInstance3D
 var ground_light: OmniLight3D
 var ready_ok := false
 var frames := 0
@@ -132,20 +135,14 @@ static func g(v: Vector3) -> Vector3:
 
 func _build() -> void:
 	var t_build := Time.get_ticks_usec()
-	# Environment: procedural sky with the technical view's zenith and haze colours (a physical sky
-	# read grey at this exposure), fog with aerial perspective, screen-space effects, tone mapping.
+	# Environment: an illustrative sky shader (gradient, sun halo and disc, static clouds); the fog
+	# takes its colour from that sky (aerial perspective 1), so the land fades into the sky it is
+	# drawn against; screen-space effects; AgX tone mapping at a fixed exposure (no auto exposure).
 	var we := WorldEnvironment.new()
 	env = Environment.new()
 	var sky := Sky.new()
-	var psky := ProceduralSkyMaterial.new()
-	psky.sky_top_color = Color(0.18, 0.39, 0.72)
-	psky.sky_horizon_color = Color(0.7, 0.78, 0.87)
-	psky.sky_curve = 0.12
-	psky.sky_energy_multiplier = 1.15
-	psky.ground_bottom_color = Color(0.2, 0.22, 0.2)
-	psky.ground_horizon_color = Color(0.62, 0.68, 0.74)
-	psky.sun_angle_max = 20.0
-	psky.sun_curve = 0.1
+	var psky := ShaderMaterial.new()
+	psky.shader = load("res://shaders/sky.gdshader")
 	sky.sky_material = psky
 	sky.process_mode = Sky.PROCESS_MODE_QUALITY
 	sky.radiance_size = Sky.RADIANCE_SIZE_256
@@ -154,16 +151,17 @@ func _build() -> void:
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
 	env.tonemap_mode = Environment.TONE_MAPPER_AGX
-	env.tonemap_exposure = 1.0
+	env.tonemap_exposure = 0.92
+	env.tonemap_white = 6.0
 	env.fog_enabled = true
 	env.fog_mode = Environment.FOG_MODE_EXPONENTIAL
-	env.fog_light_color = Color(0.68, 0.77, 0.9)
+	env.fog_light_color = Color(0.72, 0.8, 0.89)
 	env.fog_sun_scatter = 0.15
-	env.fog_density = 0.000022
-	env.fog_aerial_perspective = 0.7
-	env.fog_sky_affect = 0.25
+	env.fog_density = 0.000045
+	env.fog_aerial_perspective = 1.0
+	env.fog_sky_affect = 0.0
 	env.fog_height = 400.0
-	env.fog_height_density = 0.00004
+	env.fog_height_density = 0.00006
 	env.volumetric_fog_density = 0.00012
 	env.volumetric_fog_albedo = Color(0.9, 0.92, 0.95)
 	env.volumetric_fog_length = 1200.0
@@ -175,7 +173,7 @@ func _build() -> void:
 	env.ssr_max_steps = 64
 	env.glow_intensity = 0.35
 	env.glow_bloom = 0.05
-	env.glow_hdr_threshold = 1.4
+	env.glow_hdr_threshold = 3.0
 	env.adjustment_enabled = true
 	env.adjustment_saturation = 1.05
 	we.environment = env
@@ -183,7 +181,7 @@ func _build() -> void:
 	sun = DirectionalLight3D.new()
 	sun.name = "SunIllustrative"
 	sun.light_color = Color(1.0, 0.95, 0.88)
-	sun.light_energy = 2.0
+	sun.light_energy = 1.7
 	sun.shadow_enabled = true
 	sun.shadow_bias = 0.03
 	sun.shadow_normal_bias = 1.2
@@ -194,7 +192,7 @@ func _build() -> void:
 	sun.look_at_from_position(Vector3.ZERO, -d, Vector3.UP if absf(d.normalized().y) < 0.99 else Vector3.FORWARD)
 	camera = Camera3D.new()
 	camera.near = 0.5
-	camera.far = 120000.0
+	camera.far = 250000.0
 	camera.fov = 30.0
 	add_child(camera)
 	camera.make_current()
@@ -241,6 +239,8 @@ func _build() -> void:
 	t = cli.start_t if not is_nan(cli.start_t) else record.t0()
 	playing = cli.play
 	hud.set_camera(mode)
+	hud.set_controls_visible(cli.controls)
+	_track_lines()
 	_set_time(t)
 	print("cinematic: scene built in %d ms (profile %s: %s)" % [(Time.get_ticks_usec() - t_build) / 1000, profile_name, profile_reason])
 	if cli.shot_path != "":
@@ -303,6 +303,45 @@ func _pad_rings() -> void:
 		add_child(mi)
 
 
+# Data overlays for reading height: the nozzle-plane track draped on the terrain (record) and a
+# drop line from the stage to the ground under it.
+func _track_lines() -> void:
+	var im := ImmediateMesh.new()
+	im.surface_begin(Mesh.PRIMITIVE_LINE_STRIP)
+	var ids: Array = record.nozzle_ids
+	for i in record.times.size():
+		var x = record.channels[ids[0]][i]
+		var y = record.channels[ids[1]][i]
+		if x == null or y == null:
+			continue
+		im.surface_add_vertex(Vector3(x, pack.ground(x, y) + 0.6, -y))
+	im.surface_end()
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(1, 1, 1, 0.8)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	var mi := MeshInstance3D.new()
+	mi.mesh = im
+	mi.material_override = mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mi)
+	drop = MeshInstance3D.new()
+	drop.material_override = mat
+	drop.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(drop)
+
+
+func _update_drop(vp: Vector3) -> void:
+	if drop == null:
+		return
+	var im := ImmediateMesh.new()
+	im.surface_begin(Mesh.PRIMITIVE_LINES)
+	im.surface_add_vertex(g(vp))
+	im.surface_add_vertex(g(Vector3(vp.x, vp.y, pack.ground(vp.x, vp.y))))
+	im.surface_end()
+	drop.mesh = im
+
+
 func _ground_effect_nodes() -> void:
 	# Where the plume meets the ground: a warm light and a pale dust disc (illustration from the
 	# applied throttle and the nozzle's height above the drawn terrain only).
@@ -310,6 +349,7 @@ func _ground_effect_nodes() -> void:
 	ground_light.light_color = Color(1.0, 0.66, 0.38)
 	ground_light.omni_range = 140.0
 	ground_light.omni_attenuation = 1.6
+	ground_light.light_volumetric_fog_energy = 0.0
 	add_child(ground_light)
 	var img := Image.create(128, 128, true, Image.FORMAT_RGBA8)
 	for y in 128:
@@ -333,6 +373,32 @@ func _ground_effect_nodes() -> void:
 	dust.material_override = mat
 	dust.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(dust)
+	# Exhaust spreading over the ground when the plume reaches it (illustration): a flat, warm,
+	# additive glow on the ground, brightest under the nozzle, so a burning engine stays visible
+	# down to contact.
+	var si := Image.create(128, 128, true, Image.FORMAT_RGBA8)
+	for yy in 128:
+		for xx in 128:
+			var rr := Vector2(xx - 63.5, yy - 63.5).length() / 64.0
+			var a := clampf(1.0 - rr, 0.0, 1.0)
+			si.set_pixel(xx, yy, Color(1.0, 0.6, 0.3, a * a * a))
+	si.generate_mipmaps()
+	var sm := StandardMaterial3D.new()
+	sm.albedo_texture = ImageTexture.create_from_image(si)
+	sm.albedo_color = Color(1.6, 1.2, 0.9)
+	sm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	sm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	sm.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	sm.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var sq := QuadMesh.new()
+	sq.size = Vector2(2, 2)
+	sq.orientation = PlaneMesh.FACE_Y
+	splash_mat = null
+	splash = MeshInstance3D.new()
+	splash.mesh = sq
+	splash.material_override = sm
+	splash.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(splash)
 
 
 # --- playback -----------------------------------------------------------------------------------
@@ -346,10 +412,14 @@ func _set_time(at: float) -> void:
 	t = clampf(at, record.t0(), record.t1())
 	apply_pose(t)
 	var len: float = record.plume_length(t)
-	Stage.set_plume(stage, len, t)
+	# The axial plume stops at the ground; below that it is drawn as the ground spread.
+	var vp := _enu(vehicle.position)
+	var clear_m: float = maxf(0.0, vp.z - pack.ground(vp.x, vp.y))
+	Stage.set_plume(stage, len, t, clear_m)
 	for m in terrain.get("materials", []):
 		m.set_shader_parameter("logical_t", t)
 	_ground_effect(len)
+	_update_drop(vp)
 	hud.set_time(t, record)
 	_place_camera()
 
@@ -362,6 +432,12 @@ func _ground_effect(len: float) -> void:
 	var on := len > 0.0 and h < reach
 	dust.visible = on
 	ground_light.visible = on
+	splash.visible = len > 0.0 and h < len
+	if splash.visible:
+		var ks: float = clampf(1.0 - maxf(0.0, h) / len, 0.0, 1.0)
+		var rs: float = 5.0 + 14.0 * ks
+		splash.position = g(Vector3(p.x, p.y, gz + 0.35))
+		splash.scale = Vector3(rs, 1.0, rs)
 	if not on:
 		return
 	var k := (1.0 - maxf(0.0, h) / reach) * minf(1.0, len / 28.0)
@@ -464,6 +540,14 @@ func pose(m: String) -> Dictionary:
 		"wide":
 			var dw := top_z * 1.35
 			return {"pos": Vector3(pv.x + 0.5 * dw, pv.y - 0.95 * dw, top_z * 0.62), "target": Vector3(pv.x, pv.y, top_z * 0.42), "fov": 40.0}
+	if m == "lowwide":
+		# Low wide view from the sun side (cinematic only): an observer 12 m above the ground at
+		# least 900 m out, the stage and the landscape behind it in one frame.
+		var dl: float = maxf(900.0, aim.z * 1.4)
+		var at := pv + bearing(150, 0) * dl
+		at.z = pack.ground(at.x, at.y) + 12.0
+		var tg := Vector3(aim.x, aim.y, aim.z * 0.6 + pack.ground(pv.x, pv.y) * 0.4)
+		return {"pos": at, "target": tg, "fov": 38.0}
 	var span := 3200.0
 	return {"pos": Vector3(pv.x, pv.y - span * 0.02, span / (2.0 * tan(deg_to_rad(20.0)))), "target": pv, "fov": 40.0}
 
@@ -533,12 +617,13 @@ func _unhandled_input(ev: InputEvent) -> void:
 			_set_time(record.t0())
 		KEY_END:
 			_set_time(record.t1())
-		KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6:
+		KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7:
 			set_mode(CAMERAS[ev.keycode - KEY_1])
 		KEY_H:
-			# Hides the playback and camera rows; the illustrative label and credits stay.
-			hud.rows[0].visible = not hud.rows[0].visible
-			hud.rows[1].visible = hud.rows[0].visible
+			# Hides the playback bar; the readout, verdicts, illustrative label and credit line stay.
+			hud.set_controls_visible(not hud.bar.visible)
+		KEY_C:
+			hud.toggle_credits()
 		KEY_ESCAPE:
 			get_tree().quit(0)
 

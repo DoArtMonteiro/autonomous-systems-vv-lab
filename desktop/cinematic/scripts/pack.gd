@@ -225,6 +225,17 @@ func ground(e: float, n: float) -> float:
 	return 0.0 if is_nan(g) else g
 
 
+func attributions() -> PackedStringArray:
+	# The full attribution text of every source, without repeats.
+	var out := PackedStringArray()
+	for s in m.get("sources", []):
+		if typeof(s) == TYPE_DICTIONARY:
+			var a := str(s.get("attribution", s.get("credit", "")))
+			if a != "" and not (a in out):
+				out.append(a)
+	return out
+
+
 func credits() -> PackedStringArray:
 	# The short credit line of every source, without repeats (the full attributions are in the pack).
 	var out := PackedStringArray()

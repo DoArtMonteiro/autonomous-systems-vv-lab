@@ -21,7 +21,9 @@ float noise3(vec3 p) {
 }
 
 void vertex() {
-	v_f = clamp(0.5 - VERTEX.y, 0.0, 1.0); // centred mesh: +0.5 is the nozzle end
+	// Centred mesh, placed so that local -0.5 is at the nozzle (checked on renders: the bright end
+	// must be the nozzle end).
+	v_f = clamp(0.5 + VERTEX.y, 0.0, 1.0);
 	v_local = VERTEX;
 }
 
@@ -31,7 +33,9 @@ void fragment() {
 	float along = pow(1.0 - v_f, mix(1.6, 3.0, core));
 	// Fresnel-like falloff so the cone reads as a volume, not a shell.
 	float rim = pow(clamp(abs(dot(normalize(NORMAL), normalize(VIEW))), 0.0, 1.0), 1.5);
-	float a = along * rim * (0.55 + 0.45 * n);
+	// Near the apex the cone's faces converge and pile up in a few pixels: fade the last part out
+	// so the tip does not read as a bright ball.
+	float a = along * rim * (0.55 + 0.45 * n) * (1.0 - smoothstep(0.5, 0.9, v_f));
 	// Shock-diamond banding near the nozzle (illustration).
 	a *= 1.0 + 0.35 * core * smoothstep(0.0, 0.08, v_f) * (0.5 + 0.5 * cos(v_f * 60.0));
 	vec3 c = mix(colour, vec3(1.0, 0.93, 0.8), core);
