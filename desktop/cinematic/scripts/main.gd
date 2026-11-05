@@ -622,6 +622,8 @@ func _unhandled_input(ev: InputEvent) -> void:
 		KEY_H:
 			# Hides the playback bar; the readout, verdicts, illustrative label and credit line stay.
 			hud.set_controls_visible(not hud.bar.visible)
+		KEY_V:
+			hud.reveal()
 		KEY_C:
 			hud.toggle_credits()
 		KEY_ESCAPE:
