@@ -156,6 +156,12 @@ Conclusão do revisor: «a plume-and-props upgrade, not a fidelity upgrade». O 
 
 A política de segurança de conteúdo do Studio e as capacidades do Tauri não mudaram: os quatro comandos são comandos da aplicação. O espaço livre é lido com `GetDiskFreeSpaceExW` por uma declaração direta da `kernel32`, o único bloco `unsafe` do Studio, porque ler o espaço livre do volume é uma chamada nativa em qualquer crate. A extração usa a crate `zip` 2.6.1 que o lock já tinha (exportação de evidência), com as mesmas funcionalidades.
 
+## Verificação executada
+
+- Em `desktop/`: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (todos passam; o `vv-studio` tem 4 testes novos em `modules.rs`) e `cargo build --release`.
+- Na raiz: `cargo build --release` e `python -m unittest discover -s tests -p "test_*.py"` (377 testes, 42 ignorados; os 3 da Cinematic View correram com `VV_GODOT` definido).
+- Não foram corridas de novo a campanha `run_campaign.py` nem a verificação completa da raiz (`cargo fmt`, `clippy`, `test`): este marco não altera o pacote da raiz nem os seus hashes canónicos.
+
 ## Limitações conhecidas
 
 - **O módulo corre o binário do editor do Godot** (181 MB) sobre a pasta do projeto, em vez de um executável exportado com um `.pck`. Os modelos de exportação têm 1,28 GB (tamanho do servidor, `Content-Length` do ficheiro oficial) e não foram descarregados. Um executável exportado seria mais pequeno e não teria o editor dentro.
