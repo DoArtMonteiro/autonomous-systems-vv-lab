@@ -3,7 +3,8 @@
 # readout), altitude of the nozzle plane, speed and applied throttle; the outcome and safety
 # verdicts are copied verbatim from the record (top right). A persistent label (bottom left) says
 # what is reconstructed for display; one short credit line (bottom right) keeps the OpenStreetMap
-# notice visible, and C opens every attribution of the pack. H hides the playback bar.
+# notice visible, and C opens every attribution of the pack. H hides the playback bar. The verdicts stay hidden until
+# the playback reaches the end of the run (V shows them earlier).
 extends RefCounted
 
 const ILLUSTRATIVE := "Illustrative, not data: stage geometry (42 m), plume and exhaust, glow and dust, crown shapes and foliage cards, building walls and roofs, sky, haze, water finish, ground beyond the pack."
@@ -13,6 +14,8 @@ const MARGIN := 18
 var layer: CanvasLayer
 var readout: Label
 var verdict: Label
+var verdict_text := ""
+var revealed := false
 var status: Label
 var credit_line: Label
 var credits_panel: PanelContainer
@@ -84,20 +87,21 @@ func build(root: Node, record, pack, t0: float, t1: float, profiles: Array, came
 	verdict.custom_minimum_size = Vector2(340, 0)
 	var o: Dictionary = record.outcome()
 	var s: Dictionary = record.safety()
-	verdict.text = "Outcome (record): %s. %s\nSafety (record): %s. %s" % [str(o.get("label", o.get("code", "n/a"))), str(o.get("explanation", "")), str(s.get("status", "n/a")), str(s.get("explanation", ""))]
+	verdict_text = "Outcome (record): %s. %s\nSafety (record): %s. %s" % [str(o.get("label", o.get("code", "n/a"))), str(o.get("explanation", "")), str(s.get("status", "n/a")), str(s.get("explanation", ""))]
 	vr.add_child(verdict)
+	_show_verdict(false)
 	layer.add_child(vr)
 	# Bottom left: the persistent illustrative label.
 	status = _label(10, Color(0.88, 0.9, 0.92))
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	status.text = ILLUSTRATIVE + "\n" + DATA
+	status.text = ILLUSTRATIVE + "\n" + DATA + "\nRings (record): green R5 landing radius, red S2 keep-out. White line: nozzle track on the ground."
 	var sp := PanelContainer.new()
 	sp.add_theme_stylebox_override("panel", _panel(0.45))
 	_anchor(sp, 0, 1, 0, 1)
 	sp.offset_left = MARGIN
 	sp.offset_right = MARGIN + 560
-	sp.offset_top = -MARGIN - 52
-	sp.offset_bottom = -MARGIN
+	sp.offset_top = -MARGIN - 86
+	sp.offset_bottom = -MARGIN - 8
 	status.custom_minimum_size = Vector2(540, 0)
 	sp.add_child(status)
 	layer.add_child(sp)
@@ -182,7 +186,20 @@ func toggle_credits() -> void:
 	credits_panel.visible = not credits_panel.visible
 
 
+# The record's verdicts are shown only when the playback reaches the end of the run (the rule of
+# the technical view), or when the viewer asks for them with V.
+func _show_verdict(on: bool) -> void:
+	verdict.text = verdict_text if on else "Result: shown when the playback reaches the end of the run. Press V to show it now."
+
+
+func reveal() -> void:
+	revealed = true
+	_show_verdict(true)
+
+
 func set_time(t: float, record) -> void:
+	if not revealed and t >= record.t1() - 1e-9:
+		reveal()
 	var i: int = record.lower_index(t)
 	var st: float = record.times[i]
 	var v := func(id: String, d: int) -> String:
