@@ -87,6 +87,7 @@ pub fn parameters() -> Vec<ParameterSpec> {
             step: p.step,
             default: p.default,
             integer: p.integer,
+            influences: Vec::new(),
         })
         .collect()
 }
