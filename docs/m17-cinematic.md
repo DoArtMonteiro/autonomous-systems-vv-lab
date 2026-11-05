@@ -133,9 +133,9 @@ Limites desta medição: uma só máquina e uma só execução por perfil; o má
 
 As capturas técnicas foram tiradas com `desktop/studio/tests/m17_tech_shots.py` (biblioteca e configuração temporárias; o registo da execução mostrada foi guardado e comparado com o de ensaio: mesma base de tempo, mesmo resultado, canais iguais com diferenças só no último bit da formatação decimal de `speed`, `tilt_deg` e de um valor de `altitude`). As da Cinematic View usam o registo de ensaio, `--shot` e 90 frames de espera para o TAA e as sombras assentarem. Os metadados estão em `technical-shots.json` e `cinematic-shots.json`. São imagens, não medições.
 
-### Avaliação independente
+### Primeira avaliação independente (primeira iteração)
 
-Um agente revisor só de leitura recebeu apenas as seis imagens e a pergunta (é uma melhoria substancial e visível, e onde é fraca), sem acesso ao código nem a este texto. Veredicto: **«modest improvement»**. Resumo do que disse:
+As capturas da primeira iteração estão em `docs/evidence/m17/cinematic/before-iteration/`. Um agente revisor só de leitura recebeu apenas as seis imagens e a pergunta (é uma melhoria substancial e visível, e onde é fraca), sem acesso ao código nem a este texto. Veredicto: **«modest improvement»**. Resumo do que disse:
 
 - Ganhos: a pluma (núcleo, brilho e luz no solo, contra um triângulo amarelo rígido), o modelo do andar (aletas, juntas, pernas) e, junto à plataforma, a variedade de cor das copas.
 - Iguais ou piores: o céu lê-se cinzento-claro e plano, com uma aresta reta onde acaba o chão para lá do pacote; uma mancha escura diagonal no mar a 7,31 s; árvores de tamanho uniforme e edifícios cinzentos sem textura que parecem uma camada de jogo e desfocam a fotografia a 16,29 s; a plataforma quase branca e as marcas de terra perdidas no contacto; a pluma não se vê no contacto apesar de o acelerador estar a 58 %; não há sombra de contacto sob o andar.
@@ -143,7 +143,59 @@ Um agente revisor só de leitura recebeu apenas as seis imagens e a pergunta (é
 - O painel inferior e o bloco do canto tapam a ponta da pluma e a linha de créditos fica cortada na margem.
 - Rotulagem honesta nos dois lados; os valores do ecrã coincidem com os da vista técnica nos três instantes.
 
-Conclusão do revisor: «a plume-and-props upgrade, not a fidelity upgrade». O objetivo deste marco era uma melhoria substancial e, segundo esta avaliação, não foi atingido. As correções apontadas estão na lista de limitações; nenhuma foi feita depois da avaliação, para que as imagens e as medições correspondam ao código descrito.
+Conclusão do revisor: «a plume-and-props upgrade, not a fidelity upgrade».
+
+### Segunda iteração: o que mudou
+
+Cada ponto da primeira avaliação foi tratado na sua origem:
+
+| Problema | Causa encontrada | Correção |
+| --- | --- | --- |
+| Céu plano e faixa no horizonte | Céu procedimental de duas cores; a névoa tinha cor própria e, ao olhar para chão distante, a perspetiva aérea amostrava a parte «chão» do céu | Sombreador de céu próprio (gradiente, halo e disco do sol, nuvens estáticas); abaixo do horizonte o céu é a névoa do horizonte; `fog_aerial_perspective` 1, densidade 4,5e-5; chão fora do pacote até 200 km e câmara até 250 km |
+| Aresta do pacote e faixas | O chão fora do pacote tinha outro material e outra cor | Usa o material do terreno; nos últimos 2,5 km da grelha base a imagem funde-se numa cor média de terra e mar calculada da própria imagem, e fora do pacote só essa cor neutra |
+| «Bola» brilhante abaixo do andar | A coordenada axial da pluma estava invertida: a ponta do cone era a parte mais brilhante | Coordenada corrigida (verificada nas imagens) e ponta a desvanecer |
+| Mar escurecido | Albedo da água multiplicado por 0,35 | Cor da imagem a 70 %, rugosidade 0,05, reflexo do céu e SSR |
+| Árvores iguais | Uma forma por tipo e uma cor | Cinco arquétipos (copa redonda, cónica e em guarda-sol; dois arbustos) escolhidos pela altura lidar e por hash; variação determinista de matiz e luminância |
+| Edifícios sem textura | Cor lisa | Sombreador com bandas de pisos, juntas, vidros e rodapé nas paredes; telhado com a cor da imagem e variação |
+| Plataforma branca | Albedo da fotografia até 0,8 | Luminância limitada a cerca de 0,38, exposição 0,92, sol 1,7, limiar do brilho 3 |
+| Sem pluma no contacto | O bocal está a 0,1 m: a pluma axial ficava dentro do terreno | Pluma axial cortada no solo, brilho do bocal sempre que o motor está ligado e brilho rasante no chão quando a pluma o alcança |
+| HUD sobre a pluma, créditos cortados | Barra inferior larga | Leitura em cima à esquerda, veredictos em cima à direita, rótulo ilustrativo em baixo à esquerda, uma linha de crédito em baixo à direita (ODbL visível, C abre todas as atribuições), barra de reprodução oculta com H ou `--controls hidden` (usado nas capturas) |
+| Sem pista de profundidade | Faltava o percurso no solo | Percurso do plano do bocal assente no terreno e linha vertical até ao solo, dados do registo |
+
+Foi acrescentada uma câmara só da Cinematic View, «Low» (`lowwide`): observador a 12 m do solo, a pelo menos 900 m da plataforma, do lado do sol.
+
+As novas capturas estão em `docs/evidence/m17/cinematic/cinematic-*.png` (mesmos três instantes e câmaras, perfil Ultra) e `cinematic-cape-canaveral-lowwide-16.29-1440x900.png`. As técnicas não mudaram.
+
+O teste de paridade da pose voltou a passar (3 testes). Banco de ensaio repetido para Balanced e Ultra com o mesmo comando (`docs/evidence/m17/cinematic/bench-iteration-2/`):
+
+| Perfil | Arranque | Frame p50 | Frame p99 | Frame máx. | Memória de vídeo | Working set | Bytes privados |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Balanced (1.ª → 2.ª) | 5,89 → 4,22 s | 1,55 → 2,50 ms | 2,71 → 3,82 ms | 11,3 → 14,5 ms | 573 → 551 MB | 1417 → 1376 MB | 1862 → 1791 MB |
+| Ultra (1.ª → 2.ª) | 5,36 → 4,75 s | 3,30 → 4,44 ms | 7,55 → 8,97 ms | 57,7 → 14,4 ms | 980 → 958 MB | 1421 → 1302 MB | 2506 → 2297 MB |
+
+O custo por frame subiu (sombreadores de céu, edifícios e terreno mais pesados, mais instâncias de vegetação); continua abaixo de 9 ms no p99 em Ultra. O arranque mais curto reflete a cache de sombreadores já preenchida e a carga da máquina, não uma otimização.
+
+### Segunda avaliação independente
+
+Um novo agente revisor só de leitura, sem contexto, recebeu as sete imagens. Veredicto: **«modest improvement»**, de novo. O que disse:
+
+- Melhor: o céu (a vista técnica tem uma faixa escura acima do horizonte), o par de 16,29 s (cartões de árvores, edifícios, gradiente da água junto à costa, profundidade ao nível do solo) e a linha de árvores no contacto. «Nicer» em 5 s, «not realistic» em 10 s; «a mid-2000s game, not cinema».
+- Fraco: a névoa a 1500 m tira contraste à zona da plataforma; a pluma em altitude lê-se como um disco branco saturado maior do que o andar, e na vista baixa o brilho é o assunto e o andar um ponto; a água a 7,31 s parece cinzenta e mate; copas como manchas com arestas de cartões visíveis; um edifício curvo como extrusão branca; a plataforma ainda um disco cinzento; não viu sombras projetadas no contacto; o modelo do andar é o mesmo da primeira iteração.
+- Honestidade: o painel do resultado mostra «Landed» desde o início, quando a vista técnica o esconde até ao fim; a última linha do rótulo ilustrativo toca a margem; os anéis R5 e S2 não têm legenda.
+- O que o limita, segundo o revisor: céu, sombras e luz são configuração do motor; o andar, as árvores e os edifícios são arte e precisariam de modelos novos; a nitidez do terreno é a resolução das imagens de origem.
+
+Duas afirmações do revisor não correspondem à configuração: as sombras direcionais estão ligadas (o andar projeta uma sombra longa e estreita para a esquerda no contacto, pouco visível com o sol a 27° e este enquadramento) e o céu já não é de um só tom. As restantes observações ficam como estão.
+
+### O que limita a fidelidade
+
+A segunda iteração corrigiu os defeitos de configuração e de código. O que falta para uma melhoria substancial não é, na maior parte, do motor:
+
+- **Resolução dos dados.** A imagem base tem 10 m por texel e a de pormenor 0,5 m; o modelo digital de superfície tem 30 m e o de pormenor 4 m. A meia altitude o chão é uma fotografia desfocada com a luz do voo, e nenhum sombreador acrescenta pormenor que não está nos dados.
+- **Modelos.** O andar, as árvores e os edifícios são geometria gerada por código, sem modelos texturados nem fotogrametria. Um andar com materiais PBR feitos à mão, árvores com folhagem modelada e edifícios com fachadas reais exigem trabalho de arte que este marco não teve.
+- **Direção de arte e afinação.** Névoa, brilho da pluma e exposição foram afinados em poucas passagens; a pluma em altitude ainda satura.
+- **Motor.** O Godot 4.7 tem o que se usou (sombras PSSM com PCSS, SSAO, SSIL, SSR, névoa volumétrica, TAA/FSR2). Não tem nuvens volumétricas, céu atmosférico físico de qualidade de produção nem geometria virtualizada; o UE5 tem, mas exige a aprovação do EULA e do disco.
+
+Conclusão: com os dados e a geometria atuais, a Cinematic View é uma melhoria modesta e não a melhoria substancial pedida.
 
 ## Instalação, verificação e remoção
 
@@ -171,7 +223,8 @@ A política de segurança de conteúdo do Studio e as capacidades do Tauri não 
 - **Menos camadas de análise do que a vista técnica.** Não há trajetória desenhada, estimativa de navegação, marcadores de eventos nem execuções de referência; o anel da plataforma não muda de cor no fim de uma execução falhada (o veredicto do registo está no ecrã). É uma vista de apresentação; a análise continua na vista técnica.
 - **Sem órbita livre da câmara.** As câmaras são as regras portadas; não se pode arrastar.
 - **O tempo até ao primeiro frame inclui a compilação dos sombreadores** na primeira execução; as seguintes usam a cache.
-- **Defeitos visuais apontados pela avaliação e não corrigidos**: céu plano e aresta do chão fora do pacote no horizonte; mancha escura no mar a média altitude; plataforma sobreexposta; pluma escondida pelo terreno no contacto (o plano do bocal está a 0,1 m) e sem sombra de contacto; painel inferior a tapar a pluma e créditos cortados a 1440x900; falta a linha do percurso no solo como pista de profundidade.
+- **Defeitos que a segunda avaliação ainda aponta**: névoa a tirar contraste a 1500 m; pluma saturada em altitude e dominante na vista baixa; água mate a meia altitude; copas com arestas de cartões; plataforma cinzenta e plana; o painel do resultado mostra o veredicto final desde o início (a vista técnica esconde-o até ao fim); a última linha do rótulo ilustrativo toca a margem; anéis R5 e S2 sem legenda no ecrã.
+- **O zip do módulo medido (87,8 MB) foi gerado na primeira iteração**; não foi gerado de novo depois da segunda.
 - **Fidelidade ainda limitada pelos dados**: a fotografia tem a luz e as sombras do voo e é iluminada de novo; as alturas da maior parte dos edifícios são estimativas; as plantas são esferas deformadas com cartões; não há iluminação global (SDFGI ou VoxelGI) porque a escala de 18 km não lhe convém.
 
 ## O que requer aprovação do responsável
