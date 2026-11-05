@@ -53,6 +53,11 @@ export const api = {
   importEnvironmentPackage: () => invoke('import_environment_package'),
   removeEnvironment: (id) => invoke('remove_environment', { id }),
   revealEnvironments: () => invoke('reveal_environments'),
+  // M17 Cinematic View module: status, install from a verified zip, uninstall, launch by ids.
+  cinematicStatus: () => invoke('cinematic_status'),
+  cinematicInstallFromFile: () => invoke('cinematic_install_from_file'),
+  cinematicUninstall: () => invoke('cinematic_uninstall'),
+  cinematicLaunch: (runId, envId) => invoke('cinematic_launch', { runId, envId }),
 };
 
 let reporting = false;

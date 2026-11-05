@@ -7,6 +7,7 @@ import { state, pref, setPref } from '../store.js';
 import { toast, errorText } from '../ui.js';
 import { envCard } from '../env-catalogue.js';
 import { listEnvironments, forgetEnvironments, mb } from '../environments.js';
+import { cinematicSection } from '../cinematic.js';
 
 let root;
 let reload = async () => {};
@@ -59,6 +60,7 @@ function render() {
             h('tbody', null, state.rejected.map((r) => h('tr', null, h('td', { class: 'mono' }, r.dir), h('td', null, r.reason)))))) : h('p', { class: 'dim small' }, 'No domain directory was rejected.'),
         h('div', { class: 'row' }, restart, h('span', { class: 'dim small' }, `${start.domains ?? state.domains.length} discovered, ${(start.rejected || []).length} rejected, ${start.recovered ?? 0} interrupted runs cleared at start.`)))),
     environmentsSection(),
+    cinematicSection(),
     h('section', null, h('h2', null, 'Library'), h('div', { class: 'sec-body' },
       h('p', { class: 'mono' }, info.library || 'n/a'),
       h('div', { class: 'row' }, h('button', { type: 'button', class: 'btn', onclick: () => api.reveal(null).catch((e) => toast(errorText(e), 'error')) }, 'Open library folder')),

@@ -12,6 +12,8 @@
 //!   claims under `<install dir>/discovery/claims/`, run as child processes (see `discovery.rs`);
 //! - geographic environments (M16): packs shipped under `<install dir>/environments/` and packs the
 //!   user imports under `Documents/VV Lab Library/environments/` (see `geo.rs`); no network;
+//! - optional modules (M17): the Cinematic View, installed from a verified zip under
+//!   `<app local data>/modules/cinematic/<version>/` (see `modules.rs`);
 //! - preferences and log: the per-user application config and log directories.
 //!
 //! `vv-studio --self-test <report.json>` runs headless: it starts the platform, runs and replays the
@@ -21,6 +23,7 @@
 
 mod discovery;
 mod geo;
+mod modules;
 mod packages;
 
 use std::collections::BTreeSet;
@@ -55,6 +58,7 @@ struct Paths {
 struct AppState {
     paths: Paths,
     geo: Arc<geo::Geo>,
+    modules: modules::Modules,
     discovery: discovery::Discovery,
     platform: RwLock<Option<Arc<Platform>>>,
     start: Mutex<Option<Result<StartReport, String>>>,
@@ -634,8 +638,20 @@ fn main() {
                 &format!("engine {}", disc.paths.engine.display()),
             );
             let geo = Arc::new(geo::Geo::new(geo_paths(app, &paths.library)));
+            // VVLAB_MODULES replaces the modules folder, for tests and development.
+            let modules_root = std::env::var_os("VVLAB_MODULES")
+                .map(PathBuf::from)
+                .or_else(|| {
+                    app.path()
+                        .app_local_data_dir()
+                        .ok()
+                        .map(|d| d.join("modules"))
+                })
+                .unwrap_or_else(|| paths.library.join(".modules"))
+                .join("cinematic");
             app.manage(AppState {
                 geo,
+                modules: modules::Modules::new(modules_root),
                 discovery: disc,
                 paths: paths.clone(),
                 platform: RwLock::new(None),
@@ -690,6 +706,10 @@ fn main() {
             packages::import_environment_package,
             geo::remove_environment,
             geo::reveal_environments,
+            modules::cinematic_status,
+            modules::cinematic_install_from_file,
+            modules::cinematic_uninstall,
+            modules::cinematic_launch,
         ])
         .build(tauri::generate_context!())
         .expect("the studio could not start")
