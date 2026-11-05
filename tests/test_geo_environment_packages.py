@@ -52,7 +52,7 @@ class EnvironmentIndex(unittest.TestCase):
             with open(os.path.join(GEO, p), encoding="utf-8") as f:
                 t = f.read()
             self.assertIsNone(re.search(r"[A-Za-z]:\\\\|/Users/|\\\\Users\\\\|AppData", t), p)
-            self.assertNotIn("—", t, p)
+            self.assertNotIn(chr(0x2014), t, p)
 
     def test_bundled_packs_package_to_the_indexed_bytes(self):
         with tempfile.TemporaryDirectory() as d:

@@ -115,6 +115,9 @@ def notice(m, cfg):
         L += [f"- {g}" for g in gaps]
     else:
         L.append("- Nenhuma lacuna de licença conhecida para as fontes acima.")
+    for t in cfg.get("notice_texts", []):
+        # Licence texts that must travel unmodified with the data are reproduced verbatim.
+        L += ["", f"## {t['title']}", "", "```text", t["text"], "```"]
     L += ["", "As formas desenhadas (paredes, telhados planos, copas e folhas) são ilustrativas; as posições, os contornos "
           "e as alturas vêm dos dados, com a origem de cada altura indicada em `features.json`. O veículo, a plataforma e a "
           "missão simulados são genéricos e não representam nenhuma instalação, operação ou entidade.", ""]
