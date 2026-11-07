@@ -466,7 +466,14 @@ pub fn launch_command(
     let m = verify_installed(&dir)
         .map_err(|e| invalid(format!("the installed module failed verification: {e}")))?;
     let exe = dir.join(&m.exe);
-    let args = vec![
+    let mut args = Vec::new();
+    // On this Windows machine (RX 7700 XT, driver 32.0.31041) Godot's Vulkan swap chain fails on
+    // every frame ("Couldn't get Vulkan surface capabilities", VkResult -13) and the window stays
+    // black; Direct3D 12 renders the same scene without an error. Windows therefore uses D3D12.
+    if cfg!(windows) {
+        args.extend(["--rendering-driver".to_string(), "d3d12".to_string()]);
+    }
+    args.extend([
         "--path".to_string(),
         dir.join(&m.project).display().to_string(),
         "--".to_string(),
@@ -476,7 +483,7 @@ pub fn launch_command(
         env_dir.display().to_string(),
         "--profile".to_string(),
         "auto".to_string(),
-    ];
+    ]);
     Ok((exe, args))
 }
 
@@ -641,10 +648,13 @@ mod tests {
         assert_eq!(s.version.as_deref(), Some("0.1.0"));
         let (exe, args) = launch_command(&root, Path::new("R"), Path::new("E")).unwrap();
         assert!(exe.ends_with("0.1.0/godot/g.exe") || exe.ends_with("0.1.0\\godot\\g.exe"));
+        let at = args.iter().position(|a| a == "--path").unwrap();
         assert_eq!(
-            args[2..],
+            args[at + 2..],
             ["--", "--run", "R", "--env", "E", "--profile", "auto"]
         );
+        // Windows uses Direct3D 12 (see launch_command).
+        assert_eq!(cfg!(windows), args[..at] == ["--rendering-driver", "d3d12"]);
         // A modified installed file fails verification and blocks the launch.
         fs::write(root.join("0.1.0").join("godot").join("g.exe"), b"MZ evil").unwrap();
         let s = status_of(&root);
@@ -730,7 +740,8 @@ mod tests {
         assert!(s.installed && s.verified, "{s:?}");
         let (exe, args) = launch_command(&root, Path::new("R"), Path::new("E")).unwrap();
         assert!(exe.is_file());
-        assert!(Path::new(&args[1]).join("project.godot").is_file());
+        let at = args.iter().position(|a| a == "--path").unwrap();
+        assert!(Path::new(&args[at + 1]).join("project.godot").is_file());
         assert!(!uninstall(&root).unwrap().installed);
         let _ = fs::remove_dir_all(&d);
         // Opt-in for acceptance runs: install the same zip, through the same code, into a real
