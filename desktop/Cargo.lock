@@ -4216,6 +4216,7 @@ version = "0.16.2"
 dependencies = [
  "serde",
  "serde_json",
+ "sha2",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
@@ -4223,6 +4224,7 @@ dependencies = [
  "tauri-plugin-single-instance",
  "vv-geo",
  "vv-platform",
+ "zip",
 ]
 
 [[package]]

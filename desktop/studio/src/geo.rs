@@ -103,7 +103,7 @@ impl Geo {
         l
     }
 
-    fn get(&self, id: &str) -> Result<(Kind, Arc<Environment>), PlatformError> {
+    pub(crate) fn get(&self, id: &str) -> Result<(Kind, Arc<Environment>), PlatformError> {
         self.load(false)
             .envs
             .iter()
