@@ -125,6 +125,10 @@ pub struct ParameterSpec {
     pub step: f64,
     pub default: f64,
     pub integer: bool,
+    /// Requirement ids this parameter is known to act on, a hand-written hint of the domain (M17).
+    /// Absent in older catalogs.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub influences: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]

@@ -246,6 +246,7 @@ fn parameter(
         step: 1.0,
         default,
         integer,
+        influences: Vec::new(),
     }
 }
 

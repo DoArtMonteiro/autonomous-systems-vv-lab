@@ -66,7 +66,7 @@ fn catalog_is_consistent() {
     assert_eq!(c.faults.len(), 10);
     assert_eq!(c.max_faults, 2);
     assert_eq!(c.controllers.len(), 4);
-    assert_eq!(c.scenarios.len(), 2);
+    assert_eq!(c.scenarios.len(), 4);
     for s in &c.scenarios {
         assert!(s.controllers.contains(&s.default_controller));
         for ctl in &s.controllers {
@@ -84,7 +84,10 @@ fn catalog_is_consistent() {
             let path = vv_domain_rocket::case::parameter_path(p).expect("known path");
             let value = path
                 .iter()
-                .fold(&case, |node, key| &node[*key])
+                .fold(&case, |node, key| match key.parse::<usize>() {
+                    Ok(index) => &node[index],
+                    Err(_) => &node[*key],
+                })
                 .as_f64()
                 .expect("number");
             assert_eq!(value, spec.default, "{} in {}", p, s.id);
@@ -468,4 +471,113 @@ fn replay_rejects_a_forged_verdict_in_the_verification() {
     assert_ne!(forged, text);
     fs::write(&path, forged).unwrap();
     assert_eq!(replay(&Host, &dir).status, "rejected");
+}
+
+// ------------------------------------------------------------------ M17 Experiment Lab
+
+fn with_params(scenario: &str, controller: &str, seed: u64, params: &[(&str, f64)]) -> RunRequest {
+    let mut r = request(scenario, controller, seed, vec![]);
+    for (id, v) in params {
+        r.parameters.insert((*id).to_string(), *v);
+    }
+    r
+}
+
+fn case_json(r: &RunRequest) -> serde_json::Value {
+    serde_json::from_slice(&case_bytes(&validate_request(&Host, r).unwrap()).unwrap()).unwrap()
+}
+
+fn channel<'a>(rec: &'a RunRecord, id: &str) -> &'a [Option<f64>] {
+    &rec.channels.iter().find(|c| c.id == id).expect(id).values
+}
+
+#[test]
+fn a_registered_value_parameter_makes_the_case_exploratory_and_only_then() {
+    let plain = case_json(&with_params(
+        M9,
+        "robust",
+        5000,
+        &[("lateral_position_gain", 0.2)],
+    ));
+    assert_eq!(plain["schema"], "vv-rocket-landing.v1");
+    let moved = case_json(&with_params(
+        M9,
+        "robust",
+        5000,
+        &[("initial_downrange_m", -40.0)],
+    ));
+    assert_eq!(moved["schema"], "vv-rocket-landing.v2");
+    assert_eq!(moved["initial"]["position_m"][0], -40.0);
+    assert_eq!(moved["initial"]["position_m"][2], 3000.0);
+    // A value equal to its default is not written and leaves the template untouched.
+    let same = case_json(&with_params(
+        M9,
+        "robust",
+        5000,
+        &[("initial_downrange_m", 80.0)],
+    ));
+    assert_eq!(same["schema"], "vv-rocket-landing.v1");
+}
+
+#[test]
+fn a_judging_only_parameter_changes_the_verdict_limit_and_no_state() {
+    let base = run_into(&with_params(M9, "robust", 5000, &[]), &temp("judge-a"));
+    let wide = run_into(
+        &with_params(M9, "robust", 5000, &[("landing_zone_radius_m", 2.0)]),
+        &temp("judge-b"),
+    );
+    for c in &base.channels {
+        assert_eq!(c.values, channel(&wide, &c.id), "channel {}", c.id);
+    }
+    let r5 = |rec: &RunRecord| {
+        rec.requirements
+            .iter()
+            .find(|r| r.id == "R5_position")
+            .unwrap()
+            .expected
+            .clone()
+    };
+    assert_ne!(r5(&base), r5(&wide));
+    assert!(wide.notes.iter().any(|n| n.starts_with("Exploratory case")));
+    assert!(!base.notes.iter().any(|n| n.starts_with("Exploratory case")));
+}
+
+#[test]
+fn an_initial_condition_parameter_changes_the_simulated_trajectory() {
+    let base = run_into(&with_params(M9, "robust", 5000, &[]), &temp("init-a"));
+    let moved = run_into(
+        &with_params(M9, "robust", 5000, &[("initial_downrange_m", -150.0)]),
+        &temp("init-b"),
+    );
+    let x0 = |rec: &RunRecord| channel(rec, "pos_x").first().copied().flatten().unwrap();
+    assert!(
+        (x0(&base) - x0(&moved) - 230.0).abs() < 1e-9,
+        "{} {}",
+        x0(&base),
+        x0(&moved)
+    );
+}
+
+#[test]
+fn the_vehicle_presets_are_exploratory_cases_that_run_and_replay() {
+    for (scenario, dry) in [
+        (vv_domain_rocket::case::HEAVY, 30000.0),
+        (vv_domain_rocket::case::LIGHT, 5500.0),
+    ] {
+        let r = with_params(scenario, "robust", 5001, &[]);
+        let case = case_json(&r);
+        assert_eq!(case["schema"], "vv-rocket-landing.v2");
+        assert_eq!(case["vehicle"]["dry_mass_kg"], dry);
+        let dir = temp("preset");
+        let rec = run_into(&r, &dir);
+        assert!(
+            rec.notes.iter().any(|n| n.starts_with("Exploratory case")),
+            "{scenario}"
+        );
+        let again = run_into(&r, &temp("preset-again"));
+        assert_eq!(
+            serde_json::to_vec(&rec.channels).unwrap(),
+            serde_json::to_vec(&again.channels).unwrap()
+        );
+    }
 }

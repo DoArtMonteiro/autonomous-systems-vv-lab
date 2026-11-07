@@ -118,6 +118,10 @@ fn demos_show_what_their_expectation_says() {
                 ("guarded", "hard_landing", "safe", &["R5_position"]),
             ],
         ),
+        (
+            "soft-but-off-pad",
+            &[("robust", "hard_landing", "safe", &["R5_position"])],
+        ),
     ];
     let c = catalog();
     assert_eq!(c.demos.len(), expected.len());

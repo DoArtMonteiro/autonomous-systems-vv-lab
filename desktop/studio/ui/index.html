@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="css/discover.css">
   <link rel="stylesheet" href="css/mission.css">
   <link rel="stylesheet" href="css/control.css">
+  <link rel="stylesheet" href="css/lab.css">
   <script type="module" src="js/main.js"></script>
 </head>
 <body>
@@ -24,6 +25,7 @@
       <button type="button" class="nav-btn" data-view="home" aria-keyshortcuts="1">Home</button>
       <button type="button" class="nav-btn" data-view="missions" aria-keyshortcuts="2">Missions</button>
       <button type="button" class="nav-btn nav-discover" data-view="discover" aria-keyshortcuts="3">Investigate</button>
+      <button type="button" class="nav-btn nav-lab" data-view="lab">Experiment</button>
       <span class="nav-sep" aria-hidden="true"></span>
       <button type="button" class="nav-btn nav-work" data-view="prepare" aria-keyshortcuts="4">Configure</button>
       <button type="button" class="nav-btn nav-work" data-view="run" aria-keyshortcuts="5">Analyse</button>
@@ -56,6 +58,7 @@
     <section id="view-compare" class="view" hidden aria-label="Compare runs"></section>
     <section id="view-library" class="view" hidden aria-label="Records: stored runs, scenarios and comparisons"></section>
     <section id="view-settings" class="view" hidden aria-label="Settings and about"></section>
+    <section id="view-lab" class="view" hidden aria-label="Experiment Lab"></section>
   </main>
   <div id="toasts" class="toasts" aria-live="polite"></div>
   <div id="modal-root" hidden></div>

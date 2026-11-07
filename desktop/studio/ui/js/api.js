@@ -50,6 +50,7 @@ export const api = {
   environmentFile: (id, file) => invoke('environment_file', { id, file }),
   geoTrack: (id, runId) => invoke('geo_track', { id, runId }),
   importEnvironment: () => invoke('import_environment'),
+  importEnvironmentPackage: () => invoke('import_environment_package'),
   removeEnvironment: (id) => invoke('remove_environment', { id }),
   revealEnvironments: () => invoke('reveal_environments'),
 };

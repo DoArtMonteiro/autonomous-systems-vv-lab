@@ -103,7 +103,7 @@ impl Geo {
         l
     }
 
-    fn get(&self, id: &str) -> Result<(Kind, Arc<Environment>), PlatformError> {
+    pub(crate) fn get(&self, id: &str) -> Result<(Kind, Arc<Environment>), PlatformError> {
         self.load(false)
             .envs
             .iter()
@@ -115,14 +115,14 @@ impl Geo {
     }
 }
 
-fn geo_err(e: vv_geo::GeoError) -> PlatformError {
+pub(crate) fn geo_err(e: vv_geo::GeoError) -> PlatformError {
     match e {
         vv_geo::GeoError::Io(m) => PlatformError::Io(m),
         vv_geo::GeoError::Invalid(m) => PlatformError::Invalid(m),
     }
 }
 
-fn listing(geo: &Geo, reload: bool) -> Value {
+pub(crate) fn listing(geo: &Geo, reload: bool) -> Value {
     let l = geo.load(reload);
     json!({
         "environments": l.envs.iter().map(|(k, e)| {

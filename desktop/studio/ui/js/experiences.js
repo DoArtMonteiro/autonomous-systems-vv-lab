@@ -32,6 +32,16 @@ export const EXPERIENCES = [
     watch: ['The engine lights at about 4 s and the fall slows from 200 m/s to under 2 m/s.', 'The estimate the controller flies on stays close to the true position.'],
     learn: ['What an autonomous controller is asked to do', 'Why the mission result and safety are judged separately'],
     categories: ['start'], level: 'Explorer', minutes: 1, runs: ['Robust controller'],
+    grade: 'demonstration', claim: null, next: 'off-the-pad',
+  },
+  {
+    id: 'off-the-pad', domain: 'rocket-landing', demo: 'soft-but-off-pad',
+    title: 'Soft, but off the pad', kicker: 'Fix it in the Lab',
+    summary: 'The stage touches down gently but about 19 m from the pad centre. What would bring it onto the pad?',
+    objective: 'Touch down slower than 3 m/s and within 10 m of the pad centre. This run meets the first and misses the second: its lateral guidance is tuned too gently.',
+    watch: ['The descent slows normally and the touchdown is soft.', 'The stage drifts toward the pad but is still about 19 m out at contact.', 'Choose “Change the conditions” to try another gain in the Experiment Lab.'],
+    learn: ['How one requirement can fail while the others pass', 'How to test a fix on other seeds before trusting it'],
+    categories: ['start', 'robustness'], level: 'Explorer', minutes: 3, runs: ['Robust, lateral gain 0.04'],
     grade: 'demonstration', claim: null, next: 'lying-altimeter',
   },
   {

@@ -24,3 +24,10 @@ tauri = { version = "2.11", features = [] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-single-instance = "2.4"
+# Environment packages (M17): the same zip and sha2 the platform already uses; no new crate.
+zip = { version = "2.6.1", default-features = false, features = ["deflate"] }
+sha2.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+# Free disk space before an install (GetDiskFreeSpaceExW); already in the lock through Tauri.
+windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem"] }
