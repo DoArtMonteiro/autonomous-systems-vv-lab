@@ -53,4 +53,4 @@ PASS Layout 1920x1080: no stray null or undefined text
 PASS Layout 1920x1080: every visible control has a name
 PASS no script error or console error
 
-48 of 48 checks passed; screenshots in C:\Users\Duarte\AppData\Local\Temp\claude\b22e219d38586b9f\257de639-355c-4036-950e-e7eebb6fb888\scratchpad\m15i
+48 of 48 checks passed; screenshots in <scratch>\m15i

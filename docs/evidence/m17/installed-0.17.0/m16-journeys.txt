@@ -1,7 +1,7 @@
 PASS Settings: the installed environments are listed with sources and size  [cape-canaveral,santa-maria-azores,spaceport-america]
 PASS Settings: Studio says it makes no network request
 PASS Geo: the player offers Engineering, Geospatial and Mission Control
-PASS Geo: the geospatial view loads from the local pack  [0.39 s]
+PASS Geo: the geospatial view loads from the local pack  [0.37 s]
 PASS Geo: an environment is selected  [cape-canaveral]
 PASS Geo: switching view keeps the same runs
 PASS Sources: the map keeps the ODbL credit and points to the rest  [i Sources Terrain is context only  © OpenStreetMap contributors · 5 more in Sources]
@@ -25,7 +25,7 @@ PASS Sources: a second tap closes it
 PASS World: the Cape pack draws OSM buildings and lidar vegetation  [{"buildings": 687, "lidar_structures": 8, "structures": 39, "trees": 8248, "shrubs": 97479, "tiles": 47, "vegetation_in_range": 0, "vegetation_tiers": [0, 0, 105727]}]
 PASS World: vegetation near the pad camera is drawn in full detail  [[55069, 50658, 0]]
 PASS Auto camera: the camera picks a shot from the playback state  [follow]
-PASS Geo to Mission Control keeps the playback time  [10.525999999999957 -> 10.525999999999957]
+PASS Geo to Mission Control keeps the playback time  [10.417499999999956 -> 10.417499999999956]
 PASS Mission Control keeps the landscape
 PASS Mission Control to Engineering keeps the playback time
 PASS Geo: placing the run on a landscape changes no record
@@ -70,10 +70,10 @@ PASS Layout 1024x640: every control has a name
 PASS No environment: Geospatial is disabled and says why  [{"off": "true", "title": "No validated geographic environment is installed. See Settings, Environments."}]
 PASS No environment: the engineering scene plays offline
 PASS No environment: Mission Control works on the engineering scene
-PASS Tampered pack: it is rejected with the reason  [ed packs are kept in %USERPROFILE%\AppData\Local\Temp\vv-m16-lib-gx2lzwzh\environments.  Install a package… Import a pack folder… Open the imported packs folder]
+PASS Tampered pack: it is rejected with the reason  [ed packs are kept in %USERPROFILE%\AppData\Local\Temp\vv-m16-lib-3lmnp17d\environments.  Install a package… Import a pack folder… Open the imported packs folder]
 PASS Tampered pack: Geospatial is disabled and says why  [{"off": "true", "title": "No validated geographic environment is installed. See Settings, Environments."}]
 PASS Tampered pack: the engineering scene plays offline
 PASS Tampered pack: Mission Control works on the engineering scene
 PASS no script error or console error
 
-77 of 77 checks passed; screenshots in C:\Users\Duarte\AppData\Local\Temp\claude\b22e219d38586b9f\257de639-355c-4036-950e-e7eebb6fb888\scratchpad\m16i
+77 of 77 checks passed; screenshots in <scratch>\m16i
