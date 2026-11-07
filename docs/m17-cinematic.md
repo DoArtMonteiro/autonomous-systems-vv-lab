@@ -214,6 +214,12 @@ A política de segurança de conteúdo do Studio e as capacidades do Tauri não 
 - Na raiz: `cargo build --release` e `python -m unittest discover -s tests -p "test_*.py"` (377 testes, 42 ignorados; os 3 da Cinematic View correram com `VV_GODOT` definido).
 - Não foram corridas de novo a campanha `run_campaign.py` nem a verificação completa da raiz (`cargo fmt`, `clippy`, `test`): este marco não altera o pacote da raiz nem os seus hashes canónicos.
 
+## Aceitação no Studio instalado (0.17.0)
+
+Em 2026-11-07 o módulo foi instalado no Studio 0.17.0 pelo próprio código de instalação do Studio (`install_zip`, teste opcional com `VV_CINEMATIC_INSTALL_TO`) e conduzido por `desktop/studio/tests/m17_cinematic_journey.py`: estado verificado, abertura a partir do leitor, registo do módulo com o pacote verificado e o primeiro fotograma, desinstalação e regresso ao botão desativado com a razão; 8 de 8 verificações. O diálogo nativo de ficheiros não foi conduzido por script: o Windows não entrega teclas a uma janela em segundo plano e a caixa do nome do ficheiro não aparece na árvore de UI Automation.
+
+Nessa sessão o controlador Vulkan desta máquina falhou em todos os fotogramas ("Couldn't get Vulkan surface capabilities", VkResult -13) e a janela ficou preta, tanto aberta pelo Studio como à mão. Com Direct3D 12 a mesma cena desenha-se sem erros, pelo que o Studio passou a abrir o módulo com `--rendering-driver d3d12` no Windows. As medições de desempenho acima foram feitas com Vulkan em 2026-11-05 e não foram repetidas com Direct3D 12.
+
 ## Limitações conhecidas
 
 - **O módulo corre o binário do editor do Godot** (181 MB) sobre a pasta do projeto, em vez de um executável exportado com um `.pck`. Os modelos de exportação têm 1,28 GB (tamanho do servidor, `Content-Length` do ficheiro oficial) e não foram descarregados. Um executável exportado seria mais pequeno e não teria o editor dentro.
