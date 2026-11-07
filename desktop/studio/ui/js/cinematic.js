@@ -26,7 +26,10 @@ export function cinematicButton(runId, envId, rocket) {
   const b = h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'cinematic' }, disabled: true, 'aria-disabled': 'true', title: 'Checking the Cinematic View module…' }, 'Cinematic view');
   const off = (why) => { b.disabled = true; b.setAttribute('aria-disabled', 'true'); b.title = why; };
   if (!rocket) { off('The Cinematic View replays rocket landings only.'); return b; }
-  current().then((s) => {
+  // Read afresh each time the player is built: the module folder can change outside this window
+  // (another Studio window, an uninstall, a manual removal), and a stale "installed" would offer a
+  // launch that cannot work.
+  current(true).then((s) => {
     if (!s.installed || !s.verified) return off(s.reason || 'The Cinematic View module is not installed.');
     if (!envId()) return off('The Cinematic View needs a geographic environment; none is installed.');
     b.disabled = false;

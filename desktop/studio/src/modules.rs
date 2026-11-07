@@ -733,6 +733,13 @@ mod tests {
         assert!(Path::new(&args[1]).join("project.godot").is_file());
         assert!(!uninstall(&root).unwrap().installed);
         let _ = fs::remove_dir_all(&d);
+        // Opt-in for acceptance runs: install the same zip, through the same code, into a real
+        // Studio module folder (VV_CINEMATIC_INSTALL_TO, e.g. <app local data>/modules/cinematic)
+        // and keep it, so the installed Studio can be driven without its native file dialog.
+        if let Some(real) = std::env::var_os("VV_CINEMATIC_INSTALL_TO").map(PathBuf::from) {
+            let s = install_zip(&real, &zp).unwrap();
+            assert!(s.installed && s.verified, "{s:?}");
+        }
     }
 
     #[test]
