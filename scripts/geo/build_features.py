@@ -149,7 +149,8 @@ class PackImage:
 
 # ---------------------------------------------------------------------------------- OpenStreetMap
 def overpass(lat, lon, radius, raw):
-    path = os.path.join(raw, f"overpass-{radius:.0f}.json")
+    # Raw caches are keyed by the origin too, so a moved origin never reuses another extent.
+    path = os.path.join(raw, f"overpass-{lat:.6f}-{lon:.6f}-{radius:.0f}.json")
     if os.path.exists(path):
         return json.load(open(path, encoding="utf-8"))
     q = f"""[out:json][timeout:120];
@@ -229,7 +230,7 @@ class EptRaster:
         return q[0] < self.bx[2] and q[2] > self.bx[0] and q[1] < self.bx[3] and q[3] > self.bx[1]
 
     def keys(self):
-        path = os.path.join(self.raw, f"hierarchy-{self.max_depth}.json")
+        path = os.path.join(self.raw, f"hierarchy-{self.frame.lat:.6f}-{self.frame.lon:.6f}-{self.max_depth}.json")
         if os.path.exists(path):
             return json.load(open(path))
         allh = {}
@@ -258,7 +259,7 @@ class EptRaster:
         return path
 
     def run(self):
-        cache = os.path.join(self.raw, f"rasters-{self.max_depth}-{self.half:.0f}.npz")
+        cache = os.path.join(self.raw, f"rasters-{self.frame.lat:.6f}-{self.frame.lon:.6f}-{self.max_depth}-{self.half:.0f}.npz")
         if os.path.exists(cache):
             z = np.load(cache)
             self.ground, self.chm, self.multi_frac, self.covered = z["ground"], z["chm"], z["multi_frac"], z["covered"]
@@ -337,7 +338,7 @@ def maxfilter(a, r):
 
 def naip_ndvi(frame, half, cell, year, raw):
     """NDVI on the lidar cells from the NAIP red and near-infrared bands (nan where not covered)."""
-    path = os.path.join(raw, f"ndvi-{year}-{half:.0f}.npy")
+    path = os.path.join(raw, f"ndvi-{frame.lat:.6f}-{frame.lon:.6f}-{year}-{half:.0f}.npy")
     meta = path + ".json"
     if os.path.exists(path) and os.path.exists(meta):
         return np.load(path), json.load(open(meta))

@@ -137,11 +137,12 @@ pub fn execute<H: DomainHost>(
     out: &Path,
 ) -> Result<RunRecord, HostError> {
     let mut record = host.run(request, out)?;
-    if record.schema != RECORD_SCHEMA {
+    if record.schema != RECORD_SCHEMA && record.schema != RECORD_SCHEMA_V2 {
         return Err(HostError::Simulation(format!(
-            "record schema must be {RECORD_SCHEMA}"
+            "record schema must be {RECORD_SCHEMA} or {RECORD_SCHEMA_V2}"
         )));
     }
+    record.check_entities().map_err(HostError::Simulation)?;
     if &record.request != request {
         return Err(HostError::Simulation(
             "record.request differs from the validated request".into(),

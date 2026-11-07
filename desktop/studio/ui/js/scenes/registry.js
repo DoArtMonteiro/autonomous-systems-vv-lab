@@ -7,10 +7,12 @@
 
 import { rocket3d } from './rocket.js';
 import { ground2d } from './ground.js';
+import { ascent } from './ascent.js';
 
 const registry = new Map([
   ['rocket-3d', rocket3d],
   ['ground-2d', ground2d],
+  ['ascent', ascent],
 ]);
 
 export function sceneFor(record) {

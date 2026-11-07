@@ -141,7 +141,11 @@ def tap(s):
 def sources_control(s):
     """The compact sources control: visible short credit, full notices on hover, click, keyboard and touch-type pointers."""
     note = s.js("document.getElementById('pl-scene-note').innerText")
-    check("Sources: a short credit for every source stays visible", "Copernicus" in note and "Sentinel" in note and "NGA" in note, note[:160].replace("\n", " "))
+    # M17: only the credits a licence wants in view of the map stay visible (ODbL here); every other
+    # notice is in the panel, one press away.
+    panel = s.js("document.querySelector('#pl-scene-note .si-panel').textContent")
+    check("Sources: the map keeps the ODbL credit and points to the rest", "OpenStreetMap" in note and "more in Sources" in note and "Copernicus" not in note, note[:160].replace("\n", " "))
+    check("Sources: the panel holds every notice", "Copernicus" in panel and "Sentinel" in panel and "NGA" in panel)
     hgt = s.js("document.getElementById('pl-scene-note').getBoundingClientRect().height")
     check("Sources: the closed control takes little room (under 64 px tall)", hgt < 64, f"{hgt:.0f} px")
     check("Sources: the panel is closed by default", not panel_open(s))

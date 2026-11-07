@@ -1,0 +1,64 @@
+{
+  "case": "small-leo",
+  "outcome": "orbit",
+  "seed": 42,
+  "trace_sha256": "c5ee2c6d129c6a915c8c5de5a720151022e66c507c794f732fdd35f14abbb641",
+  "verdicts": [
+    {
+      "id": "stack.S1_max_dynamic_pressure",
+      "observed": "worst 36071.3865 Pa at tick 3710",
+      "status": "pass"
+    },
+    {
+      "id": "stack.S2_axial_acceleration",
+      "observed": "worst 4.6226 g at tick 6892",
+      "status": "pass"
+    },
+    {
+      "id": "upper.S2_axial_acceleration",
+      "observed": "worst 5.2860 g at tick 22029",
+      "status": "pass"
+    },
+    {
+      "id": "stack.R1_separation_window",
+      "observed": "altitude 72.10 km, speed 2646.0 m/s",
+      "status": "pass"
+    },
+    {
+      "id": "booster.R2_propellant_margin",
+      "observed": "residual 1454.3 kg, margin 914.3 kg",
+      "status": "pass"
+    },
+    {
+      "id": "booster.R3_recovery_zone",
+      "observed": "impact at 820.52 km downrange, 367.6 m/s, t = 481.58 s",
+      "status": "fail"
+    },
+    {
+      "id": "upper.R4_periapsis",
+      "observed": "periapsis 295.14 km, eccentricity 0.00071",
+      "status": "pass"
+    },
+    {
+      "id": "upper.R5_apoapsis",
+      "observed": "apoapsis 304.60 km, error +4.60 km",
+      "status": "pass"
+    },
+    {
+      "id": "upper.R6_propellant_margin",
+      "observed": "residual 58.7 kg, margin 58.7 kg, SECO reason: target energy reached",
+      "status": "pass"
+    },
+    {
+      "id": "mission.R7_phase_sequence",
+      "observed": "all phases in order",
+      "status": "pass"
+    },
+    {
+      "id": "mission.R8_orbit_insertion",
+      "observed": "periapsis 295.14 km, apoapsis 304.60 km",
+      "status": "pass"
+    }
+  ],
+  "verification_sha256": "c562f7ca6375d983c6f02b156935af4e7c0fee93207d7d0ba627a23a1459f5d7"
+}

@@ -20,7 +20,7 @@ export const CATEGORIES = [
   { id: 'claims', label: 'Challenge a claim' },
 ];
 
-export const DOMAIN_NAMES = { 'rocket-landing': 'Rocket landing', 'ground-vehicle': 'Ground vehicle' };
+export const DOMAIN_NAMES = { 'rocket-landing': 'Rocket landing', 'ground-vehicle': 'Ground vehicle', 'launch-ascent': 'Launch ascent' };
 
 /** Order is the order of the library and of the home showcase. */
 export const EXPERIENCES = [
@@ -32,7 +32,7 @@ export const EXPERIENCES = [
     watch: ['The engine lights at about 4 s and the fall slows from 200 m/s to under 2 m/s.', 'The estimate the controller flies on stays close to the true position.'],
     learn: ['What an autonomous controller is asked to do', 'Why the mission result and safety are judged separately'],
     categories: ['start'], level: 'Explorer', minutes: 1, runs: ['Robust controller'],
-    grade: 'demonstration', claim: null, next: 'off-the-pad',
+    grade: 'demonstration', claim: null, next: 'lying-altimeter',
   },
   {
     id: 'off-the-pad', domain: 'rocket-landing', demo: 'soft-but-off-pad',
@@ -42,6 +42,26 @@ export const EXPERIENCES = [
     watch: ['The descent slows normally and the touchdown is soft.', 'The stage drifts toward the pad but is still about 19 m out at contact.', 'Choose “Change the conditions” to try another gain in the Experiment Lab.'],
     learn: ['How one requirement can fail while the others pass', 'How to test a fix on other seeds before trusting it'],
     categories: ['start', 'robustness'], level: 'Explorer', minutes: 3, runs: ['Robust, lateral gain 0.04'],
+    grade: 'demonstration', claim: null, next: 'lying-altimeter',
+  },
+  {
+    id: 'to-orbit', domain: 'launch-ascent', demo: 'small-to-orbit',
+    title: 'Two stages to orbit', kicker: 'Multi-stage mission',
+    summary: 'A small two-stage launcher climbs to a 300 km orbit. After separation the booster and the upper stage fly on as two simulated vehicles.',
+    objective: 'Keep dynamic pressure and acceleration within limits, separate in the planned window, put the upper stage into a 300 km orbit and drop the booster inside its recovery zone.',
+    watch: ['Max-Q: the throttle comes down while the air is densest.', 'Separation: from then on there are two trajectories, two telemetry streams and two sets of requirements.', 'The booster falls on a ballistic arc; the upper stage keeps burning to orbit.'],
+    learn: ['How a mission splits into separately judged vehicles', 'Why each phase has its own requirements'],
+    categories: ['start', 'compare'], level: 'Explorer', minutes: 2, runs: ['Small launcher, nominal'],
+    grade: 'demonstration', claim: null, next: 'too-heavy',
+  },
+  {
+    id: 'too-heavy', domain: 'launch-ascent', demo: 'payload-too-heavy',
+    title: 'One payload too many', kicker: 'Mission failure',
+    summary: 'The same launcher with 600 kg of payload. The upper stage runs into its propellant reserve before it has the energy for orbit.',
+    objective: 'Reach a 300 km orbit with propellant to spare. Change the payload or the ascent profile in the Experiment Lab and see which requirement moves.',
+    watch: ['The first stage behaves as before; the shortfall only shows on the upper stage.', 'Cut-off comes from the propellant reserve, not from the target energy.'],
+    learn: ['How one entity can fail while another passes', 'How a mission result is built from entity results'],
+    categories: ['faults'], level: 'Analyst', minutes: 2, runs: ['Small launcher, 600 kg payload'],
     grade: 'demonstration', claim: null, next: 'lying-altimeter',
   },
   {

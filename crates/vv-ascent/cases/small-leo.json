@@ -1,0 +1,89 @@
+{
+  "schema": "vv-ascent-case.v1",
+  "name": "Small two-stage launcher, about 35 t at liftoff, to a 300 km circular orbit",
+  "status": "exploratory, not a real vehicle",
+  "provenance": [
+    "Order-of-magnitude values typical of public descriptions of small kerosene and liquid-oxygen launchers: first-stage Isp about 285 s at sea level and 315 s in vacuum, upper-stage vacuum Isp about 340 s, liftoff thrust-to-weight about 1.45, structural fractions of 8 to 13 %.",
+    "No real vehicle is modelled: every number is a rounded assumption chosen for a plausible ascent, not a datum of any launcher."
+  ],
+  "vehicle": {
+    "role": "simulated",
+    "label": "Small launcher (exploratory)",
+    "stages": [
+      {
+        "id": "stage1",
+        "label": "First stage",
+        "dry_mass_kg": 2800.0,
+        "propellant_kg": 27000.0,
+        "thrust_vac_n": 560000.0,
+        "isp_vac_s": 315.0,
+        "isp_sl_s": 285.0,
+        "reference_area_m2": 2.54,
+        "drag_coefficient": 0.45,
+        "throttle_min": 0.6,
+        "throttle_max": 1.0,
+        "reserve_fraction": 0.03
+      },
+      {
+        "id": "stage2",
+        "label": "Upper stage",
+        "dry_mass_kg": 650.0,
+        "propellant_kg": 4800.0,
+        "thrust_vac_n": 55000.0,
+        "isp_vac_s": 340.0,
+        "isp_sl_s": 250.0,
+        "reference_area_m2": 2.54,
+        "drag_coefficient": 0.4,
+        "throttle_min": 0.5,
+        "throttle_max": 1.0,
+        "reserve_fraction": 0.01
+      }
+    ],
+    "payload_kg": 250.0
+  },
+  "visual": {
+    "role": "visual-only, never read by the simulation",
+    "stages": [
+      { "length_m": 13.0, "diameter_m": 1.8, "colour": "#d9dde3" },
+      { "length_m": 5.0, "diameter_m": 1.8, "colour": "#b9c2cc" }
+    ],
+    "fairing_colour": "#eef1f4"
+  },
+  "mission": {
+    "hold_s": 5.0,
+    "kick_time_s": 8.0,
+    "kick_duration_s": 4.0,
+    "kick_angle_deg": 2.5,
+    "gravity_turn_start_s": 14.0,
+    "separation_delay_s": 2.0,
+    "ignition_delay_s": 4.0,
+    "target_altitude_km": 300.0,
+    "coast_after_seco_s": 600.0,
+    "max_duration_s": 2000.0,
+    "recovery_zone": { "downrange_min_km": 850.0, "downrange_max_km": 1150.0 },
+    "guidance": {
+      "q_target_pa": 38000.0,
+      "axial_g_target": 5.0,
+      "min_time_to_go_s": 6.0,
+      "max_sin_elevation": 0.9,
+      "terminal_dv_m_s": 30.0
+    }
+  },
+  "limits": {
+    "max_q_pa": 45000.0,
+    "max_axial_g": 6.0,
+    "separation_altitude_km": [40.0, 120.0],
+    "separation_speed_m_s": [1500.0, 3500.0],
+    "apoapsis_tolerance_km": 15.0,
+    "min_periapsis_km": 180.0,
+    "min_residual_fraction": [0.02, 0.0]
+  },
+  "dispersions": {
+    "enabled": true,
+    "thrust_sigma": 0.01,
+    "isp_sigma": 0.003,
+    "propellant_sigma": 0.003,
+    "dry_mass_sigma": 0.01
+  },
+  "sensors": { "position_sigma_m": 10.0, "velocity_sigma_m_s": 0.1 }
+}

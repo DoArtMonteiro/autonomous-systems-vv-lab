@@ -1,0 +1,10 @@
+PASS Cinematic: the module installs from its zip and every file verifies  [{"installed": true, "verified": true, "version": "0.1.0", "godot": "4.7.2-stable", "disk_bytes": 181267199, "min_vram_bytes": 2000000000, "location": "%USERPROFILE%\\AppData\\Local\\org.vvlab.studio\\modules\\cinematic\\0.1.0", "reason": nu]
+PASS Cinematic: the player opens the module window on the shown run
+PASS Cinematic: the module verified the pack and drew its first frame  [Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org D3D12 12_0 - Forward+ - Using Device #0: AMD - AMD Radeon RX 7700 XT  cinematic: pack cape-canaveral verified (6 files, SHA-256 against environment.json) cinematic: scene built in 2073 ms (profile ultra: Auto: 12.9 GB of video m]
+PASS Cinematic: the module renders without errors  [0 errors; D3D12 12_0 - Forward+ - Using Device #0: AMD - AMD Radeon RX 7700 XT]
+PASS Cinematic: uninstall removes the module  [{"installed": false, "verified": false, "version": null, "godot": null, "disk_bytes": null, "min_vram_bytes": null, "location": null, "reason": "The Cinematic View module is not installed. Install it ]
+PASS Cinematic: without the module the button is disabled and says why  [{"d": true, "t": "The Cinematic View module is not installed. Install it from Settings with a module zip and its .sha256 file."}]
+PASS Cinematic: the technical view still plays
+PASS No page error or console error
+
+8/8 checks passed

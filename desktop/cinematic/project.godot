@@ -1,0 +1,43 @@
+; VV Lab Cinematic View (M17): a separately installable, read-only replay renderer for powered
+; landing runs on validated environment packs. Nothing here simulates. See docs/m17-cinematic.md.
+
+config_version=5
+
+[application]
+
+config/name="VV Lab Cinematic View"
+config/description="High-fidelity replay of a recorded powered landing on a geographic environment pack. Read-only: poses come from the record."
+config/version="0.1.0"
+run/main_scene="res://main.tscn"
+config/use_custom_user_dir=true
+config/custom_user_dir_name="VV Lab Cinematic"
+boot_splash/show_image=false
+boot_splash/bg_color=Color(0.055, 0.067, 0.086, 1)
+run/low_processor_mode=false
+
+[display]
+
+window/size/viewport_width=1440
+window/size/viewport_height=900
+window/stretch/aspect="expand"
+window/vsync/vsync_mode=1
+
+[debug]
+
+settings/stdout/print_fps=false
+gdscript/warnings/untyped_declaration=0
+
+[physics]
+
+common/physics_ticks_per_second=30
+
+[rendering]
+
+renderer/rendering_method="forward_plus"
+rendering_device/driver.windows="vulkan"
+anti_aliasing/quality/msaa_3d=0
+lights_and_shadows/directional_shadow/size=4096
+lights_and_shadows/directional_shadow/soft_shadow_filter_quality=3
+environment/defaults/default_clear_color=Color(0.55, 0.65, 0.78, 1)
+textures/default_filters/anisotropic_filtering_level=4
+shader_compiler/shader_cache/enabled=true

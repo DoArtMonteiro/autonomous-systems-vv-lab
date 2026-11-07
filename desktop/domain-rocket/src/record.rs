@@ -885,6 +885,8 @@ pub fn build(request: &RunRequest, out: &Path) -> Result<RunRecord, String> {
         requirements: results.requirements,
         channels,
         notes,
+        entities: None,
+        mission: None,
     };
     Ok(record)
 }

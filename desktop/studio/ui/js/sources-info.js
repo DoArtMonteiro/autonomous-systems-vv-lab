@@ -13,13 +13,14 @@ export function shortCredits(m) {
 }
 
 /**
- * Credits that stay on the map itself. Only the ODbL asks for attribution in view of the map
- * (OSMF attribution guidelines); the Copernicus DEM (Art. 6), Sentinel and CC BY notices are met by
- * the panel one press away, Settings, the installed NOTICE and every exported evidence package, and
+ * Credits that stay on the map itself: the ODbL (OSMF attribution guidelines), the IGN of Spain
+ * (its CC BY credit must read at the foot of the view) and swisstopo (OGD terms: the source goes
+ * with the data). The Copernicus DEM (Art. 6), Sentinel and other CC BY notices are met by the
+ * panel one press away, Settings, the installed NOTICE and every exported evidence package, and
  * public-domain sources ask for none. The full text of every notice stays in the panel.
  */
 export function mapCredits(m) {
-  return [...new Set((m.sources || []).filter((s) => /\bODbL\b/.test(s.licence || '')).map((s) => s.credit || s.attribution).filter(Boolean))];
+  return [...new Set((m.sources || []).filter((s) => /\bODbL\b|Orden FOM|swisstopo terms/.test(s.licence || '')).map((s) => s.credit || s.attribution).filter(Boolean))];
 }
 
 const n = (v) => Number(v || 0).toLocaleString('en');
