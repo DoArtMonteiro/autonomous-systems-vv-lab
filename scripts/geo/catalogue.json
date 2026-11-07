@@ -1,9 +1,96 @@
 {
   "schema": "vv-geo-catalogue.v1",
-  "note": "Definitions of the environment packs that scripts/geo/build_environment.py (terrain and image) and scripts/geo/build_features.py (world layer) can build. Adding an environment is adding an entry here; see docs/m16-2-flagship.md.",
+  "note": "Definitions of the environment packs that scripts/geo/build_environment.py (terrain and image) and scripts/geo/build_features.py (world layer) can build, and that scripts/geo/package_environment.py packages. Adding an environment is adding an entry here; see docs/m16-2-flagship.md and docs/m17-environments.md. Entries with \"bundled\": true ship with the Studio in desktop/environments; the others are built into dist/packs and installed separately.",
+  "tiers": {
+    "A": "orthophoto of 1 m or finer, lidar terrain of 1 to 2 m in the detail layer, and a world layer whose heights and vegetation are measured in a lidar point cloud",
+    "B": "orthophoto of 1 m or finer and lidar or survey terrain of 5 m or finer in the detail layer; world layer from OpenStreetMap only, no measured vegetation",
+    "C": "orthophoto of 1 m or finer; the detail terrain is the 30 m base surface; world layer from OpenStreetMap only",
+    "D": "Sentinel-2 image (10 m) and the 30 m base surface only"
+  },
+  "licences": {
+    "linz-hawkes-bay-imagery-2023": {
+      "provider": "Toitū Te Whenua Land Information New Zealand (host and processor); Aerial Surveys (producer); National Institute of Water and Atmospheric Research (licensor), as listed in the survey's STAC collection",
+      "product": "Hawke's Bay 0.25m Rural Aerial Photos (2023-2025), red, green and blue bands of the RGBNIR cloud-optimised tiles",
+      "licence": "CC BY 4.0: \"Licensed for re-use under CC-BY-4.0\" (https://registry.opendata.aws/nz-imagery); the collection's STAC licence field is CC-BY-4.0 and names the licensor. https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "Hawke's Bay 0.25m Rural Aerial Photos (2023-2025), licensed by National Institute of Water and Atmospheric Research for re-use under CC-BY-4.0; accessed on 2026-11-04 from https://registry.opendata.aws/nz-imagery; modified (resampled and colour-balanced)",
+      "credit": "Aerial photos 2023-2025, NIWA, CC BY 4.0 (LINZ)",
+      "access": "AWS Open Data s3://nz-imagery, hawkes-bay/hawkes-bay_2023-2024_0.25m/rgbnir/2193 (no account)",
+      "accuracy": "The LINZ imagery and DEM are on NZGD2000, a semi-dynamic datum fixed at epoch 2000; read here as WGS84, they are offset from the base layers by of the order of 1 to 2 m on the ground. The images were flown on 2023-02-20 and later; the lidar is of November 2020 to January 2021."
+    },
+    "linz-hawkes-bay-dem-2020": {
+      "provider": "Toitū Te Whenua Land Information New Zealand (host and processor); Ocean Infinity (producer); Hawke's Bay Regional Council (licensor), as listed in the survey's STAC collection",
+      "product": "Hawke's Bay LiDAR 1m DEM (2020-2021), bare earth, heights in NZVD2016 (EPSG:7839, as stated in the LINZ elevation TIFF specification; not recorded in the GeoTIFF)",
+      "licence": "CC BY 4.0: \"Licensed for re-use under CC-BY-4.0\" (https://registry.opendata.aws/nz-elevation); the collection's STAC licence field is CC-BY-4.0 and names the licensor. https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "Hawke's Bay LiDAR 1m DEM (2020-2021), licensed by Hawke's Bay Regional Council for re-use under CC-BY-4.0; accessed on 2026-11-04 from https://registry.opendata.aws/nz-elevation; modified (resampled and converted to ellipsoidal heights)",
+      "credit": "Lidar DEM 2020-2021, Hawke's Bay Regional Council, CC BY 4.0 (LINZ)",
+      "access": "AWS Open Data s3://nz-elevation, hawkes-bay/hawkes-bay_2020-2021/dem_1m/2193 (no account)",
+      "accuracy": "LINZ states a vertical accuracy of about 20 cm for the source lidar; the tiles are LERC-compressed with a 1 mm error."
+    },
+    "ign-pnoa": {
+      "provider": "Instituto Geográfico Nacional de España (IGN) and the autonomous communities, Plan Nacional de Ortofotografía Aérea (PNOA), through the IGN WMS",
+      "product": "PNOA orthophoto mosaic of latest coverage (WMS layer OI.OrthoimageCoverage; at the pad origin the mosaic element is of July 2025, 0.15 m), rendered by the WMS at the texel size",
+      "licence": "CC BY 4.0 under the IGN licence for its geographic data products and services (Orden FOM/2807/2015): \"el uso de los productos y servicios de información geográfica del IGN [...] conlleva la aceptación por el usuario de una licencia CC-BY 4.0\"; derived works add \"Obra derivada de\" to the attribution. The WMS states \"CC BY 4.0 scne.es\" in its AccessConstraints. https://www.ign.es/resources/licencia/Condiciones_licenciaUso_IGN.pdf",
+      "attribution": "Obra derivada de PNOA 2025 CC-BY 4.0 scne.es",
+      "credit": "Obra derivada de PNOA 2025 CC-BY 4.0 scne.es",
+      "access": "WMS 1.3.0 https://www.ign.es/wms-inspire/pnoa-ma, layer OI.OrthoimageCoverage (no account)",
+      "accuracy": "IGN data are on ETRS89, read here as WGS84: an offset of the order of 1 m on the ground. In the south-east corner of the detail layer the WMS mosaic is visibly coarser than elsewhere although its mosaic metadata give the same date and 0.15 m; the reason is not recorded."
+    },
+    "ign-mdt05": {
+      "provider": "Instituto Geográfico Nacional de España (IGN), through the IGN WCS of the digital terrain models",
+      "product": "MDT05 digital terrain model, 5 m grid from PNOA lidar (WCS coverage Elevacion25830_5), heights orthometric above the Alicante datum (REDNAP, EPSG:5782)",
+      "licence": "CC BY 4.0 under the IGN licence for its geographic data products and services (Orden FOM/2807/2015), as for the PNOA source above. The WCS states \"CC BY 4.0 scne.es\" in its AccessConstraints. https://www.ign.es/resources/licencia/Condiciones_licenciaUso_IGN.pdf",
+      "attribution": "Obra derivada de MDT05 CC-BY 4.0 scne.es",
+      "credit": "Obra derivada de MDT05 CC-BY 4.0 scne.es",
+      "access": "WCS 2.0.1 https://servicios.idee.es/wcs-inspire/mdt, coverage Elevacion25830_5 (no account)",
+      "accuracy": "MDT05 is a 5 m bare-earth model: it does not resolve dune crests, tracks or the edge of the low cliff above the beach. The WCS does not state the date of the lidar flight behind the coverage at this site."
+    },
+    "swisstopo-swissimage": {
+      "provider": "Federal Office of Topography swisstopo",
+      "product": "SWISSIMAGE 10 cm orthophoto mosaic, 2023 tiles (1 km cloud-optimised GeoTIFFs, 0.1 m)",
+      "licence": "swisstopo terms of use for free geodata and geoservices (OGD), version 1.3.2021: \"The free geodata and geoservices of swisstopo may be used, distributed and made accessible. Furthermore, they may be enriched and processed and also used commercially. A reference to the source is mandatory.\" The STAC collection's licence field reads \"proprietary\"; these terms are what the product page links as its terms of use. https://www.swisstopo.admin.ch/en/terms-of-use-free-geodata-and-geoservices",
+      "attribution": "Source: Federal Office of Topography swisstopo (SWISSIMAGE 10 cm, 2023), modified (resampled and colour-balanced)",
+      "credit": "© swisstopo (SWISSIMAGE 2023)",
+      "access": "swisstopo STAC API https://data.geo.admin.ch/api/stac/v0.9, collection ch.swisstopo.swissimage-dop10 (no account)",
+      "accuracy": "swisstopo data are on CH1903+/LV95 (ETRS89-based); read here as WGS84 they are offset by of the order of 1 m on the ground. In steep terrain an orthophoto's residual relief displacement can reach a few metres."
+    },
+    "swisstopo-swissalti3d": {
+      "provider": "Federal Office of Topography swisstopo",
+      "product": "swissALTI3D 2024 bare-earth elevation model, 2 m tiles, heights in LN02 (EPSG:5728)",
+      "licence": "swisstopo terms of use for free geodata and geoservices (OGD), version 1.3.2021: \"The free geodata and geoservices of swisstopo may be used, distributed and made accessible. Furthermore, they may be enriched and processed and also used commercially. A reference to the source is mandatory.\" The STAC collection's licence field reads \"proprietary\"; these terms are what the product page links as its terms of use. https://www.swisstopo.admin.ch/en/terms-of-use-free-geodata-and-geoservices",
+      "attribution": "Source: Federal Office of Topography swisstopo (swissALTI3D, 2024), modified (resampled and converted to ellipsoidal heights)",
+      "credit": "© swisstopo (swissALTI3D 2024)",
+      "access": "swisstopo STAC API https://data.geo.admin.ch/api/stac/v0.9, collection ch.swisstopo.swissalti3d (no account)",
+      "accuracy": "swissALTI3D is a bare-earth model; its stated accuracy is in the swisstopo product documentation and was not checked against this pack. Buildings and forest are not in it, so the drawn terrain is the ground under them."
+    },
+    "npolar-ortho": {
+      "provider": "Norwegian Polar Institute (Norsk Polarinstitutt), through its ArcGIS map service",
+      "product": "NP Ortofoto Svalbard orthophoto (aerial photographs of 2009, project 13835, 20 cm, according to the NPI coverage index), rendered by the service's export at the texel size",
+      "licence": "CC BY 4.0: \"The map data is licensed under the Creative Commons Attribution 4.0 International License.\" \"MAP DATA FROM THE NORWEGIAN POLAR INSTITUTE MUST BE CREDITED WHEN USED.\" (the licence text distributed with the NPI map data, reproduced unmodified in NOTICE.md); the NPI data catalogue gives http://creativecommons.org/licenses/by/4.0/ for the service record NP_Ortofoto_Svalbard_WMTS_25833. https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "Orthophoto © Norwegian Polar Institute, CC BY 4.0, modified (resampled and colour-balanced)",
+      "credit": "Orthophoto © Norwegian Polar Institute, CC BY 4.0",
+      "access": "ArcGIS REST https://geodata.npolar.no/arcgis/rest/services/Basisdata/NP_Ortofoto_Svalbard_WMTS_25833/MapServer, export in EPSG:25833 (no account)",
+      "accuracy": "NPI data are on ETRS89 (UTM zone 33N), read here as WGS84: an offset of the order of 1 m on the ground. The photographs are of the summer of 2009."
+    },
+    "npolar-dtm": {
+      "provider": "Norwegian Polar Institute (Norsk Polarinstitutt)",
+      "product": "S0 Terrengmodell, regional model DTM2_5 2009 project 13835, Longyearbyen area (2.5 m grid, mainly from stereo models of aerial photographs)",
+      "licence": "CC BY 4.0: \"The map data is licensed under the Creative Commons Attribution 4.0 International License.\" \"MAP DATA FROM THE NORWEGIAN POLAR INSTITUTE MUST BE CREDITED WHEN USED.\" (the _Lisens_License.txt file distributed with the NPI map data, reproduced unmodified in NOTICE.md as it requires); dataset licence field http://creativecommons.org/licenses/by/4.0/ in the NPI data catalogue. https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "Terrain model © Norwegian Polar Institute (S0 Terrengmodell), CC BY 4.0, modified (resampled and converted to ellipsoidal heights)",
+      "credit": "Terrain model © Norwegian Polar Institute, CC BY 4.0",
+      "access": "https://public.data.npolar.no/kartdata/S0_Terrengmodell/Delmodell/NP_S0_DTM2_5_2009_13835_33_Longyearbyenomr.zip (dataset https://data.npolar.no/dataset/dce53a47-c726-4845-85c3-a65b46fe2fea, no account)",
+      "accuracy": "The NPI terrain model states no vertical datum in the file or the catalogue record. Its heights are treated here as heights above EGM2008: over gentle land in the detail extent the NPI model is a median 0.8 m above Copernicus GLO-30 (EGM2008), interquartile range 0.4 to 1.4 m (measured when the pack was built; GLO-30 is a surface model, but the valley floor has no trees). NPI gives a standard deviation of about 2 to 5 m for the 20 m all-covering model from stereo models; no figure is given for this regional model."
+    }
+  },
   "environments": {
     "cape-canaveral": {
       "name": "Cape Canaveral coast, Florida",
+      "bundled": true,
+      "landscape": "low barrier coast",
+      "tier": "A",
+      "pack_version": "1",
+      "licence_gaps": [
+        "NAIP: não foi encontrado um documento de licença específico do NAIP; vale a política de domínio público do FSA citada acima, que pede o crédito da imagem."
+      ],
       "summary": "Low, flat barrier coast on the Atlantic. The simulation's pad centre is placed at the centre of a circular hard-standing visible in the detail image, measured on that image (about 2 m). The facility is not modelled and the simulated pad is not that facility.",
       "site_note": "The detail image is an aerial photograph of an existing landing facility. The simulated vehicle, pad and mission are generic: they are not that facility, its operations or its operator, and imply no affiliation.",
       "lat": 28.48573,
@@ -36,6 +123,14 @@
     },
     "santa-maria-azores": {
       "name": "Santa Maria, Azores",
+      "bundled": true,
+      "landscape": "volcanic island",
+      "tier": "C",
+      "pack_version": "1",
+      "licence_gaps": [
+        "Ortofotomapa de Santa Maria 2024: a licença CC BY 4.0 vem só do registo de metadados ISO do catálogo IDEiA; não foi encontrada outra página de condições e a forma exata da atribuição não está confirmada.",
+        "Sem lidar aberto: não há vegetação medida, e a camada de pormenor usa a superfície de base de 30 m."
+      ],
       "summary": "Volcanic island with cliffs and a plateau. The simulation's pad centre is placed in an open pasture on the eastern uplands, read from the 2024 orthophoto; the slopes around it break the flat-ground assumption of the simulation, which the Studio states. No launch or landing facility is there or is implied.",
       "lat": 36.98645,
       "lon": -25.10763,
@@ -67,6 +162,13 @@
     },
     "spaceport-america": {
       "name": "Spaceport America, New Mexico",
+      "bundled": true,
+      "landscape": "high desert basin",
+      "tier": "A",
+      "pack_version": "1",
+      "licence_gaps": [
+        "NAIP: não foi encontrado um documento de licença específico do NAIP; vale a política de domínio público do FSA citada acima, que pede o crédito da imagem."
+      ],
       "summary": "High desert basin of the Jornada del Muerto at about 1400 m. The simulation's pad centre is placed on open desert ground, read from the detail image. Nearly flat around the pad, so the flat-ground assumption of the simulation holds well here.",
       "site_note": "The detail image covers part of an existing commercial spaceport. The simulated vehicle, pad and mission are generic: they are not that spaceport, its facilities or its operations, and imply no affiliation.",
       "lat": 32.99,
@@ -97,6 +199,293 @@
         "ept_project": "NM_SouthCentral_B7_2018",
         "naip_year": 2022
       }
+    },
+    "wallops-island": {
+      "name": "Wallops Island, Virginia",
+      "bundled": false,
+      "landscape": "barrier island coast",
+      "tier": "A",
+      "pack_version": "1",
+      "licence_gaps": [
+        "NAIP: não foi encontrado um documento de licença específico do NAIP; vale a política de domínio público do FSA citada acima, que pede o crédito da imagem."
+      ],
+      "summary": "Narrow Atlantic barrier island between salt marsh and beach, about 2 m above the sea. The simulation's pad centre is placed on a bare sand and grass field inside a road loop on the island, measured on the 2023 NAIP image: about 85 m from the nearest building and 400 m inland of the beach. Flat around the pad, so the flat-ground assumption of the simulation holds well here.",
+      "site_note": "The detail image covers part of an existing launch range and its buildings. The simulated vehicle, pad and mission are generic: they are not that range, its facilities, its operations or its operator, and imply no affiliation.",
+      "lat": 37.8409,
+      "lon": -75.48428,
+      "half_extent_m": 9000.0,
+      "dem_spacing_m": 30.0,
+      "image_spacing_m": 10.0,
+      "s2_items": [
+        "S2C_T18SVG_20261026T160116_L2A",
+        "S2C_T18SVH_20261026T160116_L2A"
+      ],
+      "heading_deg": 0.0,
+      "detail": {
+        "half_extent_m": 1024.0,
+        "dem_spacing_m": 4.0,
+        "image_spacing_m": 0.5,
+        "blend_m": 192.0,
+        "dem": {
+          "kind": "tnm-1m"
+        },
+        "imagery": {
+          "kind": "naip",
+          "year": 2023
+        }
+      },
+      "world": {
+        "ept": "https://s3-us-west-2.amazonaws.com/usgs-lidar-public/USGS_LPC_VA_Eastern_ShoreBAA_2015_LAS_2017",
+        "ept_project": "USGS_LPC_VA_Eastern_ShoreBAA_2015_LAS_2017",
+        "naip_year": 2023
+      }
+    },
+    "mahia-peninsula": {
+      "name": "Mahia Peninsula, New Zealand",
+      "bundled": false,
+      "landscape": "pastoral peninsula with sea cliffs",
+      "tier": "B",
+      "pack_version": "1",
+      "licence_gaps": [
+        "Sem nuvem de pontos lidar no pacote: a camada do mundo tem só edifícios do OpenStreetMap e nenhuma vegetação. O LINZ publica também um modelo de superfície de 1 m (dsm_1m) que não foi usado.",
+        "A atribuição segue o modelo do registo AWS Open Data (\"Licensed by (insert the licensor) for re-use under CC-BY-4.0\") com o licenciante de cada coleção STAC; não foi encontrada outra forma prescrita."
+      ],
+      "summary": "Open pasture on the southern tip of the Mahia Peninsula, between sea cliffs on both sides. The simulation's pad centre is placed in a large grazed paddock, read from the 2023 aerial photograph and chosen on the lidar DEM as one of the flattest open spots near the tip (within 0.25 m over 10 m). The ground rolls gently beyond that, so the flat-ground assumption of the simulation is only approximate here; the relief figures give the departure.",
+      "site_note": "The pack covers an existing launch site about 1.5 km south of the pad origin. The simulated vehicle, pad and mission are generic: they are not that site, its facilities, its operations or its operator, and imply no affiliation.",
+      "lat": -39.248377,
+      "lon": 177.867382,
+      "half_extent_m": 9000.0,
+      "dem_spacing_m": 30.0,
+      "image_spacing_m": 10.0,
+      "s2_items": [
+        "S2B_T60HWB_20261013T220619_L2A",
+        "S2B_T60HWB_20261023T220620_L2A"
+      ],
+      "heading_deg": 0.0,
+      "detail": {
+        "half_extent_m": 1024.0,
+        "dem_spacing_m": 4.0,
+        "image_spacing_m": 0.5,
+        "blend_m": 192.0,
+        "dem": {
+          "kind": "cog",
+          "licence": "linz-hawkes-bay-dem-2020",
+          "vertical_crs": "EPSG:2193+7839",
+          "ellipsoidal_crs": "EPSG:4959",
+          "urls": [
+            "https://nz-elevation.s3-ap-southeast-2.amazonaws.com/hawkes-bay/hawkes-bay_2020-2021/dem_1m/2193/BJ42_10000_0205.tiff",
+            "https://nz-elevation.s3-ap-southeast-2.amazonaws.com/hawkes-bay/hawkes-bay_2020-2021/dem_1m/2193/BJ42_10000_0305.tiff",
+            "https://nz-elevation.s3-ap-southeast-2.amazonaws.com/hawkes-bay/hawkes-bay_2020-2021/dem_1m/2193/BJ43_10000_0201.tiff",
+            "https://nz-elevation.s3-ap-southeast-2.amazonaws.com/hawkes-bay/hawkes-bay_2020-2021/dem_1m/2193/BJ43_10000_0301.tiff"
+          ]
+        },
+        "imagery": {
+          "kind": "cog",
+          "licence": "linz-hawkes-bay-imagery-2023",
+          "bands": [
+            1,
+            2,
+            3
+          ],
+          "urls": [
+            "https://nz-imagery.s3-ap-southeast-2.amazonaws.com/hawkes-bay/hawkes-bay_2023-2024_0.25m/rgbnir/2193/BJ42_10000_0205.tiff",
+            "https://nz-imagery.s3-ap-southeast-2.amazonaws.com/hawkes-bay/hawkes-bay_2023-2024_0.25m/rgbnir/2193/BJ42_10000_0305.tiff",
+            "https://nz-imagery.s3-ap-southeast-2.amazonaws.com/hawkes-bay/hawkes-bay_2023-2024_0.25m/rgbnir/2193/BJ43_10000_0201.tiff",
+            "https://nz-imagery.s3-ap-southeast-2.amazonaws.com/hawkes-bay/hawkes-bay_2023-2024_0.25m/rgbnir/2193/BJ43_10000_0301.tiff"
+          ]
+        }
+      },
+      "world": {}
+    },
+    "el-arenosillo": {
+      "name": "El Arenosillo coast, Huelva, Spain",
+      "bundled": false,
+      "landscape": "coastal sand plain with dunes and pine scrub",
+      "tier": "B",
+      "pack_version": "1",
+      "licence_gaps": [
+        "MDT05: a licença do IGN pede a data do produto na atribuição («<identificador do produto> <data> CC-BY 4.0 <produtores>»); o WCS não indica a data da cobertura neste local, por isso a atribuição usada não tem data.",
+        "A licença do IGN pede também que a expressão de reconhecimento conste dos metadados de um conjunto de dados derivado (resumo, linhagem, restrições de acesso); aqui consta do campo attribution de cada fonte em environment.json e deste aviso.",
+        "Sem nuvem de pontos lidar no pacote: a camada do mundo tem só edifícios do OpenStreetMap e nenhuma vegetação."
+      ],
+      "summary": "Sand plain about 35 m above the sea, behind a cliff and a long beach on the Gulf of Cádiz, under Mediterranean scrub and stone pine. The simulation's pad centre is placed on an open sand area with sparse shrubs, south of a straight unpaved sand strip, measured on the July 2025 PNOA orthophoto, about 300 m inland of the beach. Nearly flat around the pad.",
+      "site_note": "The detail image covers part of an existing rocket launch and test centre. The simulated vehicle, pad and mission are generic: they are not that centre, its facilities, its operations or its operator, and imply no affiliation.",
+      "lat": 37.09606,
+      "lon": -6.73142,
+      "half_extent_m": 9000.0,
+      "dem_spacing_m": 30.0,
+      "image_spacing_m": 10.0,
+      "s2_items": [
+        "S2A_T29SPB_20260924T111256_L2A",
+        "S2C_T29SPB_20261022T111855_L2A"
+      ],
+      "heading_deg": 0.0,
+      "detail": {
+        "half_extent_m": 1024.0,
+        "dem_spacing_m": 4.0,
+        "image_spacing_m": 0.5,
+        "blend_m": 192.0,
+        "dem": {
+          "kind": "wcs",
+          "licence": "ign-mdt05",
+          "url": "https://servicios.idee.es/wcs-inspire/mdt",
+          "coverage": "Elevacion25830_5",
+          "vertical_crs": "EPSG:25830+5782",
+          "ellipsoidal_crs": "EPSG:4937"
+        },
+        "imagery": {
+          "kind": "wms",
+          "licence": "ign-pnoa",
+          "year": 2025,
+          "url": "https://www.ign.es/wms-inspire/pnoa-ma",
+          "layer": "OI.OrthoimageCoverage"
+        }
+      },
+      "world": {}
+    },
+    "goms-alpine-valley": {
+      "name": "Upper Goms valley, Valais, Switzerland",
+      "bundled": false,
+      "landscape": "alpine valley",
+      "tier": "B",
+      "pack_version": "1",
+      "licence_gaps": [
+        "O campo de licença das coleções STAC da swisstopo diz \"proprietary\"; as condições aplicáveis são as condições OGD da swisstopo citadas acima, ligadas como condições de uso na página de cada produto.",
+        "Sem nuvem de pontos lidar no pacote: a camada do mundo tem só edifícios do OpenStreetMap e nenhuma vegetação, embora a floresta cubra boa parte das encostas."
+      ],
+      "summary": "Glacial valley floor of the upper Rhone at about 1340 m, between forested slopes rising to summits above 3000 m. The simulation's pad centre is placed on a hay meadow of the valley floor south of the river, read from the 2023 SWISSIMAGE orthophoto and chosen on the swissALTI3D model as the flattest open spot nearby, about 250 m from the end of a former airfield runway. The slopes rise within a kilometre; the relief figures give the departure from flat ground.",
+      "site_note": "The detail image covers a former military airfield. The simulated vehicle, pad and mission are generic: they are not that airfield or any facility, operation or operator, and imply no affiliation.",
+      "lat": 46.496883,
+      "lon": 8.295007,
+      "half_extent_m": 9000.0,
+      "dem_spacing_m": 30.0,
+      "image_spacing_m": 10.0,
+      "height_scale_m": 0.05,
+      "s2_items": [
+        "S2B_T32TMS_20260724T101659_L2A",
+        "S2C_T32TMS_20260927T102053_L2A"
+      ],
+      "heading_deg": 0.0,
+      "detail": {
+        "half_extent_m": 1024.0,
+        "dem_spacing_m": 4.0,
+        "image_spacing_m": 0.5,
+        "blend_m": 192.0,
+        "height_scale_m": 0.02,
+        "dem": {
+          "kind": "cog",
+          "licence": "swisstopo-swissalti3d",
+          "vertical_crs": "EPSG:2056+5728",
+          "ellipsoidal_crs": "EPSG:4937",
+          "urls": [
+            "https://data.geo.admin.ch/ch.swisstopo.swissalti3d/swissalti3d_2024_2664-1148/swissalti3d_2024_2664-1148_2_2056_5728.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissalti3d/swissalti3d_2024_2664-1149/swissalti3d_2024_2664-1149_2_2056_5728.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissalti3d/swissalti3d_2024_2664-1150/swissalti3d_2024_2664-1150_2_2056_5728.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissalti3d/swissalti3d_2024_2664-1151/swissalti3d_2024_2664-1151_2_2056_5728.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissalti3d/swissalti3d_2024_2664-1152/swissalti3d_2024_2664-1152_2_2056_5728.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissalti3d/swissalti3d_2024_2665-1148/swissalti3d_2024_2665-1148_2_2056_5728.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissalti3d/swissalti3d_2024_2665-1149/swissalti3d_2024_2665-1149_2_2056_5728.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissalti3d/swissalti3d_2024_2665-1150/swissalti3d_2024_2665-1150_2_2056_5728.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissalti3d/swissalti3d_2024_2665-1151/swissalti3d_2024_2665-1151_2_2056_5728.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissalti3d/swissalti3d_2024_2665-1152/swissalti3d_2024_2665-1152_2_2056_5728.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissalti3d/swissalti3d_2024_2666-1148/swissalti3d_2024_2666-1148_2_2056_5728.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissalti3d/swissalti3d_2024_2666-1149/swissalti3d_2024_2666-1149_2_2056_5728.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissalti3d/swissalti3d_2024_2666-1150/swissalti3d_2024_2666-1150_2_2056_5728.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissalti3d/swissalti3d_2024_2666-1151/swissalti3d_2024_2666-1151_2_2056_5728.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissalti3d/swissalti3d_2024_2666-1152/swissalti3d_2024_2666-1152_2_2056_5728.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissalti3d/swissalti3d_2024_2667-1148/swissalti3d_2024_2667-1148_2_2056_5728.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissalti3d/swissalti3d_2024_2667-1149/swissalti3d_2024_2667-1149_2_2056_5728.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissalti3d/swissalti3d_2024_2667-1150/swissalti3d_2024_2667-1150_2_2056_5728.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissalti3d/swissalti3d_2024_2667-1151/swissalti3d_2024_2667-1151_2_2056_5728.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissalti3d/swissalti3d_2024_2667-1152/swissalti3d_2024_2667-1152_2_2056_5728.tif"
+          ]
+        },
+        "imagery": {
+          "kind": "cog",
+          "licence": "swisstopo-swissimage",
+          "bands": [
+            1,
+            2,
+            3
+          ],
+          "urls": [
+            "https://data.geo.admin.ch/ch.swisstopo.swissimage-dop10/swissimage-dop10_2023_2664-1148/swissimage-dop10_2023_2664-1148_0.1_2056.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissimage-dop10/swissimage-dop10_2023_2664-1149/swissimage-dop10_2023_2664-1149_0.1_2056.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissimage-dop10/swissimage-dop10_2023_2664-1150/swissimage-dop10_2023_2664-1150_0.1_2056.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissimage-dop10/swissimage-dop10_2023_2664-1151/swissimage-dop10_2023_2664-1151_0.1_2056.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissimage-dop10/swissimage-dop10_2023_2664-1152/swissimage-dop10_2023_2664-1152_0.1_2056.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissimage-dop10/swissimage-dop10_2023_2665-1148/swissimage-dop10_2023_2665-1148_0.1_2056.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissimage-dop10/swissimage-dop10_2023_2665-1149/swissimage-dop10_2023_2665-1149_0.1_2056.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissimage-dop10/swissimage-dop10_2023_2665-1150/swissimage-dop10_2023_2665-1150_0.1_2056.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissimage-dop10/swissimage-dop10_2023_2665-1151/swissimage-dop10_2023_2665-1151_0.1_2056.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissimage-dop10/swissimage-dop10_2023_2665-1152/swissimage-dop10_2023_2665-1152_0.1_2056.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissimage-dop10/swissimage-dop10_2023_2666-1148/swissimage-dop10_2023_2666-1148_0.1_2056.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissimage-dop10/swissimage-dop10_2023_2666-1149/swissimage-dop10_2023_2666-1149_0.1_2056.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissimage-dop10/swissimage-dop10_2023_2666-1150/swissimage-dop10_2023_2666-1150_0.1_2056.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissimage-dop10/swissimage-dop10_2023_2666-1151/swissimage-dop10_2023_2666-1151_0.1_2056.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissimage-dop10/swissimage-dop10_2023_2666-1152/swissimage-dop10_2023_2666-1152_0.1_2056.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissimage-dop10/swissimage-dop10_2023_2667-1148/swissimage-dop10_2023_2667-1148_0.1_2056.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissimage-dop10/swissimage-dop10_2023_2667-1149/swissimage-dop10_2023_2667-1149_0.1_2056.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissimage-dop10/swissimage-dop10_2023_2667-1150/swissimage-dop10_2023_2667-1150_0.1_2056.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissimage-dop10/swissimage-dop10_2023_2667-1151/swissimage-dop10_2023_2667-1151_0.1_2056.tif",
+            "https://data.geo.admin.ch/ch.swisstopo.swissimage-dop10/swissimage-dop10_2023_2667-1152/swissimage-dop10_2023_2667-1152_0.1_2056.tif"
+          ]
+        }
+      },
+      "world": {}
+    },
+    "adventdalen-svalbard": {
+      "name": "Adventdalen, Svalbard",
+      "bundled": false,
+      "landscape": "high-Arctic valley and tundra",
+      "tier": "B",
+      "pack_version": "1",
+      "licence_gaps": [
+        "O ficheiro de licença do Instituto Polar Norueguês exige que acompanhe sem modificação todas as cópias dos dados ou de dados derivados; o texto está reproduzido sem modificação abaixo, mas o ficheiro original não está no pacote, e a instalação no Studio pode copiar só os ficheiros do manifesto e não este aviso.",
+        "O datum vertical do modelo de terreno do Instituto Polar Norueguês não é indicado; as alturas foram tratadas como altitudes acima do EGM2008, com a diferença medida indicada no manifesto.",
+        "Sem nuvem de pontos lidar no pacote, e a tundra não tem árvores: a camada do mundo tem só edifícios do OpenStreetMap."
+      ],
+      "notice_texts": [
+        {
+          "title": "Texto de licença do Instituto Polar Norueguês (_Lisens_License.txt, reproduzido sem modificação)",
+          "text": "Kartdata © Norsk Polarinstitutt\n-------------------------------\n\nKartdataene er lisensiert under Creative Commons Navngivelse 4.0 Internasjonal-lisensen. For å se en kopi av denne lisensen, besøk http://creativecommons.org/licenses/by/4.0/ eller send et brev til Creative Commons, PO Box 1866, Mountain View, CA 94042, USA.\n\nKARTDATA FRA NORSK POLARINSTITUTT SKAL KREDITERES VED BRUK. DELER AV KARTDATAENE ER AV ELDRE DATO OG IKKE EGNET FOR NAVIGASJON. Se også lisenstekstens kapittel 5. Garantier og ansvarsfraskrivelse.\n\nFor metadata og kartdatanedlastning, besøk https://data.npolar.no. Alternativt, og for Norge digitalt-parter, https://www.geonorge.no.\n\nDenne tekstfilen skal følge umodifisert med alle kopier av kartdataene, deler av kartdataene eller avledede data.\n\n\n- - - - -\n\n\nMap data © Norwegian Polar Institute\n------------------------------------\n\nThe map data is licensed under the Creative Commons Attribution 4.0 International License. To view a copy of this license, visit http://creativecommons.org/licenses/by/4.0/ or send a letter to Creative Commons, PO Box 1866, Mountain View, CA 94042, USA.\n\nMAP DATA FROM THE NORWEGIAN POLAR INSTITUTE MUST BE CREDITED WHEN USED. PARTS OF THE MAP DATA ARE OF OLDER ORIGIN AND NOT SUITED FOR NAVIGATION. See also licence Section 5 – Disclaimer of Warranties and Limitation of Liability.\n\nFor metadata and map data downloads, visit https://data.npolar.no. Alternatively, and for Norway digital partners, https://www.geonorge.no.\n\nThis text file must follow unmodified with all copies of the map data, parts of the map data, or derived data."
+        }
+      ],
+      "summary": "Broad, treeless high-Arctic valley at 78 degrees north, a few kilometres east of a small town, between flat-topped mountains rising to about 1000 m. The simulation's pad centre is placed on the low terrace of the valley floor between the braided river channels and a lagoon behind the shore road, on patchy tundra about 60 m from the lagoon, read from the 2009 NPI orthophoto, under 2 m above sea level. Flat around the pad; the plateau edges are a few kilometres away.",
+      "lat": 78.21263,
+      "lon": 15.75957,
+      "half_extent_m": 9000.0,
+      "dem_spacing_m": 30.0,
+      "image_spacing_m": 10.0,
+      "height_scale_m": 0.05,
+      "s2_items": [
+        "S2A_T33XWG_20260819T122705_L2A",
+        "S2B_T33XWG_20260819T121642_L2A"
+      ],
+      "heading_deg": 0.0,
+      "detail": {
+        "half_extent_m": 1024.0,
+        "dem_spacing_m": 4.0,
+        "image_spacing_m": 0.5,
+        "blend_m": 192.0,
+        "height_scale_m": 0.02,
+        "dem": {
+          "kind": "cog",
+          "licence": "npolar-dtm",
+          "vertical_crs": "EPSG:25833+3855",
+          "ellipsoidal_crs": "EPSG:4937",
+          "urls": [
+            "https://public.data.npolar.no/kartdata/S0_Terrengmodell/Delmodell/NP_S0_DTM2_5_2009_13835_33_Longyearbyenomr.zip!/NP_S0_DTM2_5_2009_13835_33_Longyearbyenomr/S0_DTM2_5_2009_13835_33_Longyearbyenomr.tif"
+          ]
+        },
+        "imagery": {
+          "kind": "arcgis",
+          "licence": "npolar-ortho",
+          "crs": "EPSG:25833",
+          "url": "https://geodata.npolar.no/arcgis/rest/services/Basisdata/NP_Ortofoto_Svalbard_WMTS_25833/MapServer"
+        }
+      },
+      "world": {}
     }
   }
 }
