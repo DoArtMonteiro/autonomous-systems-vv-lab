@@ -89,11 +89,13 @@ def main():
                     time.sleep(0.5)
                 check("Cinematic: the player opens the module window on the shown run", godot_running())
                 time.sleep(12)
-                try:
-                    from PIL import ImageGrab
-                    ImageGrab.grab().save(os.path.join(a.shots, "m17-cinematic-window-from-studio.png"))
-                except Exception as e:  # noqa: BLE001
-                    print("screen grab failed", e)
+                # The module's own log says whether it verified the pack, drew a first frame and
+                # rendered without errors. (No desktop screenshot: it would capture other windows.)
+                logs = os.path.join(os.environ.get("APPDATA", ""), "VV Lab Cinematic", "logs")
+                newest = max((os.path.join(logs, f) for f in os.listdir(logs)), key=os.path.getmtime) if os.path.isdir(logs) else None
+                text = open(newest, encoding="utf-8", errors="replace").read() if newest else ""
+                check("Cinematic: the module verified the pack and drew its first frame", "verified" in text and "FIRST_FRAME" in text, text[:300].replace("\n", " "))
+                check("Cinematic: the module renders without errors", "ERROR" not in text, f"{text.count('ERROR')} errors; " + text.splitlines()[1][:120] if text else "no log")
                 subprocess.run(["powershell", "-NoProfile", "-Command", "Get-Process | Where-Object { $_.ProcessName -like 'Godot*' } | Stop-Process -Force"], capture_output=True)
                 time.sleep(1)
                 after = s.page.evaluate("() => window.__TAURI__.core.invoke('cinematic_uninstall')")
