@@ -26,10 +26,10 @@ REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..")
 
 
 def send_keys(text):
-    # WScript.Shell SendKeys: braces escape the characters it treats as commands.
-    esc = "".join("{" + c + "}" if c in "+^%~(){}[]" else c for c in text)
-    ps = f"$w = New-Object -ComObject WScript.Shell; Start-Sleep -Milliseconds 300; $w.SendKeys('{esc}'); Start-Sleep -Milliseconds 300; $w.SendKeys('{{ENTER}}')"
-    subprocess.run(["powershell", "-NoProfile", "-Command", ps], check=False)
+    """Answers the native file dialog by UI Automation (uia_file_dialog.ps1)."""
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uia_file_dialog.ps1")
+    r = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, "-Title", "Choose a Cinematic View module", "-Path", text], capture_output=True, text=True)
+    check("Cinematic: the native file dialog is answered", r.stdout.strip() == "ok", (r.stdout + r.stderr).strip()[:200])
 
 
 def godot_running():
@@ -47,6 +47,7 @@ def main():
     ap.add_argument("--zip", required=True)
     ap.add_argument("--shots", default=os.path.join(REPO, "docs", "images", "m17-studio"))
     ap.add_argument("--port", type=int, default=9291)
+    ap.add_argument("--preinstalled", action="store_true", help="the module was installed by the Studio's install code (modules.rs test with VV_CINEMATIC_INSTALL_TO); skip the native dialog")
     a = ap.parse_args()
     os.makedirs(a.shots, exist_ok=True)
     env = dict(os.environ)
@@ -61,13 +62,13 @@ def main():
             browser, s = session(pw, a.port, a.shots)
             try:
                 before = status(s)
-                if before.get("installed"):
-                    s.page.evaluate("() => window.__TAURI__.core.invoke('cinematic_uninstall')")
-                s.nav("settings")
-                s.wait("[...document.querySelectorAll('button')].some((b) => /Install from a module zip/.test(b.textContent))", 20, "install button")
-                s.page.evaluate("() => [...document.querySelectorAll('button')].find((b) => /Install from a module zip/.test(b.textContent)).click()")
-                time.sleep(2.0)
-                send_keys(os.path.abspath(a.zip))
+                if not a.preinstalled:
+                    if before.get("installed"):
+                        s.page.evaluate("() => window.__TAURI__.core.invoke('cinematic_uninstall')")
+                    s.nav("settings")
+                    s.wait("[...document.querySelectorAll('button')].some((b) => /Install from a module zip/.test(b.textContent))", 20, "install button")
+                    s.page.evaluate("() => [...document.querySelectorAll('button')].find((b) => /Install from a module zip/.test(b.textContent)).click()")
+                    send_keys(os.path.abspath(a.zip))
                 t0 = time.time()
                 st = None
                 while time.time() - t0 < 180:
