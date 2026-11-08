@@ -202,7 +202,7 @@
     },
     "wallops-island": {
       "name": "Wallops Island, Virginia",
-      "bundled": false,
+      "bundled": true,
       "landscape": "barrier island coast",
       "tier": "A",
       "pack_version": "1",
@@ -242,7 +242,7 @@
     },
     "mahia-peninsula": {
       "name": "Mahia Peninsula, New Zealand",
-      "bundled": false,
+      "bundled": true,
       "landscape": "pastoral peninsula with sea cliffs",
       "tier": "B",
       "pack_version": "1",
@@ -299,7 +299,7 @@
     },
     "el-arenosillo": {
       "name": "El Arenosillo coast, Huelva, Spain",
-      "bundled": false,
+      "bundled": true,
       "landscape": "coastal sand plain with dunes and pine scrub",
       "tier": "B",
       "pack_version": "1",
@@ -345,7 +345,7 @@
     },
     "goms-alpine-valley": {
       "name": "Upper Goms valley, Valais, Switzerland",
-      "bundled": false,
+      "bundled": true,
       "landscape": "alpine valley",
       "tier": "B",
       "pack_version": "1",
@@ -436,7 +436,7 @@
     },
     "adventdalen-svalbard": {
       "name": "Adventdalen, Svalbard",
-      "bundled": false,
+      "bundled": true,
       "landscape": "high-Arctic valley and tundra",
       "tier": "B",
       "pack_version": "1",
