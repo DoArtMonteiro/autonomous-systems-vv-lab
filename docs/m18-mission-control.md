@@ -2,7 +2,7 @@
 
 O Studio 0.17.0 tinha a ciência e as funcionalidades, mas escondia-as: a página inicial vendia três modos abstratos, o Experiment Lab abria com três botões "Default run", os veículos novos só apareciam numa lista do Lab, cinco dos oito ambientes estavam em ficheiros zip que só se instalavam por um diálogo nativo, e uma corrida feita no Lab não se podia ver no leitor de missões. O M18 corrige a arquitetura de informação e liga o percurso completo, sem mudar nenhum resultado científico existente.
 
-Estado: ramo `m17-integration`, por cima do PR #30. Nada foi integrado em `main`. Studio 0.18.0 construído (`desktop/build.ps1`), não instalado sobre o 0.17.0 sem aprovação.
+Estado: ramo `m17-integration`, por cima do PR #30. Nada foi integrado em `main`. Studio 0.18.0 construído (`desktop/build.ps1`, instalador de 42,3 MB contra 19,7 MB do 0.17.0, por causa dos oito pacotes). Os percursos correram no executável de `desktop/target/release`, não numa instalação; o Studio instalado continua a ser o 0.17.0.
 
 ## O que mudou no produto
 
@@ -59,7 +59,7 @@ Por corrigir: em Compare as duas corridas têm o mesmo rótulo (a diferença nã
 
 ## O que não está disponível
 
-- **Recuperação controlada do booster** (manobra de regresso e queima de aterragem): código escrito num ramo separado (`feat/m18-booster-recovery`, worktree de agente, sem commits), nunca compilado por completo nem testado; ver a secção sobre o Defender. O hangar diz "Not in this build". O booster continua balístico depois da separação.
+- **Recuperação controlada do booster** (manobra de regresso e queima de aterragem): código escrito num ramo local separado (`feat/m18-booster-recovery`, commit `bfe78a4` marcado como trabalho em curso, não publicado), nunca compilado por completo nem testado; ver a secção sobre o Defender. O hangar diz "Not in this build". O booster continua balístico depois da separação.
 - Operações orbitais para além do voo livre de 600 s, naves espaciais e aeronaves: não há modelo.
 - A Cinematic View só reproduz aterragens; a subida não tem cena cinemática.
 - **Melhoria visual**: o M18 não muda o renderizador geoespacial nem o módulo Godot. A avaliação prévia do Unreal Engine 5 e do Cesium está em `docs/m18-cinematic-preflight.md`, com a aprovação exata necessária. O objetivo gráfico não está cumprido.
