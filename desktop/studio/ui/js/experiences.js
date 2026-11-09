@@ -10,6 +10,7 @@ import { domainById, visibleDomains } from './store.js';
 export const GRADES = {
   demonstration: { label: 'Demonstration', tone: 'neutral', text: 'One development seed, chosen to show the behaviour. It illustrates; it does not measure a rate.' },
   exploratory: { label: 'Exploratory finding', tone: 'explore', text: 'Measured on fresh development seeds by an investigation. Not confirmed by a preregistered protocol.' },
+  experiment: { label: 'Your experiment', tone: 'explore', text: 'Runs you configured. Each is a recomputable record of this model; a changed vehicle or condition is exploratory and is not evidence for any pre-registered claim.' },
 };
 
 export const CATEGORIES = [

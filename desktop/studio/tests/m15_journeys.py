@@ -108,8 +108,9 @@ class S:
 def explorer(s):
     s.wait("window.__studio.view() === 'home'", 10, "home is the first screen")
     check("Explorer: Home is the first screen", True)
-    text = s.js("document.querySelector('.home-hero').innerText")
-    check("Explorer: Home says what the product does", "fail" in text.lower() and "claim" in text.lower(), text[:90])
+    # M18: the home is Mission Control; its header says what the product does.
+    text = s.js("document.querySelector('.hm-head').innerText")
+    check("Explorer: Home says what the product does", "simulator" in text.lower() and "record" in text.lower(), text[:90])
     check("Explorer: Home has one primary action to a first landing", s.js("!!document.querySelector(\"[data-experience='first-landing'] [data-action='launch']:not([disabled])\")"))
     s.shot("m15-home-dark")
     t0 = time.time()

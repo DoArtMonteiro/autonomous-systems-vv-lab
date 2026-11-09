@@ -15,6 +15,11 @@ function current(reload = false) {
   return status;
 }
 
+/** The module's status read afresh: {installed, verified, version, reason, ...}. */
+export function cinematicStatus() {
+  return current(true);
+}
+
 const mbText = (b) => `${(b / 1048576).toFixed(0)} MB`;
 
 /**

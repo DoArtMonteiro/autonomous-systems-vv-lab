@@ -26,6 +26,15 @@ export function initLab(el, nav) {
 
 /** opts: {runId} to start from a stored run, or nothing to keep the current experiment. */
 export async function showLab(opts) {
+  if (opts && opts.scenario && opts.domain) {
+    const d = domainById(opts.domain);
+    if (d && d.catalog) {
+      clear(root).append(h('div', { class: 'lab lab-empty' }, h('p', { class: 'eyebrow' }, 'Experiment Lab'), h('h1', null, 'Simulating the baseline…'),
+        h('p', { class: 'lab-lede' }, 'The platform runs the vehicle as it is defined, on a development seed. That run becomes the baseline every change is compared with.')));
+      await startDefault(d, null, opts.scenario, opts.open);
+      return;
+    }
+  }
   if (opts && opts.runId && (!lab || lab.base.id !== opts.runId)) {
     try {
       const record = await loadRecord(opts.runId);
@@ -284,24 +293,27 @@ function renderEmpty() {
   root.append(h('div', { class: 'lab lab-empty' },
     h('p', { class: 'eyebrow' }, 'Experiment Lab'),
     h('h1', null, 'Start from a run'),
-    h('p', { class: 'lab-lede' }, 'Open a mission or a stored run and choose “Experiment from this run”, or start from the default conditions of a domain. The Lab keeps that run as the baseline and compares every new run with it.'),
-    h('div', { class: 'row' }, doms.map((d) => h('button', { type: 'button', class: 'btn', onclick: (e) => startDefault(d, e.currentTarget) }, `Default run: ${d.manifest.name}`)),
+    h('p', { class: 'lab-lede' }, 'Pick a vehicle in the hangar, open a mission or a stored run and choose “Change the conditions”, or start from the default conditions of a domain. The Lab keeps that run as the baseline and compares every new run with it.'),
+    h('div', { class: 'row' }, h('button', { type: 'button', class: 'btn btn-primary', onclick: () => navigate('vehicles') }, 'Choose a vehicle'),
+      doms.map((d) => h('button', { type: 'button', class: 'btn', onclick: (e) => startDefault(d, e.currentTarget) }, `Default run: ${d.manifest.name}`)),
       h('button', { type: 'button', class: 'btn btn-quiet', onclick: () => navigate('library') }, 'Choose a stored run'))));
 }
 
-async function startDefault(d, btn) {
+async function startDefault(d, btn, scenarioId, openGroup) {
   const cat = d.catalog;
-  const sc = cat.scenarios[0];
+  const sc = cat.scenarios.find((s) => s.id === scenarioId) || cat.scenarios[0];
   const req = { schema: REQUEST_SCHEMA, domain: d.manifest.id, scenario: sc.id, controller: sc.default_controller, seed: DEV_SEED, faults: [], parameters: {} };
   if (btn) { btn.classList.add('is-busy'); btn.disabled = true; }
   try {
     const out = await api.run(req);
     emit('runs-changed');
     startFrom(out.run_id, await loadRecord(out.run_id));
+    if (openGroup) lab.openGroup = openGroup;
     render();
   } catch (e) {
     toast(errorText(e), 'error');
     if (btn) { btn.classList.remove('is-busy'); btn.disabled = false; }
+    if (!btn) render();
   }
 }
 
@@ -310,7 +322,7 @@ function verdictPill(record) {
   const sv = verdictOfSafety(record.safety.status);
   return h('div', { class: 'lab-verdicts' },
     h('span', { class: ['mini', `v-${ov}`], title: prose(record.outcome.explanation) }, verdictGlyph(ov), record.outcome.label),
-    h('span', { class: ['mini', `v-${sv}`], title: prose(record.safety.explanation) }, verdictGlyph(sv), record.safety.status === 'safe' ? 'Safe' : record.safety.status));
+    h('span', { class: ['mini', `v-${sv}`], title: prose(record.safety.explanation) }, verdictGlyph(sv), record.safety.status === 'safe' ? 'Safety rules held' : record.safety.status));
 }
 
 function runLine(req) {
@@ -399,7 +411,7 @@ function renderEditSoon() {
   }, 60);
 }
 
-const GROUP_ORDER = ['Controller tuning', 'Initial conditions', 'Sensors', 'Requirements'];
+const GROUP_ORDER = ['Vehicle design', 'Vehicle', 'Mission', 'Controller tuning', 'Pitch programme', 'Initial conditions', 'Sensors', 'Requirements'];
 
 function renderEdit(cat, sc) {
   const el = parts.edit;
@@ -453,7 +465,7 @@ function renderEdit(cat, sc) {
     // Within a group the parameters listed for the focused failure come first.
     const listed = (p) => p.group !== 'Requirements' && (p.influences || []).some((id) => lab.focus.has(id));
     const list = specs.filter((p) => p.group === g).sort((x, y) => Number(listed(y)) - Number(listed(x)));
-    const open = list.some((p) => (p.group !== 'Requirements' && (p.influences || []).some((id) => lab.focus.has(id))) || (lab.form.params[p.id] ?? p.default) !== paramValue(base, p));
+    const open = g === lab.openGroup || list.some((p) => (p.group !== 'Requirements' && (p.influences || []).some((id) => lab.focus.has(id))) || (lab.form.params[p.id] ?? p.default) !== paramValue(base, p));
     el.append(h('details', { class: 'lab-group', open },
       h('summary', null, g, h('span', { class: 'dim small' }, ` · ${list.length}`)),
       g === 'Requirements' ? h('p', { class: 'small lab-judge' }, 'These change only how a run is judged. The flight is the same; a requirement made easier is not a better landing.') : null,
@@ -527,9 +539,19 @@ function renderComparison(el) {
   eventDeltas(a, b),
   h('p', { class: 'small dim' }, `One run on seed ${b.request.seed}. A change that helps one seed may not help another: check it across seeds below.`),
   h('div', { class: 'row' },
+    h('button', { type: 'button', class: 'btn btn-primary', id: 'lab-watch', title: 'Play both runs from their records in the mission player: engineering scene, geospatial view, Mission Control and, when installed, the Cinematic View', onclick: () => watchRuns() }, 'Watch both runs'),
     h('button', { type: 'button', class: 'btn', onclick: () => navigate('compare', { runIds: [lab.base.id, lab.exp.id] }) }, 'Compare signals in detail'),
     h('button', { type: 'button', class: 'btn btn-quiet', onclick: () => navigate('run', { runId: lab.exp.id }) }, 'Analyse the experiment'),
     h('button', { type: 'button', class: 'btn btn-quiet', title: 'Make this run the new baseline and keep experimenting from it', onclick: () => { const e = lab.exp; startFrom(e.id, e.record); render(); } }, 'Use as new baseline')));
+}
+
+/** Plays the baseline and the experiment in the mission player, from their stored records. */
+function watchRuns() {
+  const sc = scenarioSpec();
+  navigate('mission', { runs: [
+    { runId: lab.base.id, record: lab.base.record, label: 'Baseline' },
+    { runId: lab.exp.id, record: lab.exp.record, label: 'Your change' },
+  ], title: sc ? `${sc.label}: baseline and your change` : 'Baseline and your change', summary: changes().join('; ') || 'The baseline and your experiment.' });
 }
 
 function eventDeltas(a, b) {

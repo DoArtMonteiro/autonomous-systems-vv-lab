@@ -10,7 +10,7 @@
 // Switching view remounts only the presentation; the records, the cursor time and the results stay.
 
 import { h, clear, icon, num, prose, lowerIndex, timeText } from '../dom.js';
-import { loadRecord, emit, pref, setPref } from '../store.js';
+import { loadRecord, emit, pref, setPref, domainById } from '../store.js';
 import { modelOf } from '../model.js';
 import { TimeCursor } from '../cursor.js';
 import { SERIES } from '../charts.js';
@@ -52,6 +52,10 @@ export function playerState() {
 
 export async function showPlayer(opts) {
   visible = true;
+  // M18: a set of stored runs (from the Experiment Lab or the vehicle hangar) plays as a mission of
+  // its own. It is registered as an experience for this session and replays the same requests, so
+  // the platform reuses the stored records: the player never computes a flight of its own.
+  if (opts && opts.runs && opts.runs.length) opts = { experienceId: registerRuns(opts) };
   const id = opts && opts.experienceId;
   if (id && loading && loading.id === id) return; // the same mission is already loading
   if (id && (!pl || pl.exp.id !== id)) {
@@ -103,9 +107,33 @@ function dispose() {
 
 // ----------------------------------------------------------------------------- loading
 
+// The flagship pack is the default landscape when none is chosen (the list is alphabetical).
+function defaultEnv(envs) {
+  return (envs.find((e) => e.id === 'cape-canaveral') || envs[0]).id;
+}
+
+const custom = new Map(); // experience id -> {exp, r} for runs played from the Lab or the hangar
+
+/** Registers stored runs as a session experience; returns its id. runs: [{runId, record, label}]. */
+function registerRuns({ runs, title, summary }) {
+  const first = runs[0].record;
+  const id = `runs:${runs.map((x) => x.runId).join("+")}`;
+  const domain = domainById(first.request.domain);
+  const exp = {
+    id, domain: first.request.domain, kicker: 'Your experiment', title: title || 'Your runs', summary: summary || 'Runs you made in this Studio, replayed from their records.',
+    objective: 'Watch the runs you made play back from their records. The verdicts are those the platform computed for each run.',
+    watch: ['Where the runs part: the timeline marks the first divergence.', 'Which requirement each run passes or fails, shown at the end.'],
+    runs: runs.map((x) => x.label), grade: 'experiment', next: null, claim: null,
+  };
+  const demo = { id, requests: runs.map((x) => x.record.request), narrative: 'These are runs you made. Each was simulated by the platform and judged against its requirements on the true state; the player replays the same requests, so the stored records are reused, not recomputed differently.' };
+  custom.set(id, { exp, r: { demo, domain, reason: domain && domain.catalog ? null : 'The domain of these runs is not installed.' } });
+  return id;
+}
+
 async function load(id) {
-  const exp = experienceById(id);
-  const r = exp ? resolve(exp) : null;
+  const c = custom.get(id);
+  const exp = c ? c.exp : experienceById(id);
+  const r = c ? c.r : exp ? resolve(exp) : null;
   if (!exp || !r.demo) {
     loading = null;
     dispose();
@@ -162,7 +190,7 @@ async function load(id) {
   pl = { exp, demo: r.demo, domain: r.domain, runs, cursor, active: 0, scene: null, revealed: false, unit, kind, envs, envId, view: 'engineering', lastView: 'engineering', mounts: 0 };
   const want = pref('missionView');
   if (want === 'control' || (want === 'geospatial' && geoPossible())) pl.view = want;
-  if (pl.view === 'geospatial' && !pl.envId) pl.envId = envs[0].id;
+  if (pl.view === 'geospatial' && !pl.envId) pl.envId = defaultEnv(envs);
   build();
   cursor.set(t0);
   if (visible && !matchMedia('(prefers-reduced-motion: reduce)').matches) cursor.play();
@@ -214,7 +242,7 @@ function setView(v) {
   if (pl.view !== 'control') pl.lastView = pl.view;
   pl.view = v;
   setPref('missionView', v);
-  if (v === 'geospatial' && !pl.envId && pl.envs.length) pl.envId = pl.envs[0].id;
+  if (v === 'geospatial' && !pl.envId && pl.envs.length) pl.envId = defaultEnv(pl.envs);
   const t = pl.cursor.t;
   const playing = pl.cursor.playing;
   build();
@@ -330,7 +358,7 @@ function build() {
     h('div', { class: 'pl-head-actions' },
       h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'analyse' }, title: 'Open the shown run with every channel, requirement and its provenance', onclick: () => navigate('run', { runId: pl.runs[pl.active].runId, t: pl.cursor.t }) }, 'Analyse'),
       runs.length > 1 ? h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'compare' }, onclick: () => navigate('compare', { runIds: runs.map((r) => r.runId), demo: pl.demo }) }, 'Compare in detail') : null,
-      cinematicButton(() => pl.runs[pl.active].runId, () => pl.envId || (pl.envs[0] && pl.envs[0].id), pl.kind === 'rocket-3d'),
+      cinematicButton(() => pl.runs[pl.active].runId, () => pl.envId || (pl.envs.length ? defaultEnv(pl.envs) : null), pl.kind === 'rocket-3d'),
       h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'configure' }, title: 'Open the shown run in the Experiment Lab: change its conditions, run a new simulation and compare', onclick: () => navigate('lab', { runId: pl.runs[pl.active].runId }) }, 'Change the conditions')));
 
   const side = h('aside', { class: 'pl-side', 'aria-label': 'Mission briefing and result' });
