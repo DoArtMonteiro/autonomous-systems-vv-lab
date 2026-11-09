@@ -98,6 +98,20 @@ pub struct Item {
     pub id: String,
     pub label: String,
     pub description: String,
+    /// M18: measured attributes of a vehicle, read by the host from the case template it really
+    /// simulates (never typed by hand), for the vehicle catalogue. Empty for other items and for
+    /// hosts that predate it; omitted from the JSON when empty, so older catalogs are unchanged.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub facts: Vec<Fact>,
+}
+
+/// One attribute of an item: a label, a number and its unit.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct Fact {
+    pub label: String,
+    pub value: f64,
+    pub unit: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]

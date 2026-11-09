@@ -79,6 +79,11 @@ fn catalog_is_consistent() {
                 .find(|x| &x.id == p)
                 .expect("parameter exists");
             assert!(spec.min <= spec.default && spec.default <= spec.max);
+            // A vehicle design factor defaults to 1: the template's own vehicle.
+            if vv_domain_rocket::case::vehicle_scale_fields(p).is_some() {
+                assert_eq!(spec.default, 1.0, "{p}");
+                continue;
+            }
             // A default is the value the template really holds.
             let case = template(&s.id).unwrap();
             let path = vv_domain_rocket::case::parameter_path(p).expect("known path");
@@ -157,6 +162,75 @@ fn a_parameter_that_differs_from_its_default_is_applied_and_only_then() {
     let mut other = base;
     other.parameters.insert("not_a_parameter".into(), 12.0);
     assert!(validate_request(&Host, &other).is_err());
+}
+
+#[test]
+fn vehicle_design_factors_scale_the_scenarios_own_vehicle_and_change_the_flight() {
+    // Default factors leave every template byte for byte.
+    for scenario in [M9, M91, "heavy-return-landing", "light-lander-landing"] {
+        let controller = if scenario == M91 { "guarded" } else { "robust" };
+        let base = request(scenario, controller, 5000, vec![]);
+        let plain = case_bytes(&validate_request(&Host, &base).unwrap()).unwrap();
+        let mut ones = base.clone();
+        for id in [
+            "vehicle_dry_mass_scale",
+            "vehicle_propellant_scale",
+            "vehicle_thrust_scale",
+            "vehicle_isp_scale",
+        ] {
+            ones.parameters.insert(id.into(), 1.0);
+        }
+        assert_eq!(
+            case_bytes(&validate_request(&Host, &ones).unwrap()).unwrap(),
+            plain,
+            "{scenario}"
+        );
+    }
+    // A factor scales the template's values (and the matching inertia) and makes the case v2.
+    let base = request("heavy-return-landing", "robust", 5000, vec![]);
+    let t = template("heavy-return-landing").unwrap();
+    let mut heavier = base.clone();
+    heavier
+        .parameters
+        .insert("vehicle_dry_mass_scale".into(), 1.2);
+    heavier
+        .parameters
+        .insert("vehicle_propellant_scale".into(), 0.5);
+    let case: serde_json::Value =
+        serde_json::from_slice(&case_bytes(&validate_request(&Host, &heavier).unwrap()).unwrap())
+            .unwrap();
+    assert_eq!(case["schema"], "vv-rocket-landing.v2");
+    let v = &case["vehicle"];
+    let tv = &t["vehicle"];
+    assert_eq!(
+        v["dry_mass_kg"].as_f64().unwrap(),
+        tv["dry_mass_kg"].as_f64().unwrap() * 1.2
+    );
+    assert_eq!(
+        v["dry_inertia_kgm2"][1].as_f64().unwrap(),
+        tv["dry_inertia_kgm2"][1].as_f64().unwrap() * 1.2
+    );
+    assert_eq!(
+        v["propellant_mass_kg"].as_f64().unwrap(),
+        tv["propellant_mass_kg"].as_f64().unwrap() * 0.5
+    );
+    assert_eq!(v["max_thrust_n"], tv["max_thrust_n"]);
+    // The simulation runs on the changed vehicle: a different trace, a different propellant use.
+    let a = run_case_dir(&base, "vehicle-base");
+    let b = run_case_dir(&heavier, "vehicle-heavier");
+    assert_ne!(
+        fs::read(a.join("trace.json")).unwrap(),
+        fs::read(b.join("trace.json")).unwrap()
+    );
+}
+
+fn run_case_dir(r: &RunRequest, name: &str) -> std::path::PathBuf {
+    let dir = temp(name);
+    let normal = validate_request(&Host, r).unwrap();
+    if execute(&Host, &normal, &dir).is_err() {
+        panic!("{name}: the run failed");
+    }
+    dir
 }
 
 #[test]
