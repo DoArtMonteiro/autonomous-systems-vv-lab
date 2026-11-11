@@ -55,7 +55,9 @@ pub const MISSIONS: [Mission; 4] = [
     Mission {
         id: "zone_corridor",
         label: "Corridor beside a restricted zone",
-        description: "Drive of 4000 mm east along a corridor 250 mm above a restricted zone, at 250 mm per tick                       in a 32-tick horizon (M2 f-zone-nominal). Registered with ideal sensors and an arrival                       radius of 0 mm; the GPS noise and the arrival radius are parameters.",
+        description: "Drive of 4000 mm east along a corridor 250 mm above a restricted zone, at 250 mm per tick \
+          in a 32-tick horizon (M2 f-zone-nominal). Registered with ideal sensors and an arrival \
+          radius of 0 mm; the GPS noise and the arrival radius are parameters.",
         scenario: include_str!("../../../scenarios/m2/f-zone-nominal.json"),
         actuator: None,
     },
