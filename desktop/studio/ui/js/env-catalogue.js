@@ -9,15 +9,17 @@ import { modal } from './ui.js';
 import { mb } from './environments.js';
 import { shortCredits } from './sources-info.js';
 
-const n = (v) => Number(v || 0).toLocaleString('en');
+const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+const n = (v) => num(v).toLocaleString('en');
 
 /** One line on the pack's world layer (v3), or null. */
-function worldLine(e) {
+export function worldLine(e) {
   const w = e.world;
-  if (!w) return null;
+  if (!isObj(w)) return null;
   const bits = [];
-  if (w.features) bits.push(`${n(w.features.buildings + (w.features.lidar_structures || 0))} buildings and structures`);
-  if (w.vegetation) bits.push(`${n(w.vegetation.count)} lidar trees and shrubs`);
+  if (isObj(w.features)) bits.push(`${n(num(w.features.buildings) + num(w.features.lidar_structures))} buildings and structures`);
+  if (isObj(w.vegetation)) bits.push(`${n(w.vegetation.count)} lidar trees and shrubs`);
   return bits.length ? `3D: ${bits.join(', ')}` : null;
 }
 
@@ -50,16 +52,17 @@ function thumbnail(id) {
 
 /** One line per layer: "2 km at 0.5 m image, 4 m terrain", then the base. */
 export function resolutionLines(e) {
-  const km = (m) => `${(m / 1000).toLocaleString('en', { maximumFractionDigits: 1 })} km`;
+  const km = (m) => `${(num(m) / 1000).toLocaleString('en', { maximumFractionDigits: 1 })} km`;
+  const sp = (o) => (isObj(o) ? num(o.spacing_m) : 0);
   const out = [];
-  for (const l of e.layers || []) if (l.role === 'detail') out.push(`${km(2 * l.extent_m)} square: image ${l.image.spacing_m} m, terrain ${l.height.spacing_m} m`);
-  out.push(`${km(2 * e.extent_m)} square: image ${e.image.spacing_m} m, terrain ${e.height.spacing_m} m`);
+  for (const l of Array.isArray(e.layers) ? e.layers : []) if (isObj(l) && l.role === 'detail') out.push(`${km(2 * num(l.extent_m))} square: image ${sp(l.image)} m, terrain ${sp(l.height)} m`);
+  out.push(`${km(2 * num(e.extent_m))} square: image ${sp(e.image)} m, terrain ${sp(e.height)} m`);
   return out;
 }
 
-function relief(e) {
-  const r = (e.relief || []).find((x) => x.radius_m === 500);
-  return r ? `${(r.max_up_m - r.min_up_m).toFixed(0)} m of relief within 500 m of the pad` : null;
+export function relief(e) {
+  const r = (Array.isArray(e.relief) ? e.relief : []).find((x) => isObj(x) && x.radius_m === 500);
+  return r ? `${(num(r.max_up_m) - num(r.min_up_m)).toFixed(0)} m of relief within 500 m of the pad` : null;
 }
 
 /** The card of one environment. `current` marks the one in use; `onUse(id)` chooses it. */
@@ -70,9 +73,9 @@ export function envCard(e, { current, onUse } = {}) {
   return h('article', { class: ['envc', chosen ? 'is-current' : ''], dataset: { env: e.id } },
     h('div', { class: 'envc-thumb' }, img, h('span', { class: 'envc-kind' }, e.kind === 'bundled' ? 'Installed with Studio' : 'Imported')),
     h('div', { class: 'envc-body' },
-      h('h3', { class: 'envc-name' }, e.name),
-      h('p', { class: 'envc-sum' }, e.summary),
-      e.site_note ? h('p', { class: 'envc-site' }, e.site_note) : null,
+      h('h3', { class: 'envc-name' }, String(e.name)),
+      h('p', { class: 'envc-sum' }, String(e.summary)),
+      typeof e.site_note === 'string' && e.site_note ? h('p', { class: 'envc-site' }, e.site_note) : null,
       h('ul', { class: 'envc-facts' },
         ...resolutionLines(e).map((x) => h('li', null, x)),
         relief(e) ? h('li', null, relief(e)) : null,

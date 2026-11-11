@@ -101,7 +101,7 @@ Medido fora da simulação com `desktop/studio/tests/perf_probe.py --flow m16` n
 | Sessão de 180 s: memória privada no fim, pior p99 | 889 a 911 MB, 6,4 ms | 1067 a 1072 MB, 6,3 ms |
 | Pedidos da vista web que saem da máquina | 0 | 0 |
 
-O ecrã limita a 165 fotogramas por segundo e a fluidez não mudou. A camada do mundo custa cerca de 230 MB de memória privada e 140 MB de GPU na vista geoespacial; a vista de engenharia não mudou. Ponto em aberto: depois de sair do leitor ficam cerca de 65 MB de GPU a mais do que no 0.16.1. O valor coincide com o mapa de sombras de 4096 x 4096 (64 MB), que a cena não liberta explicitamente ao ser desmontada; a correção (`this.sun.shadow.dispose()` em `dispose`) não está neste instalador, para que a medição corresponda ao código medido.
+O ecrã limita a 165 fotogramas por segundo e a fluidez não mudou. A camada do mundo custa cerca de 230 MB de memória privada e 140 MB de GPU na vista geoespacial; a vista de engenharia não mudou. Ponto em aberto: depois de sair do leitor ficam cerca de 65 MB de GPU a mais do que no 0.16.1. O valor coincide com o mapa de sombras de 4096 x 4096 (64 MB), que a cena não liberta explicitamente ao ser desmontada; a correção já está no código (`desktop/studio/ui/js/scenes/geo.js`, em `dispose`, por volta da linha 859: `this.sun.shadow.map.dispose()`, desde o commit `0626b75`), mas não neste instalador, para que a medição corresponda ao código medido. Os números de memória e de GPU deste quadro são anteriores à correção; a nova medição, com um instalador que a inclua, está por fazer.
 
 ## Verificação
 

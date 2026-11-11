@@ -31,7 +31,7 @@
     "active": true,
     "targets": ["nsis"],
     "publisher": "Autonomous Systems V&V Lab",
-    "copyright": "Autonomous Systems V&V Lab contributors, MIT licence",
+    "copyright": "Autonomous Systems V&V Lab contributors. MIT licence; third-party data, see NOTICE.md",
     "category": "DeveloperTool",
     "shortDescription": "Deterministic simulation, fault injection and verification workbench",
     "longDescription": "Configure ground-vehicle and rocket powered-landing missions, inject faults, compare controllers, inspect requirement and invariant verdicts judged on the true state, replay runs by recomputation and export evidence packages. Idealised research models; not flight or vehicle software.",

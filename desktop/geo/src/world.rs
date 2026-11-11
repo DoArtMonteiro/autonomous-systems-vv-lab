@@ -11,10 +11,11 @@
 //! The layer is geographic context for the drawn scene. It never reaches the simulation, the
 //! records or the verdicts.
 
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use serde::Deserialize;
-use serde_json::Value;
+use serde_json::{Value, json};
 
 use crate::environment::{GeoError, invalid_err, read_bounded, sha256_hex};
 
@@ -45,6 +46,28 @@ pub(crate) struct WorldFile {
     pub lidar_structures: Option<usize>,
     #[serde(default)]
     pub structures: Option<usize>,
+    /// Declared counts by source of height (buildings only). Checked against `features.json`.
+    #[serde(default)]
+    pub height_sources: Option<BTreeMap<String, usize>>,
+    /// Declared plant counts. Checked against `vegetation.bin`.
+    #[serde(default)]
+    pub trees: Option<usize>,
+    #[serde(default)]
+    pub shrubs: Option<usize>,
+    /// Descriptive facts shown as text or numbers; typed here so the interface never gets another
+    /// kind of value.
+    #[serde(default)]
+    pub osm_radius_m: Option<f64>,
+    #[serde(default)]
+    pub osm_timestamp: Option<String>,
+    #[serde(default)]
+    pub osm_skipped: Option<usize>,
+    #[serde(default)]
+    pub licence: Option<String>,
+    #[serde(default)]
+    pub accuracy: Option<String>,
+    #[serde(default)]
+    pub record: Option<String>,
 }
 
 /// Manifest `world` block.
@@ -64,6 +87,10 @@ pub struct World {
     pub buildings: usize,
     pub vegetation: usize,
     pub bytes: u64,
+    /// What the interface shows about the layer, built from the validated files and the typed
+    /// descriptive fields of the manifest, never from the manifest's raw JSON. Counts are
+    /// recomputed from `features.json` and `vegetation.bin`.
+    pub summary: Value,
 }
 
 #[derive(Deserialize)]
@@ -101,7 +128,6 @@ struct Structure {
     h_dm: i64,
     r_dm: i64,
     hs: String,
-    #[allow(dead_code)]
     name: Option<String>,
 }
 
@@ -116,7 +142,7 @@ fn check_file(dir: &Path, wf: &WorldFile, name: &str, max: u64) -> Result<Vec<u8
     Ok(b)
 }
 
-fn text_ok(s: &str, max: usize) -> bool {
+pub(crate) fn text_ok(s: &str, max: usize) -> bool {
     !s.is_empty() && s.len() <= max && s.chars().all(|c| !c.is_control())
 }
 
@@ -157,6 +183,11 @@ fn footprint_ok(f: &Footprint, limit_dm: i64) -> Result<(), String> {
     if twice <= 0 {
         return Err(format!("footprint {} is not counter-clockwise", f.id));
     }
+    // A repeated vertex (including a ring closed by repeating its first point) is a zero-length
+    // edge: the renderer would extrude a degenerate wall.
+    if (0..pts.len()).any(|i| pts[i] == pts[(i + 1) % pts.len()]) {
+        return Err(format!("footprint {} has a zero-length edge", f.id));
+    }
     Ok(())
 }
 
@@ -169,6 +200,7 @@ pub(crate) fn open(
     veg_half_m: f64,
 ) -> Result<World, GeoError> {
     let mut w = World::default();
+    let (mut sf, mut sv) = (Value::Null, Value::Null);
     let limit_dm = (extent_m * 10.0).round() as i64;
     if let Some(ff) = &wm.features {
         let b = check_file(dir, ff, FEATURES_FILE, MAX_FEATURES_BYTES)?;
@@ -207,10 +239,40 @@ pub(crate) fn open(
                 || !(1..=500).contains(&s.r_dm)
                 || s.x_dm.abs() > limit_dm
                 || s.y_dm.abs() > limit_dm
+                || s.name.as_deref().is_some_and(|n| !text_ok(n, 120))
             {
                 return invalid_err(format!("{FEATURES_FILE}: structure {} is not valid", s.id));
             }
         }
+        // The source of every building height is counted from the hashed file; a manifest that
+        // claims other counts (for instance more surveyed heights) is refused.
+        let mut height_sources: BTreeMap<String, usize> = BTreeMap::new();
+        for fp in &f.buildings {
+            *height_sources.entry(fp.hs.clone()).or_default() += 1;
+        }
+        if ff
+            .height_sources
+            .as_ref()
+            .is_some_and(|d| d.iter().filter(|(_, n)| **n > 0).ne(height_sources.iter()))
+        {
+            return invalid_err(format!(
+                "{FEATURES_FILE}: the declared sources of height do not match the file"
+            ));
+        }
+        sf = json!({
+            "file": FEATURES_FILE,
+            "bytes": ff.bytes,
+            "sha256": ff.sha256,
+            "buildings": f.buildings.len(),
+            "lidar_structures": f.lidar_structures.len(),
+            "structures": f.structures.len(),
+            "height_sources": height_sources,
+            "osm_radius_m": finite_opt(ff.osm_radius_m, "osm_radius_m")?,
+            "osm_timestamp": text_opt(&ff.osm_timestamp, 40, "osm_timestamp")?,
+            "osm_skipped": ff.osm_skipped,
+            "licence": text_opt(&ff.licence, 400, "licence")?,
+            "accuracy": text_opt(&ff.accuracy, 2_000, "accuracy")?,
+        });
         w.buildings = f.buildings.len() + f.lidar_structures.len();
         w.features_sha = Some(ff.sha256.clone());
         w.bytes += b.len() as u64;
@@ -223,6 +285,7 @@ pub(crate) fn open(
             return invalid_err(format!("{VEGETATION_FILE}: size and count do not match"));
         }
         let lim = (veg_half_m * 10.0).round() as i32;
+        let (mut trees, mut shrubs) = (0usize, 0usize);
         for r in b.as_chunks::<VEGETATION_RECORD>().0 {
             let x = i16::from_le_bytes([r[0], r[1]]) as i32;
             let y = i16::from_le_bytes([r[2], r[3]]) as i32;
@@ -238,12 +301,52 @@ pub(crate) fn open(
             {
                 return invalid_err(format!("{VEGETATION_FILE}: a record is out of range"));
             }
+            if kind == 1 {
+                trees += 1;
+            } else {
+                shrubs += 1;
+            }
         }
+        // Plant counts come from the records; a manifest claiming others is refused.
+        if vf.trees.is_some_and(|n| n != trees) || vf.shrubs.is_some_and(|n| n != shrubs) {
+            return invalid_err(format!(
+                "{VEGETATION_FILE}: the declared tree and shrub counts do not match the file"
+            ));
+        }
+        sv = json!({
+            "file": VEGETATION_FILE,
+            "bytes": vf.bytes,
+            "sha256": vf.sha256,
+            "count": b.len() / VEGETATION_RECORD,
+            "trees": trees,
+            "shrubs": shrubs,
+            "record": text_opt(&vf.record, 400, "record")?,
+            "accuracy": text_opt(&vf.accuracy, 2_000, "accuracy")?,
+        });
         w.vegetation = b.len() / VEGETATION_RECORD;
         w.vegetation_sha = Some(vf.sha256.clone());
         w.bytes += b.len() as u64;
     }
+    if !(sf.is_null() && sv.is_null()) {
+        w.summary = json!({"features": sf, "vegetation": sv});
+    }
     Ok(w)
+}
+
+fn finite_opt(v: Option<f64>, what: &str) -> Result<Option<f64>, GeoError> {
+    match v {
+        Some(x) if !x.is_finite() => invalid_err(format!("world {what} is not a finite number")),
+        other => Ok(other),
+    }
+}
+
+fn text_opt(v: &Option<String>, max: usize, what: &str) -> Result<Option<String>, GeoError> {
+    match v {
+        Some(s) if !text_ok(s, max) => invalid_err(format!(
+            "world {what} must be text of 1 to {max} bytes without control characters"
+        )),
+        other => Ok(other.clone()),
+    }
 }
 
 /// Manifest block of the world layer, or the default when absent.
