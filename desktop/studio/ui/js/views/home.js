@@ -163,7 +163,7 @@ export function showHome() {
       step('Explain', 'Test the suspected cause with declared interventions.'),
       step('Fix and verify', 'Check candidate fixes for regressions; recompute every verdict.')),
     h('div', { class: 'row' },
-      h('button', { type: 'button', class: 'btn', onclick: () => navigate('mission', { experienceId: 'late-gnss' }) }, 'See a claim break'),
+      h('button', { type: 'button', class: 'btn', onclick: () => navigate('mission', { experienceId: 'late-gnss' }) }, 'See a counterexample outside the registered conditions'),
       h('button', { type: 'button', class: 'btn btn-quiet', onclick: () => navigate('discover') }, 'Investigate a claim')));
 
   const foot = h('footer', { class: 'home-foot' },
