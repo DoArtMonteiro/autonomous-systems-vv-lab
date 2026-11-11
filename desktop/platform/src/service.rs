@@ -435,8 +435,10 @@ impl Platform {
         // A run stored by another host build may no longer reproduce byte for byte (see
         // `host_sdk::replay_earlier_build`). The strict replay always runs first and decides
         // alone when it passes; the earlier-build replay is only a fallback for a run it rejects,
-        // and the run id check below still binds the run to its stored request and to the build
-        // that wrote it, so the fallback cannot be obtained by editing files.
+        // and the run id check below is consistency only: `meta.json` is unauthenticated and the id
+        // is recomputable, so editing both can make a run look like another build's. The gate is
+        // advisory. What protects against edited files is the recomputation the fallback performs
+        // (verdicts both ways, telemetry, events, the native verdict flags), not this condition.
         let other_build = matches!(&meta, Ok(m) if m.host_sha256 != entry.host_sha256);
         let (summary_ok, id_ok, build) = match &meta {
             Ok(m) => {
@@ -511,10 +513,10 @@ impl Platform {
             .map_err(PlatformError::Invalid)?;
         let bytes = evidence::package(&dir, run_id, &record, &replay, &self.version).map_err(io)?;
         let path = dest.unwrap_or_else(|| {
-            let suffix = if replay.status == "rejected" {
-                "-REJECTED"
-            } else {
-                ""
+            let suffix = match replay.status.as_str() {
+                "rejected" => "-REJECTED",
+                REPLAY_VERIFIED_EARLIER_BUILD => "-EARLIER-BUILD",
+                _ => "",
             };
             self.library
                 .exports_dir()

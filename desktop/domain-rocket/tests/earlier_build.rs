@@ -170,10 +170,11 @@ fn a_run_stored_by_an_earlier_build_replays_as_verified_earlier_build_and_tamper
         "{}",
         note.detail
     );
-    // An earlier-build run still exports as a normal package, not as a rejected one.
+    // An earlier-build run exports with its own suffix: not a rejected package, not a byte-exact one.
     let zip = p.export_evidence(&old_id, None).unwrap();
     assert!(
-        zip.to_string_lossy().ends_with("-evidence.zip"),
+        zip.to_string_lossy()
+            .ends_with("-evidence-EARLIER-BUILD.zip"),
         "{}",
         zip.display()
     );
@@ -326,7 +327,49 @@ fn a_run_written_by_the_0_15_0_host_verifies_against_its_record_under_the_curren
             .iter()
             .any(|c| !c.pass && c.name == "stored artifacts match the hashes in record.json")
     );
-    for d in [dir, fresh] {
+    // The same edit with the hash in record.json rewritten too: the integrity check then passes,
+    // and the native verdict flags are what the recomputation rejects.
+    let both = copy_fixture("fixture-native-and-hash");
+    let old_bytes = fs::read(both.join("verification.json")).unwrap();
+    replace_once(
+        &both.join("verification.json"),
+        "\"requirements_pass\":false",
+        "\"requirements_pass\":true",
+    );
+    let new_bytes = fs::read(both.join("verification.json")).unwrap();
+    replace_once(
+        &both.join("record.json"),
+        &sha256_hex(&old_bytes),
+        &sha256_hex(&new_bytes),
+    );
+    replace_once(
+        &both.join("record.json"),
+        &format!("\"bytes\": {},", old_bytes.len()),
+        &format!("\"bytes\": {},", new_bytes.len()),
+    );
+    let edited = replay_earlier_build(&Host, &both);
+    assert_eq!(edited.status, "rejected", "{:?}", failed(&edited));
+    assert!(
+        edited
+            .checks
+            .iter()
+            .any(|c| c.pass && c.name == "stored artifacts match the hashes in record.json")
+    );
+    assert!(
+        failed(&edited)
+            .iter()
+            .any(|f| f.contains("requirements_pass")),
+        "{:?}",
+        failed(&edited)
+    );
+    // The report says what it does not compare.
+    assert!(
+        report
+            .checks
+            .iter()
+            .any(|c| c.pass && c.name == "not compared by the earlier-build replay")
+    );
+    for d in [dir, fresh, both] {
         let _ = fs::remove_dir_all(d);
     }
 }

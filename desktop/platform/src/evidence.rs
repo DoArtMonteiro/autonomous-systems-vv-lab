@@ -58,9 +58,10 @@ fn readme(run_id: &str, record: &RunRecord, replay: &ReplayReport) -> String {
         text.push_str(line);
         text.push('\n');
     }
-    text.push_str("\nThe desktop application replays a stored run by recomputing it from request.json and comparing every file byte for byte; replay.json lists each check.\n");
     if replay.status == REPLAY_VERIFIED_EARLIER_BUILD {
-        text.push_str("\nThis run was recorded by an earlier build of the domain host. It was recomputed with the current defaults and agrees with the stored record on the outcome, the safety status, the status and instant of each requirement, the timebases, channels, events and metrics. Texts, the scene and the native files were not compared, and the native simulator replay was not run. replay.json states what was checked.\n");
+        text.push_str("\nThis run was recorded by an earlier build of the domain host, so it was not compared byte for byte. It was recomputed with the current defaults and agrees with the stored record on the outcome, the safety status, the status and instant of each requirement (in both directions), the stored timebases, channels, events and metrics, and the verdict flags of the native verification.json. Texts, the scene, anything only the current build writes and the native simulator replay were not compared. replay.json lists each check and what was not compared.\n");
+    } else {
+        text.push_str("\nThe desktop application replays a stored run by recomputing it from request.json and comparing every file byte for byte; replay.json lists each check.\n");
     }
     text.push_str("\n## Notes\n\n");
     for note in &record.notes {

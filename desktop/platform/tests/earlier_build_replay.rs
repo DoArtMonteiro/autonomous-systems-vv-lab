@@ -132,17 +132,31 @@ impl DomainHost for Mock {
         for v in r.timebases.values_mut() {
             *v = vec![0.0, 1.0];
         }
-        r.events.clear();
-        r.requirements = vec![RequirementResult {
-            id: "R1".into(),
-            label: "R1".into(),
+        // A native verification file with verdict flags, like the real simulators write.
+        fs::write(
+            out.join("verification.json"),
+            "{\"requirements_pass\":false,\"invariants_pass\":true,\"requirements\":[{\"id\":\"R1\",\"pass\":false},{\"id\":\"R2\",\"pass\":true}]}",
+        )
+        .map_err(|e| HostError::Simulation(e.to_string()))?;
+        r.events = vec![Event {
+            t: 1.0,
+            kind: "limit_exceeded".into(),
+            label: "Limit exceeded".into(),
+            severity: "violation".into(),
+            source: "verifier".into(),
+            detail: Value::Null,
+        }];
+        let requirement = |id: &str, status: &str| RequirementResult {
+            id: id.into(),
+            label: id.into(),
             category: "requirement".into(),
-            status: "fail".into(),
+            status: status.into(),
             expected: "<= 3 m/s".into(),
             observed: "7 m/s".into(),
             t: Some(1.0),
             explanation: String::new(),
-        }];
+        };
+        r.requirements = vec![requirement("R1", "fail"), requirement("R2", "pass")];
         r.outcome.label = if self.newer {
             "Reached the ground, requirements not met"
         } else {
@@ -313,5 +327,119 @@ fn same_build_tamper_detection_is_unchanged() {
     fs::write(dir.join(RECORD_FILE), &original).unwrap();
     edit_record(&dir, |v| v["channels"][0]["values"][1] = Value::from(99.0));
     assert_eq!(replay(&NEW, &dir).status, "rejected");
+    let _ = fs::remove_dir_all(dir);
+}
+
+fn without_array_item(v: &mut Value, array: &str, index: usize) {
+    v[array].as_array_mut().unwrap().remove(index);
+}
+
+/// Rewrites a stored native file and the hash that record.json holds for it, as a person editing
+/// both would: the integrity check alone then passes.
+fn edit_native_and_hash(dir: &Path, file: &str, from: &str, to: &str) {
+    let path = dir.join(file);
+    let text = fs::read_to_string(&path).unwrap();
+    assert!(text.contains(from));
+    let edited = text.replace(from, to);
+    fs::write(&path, &edited).unwrap();
+    edit_record(dir, |v| {
+        for a in v["provenance"]["artifacts"].as_array_mut().unwrap() {
+            if a["path"] == file {
+                a["sha256"] = Value::from(vv_platform::canonical::sha256_hex(edited.as_bytes()));
+                a["bytes"] = Value::from(edited.len() as u64);
+            }
+        }
+    });
+}
+
+#[test]
+fn deleting_a_failed_requirement_or_a_violation_from_an_older_record_is_rejected() {
+    let dir = stored_by(&OLD, &[("gain", 2.5)], "delete");
+    assert_eq!(replay_earlier_build(&NEW, &dir).status, "verified");
+    let original = fs::read(dir.join(RECORD_FILE)).unwrap();
+
+    edit_record(&dir, |v| without_array_item(v, "requirements", 0)); // R1, failed
+    let r = replay_earlier_build(&NEW, &dir);
+    assert_eq!(r.status, "rejected");
+    let detail = &r
+        .checks
+        .iter()
+        .find(|c| c.name == EARLIER_BUILD_AGREEMENT_CHECK)
+        .unwrap()
+        .detail;
+    assert!(
+        detail.contains("R1 (fail) is missing from the stored record"),
+        "{detail}"
+    );
+    fs::write(dir.join(RECORD_FILE), &original).unwrap();
+
+    edit_record(&dir, |v| without_array_item(v, "events", 0)); // the violation
+    let r = replay_earlier_build(&NEW, &dir);
+    assert_eq!(r.status, "rejected");
+    let detail = &r
+        .checks
+        .iter()
+        .find(|c| c.name == EARLIER_BUILD_AGREEMENT_CHECK)
+        .unwrap()
+        .detail;
+    assert!(
+        detail.contains("violation event limit_exceeded"),
+        "{detail}"
+    );
+    fs::write(dir.join(RECORD_FILE), &original).unwrap();
+
+    // A passing requirement the older build lacked is fine (the current build knows more), but not
+    // when the domain version is the same: nothing explains its absence.
+    edit_record(&dir, |v| without_array_item(v, "requirements", 1)); // R2, passing
+    assert_eq!(
+        replay_earlier_build(&NEW, &dir).status,
+        "verified",
+        "another version may add requirements"
+    );
+    let _ = fs::remove_dir_all(dir);
+
+    let same = stored_by(&NEW, &[("gain", 2.5)], "delete-same");
+    edit_record(&same, |v| without_array_item(v, "requirements", 1));
+    let r = replay_earlier_build(&NEW, &same);
+    assert_eq!(r.status, "rejected");
+    assert!(failed(&r).contains(&EARLIER_BUILD_AGREEMENT_CHECK));
+    let _ = fs::remove_dir_all(same);
+}
+
+#[test]
+fn an_edited_native_verdict_flag_with_its_hash_updated_is_rejected_and_the_limits_are_listed() {
+    let dir = stored_by(&OLD, &[("gain", 2.5)], "native-flag");
+    let report = replay_earlier_build(&NEW, &dir);
+    assert_eq!(report.status, "verified");
+    assert!(report.checks.iter().any(|c| c.name
+        == "native verification.json flags agree with the recomputation"
+        && c.pass));
+    let limits = report
+        .checks
+        .iter()
+        .find(|c| c.name == "not compared by the earlier-build replay")
+        .unwrap();
+    assert!(
+        limits.pass
+            && limits.detail.contains("texts")
+            && limits.detail.contains("native simulator replay")
+    );
+
+    edit_native_and_hash(
+        &dir,
+        "verification.json",
+        "\"requirements_pass\":false",
+        "\"requirements_pass\":true",
+    );
+    let r = replay_earlier_build(&NEW, &dir);
+    assert_eq!(r.status, "rejected");
+    // The hash check passes, as the record was edited too; the recomputation catches the flag.
+    assert!(
+        r.checks
+            .iter()
+            .any(|c| c.name == "stored artifacts match the hashes in record.json" && c.pass)
+    );
+    let flag = r.checks.iter().find(|c| !c.pass).unwrap();
+    assert!(flag.detail.contains("requirements_pass"), "{flag:?}");
     let _ = fs::remove_dir_all(dir);
 }

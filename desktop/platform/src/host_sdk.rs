@@ -287,6 +287,22 @@ fn disagreement(stored: &RunRecord, fresh: &RunRecord) -> Option<String> {
             Some(_) => {}
         }
     }
+    // The other direction: what the recomputation found must be in the stored record, or deleting
+    // a failed requirement from it would pass. A requirement the stored record lacks is accepted
+    // only when the build that wrote it could not have known it (another domain version) and it
+    // passes; a failed one is never accepted.
+    let same_version = stored.domain.version == fresh.domain.version;
+    for x in &fresh.requirements {
+        if stored.requirements.iter().any(|q| q.id == x.id) {
+            continue;
+        }
+        if x.status == "fail" || same_version {
+            return Some(format!(
+                "requirement {} ({}) is missing from the stored record",
+                x.id, x.status
+            ));
+        }
+    }
     for (id, values) in &stored.timebases {
         if fresh.timebases.get(id) != Some(values) {
             return Some(format!("timebase {id} differs"));
@@ -308,6 +324,22 @@ fn disagreement(stored: &RunRecord, fresh: &RunRecord) -> Option<String> {
             return Some(format!("event {} at {} is not reproduced", e.kind, e.t));
         }
     }
+    // Likewise a violation or warning the recomputation reports must be in the stored record.
+    for x in &fresh.events {
+        if !matches!(x.severity.as_str(), "violation" | "warning") {
+            continue;
+        }
+        if !stored
+            .events
+            .iter()
+            .any(|e| e.t == x.t && e.kind == x.kind && e.severity == x.severity)
+        {
+            return Some(format!(
+                "{} event {} at {} is missing from the stored record",
+                x.severity, x.kind, x.t
+            ));
+        }
+    }
     for m in &stored.metrics {
         match fresh.metrics.iter().find(|x| x.id == m.id) {
             Some(x) if x.value == m.value => {}
@@ -316,6 +348,95 @@ fn disagreement(stored: &RunRecord, fresh: &RunRecord) -> Option<String> {
         }
     }
     None
+}
+
+/// What the earlier-build replay does not compare, listed in the report so a reader of
+/// `replay.json` can see the limits of the check.
+pub const EARLIER_BUILD_NOT_COMPARED: &str = "texts (labels, explanations, notes, the expected and observed text of a requirement), the scene, the entity and mission blocks, channels, events and metrics that only the current build writes (so deleting a stored channel, metric or informational event is not detected), and the native simulator replay, which needs the same simulator sources";
+
+/// Verdict flags of a native `verification.json`: the top-level `requirements_pass` and
+/// `invariants_pass`, and the pass flag or status of every entry of `requirements`, `invariants`
+/// and `verdicts`, by id. Hosts that write no such file give an empty map.
+fn native_verdicts(v: &serde_json::Value) -> std::collections::BTreeMap<String, String> {
+    let mut out = std::collections::BTreeMap::new();
+    for flag in ["requirements_pass", "invariants_pass"] {
+        if let Some(b) = v.get(flag).and_then(serde_json::Value::as_bool) {
+            out.insert(flag.to_string(), b.to_string());
+        }
+    }
+    for key in ["requirements", "invariants", "verdicts"] {
+        for item in v
+            .get(key)
+            .and_then(serde_json::Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            let Some(id) = item.get("id").and_then(serde_json::Value::as_str) else {
+                continue;
+            };
+            let value = item
+                .get("pass")
+                .and_then(serde_json::Value::as_bool)
+                .map(|b| b.to_string())
+                .or_else(|| {
+                    item.get("status")
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::to_string)
+                });
+            if let Some(value) = value {
+                out.insert(format!("{key}:{id}"), value);
+            }
+        }
+    }
+    out
+}
+
+/// Compares the verdict flags of the stored native `verification.json` with the recomputed one.
+/// The stored file is only protected by a hash in the editable record, so its flags are checked
+/// against the recomputation. Returns a description of the first difference, or the number of flags
+/// compared; `None` when neither run has such a file.
+fn native_verification_difference(dir: &Path, scratch: &Path) -> Option<Result<usize, String>> {
+    let read = |p: &Path| -> Result<Option<serde_json::Value>, String> {
+        if !p.is_file() {
+            return Ok(None);
+        }
+        read_bounded(p, MAX_RECORD_BYTES)
+            .and_then(|b| serde_json::from_slice(&b).map_err(|e| e.to_string()))
+            .map(Some)
+    };
+    let (stored, fresh) = match (
+        read(&dir.join("verification.json")),
+        read(&scratch.join("verification.json")),
+    ) {
+        (Ok(None), Ok(None)) => return None,
+        (Ok(Some(s)), Ok(Some(f))) => (native_verdicts(&s), native_verdicts(&f)),
+        (Err(e), _) | (_, Err(e)) => return Some(Err(format!("verification.json: {e}"))),
+        _ => {
+            return Some(Err(
+                "verification.json exists in only one of the two runs".into()
+            ));
+        }
+    };
+    for (k, v) in &stored {
+        match fresh.get(k) {
+            Some(f) if f == v => {}
+            other => {
+                return Some(Err(format!(
+                    "native verification {k}: stored {v}, recomputed {}",
+                    other.map_or("absent", String::as_str)
+                )));
+            }
+        }
+    }
+    // A verdict the recomputation finds failing must be in the stored file too.
+    for (k, f) in &fresh {
+        if !stored.contains_key(k) && (f == "false" || f == "fail") {
+            return Some(Err(format!(
+                "native verification {k} ({f}) is missing from the stored file"
+            )));
+        }
+    }
+    Some(Ok(stored.len()))
 }
 
 /// Replays a stored run that an earlier build of this host produced.
@@ -333,10 +454,13 @@ fn disagreement(stored: &RunRecord, fresh: &RunRecord) -> Option<String> {
 ///   stored record on outcome, safety, requirement verdicts, telemetry, events and metrics.
 ///
 /// It does not run the native simulator replay, which needs the same simulator sources, and it does
-/// not compare what [`disagreement`] lists as not compared. A changed number in the telemetry or the
-/// metrics, a flipped verdict, a changed outcome or an edited stored file is still rejected. The platform uses it only when the host build that stored the run is not
-/// the one that is running, and only after the strict [`replay`] has rejected the run: a run that
-/// still reproduces byte for byte is plain `verified`.
+/// not compare what [`EARLIER_BUILD_NOT_COMPARED`] lists, which the report repeats. A changed
+/// number in the telemetry or the metrics, a flipped or deleted verdict, a deleted violation, a
+/// changed outcome, an edited stored file or an edited native verdict flag is still rejected.
+/// The gate is advisory: the platform uses this replay when the host build that stored the run is
+/// not the one that is running, and only after the strict [`replay`] has rejected the run; the
+/// build comparison reads an unauthenticated `meta.json`, so protection against edited files comes
+/// from the recomputation, not from the gate.
 pub fn replay_earlier_build<H: DomainHost>(host: &H, dir: &Path) -> ReplayReport {
     let mut checks = Vec::new();
     let parsed: Result<RunRecord, String> = read_bounded(&dir.join(RECORD_FILE), MAX_RECORD_BYTES)
@@ -443,6 +567,26 @@ fn earlier_build_files<H: DomainHost>(
                 EARLIER_BUILD_AGREEMENT_CHECK,
                 difference.is_none(),
                 detail,
+            ));
+            // The stored native verdict flags against the recomputation (the hash that protects the
+            // file lives in the record, which can be edited together with the file).
+            match native_verification_difference(dir, &scratch) {
+                None => {}
+                Some(Ok(n)) => checks.push(check(
+                    "native verification.json flags agree with the recomputation",
+                    true,
+                    format!("{n} verdict flags"),
+                )),
+                Some(Err(e)) => checks.push(check(
+                    "native verification.json flags agree with the recomputation",
+                    false,
+                    e,
+                )),
+            }
+            checks.push(check(
+                "not compared by the earlier-build replay",
+                true,
+                EARLIER_BUILD_NOT_COMPARED,
             ));
         }
     }
