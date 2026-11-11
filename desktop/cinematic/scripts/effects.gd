@@ -88,18 +88,36 @@ static func build(parent: Node3D, sun_world: Vector3) -> Dictionary:
 	fx["glow"] = glow
 	fx["glow_mat"] = gm
 	# Flared flame skirt around the stage's foot (unit mesh, scaled to the spread).
-	var fm := ShaderMaterial.new()
-	fm.shader = load("res://shaders/ground_flame.gdshader")
-	fm.render_priority = 5   # after the dust volume: fire in front of the dust it lights
-	var flame := MeshInstance3D.new()
-	flame.mesh = _skirt_mesh(14, 48)
-	flame.material_override = fm
-	flame.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	flame.extra_cull_margin = 100.0
-	flame.layers = 2
+	# Three nested shells (outer orange, middle yellow, white-hot core), each with its own noise: hot gas
+	# spreading over the ground in layers, not one flat ring.
+	var flame := Node3D.new()
 	parent.add_child(flame)
+	var skirt := _skirt_mesh(16, 56)
+	var mats := []
+	var layers := [
+		[1.0, Color(0.95, 0.30, 0.06), Color(1.0, 0.72, 0.32), 0.75, 0.0, 5],
+		[0.66, Color(1.0, 0.52, 0.12), Color(1.0, 0.86, 0.5), 0.85, 3.1, 6],
+		[0.34, Color(1.0, 0.78, 0.36), Color(1.0, 0.97, 0.82), 1.0, 7.7, 7],
+	]
+	for L in layers:
+		var fm := ShaderMaterial.new()
+		fm.shader = load("res://shaders/ground_flame.gdshader")
+		fm.render_priority = L[5]   # after the dust volume: fire in front of the dust it lights
+		fm.set_shader_parameter("warm", L[1])
+		fm.set_shader_parameter("hot", L[2])
+		fm.set_shader_parameter("alpha_k", L[3])
+		fm.set_shader_parameter("seed", L[4])
+		var mi := MeshInstance3D.new()
+		mi.mesh = skirt
+		mi.material_override = fm
+		mi.scale = Vector3(L[0], 0.55 + 0.45 * L[0], L[0])
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mi.extra_cull_margin = 100.0
+		mi.layers = 2
+		flame.add_child(mi)
+		mats.append(fm)
 	fx["flame"] = flame
-	fx["flame_mat"] = fm
+	fx["flame_mats"] = mats
 	# Contact shadow.
 	var decal := Decal.new()
 	decal.texture_albedo = _radial_texture(true)
@@ -120,7 +138,7 @@ static func update(fx: Dictionary, p: Vector3, gz: float, plume_len: float, thro
 	var dust: MeshInstance3D = fx["dust"]
 	var glow: MeshInstance3D = fx["glow"]
 	var contact: Decal = fx["contact"]
-	var flame: MeshInstance3D = fx["flame"]
+	var flame: Node3D = fx["flame"]
 	light.visible = on
 	flame.visible = plume_len > 0.0 and h < 0.6 * plume_len + 2.0
 	dust.visible = on
@@ -139,14 +157,15 @@ static func update(fx: Dictionary, p: Vector3, gz: float, plume_len: float, thro
 		glow.position = to_godot.call(Vector3(p.x, p.y, gz + 0.3))
 		glow.scale = Vector3(rs, 1.0, rs)
 		fx["glow_mat"].set_shader_parameter("logical_t", logical_t)
-		fx["glow_mat"].set_shader_parameter("strength", 0.35 + 0.65 * ks)
+		fx["glow_mat"].set_shader_parameter("strength", (0.35 + 0.65 * ks) * 0.5)
 	if flame.visible:
 		var kf := clampf(1.0 - maxf(0.0, h) / (0.6 * plume_len + 2.0), 0.0, 1.0)
 		var rf := 4.5 + 7.0 * kf
 		flame.position = to_godot.call(Vector3(p.x, p.y, gz + 0.05))
 		flame.scale = Vector3(rf, (1.8 + 2.2 * throttle) * (0.4 + 0.6 * kf), rf)
-		fx["flame_mat"].set_shader_parameter("logical_t", logical_t)
-		fx["flame_mat"].set_shader_parameter("strength", (0.5 + 0.9 * kf) * (0.5 + 0.5 * throttle))
+		for fm in fx["flame_mats"]:
+			fm.set_shader_parameter("logical_t", logical_t)
+			fm.set_shader_parameter("strength", (0.5 + 0.9 * kf) * (0.5 + 0.5 * throttle))
 	if not on:
 		return
 	var k := (1.0 - maxf(0.0, h) / REACH) * minf(1.0, plume_len / 28.0)

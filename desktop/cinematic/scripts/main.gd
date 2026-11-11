@@ -18,6 +18,7 @@ const Pad := preload("res://scripts/pad.gd")
 const Profiles := preload("res://scripts/profiles.gd")
 const Hud := preload("res://scripts/hud.gd")
 const AscentView := preload("res://scripts/ascent.gd")
+const Skybox := preload("res://scripts/skybox.gd")
 
 # Illustrative sun (as the technical view: no date or time of day is part of the model).
 const SUN_AZIMUTH_DEG := 128.0
@@ -55,6 +56,7 @@ var ascent = null          # launch ascent view (vv-run.v2)
 var content_root: Node3D   # parent of the terrain, world layer and pad (moved by the floating origin in an ascent)
 var cameras: Array = CAMERAS
 var entity_sel := "auto"
+var sky_mat: ShaderMaterial
 var ready_ok := false
 var frames := 0
 var started_usec := 0
@@ -183,6 +185,7 @@ func _build() -> void:
 	var psky := ShaderMaterial.new()
 	psky.shader = load("res://shaders/sky.gdshader")
 	sky.sky_material = psky
+	sky_mat = psky
 	sky.process_mode = Sky.PROCESS_MODE_QUALITY
 	sky.radiance_size = Sky.RADIANCE_SIZE_256
 	env.background_mode = Environment.BG_SKY
@@ -252,6 +255,9 @@ func _build() -> void:
 		profile_reason = "Chosen on the command line"
 	settings = Profiles.settings(profile_name, cli.custom)
 	Profiles.apply(settings, get_viewport(), env, sun)
+	# Image-based sky and lighting (CC0 HDRI turned to the scene sun's azimuth), if the file is there.
+	if Skybox.apply(sky_mat, "spiaggia_di_mondello", g(_sun_dir_enu()).normalized(), 4096 if int(settings["tex_max"]) >= 2048 else 2048):
+		env.sky.radiance_size = Sky.RADIANCE_SIZE_512
 	# Terrain, world layer and stage.
 	content_root = self
 	if record.is_v2:
@@ -263,7 +269,9 @@ func _build() -> void:
 	var pad_c: Dictionary = record.pad()
 	for m in terrain.get("materials", []):
 		m.set_shader_parameter("pad_xy", Vector2(pad_c["cx"], pad_c["cy"]))
-	world = World.build(pack, content_root, settings)
+	Terrain.set_scans(terrain, int(settings["tex_max"]), 36.5)
+	var obs := _observer()
+	world = World.build(pack, content_root, settings, Vector2(pad_c["cx"], pad_c["cy"]), [Vector2(obs.x, obs.y)])
 	var pp: Dictionary = record.pad()
 	Pad.build(content_root, pack, pp["cx"], pp["cy"])
 	if record.is_v2:
@@ -272,6 +280,7 @@ func _build() -> void:
 		ascent = AscentView.new()
 		ascent.build(self, record, pack, content_root, g(_sun_dir_enu()).normalized(), earth_colour, cli.presentation)
 	else:
+		Stage.hull_tex_max = int(settings["tex_max"])
 		stage = Stage.build(vehicle)
 		for n in vehicle.find_children("*", "MeshInstance3D", true, false):
 			n.layers = 2   # not on the decals' layer (pad slab, contact shadow): they paint the ground only
@@ -709,11 +718,12 @@ func _set_dof(focus: float) -> void:
 	ca.dof_blur_far_enabled = on
 	ca.dof_blur_near_enabled = on
 	if on:
-		ca.dof_blur_far_distance = focus * 1.25
-		ca.dof_blur_far_transition = focus * 1.6
-		ca.dof_blur_near_distance = focus * 0.5
-		ca.dof_blur_near_transition = focus * 0.35
-		ca.dof_blur_amount = 0.06
+		# Gentle: a strong blur on a close, low shot reads as a miniature.
+		ca.dof_blur_far_distance = focus * 2.2
+		ca.dof_blur_far_transition = focus * 3.5
+		ca.dof_blur_near_distance = focus * 0.3
+		ca.dof_blur_near_transition = focus * 0.25
+		ca.dof_blur_amount = 0.018
 
 
 # --- frame loop ---------------------------------------------------------------------------------

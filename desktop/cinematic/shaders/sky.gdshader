@@ -12,6 +12,15 @@ uniform float energy = 1.0;
 uniform float cloud_cover = 0.62;
 uniform float cumulus_height = 1700.0;
 uniform float cirrus_height = 8000.0;
+// Image-based sky (CC0 HDRI, scripts/skybox.gd): when on, the panorama replaces the gradient and the
+// cloud layers. The lowest few degrees (another place's trees and sea) are replaced by the horizon
+// band, and the sun's pixels are clamped so the directional light is not counted twice.
+uniform bool use_hdri = false;
+uniform sampler2D hdri : filter_linear, repeat_enable;
+uniform float hdri_yaw = 0.0;
+uniform float hdri_exposure = 1.0;
+uniform float hdri_clamp = 12.0;
+uniform vec3 hdri_band = vec3(0.7, 0.8, 0.95);
 uniform float dip = 0.0;      // dip of the horizon below the camera, radians (the Earth's limb)
 uniform float space = 0.0;   // 0 at the ground, 1 in space: the sky darkens with the camera's recorded altitude
 
@@ -47,8 +56,27 @@ void sky() {
 	c = mix(c, mix(horizon, sun_haze, 0.55), pow(mu, 6.0) * 0.5 * exp(-up * 2.0));
 	c += sun_haze * (0.18 * pow(mu, 12.0) + 0.6 * pow(mu, 180.0));
 	if (AT_CUBEMAP_PASS == false && mu > 0.99996) c += vec3(18.0, 16.0, 13.0);
+	if (use_hdri) {
+		// Below about 23 degrees the panorama shows another place (a mountain, trees, the sea): there the
+		// row at 23 degrees is faded into a haze band (the mean colour of the panorama's sky away from
+		// the sun), so the horizon is the scene's own and the fog fades the land into it.
+		float ey = 0.40;
+		float ys = max(d.y, ey);
+		vec2 dxz = normalize(d.xz + vec2(1e-5)) * sqrt(max(1.0 - ys * ys, 1e-6));
+		vec3 dd = vec3(dxz.x, ys, dxz.y);
+		float u = atan(dd.x, -dd.z) / 6.2831853 + 0.5 + hdri_yaw;
+		float v = acos(clamp(dd.y, -1.0, 1.0)) / 3.14159265;
+		vec3 hc = textureLod(hdri, vec2(u, v), 0.0).rgb;
+		float hl = dot(hc, vec3(0.2126, 0.7152, 0.0722));
+		hc *= min(1.0, hdri_clamp / max(hl, 1e-4));
+		float wband = 1.0 - smoothstep(0.03, ey, d.y);
+		hc = mix(hc, hdri_band, wband);
+		c = hc * hdri_exposure;
+		// A small sun disc for the camera (the radiance map has none: the directional light is the sun).
+		if (AT_CUBEMAP_PASS == false && mu > 0.99996) c += vec3(18.0, 16.0, 13.0);
+	}
 	// Clouds.
-	if (h > 0.012) {
+	if (!use_hdri && h > 0.012) {
 		vec2 sxz = normalize(sun.xz + vec2(1e-4));
 		float haze_k = 1.0 - exp(-0.045 / (h + 0.01));   // far clouds fade into the horizon haze
 		// Cirrus veil: stretched streaks, thin, high.
@@ -81,7 +109,7 @@ void sky() {
 	}
 	// Below the horizon: the horizon haze (the fog samples this radiance over distant ground, so
 	// fogged land meets the sky without a band); the ground colour only far below.
-	if (h < 0.0) c = mix(horizon, ground, smoothstep(0.25, 0.9, -h));
+	if (h < 0.0 && !use_hdri) c = mix(horizon, ground, smoothstep(0.25, 0.9, -h));
 	// With altitude the blue sky thins out to black; the sun and the horizon glow remain.
 	c *= 1.0 - 0.985 * space * (1.0 - pow(mu, 80.0));
 	// Thin bright limb of the atmosphere just above the Earth's edge, seen from space (illustrative).

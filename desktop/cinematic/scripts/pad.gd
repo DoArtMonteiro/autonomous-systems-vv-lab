@@ -27,9 +27,8 @@ static func build(parent: Node3D, pack, cx: float, cy: float) -> Node3D:
 			hi = maxf(hi, gz)
 	var decal := Decal.new()
 	decal.name = "PadSlab"
-	decal.texture_albedo = _tex("pad_albedo.png")
-	decal.texture_normal = _tex("pad_normal.png")
-	decal.texture_orm = _tex("pad_orm.png")
+	# Markings, joints, cracks and staining only: the slab is scanned concrete in the terrain shader.
+	decal.texture_albedo = _tex("pad_marks.png")
 	decal.size = Vector3(EXTENT, (hi - lo) + 10.0, EXTENT)
 	decal.position = Vector3(cx, (hi + lo) / 2.0, -cy)
 	decal.upper_fade = 0.1

@@ -8,6 +8,8 @@ render_mode unshaded, blend_mix, depth_draw_never, cull_disabled, shadows_disabl
 
 uniform float logical_t = 0.0;
 uniform float strength = 1.0;
+uniform float alpha_k = 1.0;   // weight of this shell (the shells are nested: outer, middle, core)
+uniform float seed = 0.0;      // its own noise
 uniform vec3 hot : source_color = vec3(1.0, 0.82, 0.45);
 uniform vec3 warm : source_color = vec3(0.95, 0.30, 0.06);
 
@@ -24,8 +26,8 @@ vec3 safe_n(vec3 n) {
 void fragment() {
 	float t = clamp(UV.y, 0.0, 1.0);
 	float ang = UV.x * 6.28318;
-	float streak = n2(vec2(cos(ang) * 4.0 + sin(ang) * 4.0 + ang * 2.0, t * 5.0 - logical_t * 16.0));
-	float billow = n2(vec2(ang * 2.4 + 4.0, t * 3.0 - logical_t * 9.0));
+	float streak = n2(vec2(cos(ang) * 4.0 + sin(ang) * 4.0 + ang * 2.0 + seed, t * 5.0 - logical_t * 16.0 + seed * 1.7));
+	float billow = n2(vec2(ang * 2.4 + 4.0 + seed, t * 3.0 - logical_t * 9.0));
 	float rim = 0.7 + 0.3 * clamp(abs(dot(safe_n(NORMAL), normalize(VIEW))), 0.0, 1.0);
 	float radial = pow(1.0 - t, 0.8);
 	float a = rim * radial * (0.4 + 0.9 * streak) * (0.6 + 0.6 * billow) * strength;
@@ -33,5 +35,5 @@ void fragment() {
 	ALBEDO = mix(mix(warm, hot, heat), vec3(1.0, 0.95, 0.75), pow(1.0 - t, 4.0) * 0.8 * streak);
 	// The foot of the flame, next to the engines, is solid and bright.
 	a = max(a * 1.4, 0.85 * (1.0 - smoothstep(0.0, 0.28, t)) * (0.45 + 0.55 * streak));
-	ALPHA = clamp(a, 0.0, 0.95);
+	ALPHA = clamp(a * alpha_k, 0.0, 0.95);
 }

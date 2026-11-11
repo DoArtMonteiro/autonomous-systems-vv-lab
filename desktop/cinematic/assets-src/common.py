@@ -1,6 +1,7 @@
 """Shared helpers of the Blender asset scripts (run inside Blender: blender --factory-startup --background --python <script>).
 
-Everything is generated from code with fixed seeds: no downloaded asset, no randomness without a
+Everything these scripts write is generated from code with fixed seeds (the CC0 files in
+assets/cc0 are separate, with their own provenance): no downloaded asset in the scripts, no randomness without a
 seed, so running a script twice gives byte-identical files (the build checks this).
 """
 

@@ -2,8 +2,7 @@
 
     blender --factory-startup --background --python build_pad.py -- <out dir>
 
-Writes pad_albedo.png (RGBA, alpha = the slab's soft edge), pad_normal.png and pad_orm.png (G rough,
-B metal) for a decal of 80 x 80 m centred on the pad centre (2048 px: 3.9 cm per texel), and
+Writes pad_marks.png (RGBA: markings, joints, cracks, exhaust staining and oil, alpha where they are) for a decal of 80 x 80 m centred on the pad centre (2048 px: 3.9 cm per texel), and
 pad_props.glb: a floodlight mast, a flush edge light and a tall marker. Everything is generated from
 code with fixed seeds. The geometry of the real pad is not modelled: this is an illustration whose
 rings (landing radius 10 m, keep-out 50 m) come from the run record and are drawn separately.
@@ -97,9 +96,17 @@ def textures(out):
     hgt = -(joint * 1.0 + crack * 0.7) * 0.8 + (fine - 0.5) * 0.12 + (mottle - 0.5) * 0.05
     nrm = C.normal_from_height(hgt, 3.0)
     nrm = np.concatenate([nrm, np.ones((N, N, 1), np.float32)], axis=-1)
-    for name, arr, cs in (("pad_albedo", rgba, "sRGB"), ("pad_normal", nrm, "Non-Color"), ("pad_orm", orm, "Non-Color")):
-        img = C.make_image(name, arr, cs, "PNG")
-        save(img, os.path.join(out, name + ".png"))
+    # The slab itself is the scanned worn concrete drawn by the terrain shader (CC0, assets/cc0); this
+    # decal carries only what is painted or spilled on it: markings, joints, cracks, exhaust staining
+    # and oil, as colour with an alpha (white paint where painted, dark elsewhere).
+    dark = np.array([0.03, 0.03, 0.035], np.float32)
+    a_paint = np.clip(paint, 0.0, 1.0)
+    a_dark = np.clip(0.85 * scorch + 0.7 * oil + 0.35 * joint + 0.6 * crack, 0.0, 0.92) * slab
+    a_tot = a_paint + a_dark * (1.0 - a_paint)
+    col_m = (pc[None, None, :] * a_paint[..., None] + dark[None, None, :] * (a_dark * (1.0 - a_paint))[..., None]) / np.maximum(a_tot[..., None], 1e-4)
+    marks = np.concatenate([C.srgb(np.clip(col_m, 0, 1)), a_tot[..., None]], axis=-1)
+    img = C.make_image("pad_marks", marks, "sRGB", "PNG")
+    save(img, os.path.join(out, "pad_marks.png"))
 
 
 def props(out):

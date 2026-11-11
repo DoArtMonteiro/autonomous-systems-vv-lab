@@ -49,7 +49,7 @@ static func _mesh(v: PackedVector3Array, nv: PackedVector3Array, cv: PackedColor
 	return m
 
 
-static func build(pack, parent: Node3D, settings: Dictionary) -> Dictionary:
+static func build(pack, parent: Node3D, settings: Dictionary, pad := Vector2.ZERO, extra := []) -> Dictionary:
 	var stats := {"buildings": 0, "lidar_structures": 0, "structures": 0, "trees": 0, "shrubs": 0, "drawn_vegetation": 0, "tiles": 0}
 	var group := Node3D.new()
 	group.name = "WorldLayer"
@@ -57,7 +57,7 @@ static func build(pack, parent: Node3D, settings: Dictionary) -> Dictionary:
 	if pack.features != null:
 		_buildings(pack, group, stats)
 	if not pack.vegetation.is_empty():
-		_vegetation(pack, group, settings, stats)
+		_vegetation(pack, group, settings, stats, pad, extra)
 	return {"group": group, "stats": stats}
 
 
@@ -253,7 +253,9 @@ static func leaf_texture() -> ImageTexture:
 	return ImageTexture.create_from_image(img)
 
 
-static func _vegetation(pack, group: Node3D, st: Dictionary, stats: Dictionary) -> void:
+static func _vegetation(pack, group: Node3D, st: Dictionary, stats: Dictionary, pad := Vector2.ZERO, extra := []) -> void:
+	# Scanned plants and rocks in the near field (CC0); the plants they replace are skipped below.
+	var replaced: Dictionary = preload("res://scripts/scan_veg.gd").build(pack, group, st, stats, pad, extra)
 	var veg: Dictionary = pack.vegetation
 	var density: float = st.get("vegetation_density", 1.0)
 	var lod_near: float = st.get("lod_near_m", 700.0)
@@ -285,6 +287,8 @@ static func _vegetation(pack, group: Node3D, st: Dictionary, stats: Dictionary) 
 	card_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	var tiles := {}
 	for i in veg["n"]:
+		if replaced.has(i):
+			continue
 		var x: float = veg["x"][i]
 		var y: float = veg["y"][i]
 		var hx := int(round(x * 10.0))

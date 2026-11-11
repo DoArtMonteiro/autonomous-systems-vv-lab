@@ -64,6 +64,54 @@ static func _mipmapped(tex: Texture2D, normal := false) -> Texture2D:
 	return ImageTexture.create_from_image(img)
 
 
+static var hull_tex_max := 1024      # side of the hull scans (set from the profile before build)
+static var _hull := {}
+
+
+# The scanned hull (CC0, assets/cc0/hull): white painted metal, black paint, dirty metal, as texture
+# arrays; empty when a file cannot be read (the baked material is then kept).
+static func _hull_arrays() -> Dictionary:
+	if not _hull.is_empty():
+		return _hull
+	var side := mini(hull_tex_max, 1024)
+	var sets := ["Metal016", "Metal027", "Metal046B"]
+	var alb := []
+	var nrm := []
+	var rgh := []
+	for s in sets:
+		alb.append("cc0/hull/%s/%s_albedo.jpg" % [s, s])
+		nrm.append("cc0/hull/%s/%s_normal_gl.jpg" % [s, s])
+		rgh.append("cc0/hull/%s/%s_roughness.jpg" % [s, s])
+	var met := ["cc0/hull/Metal016/Metal016_metalness.jpg", "cc0/hull/Metal016/Metal016_metalness.jpg", "cc0/hull/Metal046B/Metal046B_metalness.jpg"]
+	var a = Assets.texture_array(alb, side)
+	var n = Assets.texture_array(nrm, side, true)
+	var r = Assets.texture_array(rgh, side)
+	var m = Assets.texture_array(met, side)
+	if a == null or n == null or r == null or m == null:
+		return {}
+	_hull = {"alb": a, "nrm": n, "rgh": r, "met": m}
+	return _hull
+
+
+# Hull material over the baked skin textures of `base` (a StandardMaterial3D with the Blender skin),
+# or null.
+static func _hull_material(base: StandardMaterial3D) -> ShaderMaterial:
+	var h := _hull_arrays()
+	if h.is_empty():
+		return null
+	var sm := ShaderMaterial.new()
+	sm.resource_name = "SkinScanned"
+	sm.shader = load("res://shaders/hull.gdshader")
+	sm.set_shader_parameter("mod_alb", base.albedo_texture)
+	sm.set_shader_parameter("mod_orm", base.roughness_texture)
+	sm.set_shader_parameter("mod_nrm", base.normal_texture)
+	sm.set_shader_parameter("hull_alb", h["alb"])
+	sm.set_shader_parameter("hull_nrm", h["nrm"])
+	sm.set_shader_parameter("hull_rgh", h["rgh"])
+	sm.set_shader_parameter("hull_met", h["met"])
+	return sm
+
+
 static func _finish_materials(root: Node) -> void:
 	for n in root.find_children("*", "MeshInstance3D", true, false):
 		var mesh: Mesh = n.mesh
@@ -80,6 +128,9 @@ static func _finish_materials(root: Node) -> void:
 				m.clearcoat_enabled = true
 				m.clearcoat = 0.2
 				m.clearcoat_roughness = 0.35
+				var hm := _hull_material(m)
+				if hm != null:
+					mesh.surface_set_material(i, hm)
 			elif m.resource_name == "Titanium" or m.resource_name == "Steel":
 				m.cull_mode = BaseMaterial3D.CULL_DISABLED
 			elif m.resource_name == "Engine":
@@ -100,6 +151,13 @@ static func build(vehicle: Node3D) -> Dictionary:
 	var out := build_plume(body)
 	out["body"] = body
 	out["model"] = model
+	out["hull_mat"] = null
+	if model != null:
+		for n in model.find_children("*", "MeshInstance3D", true, false):
+			for i in n.mesh.get_surface_count():
+				var m = n.mesh.surface_get_material(i)
+				if m is ShaderMaterial and m.resource_name == "SkinScanned":
+					out["hull_mat"] = m
 	return out
 
 
@@ -206,6 +264,11 @@ static func set_plume(s: Dictionary, length: float, logical_t: float, clear_m :=
 	var on := length > 0.0
 	s["plume"].visible = on
 	s["light"].visible = on
+	# Exhaust light on the lower hull: the recorded throttle, strongest near the ground.
+	var hm = s.get("hull_mat")
+	if hm != null:
+		hm.set_shader_parameter("hot", (clampf(throttle, 0.0, 1.0) * (0.35 + 0.65 * clampf(1.0 - clear_m / 60.0, 0.0, 1.0))) if on else 0.0)
+		hm.set_shader_parameter("logical_t", logical_t)
 	if not on:
 		return
 	# The axial flame stops at the ground (it would otherwise be drawn inside the terrain): the

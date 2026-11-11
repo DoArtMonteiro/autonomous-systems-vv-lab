@@ -7,7 +7,7 @@
 # the playback reaches the end of the run (V shows them earlier).
 extends RefCounted
 
-const ILLUSTRATIVE := "Illustrative, not data: stage geometry (42 m), landing pad, lights and masts, ground texture within 320 m of the pad, plume and exhaust, glow and dust, crown shapes, scrub colour and foliage cards, building walls and roofs, sky, haze, water finish, ground beyond the pack."
+const ILLUSTRATIVE := "Illustrative, not data: stage geometry (42 m), landing pad, lights and masts, ground texture and boulders near the pad, scanned plants (their positions and sizes are the pack's), HDRI sky, plume and exhaust, glow and dust, crown shapes, scrub colour and foliage cards, building walls and roofs, sky, haze, water finish, ground beyond the pack."
 const ILLUSTRATIVE_ASCENT := "Illustrative, not data: vehicle shapes (from the record's visual block), body axis drawn along the recorded velocity (no attitude is simulated), plume and exhaust, glow and dust, landing pad and lights, the Earth beyond the pack as a plain sphere with no geography, atmosphere, sky and haze."
 const DATA_ASCENT := "Data: each entity's position, altitude, speed and throttle from the record (interpolated between its samples for display); an entity exists from its first to its last sample; terrain and imagery of the pad's surroundings from the validated pack. Nothing here is simulated."
 const DATA := "Data: stage pose from the record (interpolated for display), throttle, verdicts; terrain, imagery, footprints, heights, plant positions from the validated pack. Nothing here is simulated."

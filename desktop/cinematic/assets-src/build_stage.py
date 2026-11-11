@@ -56,9 +56,9 @@ def skin_textures():
     soot = np.clip(base * (0.25 + 1.05 * streak) + 0.30 * np.clip(1.0 - (zz - 2.5) / 5.0, 0, 1) + 0.55 * np.clip(streak2 - 0.62, 0, 1) * np.clip(1.0 - (zz - 3.0) / 30.0, 0, 1), 0.0, 0.93)
     # Light drip stains from the seams, all along the tank.
     drip = np.clip(C.fbm(H, W, 4, 90, 15, 3) - 0.6, 0.0, 1.0) * in_tank
-    paint = np.array([0.60, 0.61, 0.62], np.float32)
+    paint = np.array([1.0, 1.0, 1.0], np.float32)   # the skin texture is a MODULATION of the scanned paint (CC0 hull sets, shaders/hull.gdshader)
     dirt = np.clip((C.fbm(H, W, 3, 120, 17, 3) - 0.52) * 2.2, 0.0, 0.45) * in_tank * (0.5 + 0.7 * C.fbm(H, W, 5, 3, 18, 3))
-    sootc = np.array([0.050, 0.045, 0.040], np.float32)
+    sootc = np.array([0.075, 0.068, 0.060], np.float32)
     albedo = paint[None, None, :] * (1.0 + pt + (micro - 0.5) * 0.05 + (mid - 0.5) * 0.06)[..., None]
     albedo = albedo * (1.0 - 0.22 * groove[..., None]) * (1.0 - 0.10 * bolt[..., None]) * (1.0 - 0.35 * drip[..., None]) * (1.0 - 0.55 * dirt[..., None])
     # Baked ambient occlusion: dark strips beside the four stowed legs and under the grid-fin hinges.
@@ -73,16 +73,16 @@ def skin_textures():
     # Engine section (below the tank): scorched dark metal with a bronze heat tint.
     eng = (1.0 - C.smoothstep(TANK0 - 0.1, TANK0 + 0.05, zz))
     heat = np.array([0.20, 0.12, 0.07], np.float32)
-    ec = np.array([0.085, 0.080, 0.075], np.float32)[None, None, :] * (0.7 + 0.9 * micro[..., None])
-    ec = ec + heat[None, None, :] * (C.fbm(H, W, 5, 12, 16, 3)[..., None] * 0.5) * np.clip(1.0 - zz / 2.6, 0, 1)[..., None]
+    ec = np.ones(3, np.float32)[None, None, :] * (0.75 + 0.5 * micro[..., None])
+    ec = ec * (1.0 + np.array([0.45, 0.0, -0.35], np.float32)[None, None, :] * (C.fbm(H, W, 5, 12, 16, 3)[..., None] * 0.8) * np.clip(1.0 - zz / 2.6, 0, 1)[..., None])
     albedo = albedo * (1.0 - eng[..., None]) + ec * eng[..., None]
     # Interstage (above the tank): matte black with faint wear.
     top = C.smoothstep(TANK1 - 0.05, TANK1 + 0.05, zz)
-    black = np.array([0.028, 0.029, 0.032], np.float32)[None, None, :] * (0.8 + 0.8 * micro[..., None] + 0.5 * mid[..., None])
+    black = np.ones(3, np.float32)[None, None, :] * (0.8 + 0.3 * micro[..., None] + 0.2 * mid[..., None])
     albedo = albedo * (1.0 - top[..., None]) + black * top[..., None]
     # Separation ring: a pale band at the top of the tank.
     ring = (1.0 - C.smoothstep(0.02, 0.06, np.abs(zz - (TANK1 - 0.18)))) * 0.25
-    albedo = albedo * (1.0 - ring[..., None]) + np.array([0.12, 0.12, 0.13], np.float32) * ring[..., None]
+    albedo = albedo * (1.0 - ring[..., None]) + np.array([0.35, 0.35, 0.35], np.float32) * ring[..., None]
     albedo = np.clip(albedo, 0.0, 1.0)
     rgba = np.concatenate([C.srgb(albedo), np.ones((H, W, 1), np.float32)], axis=-1)
     # Roughness (G) and metallic (B): satin paint, rougher where sooted, metal-ish in the engine section.
