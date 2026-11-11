@@ -48,22 +48,33 @@ static func build(parent: Node3D, pack, cx: float, cy: float) -> Node3D:
 	lamp.emission_enabled = true
 	lamp.emission = Color(1.0, 0.85, 0.6)
 	lamp.emission_energy_multiplier = 1.4
-	var place := func(src: Node3D, x: float, y: float, yaw: float) -> void:
+	var place := func(src: Node3D, x: float, y: float, yaw: float) -> Node3D:
 		if src == null:
-			return
+			return null
 		var n: Node3D = src.duplicate()
 		n.position = Vector3(x, pack.ground(x, y), -y)
 		n.rotation.y = yaw
 		root.add_child(n)
 		for gi in n.find_children("*", "GeometryInstance3D", true, false):
 			gi.layers = 2
+			gi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+		return n
 	for k in 24:
 		var a := TAU * k / 24.0
 		place.call(edge, cx + 35.0 * cos(a), cy + 35.0 * sin(a), a)
 	for k in 4:
 		# Masts and markers keep clear of the closeup camera's line of sight (bearing 38 degrees).
 		var a := deg_to_rad(100.0) + k * PI / 2.0
-		place.call(mast, cx + 46.0 * cos(a), cy + 46.0 * sin(a), -a)
+		var mn: Node3D = place.call(mast, cx + 46.0 * cos(a), cy + 46.0 * sin(a), -a)
+		if mn != null:
+			# The lamp head lights the pad with a real (warm, short range) light.
+			var lt := OmniLight3D.new()
+			lt.position = Vector3(0, 15.7, 0)
+			lt.light_color = Color(1.0, 0.86, 0.62)
+			lt.light_energy = 3.0
+			lt.omni_range = 22.0
+			lt.light_volumetric_fog_energy = 0.0
+			mn.add_child(lt)
 		place.call(marker, cx + 47.0 * cos(a + PI / 4.0), cy + 47.0 * sin(a + PI / 4.0), -a)
 	# Lamp heads and edge lights glow (emission authored here: the glTF files carry no light data).
 	for n in root.find_children("*", "MeshInstance3D", true, false):

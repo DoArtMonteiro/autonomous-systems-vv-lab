@@ -21,11 +21,14 @@ var bench_t0 := NAN
 var bench_t1 := NAN
 var play := false
 var controls := true
+var presentation := false
+var has_camera_pose := false
+var camera_pose: PackedFloat64Array = PackedFloat64Array()  # east, north, up of the eye; of the target; vertical fov in degrees
 var error := ""
 
 
 static func usage() -> String:
-	return "usage: -- --run <run dir> [--env <pack dir>] [--pose-dump t1,t2,...] [--profile auto|performance|balanced|high|ultra|custom] [--custom key=value,...] [--vram-bytes N] [--camera director|follow|pad|closeup|wide|overhead] [--t seconds] [--play] [--controls shown|hidden] [--shot out.png] [--bench out.json --bench-seconds S --bench-from T --bench-to T]"
+	return "usage: -- --run <run dir> [--env <pack dir>] [--pose-dump t1,t2,...] [--profile auto|performance|balanced|high|ultra|custom] [--custom key=value,...] [--vram-bytes N] [--camera director|follow|pad|closeup|wide|overhead] [--t seconds] [--play] [--controls shown|hidden] [--presentation] [--camera-pose ex,ey,ez,tx,ty,tz,fov] [--shot out.png] [--bench out.json --bench-seconds S --bench-from T --bench-to T]"
 
 
 static func parse(args: PackedStringArray) -> RefCounted:
@@ -33,7 +36,7 @@ static func parse(args: PackedStringArray) -> RefCounted:
 	var i := 0
 	while i < args.size():
 		var k := args[i]
-		var needs_value := k in ["--run", "--env", "--pose-dump", "--profile", "--custom", "--vram-bytes", "--camera", "--t", "--shot", "--bench", "--bench-seconds", "--bench-from", "--bench-to", "--controls"]
+		var needs_value := k in ["--run", "--env", "--pose-dump", "--profile", "--custom", "--vram-bytes", "--camera", "--t", "--shot", "--bench", "--bench-seconds", "--bench-from", "--bench-to", "--controls", "--camera-pose"]
 		var v := ""
 		if needs_value:
 			if i + 1 >= args.size():
@@ -94,6 +97,22 @@ static func parse(args: PackedStringArray) -> RefCounted:
 				c.bench_t1 = v.to_float()
 			"--play":
 				c.play = true
+			"--presentation":
+				c.presentation = true
+			"--camera-pose":
+				var parts := v.split(",", false)
+				if parts.size() != 7:
+					c.error = "--camera-pose takes seven numbers: eye east,north,up; target east,north,up; vertical fov in degrees"
+					return c
+				for part in parts:
+					if not part.strip_edges().is_valid_float():
+						c.error = "--camera-pose takes seven numbers separated by commas"
+						return c
+					c.camera_pose.append(part.strip_edges().to_float())
+				if c.camera_pose[6] < 1.0 or c.camera_pose[6] > 120.0:
+					c.error = "--camera-pose fov must be between 1 and 120 degrees"
+					return c
+				c.has_camera_pose = true
 			"--controls":
 				if not (v in ["shown", "hidden"]):
 					c.error = "--controls takes shown or hidden"

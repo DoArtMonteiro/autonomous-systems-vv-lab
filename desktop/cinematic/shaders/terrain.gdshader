@@ -23,6 +23,12 @@ uniform vec3 land_avg : source_color = vec3(0.2);
 uniform vec3 water_avg : source_color = vec3(0.05, 0.08, 0.1);
 uniform float edge_fade_m = 2500.0;
 uniform float beyond_sea = 0.5;  // fraction of the pack edge that is sea: one neutral colour beyond
+// Near the pad (within about 320 m) the photograph's tint is toned down and a procedural ground
+// (sand, dry scrub, grain, a fine normal and varied roughness) is blended over it, so the ground
+// reads as ground and not as a smooth pale surface. Deterministic: functions of position only.
+uniform vec2 pad_xy = vec2(0.0);
+uniform float near_inner_m = 60.0;
+uniform float near_outer_m = 320.0;
 
 varying vec2 v_xy;
 varying float v_sea;
@@ -59,6 +65,23 @@ void fragment() {
 		float gn = vnoise(v_xy * 2.3) * 0.55 + vnoise(v_xy * 7.9) * 0.3 + vnoise(v_xy * 23.0) * 0.15;
 		c *= 1.0 + gk * (gn - 0.5) * 2.0;
 	}
+	float near_k = 1.0 - smoothstep(near_inner_m, near_outer_m, length(v_xy - pad_xy));
+	float gn1 = vnoise(v_xy * 0.05);
+	float gn2 = vnoise(v_xy * 0.31 + 9.0);
+	float gn3 = vnoise(v_xy * 1.7 + 3.0);
+	float gn4 = vnoise(v_xy * 7.0 + 1.0);
+	if (near_k > 0.0 && role != 0) {
+		float l_ph = dot(c, vec3(0.2126, 0.7152, 0.0722));
+		c = mix(c, vec3(l_ph), 0.7 * near_k);   // the photograph's pink and orange tints
+		vec3 sand = vec3(0.52, 0.42, 0.29);
+		vec3 scrub = vec3(0.26, 0.29, 0.14);
+		vec3 dry = vec3(0.42, 0.36, 0.26);
+		vec3 g = mix(sand, scrub, smoothstep(0.45, 0.7, gn1 * 0.6 + gn2 * 0.5));
+		g = mix(g, dry, 0.5 * gn2);
+		g *= 0.7 + 0.3 * gn3 + 0.2 * gn4;
+		float rel = clamp(l_ph / 0.4, 0.55, 1.35);   // keep the photograph's light and dark layout
+		c = mix(c, g * (0.6 + 0.4 * rel), 0.72 * near_k);
+	}
 	// Aerial photographs are exposed brightly: bring them towards ground albedos, and clamp the
 	// brightest surfaces (concrete, sand) to an albedo of about 0.55 so they do not read white.
 	c *= 0.8;
@@ -72,6 +95,11 @@ void fragment() {
 	c = mix(c, c * 0.7 + vec3(0.0, 0.006, 0.01), water);
 	ALBEDO = c;
 	ROUGHNESS = mix(mix(0.92, 0.45, edge_e * beyond_sea), 0.05, water);
+	if (near_k > 0.0 && role != 0) {
+		ROUGHNESS = mix(ROUGHNESS, 0.72 + 0.25 * gn3, near_k);
+		float fine = near_k * (1.0 - smoothstep(60.0, 260.0, dist));
+		NORMAL = normalize(NORMAL + vec3(gn3 - 0.5, gn4 - 0.5, 0.0) * 0.9 * fine);
+	}
 	SPECULAR = mix(0.35, 0.5, water);
 	if (water > 0.01) {
 		// Illustrative ripple on the water normal, driven by the record time (no wall clock).

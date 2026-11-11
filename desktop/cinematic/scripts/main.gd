@@ -148,6 +148,10 @@ func _build() -> void:
 	env.background_mode = Environment.BG_SKY
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	# A less blue fill: shadows keep form without turning blue (the sky colour is only part of it).
+	env.ambient_light_sky_contribution = 0.55
+	env.ambient_light_color = Color(0.62, 0.58, 0.52)
+	env.ambient_light_energy = 0.9
 	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
 	env.tonemap_mode = Environment.TONE_MAPPER_AGX
 	env.tonemap_exposure = 0.92
@@ -210,6 +214,9 @@ func _build() -> void:
 	Profiles.apply(settings, get_viewport(), env, sun)
 	# Terrain, world layer and stage.
 	terrain = Terrain.build(pack, self)
+	var pad_c: Dictionary = record.pad()
+	for m in terrain.get("materials", []):
+		m.set_shader_parameter("pad_xy", Vector2(pad_c["cx"], pad_c["cy"]))
 	world = World.build(pack, self, settings)
 	stage = Stage.build(vehicle)
 	for n in vehicle.find_children("*", "MeshInstance3D", true, false):
@@ -239,11 +246,12 @@ func _build() -> void:
 	hud.profile_menu.item_selected.connect(func(i): _switch_profile(all_profiles[i], "Chosen in the menu"))
 	notes.append(profile_reason)
 	_update_note()
-	mode = cli.camera
+	mode = "explicit" if cli.has_camera_pose else cli.camera
 	t = cli.start_t if not is_nan(cli.start_t) else record.t0()
 	playing = cli.play
 	hud.set_camera(mode)
 	hud.set_controls_visible(cli.controls)
+	hud.set_presentation(cli.presentation)
 	_track_lines()
 	_set_time(t)
 	print("cinematic: scene built in %d ms (profile %s: %s)" % [(Time.get_ticks_usec() - t_build) / 1000, profile_name, profile_reason])
@@ -284,6 +292,8 @@ func _switch_profile(name: String, reason: String) -> void:
 
 # Rings of the record's pad (R5 landing radius, S2 keep-out), draped on the terrain: data overlays.
 func _pad_rings() -> void:
+	if cli.presentation:
+		return
 	var p: Dictionary = record.pad()
 	for spec in [[p["land"], Color(0.35, 0.85, 0.55), 0.35], [p["keep"], Color(0.95, 0.45, 0.35), 0.4]]:
 		var r: float = spec[0]
@@ -310,6 +320,8 @@ func _pad_rings() -> void:
 # Data overlays for reading height: the nozzle-plane track draped on the terrain (record) and a
 # drop line from the stage to the ground under it.
 func _track_lines() -> void:
+	if cli.presentation:
+		return
 	var im := ImmediateMesh.new()
 	im.surface_begin(Mesh.PRIMITIVE_LINE_STRIP)
 	var ids: Array = record.nozzle_ids
@@ -442,6 +454,12 @@ func _observer() -> Vector3:
 
 # Pose {pos, target, fov} (ENU) of camera rule `m` at the current playback state.
 func pose(m: String) -> Dictionary:
+	if m == "explicit":
+		# An exact eye, target and field of view given on the command line (ENU metres, degrees).
+		var cp: PackedFloat64Array = cli.camera_pose
+		var eye := Vector3(cp[0], cp[1], cp[2])
+		var tgt := Vector3(cp[3], cp[4], cp[5])
+		return {"pos": eye, "target": tgt, "fov": cp[6], "dof": eye.distance_to(tgt)}
 	if m == "director":
 		return pose(director_shot if director_shot != "" else director_pick())
 	var aim := _aim()
@@ -648,6 +666,10 @@ func _save_shot() -> void:
 	meta["file"] = cli.shot_path.get_file()
 	meta["camera"] = mode
 	meta["shot"] = director_shot
+	var fwd := -camera.global_transform.basis.z
+	meta["camera_eye_enu"] = [_enu(camera.position).x, _enu(camera.position).y, _enu(camera.position).z]
+	meta["camera_dir_enu"] = [_enu(fwd).x, _enu(fwd).y, _enu(fwd).z]
+	meta["camera_fov"] = camera.fov
 	print("SHOT " + JSON.stringify(meta))
 	get_tree().quit(0 if err == OK else 1)
 

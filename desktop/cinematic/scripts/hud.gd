@@ -7,7 +7,7 @@
 # the playback reaches the end of the run (V shows them earlier).
 extends RefCounted
 
-const ILLUSTRATIVE := "Illustrative, not data: stage geometry (42 m), landing pad, lights and masts, plume and exhaust, glow and dust, crown shapes and foliage cards, building walls and roofs, sky, haze, water finish, ground beyond the pack."
+const ILLUSTRATIVE := "Illustrative, not data: stage geometry (42 m), landing pad, lights and masts, ground texture within 320 m of the pad, plume and exhaust, glow and dust, crown shapes, scrub colour and foliage cards, building walls and roofs, sky, haze, water finish, ground beyond the pack."
 const DATA := "Data: stage pose from the record (interpolated for display), throttle, verdicts; terrain, imagery, footprints, heights, plant positions from the validated pack. Nothing here is simulated."
 const MARGIN := 18
 
@@ -176,6 +176,24 @@ func build(root: Node, record, pack, t0: float, t1: float, profiles: Array, came
 	note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row2.add_child(note)
 	layer.add_child(bar)
+
+
+# Presentation: hides the engineering panels (readout, verdicts, legend, playback bar) and keeps
+# the attribution line and one small permanent line saying that the picture is an illustration.
+func set_presentation(on: bool) -> void:
+	if not on:
+		return
+	for c in layer.get_children():
+		if c != credit_line:
+			c.visible = false
+	var l := _label(10, Color(0.9, 0.92, 0.95))
+	l.text = "Illustrative replay of a recorded run"
+	_anchor(l, 0, 1, 0, 1)
+	l.offset_left = MARGIN
+	l.offset_right = MARGIN + 400
+	l.offset_top = -MARGIN - 16
+	l.offset_bottom = -MARGIN
+	layer.add_child(l)
 
 
 func set_controls_visible(on: bool) -> void:

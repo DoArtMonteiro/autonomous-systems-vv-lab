@@ -56,11 +56,19 @@ def skin_textures():
     soot = np.clip(base * (0.25 + 1.05 * streak) + 0.30 * np.clip(1.0 - (zz - 2.5) / 5.0, 0, 1) + 0.55 * np.clip(streak2 - 0.62, 0, 1) * np.clip(1.0 - (zz - 3.0) / 30.0, 0, 1), 0.0, 0.93)
     # Light drip stains from the seams, all along the tank.
     drip = np.clip(C.fbm(H, W, 4, 90, 15, 3) - 0.6, 0.0, 1.0) * in_tank
-    paint = np.array([0.80, 0.81, 0.82], np.float32)
+    paint = np.array([0.60, 0.61, 0.62], np.float32)
     dirt = np.clip((C.fbm(H, W, 3, 120, 17, 3) - 0.52) * 2.2, 0.0, 0.45) * in_tank * (0.5 + 0.7 * C.fbm(H, W, 5, 3, 18, 3))
     sootc = np.array([0.050, 0.045, 0.040], np.float32)
     albedo = paint[None, None, :] * (1.0 + pt + (micro - 0.5) * 0.05 + (mid - 0.5) * 0.06)[..., None]
     albedo = albedo * (1.0 - 0.22 * groove[..., None]) * (1.0 - 0.10 * bolt[..., None]) * (1.0 - 0.35 * drip[..., None]) * (1.0 - 0.55 * dirt[..., None])
+    # Baked ambient occlusion: dark strips beside the four stowed legs and under the grid-fin hinges.
+    ao = np.zeros((H, W), np.float32)
+    for k in range(4):
+        du = np.abs(((uu - k * 0.25 + 0.5) % 1.0) - 0.5)
+        ao = np.maximum(ao, np.exp(-(du / 0.035) ** 2) * ((zz > 3.0) & (zz < 14.6)))
+        du2 = np.abs(((uu - (0.125 + k * 0.25) + 0.5) % 1.0) - 0.5)
+        ao = np.maximum(ao, 0.8 * np.exp(-(du2 / 0.05) ** 2) * ((zz > 38.3) & (zz < 40.6)))
+    albedo = albedo * (1.0 - 0.4 * ao[..., None])
     albedo = albedo * (1.0 - soot[..., None]) + sootc[None, None, :] * soot[..., None] * (0.7 + 0.6 * micro[..., None])
     # Engine section (below the tank): scorched dark metal with a bronze heat tint.
     eng = (1.0 - C.smoothstep(TANK0 - 0.1, TANK0 + 0.05, zz))
@@ -78,8 +86,8 @@ def skin_textures():
     albedo = np.clip(albedo, 0.0, 1.0)
     rgba = np.concatenate([C.srgb(albedo), np.ones((H, W, 1), np.float32)], axis=-1)
     # Roughness (G) and metallic (B): satin paint, rougher where sooted, metal-ish in the engine section.
-    rough = 0.30 + 0.45 * soot + 0.18 * groove + 0.10 * (micro - 0.5) + 0.35 * eng + 0.25 * top
-    metal = np.clip(0.55 * eng + 0.10 * groove, 0.0, 1.0)
+    rough = 0.24 + 0.55 * (mid - 0.5) + 0.45 * soot + 0.20 * groove + 0.14 * (micro - 0.5) + 0.35 * eng + 0.25 * top
+    metal = np.clip(0.22 * eng + 0.05 * groove, 0.0, 1.0)
     orm = np.stack([np.ones_like(rough), np.clip(rough, 0.05, 1.0), metal, np.ones_like(rough)], axis=-1)
     hgt = -(groove * 1.0 + bolt * 0.4) + (micro - 0.5) * 0.05
     nrm = C.normal_from_height(hgt, 6.0)

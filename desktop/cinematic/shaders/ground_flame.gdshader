@@ -8,7 +8,7 @@ render_mode unshaded, blend_mix, depth_draw_never, cull_disabled, shadows_disabl
 
 uniform float logical_t = 0.0;
 uniform float strength = 1.0;
-uniform vec3 hot : source_color = vec3(1.0, 0.72, 0.32);
+uniform vec3 hot : source_color = vec3(1.0, 0.82, 0.45);
 uniform vec3 warm : source_color = vec3(0.95, 0.30, 0.06);
 
 float h21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -26,10 +26,12 @@ void fragment() {
 	float ang = UV.x * 6.28318;
 	float streak = n2(vec2(cos(ang) * 4.0 + sin(ang) * 4.0 + ang * 2.0, t * 5.0 - logical_t * 16.0));
 	float billow = n2(vec2(ang * 2.4 + 4.0, t * 3.0 - logical_t * 9.0));
-	float rim = 0.45 + 0.55 * clamp(abs(dot(safe_n(NORMAL), normalize(VIEW))), 0.0, 1.0);
-	float radial = pow(1.0 - t, 1.5) * smoothstep(0.0, 0.1, t);
-	float a = rim * radial * (0.35 + 0.95 * streak) * (0.65 + 0.55 * billow) * strength;
-	float heat = clamp(pow(1.0 - t, 1.4) * 1.5 + (streak - 0.5) * 0.4, 0.0, 1.0);
-	ALBEDO = mix(warm, hot, heat);
-	ALPHA = clamp(a * 1.25, 0.0, 0.9);
+	float rim = 0.7 + 0.3 * clamp(abs(dot(safe_n(NORMAL), normalize(VIEW))), 0.0, 1.0);
+	float radial = pow(1.0 - t, 0.8);
+	float a = rim * radial * (0.4 + 0.9 * streak) * (0.6 + 0.6 * billow) * strength;
+	float heat = clamp(pow(1.0 - t, 1.1) * 1.7 + (streak - 0.5) * 0.5, 0.0, 1.0);
+	ALBEDO = mix(mix(warm, hot, heat), vec3(1.0, 0.95, 0.75), pow(1.0 - t, 4.0) * 0.8 * streak);
+	// The foot of the flame, next to the engines, is solid and bright.
+	a = max(a * 1.4, 0.85 * (1.0 - smoothstep(0.0, 0.28, t)) * (0.45 + 0.55 * streak));
+	ALPHA = clamp(a, 0.0, 0.95);
 }

@@ -30,13 +30,14 @@ float density(vec3 p, bool detail) {
 	float rr = length(p.xz);
 	if (rr >= 1.0 || p.y < 0.0 || p.y > half_height * 2.0) return 0.0;
 	float yy = p.y;
-	float body = smoothstep(1.0, 0.45, rr) * exp(-yy / (half_height * 0.7)) * smoothstep(0.0, 0.5 * half_height, yy);
+	// A ring of dust thrown outwards (the axis itself is flame, not dust), low and soft at the top.
+	float body = smoothstep(1.0, 0.5, rr) * smoothstep(0.08, 0.4, rr) * exp(-yy / (half_height * 0.8)) * smoothstep(0.0, 0.5 * half_height, yy) * (1.0 - smoothstep(1.0 * half_height, 2.0 * half_height, yy));
 	// Outward flow: the noise field slides away from the axis and rises slowly with the record time.
 	vec2 dir = p.xz / max(rr, 1e-3);
 	vec3 q = vec3(p.x - dir.x * logical_t * 0.9, p.y * 1.7 - logical_t * 0.25, p.z - dir.y * logical_t * 0.9) * 2.7;
 	float n = noise3(q) * 0.55 + noise3(q * 2.1 + 7.3) * 0.3;
 	if (detail) n += noise3(q * 4.4 + 2.2) * 0.15; else n += 0.075;
-	float d = body * smoothstep(0.34, 0.62, n + 0.26 * (1.0 - rr));
+	float d = body * smoothstep(0.40, 0.58, n + 0.22 * (1.0 - rr));
 	return d * strength;
 }
 

@@ -156,19 +156,39 @@ static func build(vehicle: Node3D) -> Dictionary:
 	glow.position = Vector3(0, -0.6, 0)
 	glow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	plume.add_child(glow)
+	# One small hot glow per engine (camera-facing), strongest when the nozzles are at the ground.
+	var eglows := []
+	for sp in spots:
+		var em := StandardMaterial3D.new()
+		em.albedo_texture = gm.albedo_texture
+		em.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		em.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		em.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		em.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+		em.albedo_color = Color(1.0, 0.8, 0.5)
+		em.disable_fog = true
+		var eq := QuadMesh.new()
+		eq.size = Vector2(2.4, 2.4)
+		var eg := MeshInstance3D.new()
+		eg.mesh = eq
+		eg.material_override = em
+		eg.position = Vector3(sp.x, -0.5, sp.y)
+		eg.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		plume.add_child(eg)
+		eglows.append(eg)
 	var light := OmniLight3D.new()
 	light.light_color = Color(1.0, 0.7, 0.4)
 	light.omni_range = 120.0
 	light.omni_attenuation = 1.6
 	light.position = Vector3(0, -6, 0)
-	light.shadow_enabled = false
+	light.shadow_enabled = false   # switched on near the ground (set_plume), where there is something to shadow
 	# The plume light must not light the volumetric fog (it made a glowing ball in the haze).
 	light.light_volumetric_fog_energy = 0.0
 	body.add_child(light)
 	var materials := [outer_arr[1], core_arr[1], haze_arr[1]]
 	materials.append_array(jet_materials)
 	return {"body": body, "plume": plume, "outer": outer_arr[0], "outer_mat": outer_arr[1], "core": core_arr[0], "core_mat": core_arr[1],
-		"haze": haze_arr[0], "haze_mat": haze_arr[1], "jets": jets, "jet_mats": jet_materials, "glow": glow, "light": light,
+		"haze": haze_arr[0], "haze_mat": haze_arr[1], "eglows": eglows, "jets": jets, "jet_mats": jet_materials, "glow": glow, "light": light,
 		"materials": materials, "model": model}
 
 
@@ -194,6 +214,10 @@ static func set_plume(s: Dictionary, length: float, logical_t: float, clear_m :=
 	var gk: float = 1.0 if clear_m > 20.0 else clampf(clear_m / 20.0, 0.2, 1.0)
 	s["glow"].material_override.albedo_color = Color(1.0, 0.78, 0.55) * (0.30 + 0.30 * throttle) * maxf(gk, 0.8)
 	s["light"].light_energy = 6.0 * minf(1.0, length / 28.0)
+	s["light"].shadow_enabled = clear_m < 120.0
+	var near_k: float = clampf(1.0 - clear_m / 60.0, 0.0, 1.0)
+	for eg in s["eglows"]:
+		eg.material_override.albedo_color = Color(1.0, 0.8, 0.5) * (0.25 + 0.9 * near_k) * (0.5 + 0.5 * throttle)
 
 
 static func _set_shell(mi: MeshInstance3D, mat: ShaderMaterial, length: float, radius: float, params: Dictionary) -> void:

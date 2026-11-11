@@ -336,6 +336,11 @@ static func _vegetation(pack, group: Node3D, st: Dictionary, stats: Dictionary) 
 				var col := Color(minf(1.0, r0 * k * (1.0 + 0.25 * hs)), minf(1.0, g0 * k * (1.0 + 0.08 * hs)), minf(1.0, b0 * k * (1.0 - 0.3 * hs)))
 				if kind == "tree1":
 					col = col.darkened(0.2)
+				if kind.begins_with("shrub"):
+					# Scrub reads as scrub, not as dark rocks, where the photograph under it is bare
+					# soil: pull the colour towards a dry olive green (illustrative; position, height
+					# and crown radius are the pack's).
+					col = col.lerp(Color(0.19, 0.22, 0.08) * (0.8 + 0.5 * hash2(hx + 3, hy + 5)), 0.65)
 				mm_near.set_instance_color(j, col)
 			stats["trees" if kind.begins_with("tree") else "shrubs"] += ids.size()
 			var parts := [["core", crown_mat, 0.0, lod_near, shadows_near], ["far", crown_mat, lod_near, lod_far, false]]
