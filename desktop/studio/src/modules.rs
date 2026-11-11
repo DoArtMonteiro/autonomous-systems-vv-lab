@@ -112,6 +112,9 @@ pub struct ModulesInner {
     pub root: PathBuf,
     /// The launched Cinematic View, if any. Install, uninstall and launch take this lock first.
     child: Mutex<Option<Child>>,
+    /// Held for the whole of an install (picker, copy, dialog, swap) and by an uninstall, so the
+    /// two never run together and never share the staging folder. Taken with `try_lock`.
+    op: Mutex<()>,
     /// The last successful full check, so the player does not hash the whole module each time it
     /// is built. A change of the manifest or the folder invalidates it; the launch always checks
     /// every file again.
@@ -133,6 +136,7 @@ impl Modules {
         Self(Arc::new(ModulesInner {
             root,
             child: Mutex::new(None),
+            op: Mutex::new(()),
             checked: Mutex::new(None),
         }))
     }
@@ -166,9 +170,17 @@ impl ModulesInner {
         s
     }
 
+    /// Starts an install or an uninstall; refused while another one is in progress.
+    fn begin_op(&self) -> Result<std::sync::MutexGuard<'_, ()>, PlatformError> {
+        self.op
+            .try_lock()
+            .map_err(|_| invalid("an install or uninstall of the module is in progress"))
+    }
+
     /// Removes the module unless the Cinematic View runs. The lock is held through the removal, so
     /// no launch can start on a half-removed module.
     fn uninstall_guarded(&self) -> Result<Status, PlatformError> {
+        let _op = self.begin_op()?;
         let mut slot = self.child.lock().map_err(err)?;
         ensure_not_running(
             &mut slot,
@@ -926,6 +938,16 @@ pub async fn cinematic_install_from_file(
     let modules = state.modules.clone();
     let log = state.paths.log.clone();
     blocking(move || {
+        // One install or uninstall at a time, from before the picker to the end.
+        let _op = modules.begin_op()?;
+        // Refused up front when the view runs; the check after the confirmation is the one that
+        // counts, because the view can be started while the user reads the dialog.
+        if let Ok(mut slot) = modules.child.try_lock() {
+            ensure_not_running(
+                &mut slot,
+                "the Cinematic View is open; close it before installing or replacing the module",
+            )?;
+        }
         let picked = app
             .dialog()
             .file()
@@ -1569,6 +1591,45 @@ mod tests {
         fs::create_dir_all(root.join(".old-1").join("0.0.1")).unwrap();
         recover_aside(&root);
         assert!(!root.join("0.0.1").exists());
+        let _ = fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn an_operation_in_progress_refuses_an_uninstall_and_a_second_install() {
+        let d = tmp("op");
+        let root = d.join("modules").join("cinematic");
+        let m = Modules::new(root.clone());
+        install(&root, &build_version(&d, "0.1.0", b"MZ one")).unwrap();
+        let guard = m.begin_op().unwrap();
+        for e in [
+            m.uninstall_guarded().unwrap_err().to_string(),
+            m.begin_op().unwrap_err().to_string(),
+        ] {
+            assert!(e.contains("in progress"), "{e}");
+        }
+        assert!(status_of(&root).verified, "the module is untouched");
+        drop(guard);
+        assert!(!m.uninstall_guarded().unwrap().installed);
+        let _ = fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn a_failing_confirmation_stops_the_install_and_keeps_the_module() {
+        let d = tmp("conferr");
+        let root = d.join("modules").join("cinematic");
+        install(&root, &build_version(&d, "0.1.0", b"MZ one")).unwrap();
+        let zp = build_version(&d, "0.2.0", b"MZ two");
+        let e = install_zip(&root, &zp, &|_| Err(invalid("the view is open")))
+            .unwrap_err()
+            .to_string();
+        assert!(e.contains("the view is open"), "{e}");
+        let s = status_of(&root);
+        assert!(s.verified && s.version.as_deref() == Some("0.1.0"), "{s:?}");
+        assert_eq!(
+            fs::read_dir(&root).unwrap().count(),
+            1,
+            "staging is removed and nothing else is left"
+        );
         let _ = fs::remove_dir_all(&d);
     }
 
