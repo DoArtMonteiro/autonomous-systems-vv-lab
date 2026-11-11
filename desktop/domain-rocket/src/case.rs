@@ -12,20 +12,48 @@ pub const DURATION_S: f64 = 40.0;
 
 const TEMPLATE_M9: &str = include_str!("../../../crates/vv-rocket/landing/nominal.json");
 const TEMPLATE_M91: &str = include_str!("../../../crates/vv-rocket/landing/m91-nominal.json");
+// M17 vehicle presets: exploratory (case schema v2) templates with the M9 initial state, sensors,
+// requirements and gains and another vehicle. See docs/m17-experiment-lab.md.
+const TEMPLATE_HEAVY: &str = include_str!("../cases/heavy-return.json");
+const TEMPLATE_LIGHT: &str = include_str!("../cases/light-lander.json");
 
 pub const M9: &str = "m9-landing";
 pub const M91: &str = "m91-landing";
+pub const HEAVY: &str = "heavy-return-landing";
+pub const LIGHT: &str = "light-lander-landing";
+
+/// Case schema of an exploratory case (vv-rocket `LANDING_SCHEMA_V2`).
+pub const EXPLORATORY_SCHEMA: &str = "vv-rocket-landing.v2";
+
+/// A parameter that sets a value the pre-registered (v1) case pins: changing one makes the case
+/// exploratory (schema v2), which the simulator accepts only within its bounded ranges.
+pub fn pins_registered_value(id: &str) -> bool {
+    matches!(
+        id,
+        "initial_altitude_m"
+            | "initial_downrange_m"
+            | "initial_crossrange_m"
+            | "initial_vertical_velocity_mps"
+            | "initial_horizontal_velocity_mps"
+            | "altimeter_sigma_m"
+            | "gnss_position_sigma_m"
+            | "landing_zone_radius_m"
+            | "contact_vertical_speed_limit_mps"
+    )
+}
 
 pub fn template(scenario: &str) -> Result<Value, String> {
     let text = match scenario {
         M9 => TEMPLATE_M9,
         M91 => TEMPLATE_M91,
+        HEAVY => TEMPLATE_HEAVY,
+        LIGHT => TEMPLATE_LIGHT,
         other => return Err(format!("unknown scenario {other}")),
     };
     serde_json::from_str(text).map_err(|e| format!("template of {scenario}: {e}"))
 }
 
-/// Where a parameter lives in the case: the controller gains.
+/// Where a parameter lives in the case. A numeric key indexes an array.
 pub fn parameter_path(id: &str) -> Option<&'static [&'static str]> {
     Some(match id {
         "ignition_fraction" => &["controller", "gains", "ignition_fraction"],
@@ -36,6 +64,15 @@ pub fn parameter_path(id: &str) -> Option<&'static [&'static str]> {
         "altimeter_residual_threshold_m" => {
             &["controller", "gains", "altimeter_residual_threshold_m"]
         }
+        "initial_altitude_m" => &["initial", "position_m", "2"],
+        "initial_downrange_m" => &["initial", "position_m", "0"],
+        "initial_crossrange_m" => &["initial", "position_m", "1"],
+        "initial_vertical_velocity_mps" => &["initial", "velocity_mps", "2"],
+        "initial_horizontal_velocity_mps" => &["initial", "velocity_mps", "0"],
+        "altimeter_sigma_m" => &["sensors", "altimeter_sigma_m"],
+        "gnss_position_sigma_m" => &["sensors", "gnss_position_sigma_m"],
+        "landing_zone_radius_m" => &["requirements", "r5_position_m"],
+        "contact_vertical_speed_limit_mps" => &["requirements", "r1_vertical_speed_mps"],
         _ => return None,
     })
 }
@@ -139,7 +176,11 @@ pub fn case_bytes(request: &RunRequest) -> Result<Vec<u8>, String> {
         }
         let mut node = &mut case;
         for key in path {
-            node = node.get_mut(*key).ok_or_else(|| {
+            let next = match key.parse::<usize>() {
+                Ok(index) => node.get_mut(index),
+                Err(_) => node.get_mut(*key),
+            };
+            node = next.ok_or_else(|| {
                 format!(
                     "parameter {id} does not exist in the case of {}",
                     request.scenario
@@ -147,6 +188,9 @@ pub fn case_bytes(request: &RunRequest) -> Result<Vec<u8>, String> {
             })?;
         }
         *node = number(*value);
+        if pins_registered_value(id) {
+            case["schema"] = json!(EXPLORATORY_SCHEMA);
+        }
     }
     serde_json::to_vec(&case).map_err(|e| e.to_string())
 }

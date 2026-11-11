@@ -274,6 +274,8 @@ fn record_for(request: &RunRequest, trace: &Trace) -> RunRecord {
         }],
         scene: json!({ "kind": "none" }),
         notes: vec!["Reference domain: proves the contract, makes no physical claim.".into()],
+        entities: None,
+        mission: None,
     }
 }
 
@@ -298,6 +300,7 @@ fn int_param(id: &str, label: &str, unit: &str, range: (f64, f64), default: f64)
         step: 1.0,
         default,
         integer: true,
+        influences: Vec::new(),
     }
 }
 

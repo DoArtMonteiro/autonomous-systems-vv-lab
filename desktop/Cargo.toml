@@ -5,6 +5,7 @@ resolver = "3"
 members = [
     "platform",
     "domain-rocket",
+    "domain-ascent",
     "domain-ground",
     "domain-reference",
     "geo",

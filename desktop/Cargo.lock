@@ -4155,6 +4155,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "vv-ascent"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
+name = "vv-domain-ascent"
+version = "0.15.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "vv-ascent",
+ "vv-platform",
+]
+
+[[package]]
 name = "vv-domain-ground"
 version = "0.15.0"
 dependencies = [
@@ -4212,10 +4231,11 @@ dependencies = [
 
 [[package]]
 name = "vv-studio"
-version = "0.16.2"
+version = "0.17.0"
 dependencies = [
  "serde",
  "serde_json",
+ "sha2",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
@@ -4223,6 +4243,8 @@ dependencies = [
  "tauri-plugin-single-instance",
  "vv-geo",
  "vv-platform",
+ "windows-sys 0.61.2",
+ "zip",
 ]
 
 [[package]]

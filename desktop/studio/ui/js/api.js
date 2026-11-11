@@ -50,8 +50,14 @@ export const api = {
   environmentFile: (id, file) => invoke('environment_file', { id, file }),
   geoTrack: (id, runId) => invoke('geo_track', { id, runId }),
   importEnvironment: () => invoke('import_environment'),
+  importEnvironmentPackage: () => invoke('import_environment_package'),
   removeEnvironment: (id) => invoke('remove_environment', { id }),
   revealEnvironments: () => invoke('reveal_environments'),
+  // M17 Cinematic View module: status, install from a module zip (its SHA-256 is shown for confirmation first), uninstall, launch by ids.
+  cinematicStatus: () => invoke('cinematic_status'),
+  cinematicInstallFromFile: () => invoke('cinematic_install_from_file'),
+  cinematicUninstall: () => invoke('cinematic_uninstall'),
+  cinematicLaunch: (runId, envId) => invoke('cinematic_launch', { runId, envId }),
 };
 
 let reporting = false;

@@ -163,9 +163,10 @@ def analyst(s):
     s.page.click("#view-missions [data-experience='lying-altimeter'] [data-action='launch']")
     s.wait_player("lying-altimeter")
     s.page.click(".pl-head-actions [data-action='configure']")
-    s.wait("window.__studio.view() === 'prepare'", 10)
-    txt = s.js("document.querySelector('#view-prepare').innerText")
-    check("Analyst: Change the conditions opens the request in Configure", "Configure a run" in txt and "Altimeter bias" in txt and s.js("document.querySelector('#view-prepare input[type=text], #view-prepare input:not([type])') !== null"))
+    # M17: Change the conditions opens the shown run in the Experiment Lab (Configure stays in the nav).
+    s.wait("window.__studio.view() === 'lab' && document.querySelector('.lab-base')", 30)
+    txt = s.js("document.querySelector('#view-lab').innerText")
+    check("Analyst: Change the conditions opens the run in the Experiment Lab", "What would change this outcome?" in txt and "Altimeter bias" in txt)
     s.shot("m15-configure-from-player-dark")
 
 

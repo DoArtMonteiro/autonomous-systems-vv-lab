@@ -1,0 +1,42 @@
+{
+  "schema": "vv-domain-manifest.v1",
+  "id": "launch-ascent",
+  "name": "Two-stage launch ascent",
+  "version": "0.15.0",
+  "description": "Deterministic planar ascent of an exploratory two-stage launcher to a target orbit: pitch programme and gravity turn, max-Q throttling, MECO and separation, then the booster and the upper stage integrated as separate entities (ballistic booster to impact, upper stage under explicit radial guidance to SECO and a coast). Requirements and invariants per entity and for the mission, judged on the true state; records vv-run.v2.",
+  "contract": {
+    "name": "vv-domain",
+    "major": 1,
+    "minor": 0
+  },
+  "host": {
+    "executable": "vv-domain-ascent.exe",
+    "timeout_s": 120,
+    "max_output_bytes": 1048576
+  },
+  "capabilities": ["run", "replay", "compare", "evidence"],
+  "visualisations": ["scene.ascent", "plots", "requirements", "timeline", "events"],
+  "seeds": {
+    "min": 0,
+    "max": 4294967295,
+    "protected": [
+      {
+        "start": 3000,
+        "end": 3099,
+        "reason": "M10 evaluation seeds; never run before the owner freezes the evaluation configuration. Use a development seed such as 5000 to 5099."
+      },
+      {
+        "start": 6000,
+        "end": 6099,
+        "reason": "M10 reserve seeds; never run before the owner freezes the evaluation configuration. Use a development seed such as 5000 to 5099."
+      },
+      {
+        "start": 44000,
+        "end": 44999,
+        "reason": "Reserved for a future preregistered confirmation; never run before the owner freezes and authorises that protocol. Use a development seed such as 5000 to 5099."
+      }
+    ]
+  },
+  "model_validity": "Exploratory planar 3-DOF point-mass model; the vehicles are not real vehicles and nothing is validated against flight data. Spherical non-rotating Earth with inverse-square gravity, isothermal exponential atmosphere, constant drag coefficient, no winds, no attitude dynamics, no structural loads, no engine transients, no boostback or landing burn of the booster.",
+  "user_facing": true
+}

@@ -20,13 +20,14 @@ import { experienceById, resolve, GRADES, DOMAIN_NAMES } from '../experiences.js
 import { claimStatus, forgetClaims } from '../claims.js';
 import { mountCinema } from '../scenes/rocket-cinema.js';
 import { ground2d } from '../scenes/ground.js';
-import { openRequest } from './prepare.js';
+import { sceneFor } from '../scenes/registry.js';
 import { phasesOf, divergence, readouts, hudNum, ROCKET_METRICS, KIND_WORD, metricValue } from '../session.js';
 import { mountGeo } from '../scenes/geo.js';
 import { listEnvironments, loadPack, trackOf, mb } from '../environments.js';
 import { buildControl } from './control.js';
 import { sourcesInfo } from '../sources-info.js';
 import { openCatalogue } from '../env-catalogue.js';
+import { cinematicButton } from '../cinematic.js';
 
 let root;
 let navigate = () => {};
@@ -248,7 +249,7 @@ function phaseAt(t) {
 
 function sceneNote() {
   const rocket = pl.kind === 'rocket-3d';
-  const note = h('div', { class: 'pl-scene-note', id: 'pl-scene-note' });
+  const note = h('div', { class: ['pl-scene-note', pl.kind === 'ascent' ? 'is-entity' : ''], id: 'pl-scene-note' });
   if (wantGeo()) {
     const env = pl.envs.find((x) => x.id === pl.envId);
     note.classList.add('is-geo');
@@ -256,7 +257,9 @@ function sceneNote() {
   } else {
     note.append(h('p', null, rocket
       ? (pl.runs.length > 1 ? 'Shown run: true trajectory (solid), the controller’s estimated position (dashed yellow) and the stage. Other runs: their true trajectories as coloured lines. ' : 'True trajectory (solid), the controller’s estimated position (dashed yellow) and the stage. ') + 'Sampled every 0.1 s and interpolated for display; the stage body is drawn for orientation, the model has no length.'
-      : 'True paths and GPS samples, one sample per tick. Top view, x east, y north.'));
+      : pl.kind === 'ascent'
+        ? 'True trajectories of each simulated entity, from the run record: the stack until separation, then the booster and the upper stage. Point masses in a plane; the lines are samples joined for display.'
+        : 'True paths and GPS samples, one sample per tick. Top view, x east, y north.'));
     if (pl.geoError) note.append(h('p', { class: 'pl-geo-warn' }, `Geospatial view unavailable: ${pl.geoError} The engineering scene is shown instead.`));
   }
   return note;
@@ -327,7 +330,8 @@ function build() {
     h('div', { class: 'pl-head-actions' },
       h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'analyse' }, title: 'Open the shown run with every channel, requirement and its provenance', onclick: () => navigate('run', { runId: pl.runs[pl.active].runId, t: pl.cursor.t }) }, 'Analyse'),
       runs.length > 1 ? h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'compare' }, onclick: () => navigate('compare', { runIds: runs.map((r) => r.runId), demo: pl.demo }) }, 'Compare in detail') : null,
-      h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'configure' }, title: 'Open the shown run as an editable request', onclick: () => { openRequest(pl.runs[pl.active].record.request); navigate('prepare'); } }, 'Change the conditions')));
+      cinematicButton(() => pl.runs[pl.active].runId, () => pl.envId || (pl.envs[0] && pl.envs[0].id), pl.kind === 'rocket-3d'),
+      h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'configure' }, title: 'Open the shown run in the Experiment Lab: change its conditions, run a new simulation and compare', onclick: () => navigate('lab', { runId: pl.runs[pl.active].runId }) }, 'Change the conditions')));
 
   const side = h('aside', { class: 'pl-side', 'aria-label': 'Mission briefing and result' });
   const transport = buildTransport();
@@ -355,6 +359,11 @@ function mountEngineering(viewport, models, colours) {
   } else if (pl.kind === 'ground-2d') {
     pl.scene = models.length > 1 ? ground2d.compare(viewport, models, colours, pl.runs.map((r) => r.label), pl.cursor) : ground2d.mount(viewport, models[0], pl.cursor, { unit: pl.unit });
     pl.renderer = 'ground-2d';
+  } else if (sceneFor(pl.runs[pl.active].record)) {
+    // Any other registered scene (M17: the multi-entity ascent) is drawn from the shown run.
+    viewport.classList.add('is-2d');
+    pl.scene = sceneFor(pl.runs[pl.active].record).mount(viewport, models[pl.active], pl.cursor, { unit: pl.unit });
+    pl.renderer = pl.kind;
   } else {
     viewport.append(h('p', { class: 'pl-scene-note' }, 'This domain declares no scene; the result and the analysis are complete without one.'));
     pl.renderer = null;
@@ -441,6 +450,10 @@ function onTime(t) {
     ph.text ? h('span', { class: ['pl-phase-name', `ph-${ph.kind}`] }, ph.text) : null,
     ended ? h('span', { class: 'pl-ended small' }, `${run.label} ${ended}`) : null].filter(Boolean));
   pl.tr.range.setAttribute('aria-valuetext', `${timeText(t, pl.unit)}, ${ph.text || 'no phase'}`);
+  // Scenes other than the rocket and the ground vehicle carry their own telemetry (the ascent scene
+  // shows each entity's state), so the generic card stays hidden instead of showing wrong channels.
+  pl.dom.hud.hidden = !rocket && pl.kind !== 'ground-2d';
+  if (pl.dom.hud.hidden) { updateTransport(t); return; }
   pl.dom.hud.replaceChildren(
     h('p', { class: 'pl-hud-h' }, h('span', { class: 'pl-swatch', style: { background: run.colour } }), run.label, ph.end && td ? h('span', { class: 'pl-hud-at' }, 'at contact') : null),
     h('dl', null, readouts(run, t, rocket).map(([k, v, u, kind, title]) => h('div', { class: 'pl-hud-row', title },

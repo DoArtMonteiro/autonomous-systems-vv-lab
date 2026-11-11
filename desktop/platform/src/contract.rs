@@ -14,6 +14,9 @@ pub const MANIFEST_SCHEMA: &str = "vv-domain-manifest.v1";
 pub const CATALOG_SCHEMA: &str = "vv-domain-catalog.v1";
 pub const REQUEST_SCHEMA: &str = "vv-run-request.v1";
 pub const RECORD_SCHEMA: &str = "vv-run.v1";
+/// Multi-entity record (M17): a `vv-run.v1` record plus `entities` and `mission`. Additive: a v1
+/// record has neither field and serialises exactly as before.
+pub const RECORD_SCHEMA_V2: &str = "vv-run.v2";
 pub const REPLAY_SCHEMA: &str = "vv-run-replay.v1";
 
 /// File a domain host writes into its run directory, next to its native artifacts.
@@ -125,6 +128,10 @@ pub struct ParameterSpec {
     pub step: f64,
     pub default: f64,
     pub integer: bool,
+    /// Requirement ids this parameter is known to act on, a hand-written hint of the domain (M17).
+    /// Absent in older catalogs.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub influences: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -361,6 +368,137 @@ pub struct RunRecord {
     pub scene: Value,
     /// Caveats the UI must show next to the run.
     pub notes: Vec<String>,
+    /// `vv-run.v2` only: the entities of a multi-entity run, in creation order.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entities: Option<Vec<Entity>>,
+    /// `vv-run.v2` only: mission-level results and the declared event order.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mission: Option<MissionResult>,
+}
+
+/// One simulated entity of a `vv-run.v2` record (for example a stack that separates into a booster
+/// and an upper stage). Its data stays in the top-level lists, so every v1 view still works; the
+/// entity names which of them are its own.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct Entity {
+    pub id: String,
+    pub label: String,
+    /// Domain kind, e.g. stack, booster, upper_stage.
+    pub kind: String,
+    /// Entity this one separated from; `None` for a root entity.
+    pub parent: Option<String>,
+    /// Timebase of its state samples (a key of `timebases`).
+    pub timebase: String,
+    /// Instants of its first and last state sample.
+    pub t_start: f64,
+    pub t_end: f64,
+    /// Why its history ends (separated, surface impact, end of simulated time...).
+    pub end_reason: String,
+    /// Ids of its state channels in `channels`.
+    pub channels: Vec<String>,
+    /// Indices into `events` of the events of this entity, ascending.
+    pub events: Vec<u32>,
+    /// Ids of its requirements in `requirements`.
+    pub requirements: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct MissionResult {
+    /// Ids of the mission-level requirements in `requirements` (judged over all entities).
+    pub requirements: Vec<String>,
+    /// The total order of `events`, stated by the domain.
+    pub event_order: String,
+    pub explanation: String,
+}
+
+impl RunRecord {
+    /// Structural rules of `vv-run.v2` on top of those of v1; a v1 record must carry neither
+    /// `entities` nor `mission`.
+    pub fn check_entities(&self) -> Result<(), String> {
+        match self.schema.as_str() {
+            RECORD_SCHEMA => {
+                if self.entities.is_some() || self.mission.is_some() {
+                    return Err(format!("{RECORD_SCHEMA} carries no entities or mission"));
+                }
+                Ok(())
+            }
+            RECORD_SCHEMA_V2 => {
+                let (Some(entities), Some(mission)) = (&self.entities, &self.mission) else {
+                    return Err(format!("{RECORD_SCHEMA_V2} needs entities and mission"));
+                };
+                if entities.is_empty() {
+                    return Err("a multi-entity record needs at least one entity".into());
+                }
+                let req_ids: Vec<&str> = self.requirements.iter().map(|r| r.id.as_str()).collect();
+                let mut owned: Vec<&str> = Vec::new();
+                for (i, e) in entities.iter().enumerate() {
+                    if entities[..i].iter().any(|x| x.id == e.id) {
+                        return Err(format!("entity {} is repeated", e.id));
+                    }
+                    if let Some(p) = &e.parent
+                        && !entities[..i].iter().any(|x| &x.id == p)
+                    {
+                        return Err(format!(
+                            "entity {} names a parent not listed before it",
+                            e.id
+                        ));
+                    }
+                    if !self.timebases.contains_key(&e.timebase) {
+                        return Err(format!("entity {} names an unknown timebase", e.id));
+                    }
+                    if !e.t_start.is_finite() || !e.t_end.is_finite() || e.t_start > e.t_end {
+                        return Err(format!("entity {} ends before it starts", e.id));
+                    }
+                    for c in &e.channels {
+                        match self.channels.iter().find(|x| &x.id == c) {
+                            None => {
+                                return Err(format!("entity {} names unknown channel {c}", e.id));
+                            }
+                            Some(x) if x.timebase != e.timebase => {
+                                return Err(format!(
+                                    "channel {c} is not on the timebase of entity {}",
+                                    e.id
+                                ));
+                            }
+                            Some(_) => {}
+                        }
+                    }
+                    if e.events.windows(2).any(|w| w[0] >= w[1])
+                        || e.events.iter().any(|&k| k as usize >= self.events.len())
+                    {
+                        return Err(format!(
+                            "entity {} event indices are not ascending and in range",
+                            e.id
+                        ));
+                    }
+                    for r in &e.requirements {
+                        if !req_ids.contains(&r.as_str()) {
+                            return Err(format!("entity {} names unknown requirement {r}", e.id));
+                        }
+                        owned.push(r);
+                    }
+                }
+                for r in &mission.requirements {
+                    if !req_ids.contains(&r.as_str()) {
+                        return Err(format!("mission names unknown requirement {r}"));
+                    }
+                    owned.push(r);
+                }
+                owned.sort_unstable();
+                let mut all = req_ids.clone();
+                all.sort_unstable();
+                if owned != all {
+                    return Err(
+                        "every requirement belongs to exactly one entity or to the mission".into(),
+                    );
+                }
+                Ok(())
+            }
+            other => Err(format!("unknown record schema {other}")),
+        }
+    }
 }
 
 // ------------------------------------------------------------------ replay (host `replay`)

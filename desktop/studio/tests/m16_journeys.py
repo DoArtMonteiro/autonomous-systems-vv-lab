@@ -144,6 +144,8 @@ def sources_control(s):
     check("Sources: the short credit of every source that asks for one stays on the map (Copernicus, Sentinel, OpenStreetMap); public-domain sources that ask for none (NGA) are in the panel only", "Copernicus" in note and "Sentinel" in note and "OpenStreetMap" in note and "NGA" not in note, note[:200].replace("\n", " "))
     size = s.js("parseFloat(getComputedStyle(document.querySelector('.si-credit')).fontSize)")
     check("Sources: the credit is at least 11 px", size >= 11, f"{size} px")
+    panel = s.js("document.querySelector('#pl-scene-note .si-panel').textContent")
+    check("Sources: the panel holds every notice", "Copernicus" in panel and "Sentinel" in panel and "NGA" in panel)
     hgt = s.js("document.getElementById('pl-scene-note').getBoundingClientRect().height")
     check("Sources: the closed control takes little room (under 80 px tall)", hgt < 80, f"{hgt:.0f} px")
     check("Sources: the panel is closed by default", not panel_open(s))

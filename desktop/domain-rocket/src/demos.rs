@@ -51,6 +51,11 @@ fn gnss_bias_late() -> Vec<FaultRequest> {
     vec![fault("gnss_bias", Some(9.72), 0.02, 40.0)]
 }
 
+fn with_lateral_gain(mut r: RunRequest, gain: f64) -> RunRequest {
+    r.parameters.insert("lateral_position_gain".into(), gain);
+    r
+}
+
 fn with_threshold(mut r: RunRequest, threshold_m: f64) -> RunRequest {
     r.parameters
         .insert("altimeter_residual_threshold_m".into(), threshold_m);
@@ -148,6 +153,18 @@ pub fn demos() -> Vec<Demo> {
                 "Events: the altimeter is rejected only with the 1 m threshold",
             ]),
             expectation: "Threshold 3 m: hard landing, unsafe, R1 vertical speed and S5 no powered ascent fail. Threshold 1 m: hard landing, safe, only R5 position fails.".into(),
+        },
+        Demo {
+            id: "soft-but-off-pad".into(),
+            title: "Soft, but off the pad: a lateral guidance tuned too gently".into(),
+            narrative: "The robust controller with its lateral position gain lowered from 0.12 to 0.04 per second, no fault. The stage brakes as it should and touches down at about 1.7 m/s, well inside the 3 m/s of R1, but its guidance pulls it toward the pad centre too slowly: it lands about 19 m away, outside the 10 m of R5. Open it in the Experiment Lab to change the gain or the tilt cap, run a new simulation and check whether the setting that lands on the pad holds on other seeds.".into(),
+            requests: vec![with_lateral_gain(request(M9, "robust", 5000, vec![]), 0.04)],
+            look_at: look(&[
+                "Vertical speed at contact: about 1.7 m/s against the 3 m/s limit of R1",
+                "Distance from pad centre at contact: about 19 m against the 10 m of R5",
+                "Safety stays safe: missing the pad is a mission requirement, not a safety invariant, while the stage stays inside the 50 m keep-out radius",
+            ]),
+            expectation: "Hard landing, safe, only R5 position fails.".into(),
         },
     ]
 }

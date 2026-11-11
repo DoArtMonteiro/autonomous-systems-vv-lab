@@ -1,0 +1,56 @@
+PASS Explorer: Home is the first screen
+PASS Explorer: Home says what the product does  [AUTONOMOUS SYSTEMS V&V LAB
+
+Watch autonomous systems work, fail, and show you why.
+
+Simula]
+PASS Explorer: Home has one primary action to a first landing
+PASS Explorer: one click from Home to a landing on screen  [0.3 s]
+PASS Explorer: the landing plays by itself
+PASS Explorer: readouts are labelled as true state, estimate or derived  [Robust controller  T Altitude 2150 m T Descent rate 219.2 m/s T Horizontal speed 9.79 m/s T Tilt 1.36 ° T Throttle 0.00 ]
+PASS Explorer: the phase is shown  [Engine off]
+PASS Explorer: the result is hidden until the end
+PASS Explorer: the result says the stage landed safely  [[["landed", "safe"]]]
+PASS Explorer: the result explains why
+PASS Explorer: next mission is the faulted variation
+PASS Explorer: the variation has two runs to compare
+PASS Explorer: the scene switches to the second run
+PASS Explorer: baseline lands hard, robust lands  [[["hard_landing", "safe"], ["landed", "safe"]]]
+PASS Explorer: the difference is located in time
+PASS Explorer: a failed requirement names expected and observed
+PASS Analyst: Analyse opens the shown run with full telemetry
+PASS Analyst: Compare in detail opens the matrix of both runs
+PASS Analyst: Change the conditions opens the run in the Experiment Lab
+PASS Library: the Challenge a claim filter shows the claim-backed missions  [3]
+PASS Researcher: registered bias fails R5 only, later smaller bias fails R1  [[["hard_landing", "safe"], ["hard_landing", "safe"]]]
+PASS Researcher: the finding is labelled exploratory
+PASS Researcher: the claim behind the mission can be challenged  [CHALLENGE THIS CLAIM
+
+“The guarded M9.1 controller touches down within R1 (vertical speed at most 3 m/s) when the GNSS position is biased by 5 to 30 m, whenever]
+PASS Researcher: Challenge this claim opens that claim in Investigate  [G3 under a late GNSS bias]
+PASS Researcher: the claim page explains what a challenge does
+PASS Researcher: the mitigation trades an unsafe hard landing for an R5 failure  [[["hard_landing", "unsafe"], ["hard_landing", "safe"]]]
+PASS Ground: the corridor mission shows the top view
+PASS Ground: exact GPS safe, 1 mm noise unsafe, radius 250 mm safe  [[["completed", "safe"], ["incomplete", "unsafe"], ["completed", "safe"]]]
+PASS Keyboard: Space toggles playback
+PASS Keyboard: End jumps to the end and reveals the result
+PASS Keyboard: Home returns to the start
+PASS Keyboard: 1 goes Home
+PASS Layout 1024x640: home has no horizontal scroll
+PASS Layout 1024x640: missions has no horizontal scroll
+PASS Layout 1024x640: player has no horizontal scroll
+PASS Layout 1024x640: no stray null or undefined text
+PASS Layout 1024x640: every visible control has a name
+PASS Layout 1366x768: home has no horizontal scroll
+PASS Layout 1366x768: missions has no horizontal scroll
+PASS Layout 1366x768: player has no horizontal scroll
+PASS Layout 1366x768: no stray null or undefined text
+PASS Layout 1366x768: every visible control has a name
+PASS Layout 1920x1080: home has no horizontal scroll
+PASS Layout 1920x1080: missions has no horizontal scroll
+PASS Layout 1920x1080: player has no horizontal scroll
+PASS Layout 1920x1080: no stray null or undefined text
+PASS Layout 1920x1080: every visible control has a name
+PASS no script error or console error
+
+48 of 48 checks passed; screenshots in <scratch>\m15i
