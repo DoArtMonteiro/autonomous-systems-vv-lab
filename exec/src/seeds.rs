@@ -355,7 +355,8 @@ mod tests {
         let desktop = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../desktop");
         for domain in ["domain-ascent", "domain-ground", "domain-rocket"] {
             let path = desktop.join(domain).join("domain.json");
-            let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+            let text = std::fs::read_to_string(&path)
+                .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
             let manifest: serde_json::Value = serde_json::from_str(&text).unwrap();
             let hits: Vec<(u64, u64)> = manifest["seeds"]["protected"]
                 .as_array()
