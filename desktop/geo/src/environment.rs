@@ -14,6 +14,7 @@
 //! Packs are built by `scripts/geo/build_environment.py` with PROJ; recomputing their check points
 //! here is a test of two independent implementations against each other.
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -37,6 +38,16 @@ const MAX_MANIFEST_BYTES: u64 = 256 * 1024;
 const MAX_HEIGHT_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_IMAGE_BYTES: u64 = 32 * 1024 * 1024;
 const MAX_EXTENT_M: f64 = 50_000.0;
+/// Most texels of one decoded image (8192 x 8192): the web view allocates four bytes each.
+const MAX_IMAGE_PIXELS: usize = 8192 * 8192;
+/// Most vertices of one height grid (about 2049 x 2049): the web view keeps four bytes each.
+const MAX_GRID_VERTICES: usize = 4_200_000;
+/// Limits of the descriptive text the interface shows from a manifest.
+const MAX_SOURCES: usize = 32;
+const MAX_SOURCE_TEXT: usize = 2_000;
+const MAX_CREDIT: usize = 300;
+const MAX_ACCURACY_NOTES: usize = 32;
+const MAX_NOTE: usize = 2_000;
 /// Tolerance for the recomputed check points (m).
 pub const CHECK_TOLERANCE_M: f64 = 1e-3;
 
@@ -78,6 +89,23 @@ struct Manifest {
     layers: Vec<Layer>,
     sources: Vec<Source>,
     checks: Vec<Check>,
+    // Descriptive facts the interface shows. Typed here so a manifest with another kind of value
+    // is rejected, and re-emitted from these fields only (see `summary_of`).
+    #[serde(default)]
+    site_note: Option<String>,
+    #[serde(default)]
+    relief: Option<Vec<Relief>>,
+    #[serde(default)]
+    accuracy: Option<Vec<String>>,
+    #[serde(default)]
+    built: Option<BTreeMap<String, Value>>,
+}
+
+#[derive(Deserialize, Serialize)]
+struct Relief {
+    radius_m: f64,
+    min_up_m: f64,
+    max_up_m: f64,
 }
 
 #[derive(Deserialize)]
@@ -136,6 +164,13 @@ struct Source {
     product: String,
     licence: String,
     attribution: String,
+    /// Short credit shown on the map; falls back to the attribution.
+    #[serde(default)]
+    credit: Option<String>,
+    #[serde(default)]
+    access: Option<String>,
+    #[serde(default)]
+    layer: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -325,6 +360,12 @@ fn read_grid(dir: &Path, h: &Height, extent: f64, name: &str) -> Result<(Grid, V
     if !(2..=4097).contains(&h.columns) || !(2..=4097).contains(&h.rows) {
         return invalid(format!("{name}: grid size outside 2..4097"));
     }
+    if h.columns * h.rows > MAX_GRID_VERTICES {
+        return invalid(format!(
+            "{name}: {}x{} vertices is more than {MAX_GRID_VERTICES}",
+            h.columns, h.rows
+        ));
+    }
     let s = finite(h.spacing_m, "height spacing")?;
     if !(0.25..=1000.0).contains(&s) || finite(h.scale_m, "height scale")? <= 0.0 {
         return invalid(format!("{name}: spacing or scale out of range"));
@@ -370,6 +411,12 @@ fn read_image(dir: &Path, im: &Image, extent: f64, name: &str) -> Result<Vec<u8>
     if im.file != name || !(16..=16384).contains(&im.columns) || !(16..=16384).contains(&im.rows) {
         return invalid(format!(
             "the image must be {name}, 16 to 16384 texels a side"
+        ));
+    }
+    if im.columns * im.rows > MAX_IMAGE_PIXELS {
+        return invalid(format!(
+            "{name}: {}x{} texels is more than {MAX_IMAGE_PIXELS}",
+            im.columns, im.rows
         ));
     }
     let sp = finite(im.spacing_m, "image spacing")?;
@@ -509,6 +556,24 @@ impl Environment {
                 "every source must name its provider, product, licence and attribution",
             );
         }
+        check_descriptive(&m)?;
+        // Building footprints are derived from OpenStreetMap: the ODbL requires that the database
+        // keep its attribution and licence, so the pack must carry a source that says so, and the
+        // credit the Studio puts on the map must name OpenStreetMap.
+        if wm.features.is_some()
+            && !m.sources.iter().any(|x| {
+                x.licence.contains("ODbL")
+                    && x.attribution.contains("OpenStreetMap")
+                    && x.credit
+                        .as_deref()
+                        .unwrap_or(&x.attribution)
+                        .contains("OpenStreetMap")
+            })
+        {
+            return invalid(
+                "a pack with building footprints needs a source whose licence names the ODbL and whose attribution and credit name OpenStreetMap",
+            );
+        }
 
         let frame = Enu::new(
             Geodetic::new(o.lat_deg, o.lon_deg, o.h_ellipsoid_m),
@@ -572,7 +637,7 @@ impl Environment {
             }
         }
         env.worst_check_m = worst;
-        env.summary = summary_of(&full, &env);
+        env.summary = summary_of(&m, &full, &env);
         Ok(env)
     }
 
@@ -691,27 +756,105 @@ impl Environment {
     }
 }
 
-fn summary_of(full: &Value, env: &Environment) -> Value {
+/// Bounds on the descriptive text the interface shows: sources, accuracy notes, relief and build
+/// facts. Types are enforced by deserialisation; this bounds sizes and refuses control characters.
+fn check_descriptive(m: &Manifest) -> Result<(), GeoError> {
+    let bad = |what: &str| invalid_err(format!("{what} is not valid text of bounded size"));
+    if m.sources.len() > MAX_SOURCES {
+        return invalid(format!("more than {MAX_SOURCES} sources"));
+    }
+    for s in &m.sources {
+        let credit_ok = s
+            .credit
+            .as_deref()
+            .is_none_or(|c| world::text_ok(c, MAX_CREDIT));
+        let more_ok = [s.access.as_deref(), s.layer.as_deref()]
+            .into_iter()
+            .flatten()
+            .all(|t| world::text_ok(t, MAX_SOURCE_TEXT));
+        if ![&s.provider, &s.product, &s.licence, &s.attribution]
+            .into_iter()
+            .all(|t| world::text_ok(t, MAX_SOURCE_TEXT))
+            || !credit_ok
+            || !more_ok
+        {
+            return bad("a source field");
+        }
+    }
+    if let Some(n) = &m.site_note
+        && !world::text_ok(n, 600)
+    {
+        return bad("site_note");
+    }
+    if let Some(a) = &m.accuracy
+        && (a.len() > MAX_ACCURACY_NOTES || a.iter().any(|t| !world::text_ok(t, MAX_NOTE)))
+    {
+        return bad("accuracy");
+    }
+    if let Some(r) = &m.relief
+        && (r.len() > 16
+            || r.iter().any(|x| {
+                ![x.radius_m, x.min_up_m, x.max_up_m]
+                    .iter()
+                    .all(|v| v.is_finite())
+            }))
+    {
+        return bad("relief");
+    }
+    if let Some(b) = &m.built
+        && (b.len() > 32
+            || b.iter().any(|(k, v)| {
+                !world::text_ok(k, 64)
+                    || match v {
+                        Value::String(t) => !world::text_ok(t, 200),
+                        Value::Number(_) | Value::Bool(_) => false,
+                        _ => true,
+                    }
+            }))
+    {
+        return bad("built");
+    }
+    Ok(())
+}
+
+/// The manifest facts the interface shows (no file paths), built from validated, typed fields and
+/// from the world layer's recomputed counts, never from the manifest's raw JSON.
+fn summary_of(m: &Manifest, full: &Value, env: &Environment) -> Value {
     let pick = |k: &str| full.get(k).cloned().unwrap_or(Value::Null);
+    let sources: Vec<Value> = m
+        .sources
+        .iter()
+        .map(|s| {
+            json!({
+                "provider": s.provider,
+                "product": s.product,
+                "licence": s.licence,
+                "attribution": s.attribution,
+                "credit": s.credit,
+                "access": s.access,
+                "layer": s.layer,
+            })
+        })
+        .collect();
     json!({
-        "schema": pick("schema"),
+        "schema": m.schema,
         "id": env.id,
-        "name": pick("name"),
-        "summary": pick("summary"),
-        "site_note": pick("site_note"),
+        "name": m.name,
+        "summary": m.summary,
+        "site_note": m.site_note,
         "origin": pick("origin"),
         "frame": pick("frame"),
-        "extent_m": pick("extent_m"),
+        "extent_m": m.extent_m,
         "height": pick("height"),
         "image": pick("image"),
         "layers": full.get("layers").cloned().unwrap_or_else(|| json!([])),
-        "relief": pick("relief"),
-        "accuracy": pick("accuracy"),
-        "sources": pick("sources"),
-        "built": pick("built"),
-        "world": pick("world"),
+        "relief": m.relief,
+        "accuracy": m.accuracy,
+        "sources": sources,
+        "built": m.built,
+        "world": env.world.summary,
         "bytes": env.bytes,
-        "checks": full.get("checks").and_then(Value::as_array).map(|a| a.len()).unwrap_or(0),
+        "checks": m.checks.len(),
         "worst_check_m": env.worst_check_m,
     })
 }
@@ -1133,6 +1276,13 @@ mod tests {
         let (b, l, s) = (n("buildings"), n("lidar_structures"), n("structures"));
         edit(dir, |m| {
             m["schema"] = json!(SCHEMA_V3);
+            m["sources"] = json!([
+                {"provider": "test", "product": "test", "licence": "test", "attribution": "test"},
+                {"provider": "OpenStreetMap contributors", "product": "building footprints",
+                 "licence": "Open Data Commons Open Database License (ODbL) 1.0",
+                 "attribution": "Buildings: (c) OpenStreetMap contributors, ODbL 1.0",
+                 "credit": "(c) OpenStreetMap contributors"},
+            ]);
             m["world"] = json!({
                 "features": {"file": FEATURES_FILE, "bytes": fb.len(), "sha256": sha256_hex(&fb),
                              "buildings": b, "lidar_structures": l, "structures": s},
@@ -1224,6 +1374,235 @@ mod tests {
         assert!(reason(&dir).contains("SHA-256"));
         add_world(&dir, features(), &ok_veg);
         assert!(Environment::open(&dir).is_ok());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    // ------------------------------------------------------- tampered manifests and limits
+
+    fn open_world(id: &str) -> (PathBuf, PathBuf) {
+        let (root, dir) = synthetic(id, true);
+        let veg = [
+            veg_record(100, -100, 450, 25, 1),
+            veg_record(-200, 50, 150, 12, 0),
+        ]
+        .concat();
+        add_world(&dir, features(), &veg);
+        (root, dir)
+    }
+
+    fn reason(d: &Path) -> String {
+        Environment::open(d).unwrap_err().to_string()
+    }
+
+    #[test]
+    fn the_summary_recomputes_world_counts_from_the_hashed_files() {
+        let (root, dir) = open_world("syn-w-recompute");
+        // Counts left out of the manifest are still reported, from the files.
+        let w = Environment::open(&dir).unwrap().summary()["world"].clone();
+        assert_eq!(w["features"]["height_sources"], json!({"lidar": 1}));
+        assert_eq!(w["features"]["buildings"], json!(1));
+        assert_eq!(w["vegetation"]["trees"], json!(1));
+        assert_eq!(w["vegetation"]["shrubs"], json!(1));
+        // Declared correctly (zero counts allowed), the same.
+        edit(&dir, |m| {
+            m["world"]["features"]["height_sources"] = json!({"lidar": 1, "default": 0});
+            m["world"]["vegetation"]["trees"] = json!(1);
+            m["world"]["vegetation"]["shrubs"] = json!(1);
+        });
+        assert!(Environment::open(&dir).is_ok());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn a_manifest_claiming_other_heights_or_plants_than_its_files_is_rejected() {
+        let (root, dir) = open_world("syn-w-claims");
+        // The file says the one building height is lidar. Claim two, then a default one.
+        edit(&dir, |m| {
+            m["world"]["features"]["height_sources"] = json!({"lidar": 2});
+        });
+        assert!(
+            reason(&dir).contains("sources of height"),
+            "{}",
+            reason(&dir)
+        );
+        edit(&dir, |m| {
+            m["world"]["features"]["height_sources"] = json!({"default": 1});
+        });
+        assert!(reason(&dir).contains("sources of height"));
+        edit(&dir, |m| {
+            m["world"]["features"]["height_sources"] = json!({"lidar": "many"});
+        });
+        assert!(reason(&dir).contains("world"));
+        edit(&dir, |m| {
+            m["world"]["features"]["height_sources"] = json!({"lidar": 1});
+            m["world"]["vegetation"]["trees"] = json!(500);
+        });
+        assert!(reason(&dir).contains("tree and shrub"));
+        edit(&dir, |m| {
+            m["world"]["vegetation"]["trees"] = json!(1);
+            m["world"]["vegetation"]["shrubs"] = json!(9);
+        });
+        assert!(reason(&dir).contains("tree and shrub"));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn descriptive_manifest_fields_of_another_type_are_rejected() {
+        let (root, dir) = open_world("syn-w-types");
+        let ok_source =
+            json!({"provider": "p", "product": "p", "licence": "l", "attribution": "a"});
+        let mut bad_credit = ok_source.clone();
+        bad_credit["credit"] = json!({"x": 1});
+        let cases: [(&str, Value); 9] = [
+            ("site_note", json!({"x": 1})),
+            ("accuracy", json!("a string, not a list")),
+            ("accuracy", json!([1, 2])),
+            (
+                "relief",
+                json!([{"radius_m": "ten", "min_up_m": 0, "max_up_m": 1}]),
+            ),
+            ("relief", json!({"a": 1})),
+            ("built", json!({"by": ["x"]})),
+            ("built", json!("script")),
+            ("sources", json!([bad_credit])),
+            ("name", json!(["x"])),
+        ];
+        for (k, v) in cases {
+            let keep = {
+                let m: Value =
+                    serde_json::from_slice(&fs::read(dir.join(MANIFEST)).unwrap()).unwrap();
+                m[k].clone()
+            };
+            edit(&dir, |m| m[k] = v);
+            assert!(Environment::open(&dir).is_err(), "{k} accepted");
+            edit(&dir, |m| m[k] = keep);
+        }
+        // Unbounded or control-character text is refused as well.
+        edit(&dir, |m| m["site_note"] = json!("x".repeat(601)));
+        assert!(reason(&dir).contains("site_note"));
+        edit(&dir, |m| m["site_note"] = json!("bad\u{7}note"));
+        assert!(reason(&dir).contains("site_note"));
+        edit(&dir, |m| m["site_note"] = Value::Null);
+        edit(&dir, |m| m["world"]["features"]["accuracy"] = json!(42));
+        assert!(reason(&dir).contains("world"));
+        edit(&dir, |m| m["world"]["features"]["accuracy"] = json!("fine"));
+        assert!(Environment::open(&dir).is_ok());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn the_summary_carries_only_typed_descriptive_fields() {
+        let (root, dir) = open_world("syn-w-typed-summary");
+        edit(&dir, |m| {
+            m["site_note"] = json!("A note.");
+            m["accuracy"] = json!(["one", "two"]);
+            m["relief"] = json!([{"radius_m": 10.0, "min_up_m": -1.0, "max_up_m": 1.0}]);
+            m["built"] = json!({"by": "script", "date": "2026-11-04"});
+            m["world"]["lidar"] = json!({"anything": {"nested": [1, 2, 3]}});
+            m["sources"][0]["items"] = json!({"unchecked": true});
+        });
+        let e = Environment::open(&dir).unwrap();
+        let s = e.summary();
+        assert_eq!(s["accuracy"], json!(["one", "two"]));
+        assert_eq!(s["relief"][0]["radius_m"], json!(10.0));
+        assert_eq!(s["built"]["by"], json!("script"));
+        assert!(s["world"].get("lidar").is_none());
+        assert!(s["sources"][0].get("items").is_none());
+        assert_eq!(
+            s["sources"][1]["credit"],
+            json!("(c) OpenStreetMap contributors")
+        );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn building_footprints_need_an_odbl_openstreetmap_source() {
+        let (root, dir) = open_world("syn-w-odbl");
+        let plain = json!([{"provider": "t", "product": "t", "licence": "t", "attribution": "t"}]);
+        edit(&dir, |m| m["sources"] = plain.clone());
+        assert!(reason(&dir).contains("ODbL") && reason(&dir).contains("OpenStreetMap"));
+        // The licence alone, or the attribution alone, is not enough.
+        edit(&dir, |m| {
+            m["sources"] = json!([{"provider": "t", "product": "t", "licence": "ODbL 1.0", "attribution": "somebody"}]);
+        });
+        assert!(reason(&dir).contains("OpenStreetMap"));
+        edit(&dir, |m| {
+            m["sources"] = json!([{"provider": "t", "product": "t", "licence": "CC0", "attribution": "OpenStreetMap contributors"}]);
+        });
+        assert!(reason(&dir).contains("ODbL"));
+        // A credit that does not name OpenStreetMap would replace it on the map.
+        edit(&dir, |m| {
+            m["sources"] = json!([{"provider": "t", "product": "t", "licence": "ODbL 1.0", "attribution": "OpenStreetMap contributors", "credit": "Nothing to see"}]);
+        });
+        assert!(reason(&dir).contains("credit name OpenStreetMap"));
+        edit(&dir, |m| {
+            m["sources"] = json!([{"provider": "t", "product": "t", "licence": "ODbL 1.0", "attribution": "OpenStreetMap contributors"}]);
+        });
+        assert!(Environment::open(&dir).is_ok());
+        // Lidar vegetation alone does not need it.
+        edit(&dir, |m| {
+            m["world"]["features"] = Value::Null;
+            m["sources"] = plain.clone();
+        });
+        assert!(Environment::open(&dir).is_ok());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn huge_images_and_grids_are_refused_before_their_files_are_read() {
+        let (root, dir) = synthetic("syn-caps", false);
+        // 9000 x 9000 is inside 16..16384 a side but is 81 million texels (8192 x 8192 is the cap).
+        edit(&dir, |m| {
+            m["image"]["columns"] = json!(9000);
+            m["image"]["rows"] = json!(9000);
+        });
+        assert!(
+            reason(&dir).contains("texels is more than"),
+            "{}",
+            reason(&dir)
+        );
+        edit(&dir, |m| {
+            m["image"]["columns"] = json!(16);
+            m["image"]["rows"] = json!(16);
+            m["height"]["columns"] = json!(2500);
+            m["height"]["rows"] = json!(2500);
+        });
+        assert!(
+            reason(&dir).contains("vertices is more than"),
+            "{}",
+            reason(&dir)
+        );
+        edit(&dir, |m| {
+            m["height"]["columns"] = json!(7);
+            m["height"]["rows"] = json!(7);
+        });
+        assert!(Environment::open(&dir).is_ok());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn structure_names_and_degenerate_footprints_are_validated() {
+        let (root, dir) = synthetic("syn-v3-text", true);
+        let veg = veg_record(100, -100, 450, 25, 1);
+        for name in [json!("x".repeat(121)), json!("bell\u{7}"), json!("")] {
+            let mut f = features();
+            f["structures"][0]["name"] = name;
+            add_world(&dir, f, &veg);
+            assert!(reason(&dir).contains("structure n1"), "{}", reason(&dir));
+        }
+        let mut f = features();
+        f["structures"][0]["name"] = json!("Launch tower");
+        add_world(&dir, f, &veg);
+        assert!(Environment::open(&dir).is_ok());
+        // A ring closed by repeating its first point, or with a repeated vertex.
+        let mut f = features();
+        f["buildings"][0]["ring_dm"] = json!([100, 100, 300, 100, 300, 300, 100, 300, 100, 100]);
+        add_world(&dir, f, &veg);
+        assert!(reason(&dir).contains("zero-length"), "{}", reason(&dir));
+        let mut f = features();
+        f["buildings"][0]["ring_dm"] = json!([100, 100, 300, 100, 300, 100, 300, 300, 100, 300]);
+        add_world(&dir, f, &veg);
+        assert!(reason(&dir).contains("zero-length"));
         let _ = fs::remove_dir_all(root);
     }
 }
