@@ -1,0 +1,197 @@
+{
+  "flow": "m16",
+  "exe": "vv-studio.exe",
+  "machine": {
+    "cpu": "AMD64 Family 25 Model 97 Stepping 2, AuthenticAMD",
+    "os": "Windows-11-10.0.26300-SP0",
+    "python": "3.14.6"
+  },
+  "cold_start_to_ready_s": 0.97,
+  "idle_memory": {
+    "processes": 7,
+    "working_set_mb": 391.5,
+    "private_mb": 210.0,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "idle_frames": {
+    "frames": 331,
+    "mean_ms": 6.06,
+    "p50_ms": 6.1,
+    "p95_ms": 6.2,
+    "p99_ms": 6.2,
+    "max_ms": 6.2,
+    "over_33ms": 0
+  },
+  "clicks_to_landing": 1,
+  "click_to_landing_on_screen_s": 0.25,
+  "machine_time_to_landing_s": 1.22,
+  "playback_detected": true,
+  "playback_frames": {
+    "frames": 825,
+    "mean_ms": 6.06,
+    "p50_ms": 6.1,
+    "p95_ms": 6.2,
+    "p99_ms": 6.2,
+    "max_ms": 6.6,
+    "over_33ms": 0
+  },
+  "playback_memory": {
+    "processes": 7,
+    "working_set_mb": 480.4,
+    "private_mb": 357.2,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "webgl": "ANGLE (AMD, AMD Radeon RX 7700 XT (0x0000747E) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "window_inner": [
+    1440,
+    900,
+    1
+  ],
+  "engineering_playback_cpu_percent_of_one_core": 54.4,
+  "engineering_gpu": {
+    "gpu_dedicated_mb": 137.6,
+    "gpu_3d_utilisation_percent": 4.1
+  },
+  "geo_switch_to_terrain_on_gpu_s": 0.444,
+  "geo_playback_frames": {
+    "frames": 825,
+    "mean_ms": 6.06,
+    "p50_ms": 6.1,
+    "p95_ms": 6.1,
+    "p99_ms": 6.2,
+    "max_ms": 6.2,
+    "over_33ms": 0
+  },
+  "geo_playback_cpu_percent_of_one_core": 82.8,
+  "geo_playback_memory": {
+    "processes": 7,
+    "working_set_mb": 868.3,
+    "private_mb": 1056.1,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "geo_gpu": {
+    "gpu_dedicated_mb": 459.8,
+    "gpu_3d_utilisation_percent": 63.2
+  },
+  "geo_scene": {
+    "renders": 1468,
+    "triangles": 4352762,
+    "geometries": 49,
+    "textures": 10,
+    "camera": {
+      "mode": "follow",
+      "position": [
+        88,
+        -163.3,
+        43
+      ],
+      "target": [
+        -0.5,
+        3.2,
+        19.8
+      ],
+      "fov": 30,
+      "distance": 190,
+      "stageFraction": 0.411,
+      "observer": null,
+      "shot": null
+    },
+    "world": {
+      "buildings": 687,
+      "lidar_structures": 8,
+      "structures": 39,
+      "trees": 8248,
+      "shrubs": 97479,
+      "tiles": 47,
+      "vegetation_in_range": 105727,
+      "vegetation_tiers": [
+        64104,
+        41623,
+        0
+      ]
+    }
+  },
+  "switch_to_control_s": 0.448,
+  "control_playback_frames": {
+    "frames": 826,
+    "mean_ms": 6.06,
+    "p50_ms": 6.1,
+    "p95_ms": 6.2,
+    "p99_ms": 6.2,
+    "max_ms": 6.3,
+    "over_33ms": 0
+  },
+  "control_playback_cpu_percent_of_one_core": 3.8,
+  "control_memory": {
+    "processes": 7,
+    "working_set_mb": 909.3,
+    "private_mb": 1106.8,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "after_leaving_memory": {
+    "processes": 7,
+    "working_set_mb": 628.1,
+    "private_mb": 570.2,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "after_leaving_gpu": {
+    "gpu_dedicated_mb": 156.6,
+    "gpu_3d_utilisation_percent": 0
+  },
+  "long_session_start_memory": {
+    "processes": 7,
+    "working_set_mb": 932.9,
+    "private_mb": 1363.9,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "long_session_s": 180,
+  "long_session_p99_ms_samples": [
+    6.2,
+    6.3,
+    6.2,
+    6.2,
+    6.2,
+    6.2,
+    6.2,
+    6.2,
+    6.3,
+    6.2,
+    6.3,
+    6.2,
+    6.2,
+    6.2,
+    6.2,
+    6.3,
+    6.2,
+    6.2
+  ],
+  "long_session_end_memory": {
+    "processes": 7,
+    "working_set_mb": 917.6,
+    "private_mb": 1066.7,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "webview_requests": 17,
+  "webview_requests_leaving_the_machine": []
+}

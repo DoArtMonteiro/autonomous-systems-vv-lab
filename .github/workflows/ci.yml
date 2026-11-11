@@ -310,6 +310,8 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           python desktop/studio/tests/m15_journeys.py --exe "$env:LOCALAPPDATA\VV Lab Studio\vv-studio.exe" --domains "" --port 9334 --shots "$env:RUNNER_TEMP\ui-shots-m15"
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          python desktop/studio/tests/m16_journeys.py --exe "$env:LOCALAPPDATA\VV Lab Studio\vv-studio.exe" --domains "" --environments "" --port 9335 --shots "$env:RUNNER_TEMP\ui-shots-m16"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
 
       - name: Uninstall silently
         if: always()

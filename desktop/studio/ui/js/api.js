@@ -45,6 +45,13 @@ export const api = {
   deleteComparison: (id) => invoke('delete_comparison', { id }),
   getPrefs: () => invoke('get_prefs'),
   setPrefs: (prefs) => invoke('set_prefs', { prefs }),
+  // M16 geographic environments: validated packs, bytes over IPC (no network, CSP unchanged).
+  listEnvironments: () => invoke('list_environments'),
+  environmentFile: (id, file) => invoke('environment_file', { id, file }),
+  geoTrack: (id, runId) => invoke('geo_track', { id, runId }),
+  importEnvironment: () => invoke('import_environment'),
+  removeEnvironment: (id) => invoke('remove_environment', { id }),
+  revealEnvironments: () => invoke('reveal_environments'),
 };
 
 let reporting = false;

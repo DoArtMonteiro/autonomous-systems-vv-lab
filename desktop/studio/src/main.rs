@@ -10,6 +10,8 @@
 //!   M13 investigations), kept by uninstall;
 //! - Discovery Lab (M13): the investigation engine `<install dir>/engines/vv-exec.exe` and the
 //!   claims under `<install dir>/discovery/claims/`, run as child processes (see `discovery.rs`);
+//! - geographic environments (M16): packs shipped under `<install dir>/environments/` and packs the
+//!   user imports under `Documents/VV Lab Library/environments/` (see `geo.rs`); no network;
 //! - preferences and log: the per-user application config and log directories.
 //!
 //! `vv-studio --self-test <report.json>` runs headless: it starts the platform, runs and replays the
@@ -18,6 +20,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod discovery;
+mod geo;
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -50,6 +53,7 @@ struct Paths {
 
 struct AppState {
     paths: Paths,
+    geo: Arc<geo::Geo>,
     discovery: discovery::Discovery,
     platform: RwLock<Option<Arc<Platform>>>,
     start: Mutex<Option<Result<StartReport, String>>>,
@@ -475,6 +479,21 @@ fn resolve_paths(app: &tauri::App) -> Paths {
     }
 }
 
+/// Environment packs: `VVLAB_ENVIRONMENTS` (one or more folders) replaces the bundled folder, for
+/// tests and development; imported packs live in the library.
+fn geo_paths(app: &tauri::App, library: &Path) -> geo::GeoPaths {
+    let mut bundled = env_dirs("VVLAB_ENVIRONMENTS");
+    if bundled.is_empty()
+        && let Ok(res) = app.path().resource_dir()
+    {
+        bundled.push(res.join("environments"));
+    }
+    geo::GeoPaths {
+        bundled,
+        imported: library.join("environments"),
+    }
+}
+
 fn check(name: impl Into<String>, pass: bool, detail: Value) -> Value {
     json!({ "check": name.into(), "pass": pass, "detail": detail })
 }
@@ -560,6 +579,24 @@ fn self_test(report_path: &Path) -> i32 {
         ok &= pass;
         checks.push(check(name, pass, detail));
     }
+    // Geographic environments (M16): every bundled pack validates, check points included.
+    let mut env_roots = env_dirs("VVLAB_ENVIRONMENTS");
+    if env_roots.is_empty() {
+        env_roots.push(exe_dir.join("environments"));
+    }
+    for root in env_roots {
+        let (good, bad) = vv_geo::environment::discover(&root);
+        let pass = !good.is_empty() && bad.is_empty();
+        ok &= pass;
+        checks.push(check(
+            "environment packs",
+            pass,
+            json!({
+                "accepted": good.iter().map(|e| json!({"id": e.id, "bytes": e.bytes(), "worst_check_m": e.worst_check_m()})).collect::<Vec<_>>(),
+                "rejected": bad.iter().map(|(f, r)| json!({"folder": f, "reason": r})).collect::<Vec<_>>(),
+            }),
+        ));
+    }
     let report = json!({ "schema": "vv-studio-self-test.v1", "version": VERSION, "pass": ok, "checks": checks });
     let _ = fs::write(
         report_path,
@@ -595,7 +632,9 @@ fn main() {
                 &paths.log,
                 &format!("engine {}", disc.paths.engine.display()),
             );
+            let geo = Arc::new(geo::Geo::new(geo_paths(app, &paths.library)));
             app.manage(AppState {
+                geo,
                 discovery: disc,
                 paths: paths.clone(),
                 platform: RwLock::new(None),
@@ -643,6 +682,12 @@ fn main() {
             discovery::verify_investigation,
             discovery::cancel_investigation,
             discovery::reveal_investigation,
+            geo::list_environments,
+            geo::environment_file,
+            geo::geo_track,
+            geo::import_environment,
+            geo::remove_environment,
+            geo::reveal_environments,
         ])
         .build(tauri::generate_context!())
         .expect("the studio could not start")

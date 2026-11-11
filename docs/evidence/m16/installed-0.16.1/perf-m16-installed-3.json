@@ -1,0 +1,182 @@
+{
+  "flow": "m16",
+  "exe": "vv-studio.exe",
+  "machine": {
+    "cpu": "AMD64 Family 25 Model 97 Stepping 2, AuthenticAMD",
+    "os": "Windows-11-10.0.26300-SP0",
+    "python": "3.14.6"
+  },
+  "cold_start_to_ready_s": 1.47,
+  "idle_memory": {
+    "processes": 7,
+    "working_set_mb": 396.4,
+    "private_mb": 218.4,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "idle_frames": {
+    "frames": 330,
+    "mean_ms": 6.08,
+    "p50_ms": 6.1,
+    "p95_ms": 6.2,
+    "p99_ms": 6.3,
+    "max_ms": 13.8,
+    "over_33ms": 0
+  },
+  "clicks_to_landing": 1,
+  "click_to_landing_on_screen_s": 1.22,
+  "machine_time_to_landing_s": 2.69,
+  "playback_detected": true,
+  "playback_frames": {
+    "frames": 825,
+    "mean_ms": 6.06,
+    "p50_ms": 6.1,
+    "p95_ms": 6.2,
+    "p99_ms": 6.2,
+    "max_ms": 6.3,
+    "over_33ms": 0
+  },
+  "playback_memory": {
+    "processes": 7,
+    "working_set_mb": 467.8,
+    "private_mb": 351.9,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "webgl": "ANGLE (AMD, AMD Radeon RX 7700 XT (0x0000747E) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "window_inner": [
+    1440,
+    900,
+    1
+  ],
+  "engineering_playback_cpu_percent_of_one_core": 75.3,
+  "engineering_gpu": {
+    "gpu_dedicated_mb": 135.3,
+    "gpu_3d_utilisation_percent": 3
+  },
+  "geo_switch_to_terrain_on_gpu_s": 0.468,
+  "geo_playback_frames": {
+    "frames": 825,
+    "mean_ms": 6.06,
+    "p50_ms": 6.1,
+    "p95_ms": 6.2,
+    "p99_ms": 6.2,
+    "max_ms": 6.4,
+    "over_33ms": 0
+  },
+  "geo_playback_cpu_percent_of_one_core": 42.8,
+  "geo_playback_memory": {
+    "processes": 7,
+    "working_set_mb": 790.3,
+    "private_mb": 825.2,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "geo_gpu": {
+    "gpu_dedicated_mb": 314.3,
+    "gpu_3d_utilisation_percent": 0
+  },
+  "geo_scene": {
+    "renders": 674,
+    "triangles": 1264890,
+    "geometries": 29,
+    "textures": 8,
+    "camera": {
+      "mode": "follow",
+      "position": [
+        88,
+        -163.4,
+        42.1
+      ],
+      "target": [
+        -0.5,
+        3.1,
+        18.9
+      ],
+      "fov": 30,
+      "distance": 190,
+      "stageFraction": 0.411,
+      "observer": null
+    }
+  },
+  "switch_to_control_s": 0.417,
+  "control_playback_frames": {
+    "frames": 825,
+    "mean_ms": 6.06,
+    "p50_ms": 6.1,
+    "p95_ms": 6.2,
+    "p99_ms": 6.2,
+    "max_ms": 6.5,
+    "over_33ms": 0
+  },
+  "control_playback_cpu_percent_of_one_core": 89.5,
+  "control_memory": {
+    "processes": 7,
+    "working_set_mb": 828.2,
+    "private_mb": 1025.0,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "after_leaving_memory": {
+    "processes": 7,
+    "working_set_mb": 687.3,
+    "private_mb": 641.1,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "after_leaving_gpu": {
+    "gpu_dedicated_mb": 89.6,
+    "gpu_3d_utilisation_percent": 0
+  },
+  "long_session_start_memory": {
+    "processes": 7,
+    "working_set_mb": 844.6,
+    "private_mb": 1048.6,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "long_session_s": 180,
+  "long_session_p99_ms_samples": [
+    6.2,
+    6.2,
+    6.2,
+    6.2,
+    6.2,
+    6.2,
+    6.2,
+    6.2,
+    6.2,
+    6.2,
+    6.2,
+    6.2,
+    6.2,
+    6.2,
+    6.2,
+    6.2,
+    6.2,
+    6.2
+  ],
+  "long_session_end_memory": {
+    "processes": 7,
+    "working_set_mb": 857.1,
+    "private_mb": 888.9,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "webview_requests": 15,
+  "webview_requests_leaving_the_machine": []
+}

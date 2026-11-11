@@ -1,0 +1,47 @@
+PASS Settings: the installed environments are listed with sources and size  [cape-canaveral,santa-maria-azores]
+PASS Settings: Studio says it makes no network request
+PASS Geo: the player offers Engineering, Geospatial and Mission Control
+PASS Geo: the geospatial view loads from the local pack  [0.12 s]
+PASS Geo: an environment is selected  [cape-canaveral]
+PASS Geo: switching view keeps the same runs
+PASS Geo: the scene says what is simulated, context and illustrative  [SIMULATED trajectory, attitude, throttle, estimate, events CONTEXT Cape Canaveral coast, Florida: terrain 30 m, image 10]
+PASS Geo: the attribution of the sources is visible
+PASS Geo to Mission Control keeps the playback time  [8.060799999999919 -> 8.060799999999919]
+PASS Mission Control keeps the landscape
+PASS Mission Control to Engineering keeps the playback time
+PASS Geo: placing the run on a landscape changes no record
+PASS MC rocket: telemetry is grouped for a rocket landing  [motion,propulsion,navigation,sensors,geo]
+PASS MC rocket: propellant comes from a recorded true-state channel
+PASS MC rocket: estimated and true heights are both shown with their origin
+PASS MC rocket: geographic values are tagged G
+PASS MC rocket: requirements are pending before contact
+PASS MC rocket: two runs on the timeline
+PASS MC rocket: the timeline marks where the runs part
+PASS MC rocket: a controller detection is on the timeline  [Fault injected, 0.00 s: Fault starts: gnss_bias; Controller detection, 0.10 s: Controller first reports sensor disagreement; Controller detection, 0.10 s: Controller first rejects the altimeter (Registered: 15 m from 0 s); Event, 4.20 s: Engine ignition (Registered: 15 m from 0 s); Verifier finding at 23.40 s, named when the playback reaches it; Fault injected, 0.02 s: Fault starts: gnss_bias (Later: 9.72 m from 0.02 s); Event, 3.84 s: Engine ignition (Later: 9.72 m from 0.02 s); Runs part, 4.30 s: Later: 9.72 m from 0.02 s departs from Registered: 15 m from 0 s by more than 1 m (Later: 9.72 m from 0.02 s)]
+PASS MC rocket: clicking an event pauses at its instant
+PASS MC rocket: the event opens an evidence card with a way into analysis
+PASS MC rocket: the fault onset is on the timeline
+PASS MC rocket: cinematic mode hides the side panels
+PASS MC rocket: at the end every requirement is judged  [R1_vertical_speed:met, R2_horizontal_speed:met, R3_tilt:met, R4_angular_rate:met, R5_position:failed, R6_propellant_margin:met, S1_tilt_envelope:held, S2_keep_out:held, S3_axial_load:held, S4_no_relight:held, S5_no_powered_ascent:held]
+PASS MC rocket: Analyse opens at the same instant  [30.33836014269004]
+PASS Leaving the player releases the geospatial renderer  [{"renderer": "suspended", "scene": null}]
+PASS Returning to the player restores the geospatial view at the same instant
+PASS MC ground: Geospatial is unavailable for a millimetre grid, with the reason
+PASS MC ground: ground-vehicle telemetry, no aerospace metrics  [VEHICLE T East 1750 mm T North 2000 mm T Moved this tick 250.0 mm D To goal 3250 mm CONTROL C Command 250.0 mm D Mode no]
+PASS MC ground: three runs on the timeline
+PASS Layout 1440x900: no horizontal scroll in Mission Control
+PASS Layout 1440x900: every control has a name
+PASS Layout 1280x800: no horizontal scroll in Mission Control
+PASS Layout 1280x800: every control has a name
+PASS Layout 1024x640: no horizontal scroll in Mission Control
+PASS Layout 1024x640: every control has a name
+PASS No environment: Geospatial is disabled and says why  [{"off": "true", "title": "No validated geographic environment is installed. See Settings, Environments."}]
+PASS No environment: the engineering scene plays offline
+PASS No environment: Mission Control works on the engineering scene
+PASS Tampered pack: it is rejected with the reason  [MB in total. Imported packs are kept in <temporary folder>\vv-m16-lib-iddh4ziz\environments.  Import a pack folder… Open the imported packs folder]
+PASS Tampered pack: Geospatial is disabled and says why  [{"off": "true", "title": "No validated geographic environment is installed. See Settings, Environments."}]
+PASS Tampered pack: the engineering scene plays offline
+PASS Tampered pack: Mission Control works on the engineering scene
+PASS no script error or console error
+
+45 of 45 checks passed; screenshots in docs/images/m16-studio

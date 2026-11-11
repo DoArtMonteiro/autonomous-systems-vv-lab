@@ -79,7 +79,7 @@ export class Rocket3D {
     this.mode = 'follow';
     this.ok = true;
     try {
-      this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+      this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true, ...(opts.gl || {}) });
       if (!this.renderer.getContext()) throw new Error('no WebGL context');
     } catch (e) {
       this.ok = false;
@@ -285,6 +285,7 @@ export class Rocket3D {
     const thr = ch.throttle ? ch.throttle[i] : null;
     const on = ch.engine ? ch.engine[i] === 1 : thr > 0;
     const len = on && thr ? 6 + 22 * thr : 0;
+    this.plumeLength = len;
     this.plume.visible = len > 0;
     this.plume.scale.set(len || 1, 1, 1);
     this.cur = new THREE.Vector3(px ?? nx ?? 0, py ?? ny ?? 0, pz ?? nz ?? 0);
@@ -311,6 +312,7 @@ export class Rocket3D {
     this.pending = requestAnimationFrame(() => {
       this.pending = 0;
       this.renderer.render(this.s, this.camera);
+      this.rendered = (this.rendered || 0) + 1;
     });
   }
 
