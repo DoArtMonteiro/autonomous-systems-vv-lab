@@ -205,7 +205,9 @@ def gating(s):
         s.page.click(".pl-play")
     set_frac(s, 0.3)
     t = player(s)["t"] + 1e-6
-    later = f"[...document.querySelectorAll('.pl-mark[data-gated]')].filter((b) => Number(b.dataset.t) > {t}).length"
+    # Findings later than the playback time are not drawn at all (not even hidden): the player state
+    # counts what the record holds against what the page draws.
+    later = "(() => { const p = window.__studio.player(); return p.findings - p.findingsDrawn; })()"
     ahead = f"[...document.querySelectorAll('.pl-mark[data-gated]')].filter((b) => Number(b.dataset.t) > {t} && !b.hidden).length"
     check("Gating: the run has findings later than the playback time", s.js(later) > 0, str(s.js(later)))
     check("Gating: no later finding is shown on the player timeline", s.js(ahead) == 0)

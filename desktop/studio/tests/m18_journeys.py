@@ -14,6 +14,7 @@ These are scripted checks of what the screen shows. They are not observations of
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -101,7 +102,8 @@ def environments(s):
     s.wait("document.querySelectorAll('.at-card .at-img[src]').length === 8", 30, "thumbnails")
     s.page.click(".at-card[data-env='wallops-island'] [data-action='use']")
     s.wait("document.querySelector(\".at-card[data-env='wallops-island']\").classList.contains('is-current')", 10, "chosen")
-    check("Environments: Wallops Island chosen for the missions", True)
+    chosen = s.js("[...document.querySelectorAll('.at-card.is-current')].map((e) => e.dataset.env)")
+    check("Environments: Wallops Island is the one chosen environment", chosen == ["wallops-island"], json.dumps(chosen))
     s.shot("m18-environments-dark")
 
 
@@ -138,6 +140,11 @@ def compare(s, base_id, exp_id):
     time.sleep(2)
     text = s.js("document.querySelector('#view-compare').innerText")
     check("Compare: both runs are open", base_id[:8] in text and exp_id[:8] in text, " ".join(text[:200].split()))
+    labels = s.js("[...document.querySelectorAll('.run-legend .key-label')].map((e) => ({ text: e.textContent.trim(), cut: e.scrollWidth > e.clientWidth + 1 }))")
+    texts = [x["text"] for x in labels]
+    check("Compare: the two runs have different labels", len(texts) == 2 and texts[0] != texts[1], json.dumps(texts))
+    check("Compare: the labels name the changed parameter and its value, not the whole configuration", len(texts) == 2 and all("thrust" in t.lower() for t in texts) and "0.7" in texts[1] and "0.7" not in texts[0], json.dumps(texts))
+    check("Compare: no label is truncated", len(labels) == 2 and not any(x["cut"] for x in labels), json.dumps(labels))
     s.shot("m18-compare-dark")
     s.nav("lab")
     s.wait("document.querySelector('#lab-watch')", 20, "lab result")
@@ -157,13 +164,20 @@ def watch(s, base_id, exp_id):
     s.wait("(() => { const p = window.__studio.player(); return p && p.renderer === 'geospatial'; })()", 90, "geospatial")
     p = s.player()
     check("Player: the geospatial view uses the chosen environment", p["environment"] == "wallops-island", str(p["environment"]))
-    s.js("window.__studio.player() && document.querySelector('.pl-scrub input, input[type=range]') && 0")
     time.sleep(6)
     s.shot("m18-player-geospatial-wallops-dark")
+    views = s.js("[...document.querySelectorAll('.pl-views [data-view]')].map((b) => [b.dataset.view, b.textContent.trim()])")
+    check("Flight console: the player's operations layout is called Flight console", views == [["engineering", "Engineering"], ["geospatial", "Geospatial"], ["control", "Flight console"]], json.dumps(views))
+    check("Flight console: the player does not use the name of the home page", "Mission Control" not in s.js("document.querySelector('#view-mission').innerText"))
+    player_header(s)
     b = s.js("(() => { const b = document.querySelector(\"[data-action='cinematic']\"); return b ? { disabled: b.disabled, title: b.title } : null; })()")
     NUMBERS["cinematic_button"] = b
-    if b and not b["disabled"]:
-        check("Cinematic: the same record can open in the Cinematic View", True, b["title"])
+    status = s.page.evaluate("() => window.__TAURI__.core.invoke('cinematic_status')")
+    NUMBERS["cinematic_status"] = {k: status.get(k) for k in ("installed", "verified", "version")}
+    should_open = bool(status.get("installed") and status.get("verified"))
+    check("Cinematic: the button is enabled exactly when the module is installed and verified", bool(b) and (not b["disabled"]) == should_open, f"{json.dumps(b)} status {json.dumps(NUMBERS['cinematic_status'])}")
+    if should_open and b and not b["disabled"]:
+        check("Cinematic: the enabled button says which module version opens this record", str(status.get("version", "")) in b["title"], b["title"])
         s.page.click("[data-action='cinematic']")
         running = False
         for _ in range(60):
@@ -175,7 +189,44 @@ def watch(s, base_id, exp_id):
         time.sleep(6)
         kill_godot()
     else:
-        check("Cinematic: not available here, and the button says why", bool(b) and bool(b["title"]), json.dumps(b))
+        reason = status.get("reason") or ""
+        check("Cinematic: not available here, and the button gives the module's reason", bool(b) and b["disabled"] and bool(reason) and reason in b["title"], f"{json.dumps(b)} reason {reason!r}")
+
+
+def header_overlaps(s):
+    """Bounding boxes of the player header's controls, and the pairs that overlap or leave the window."""
+    return s.js("""() => {
+        const els = [...document.querySelectorAll('.pl-head button, .pl-head select, .pl-head h1, .pl-head .grade, .pl-head .pl-env-none')].filter((e) => e.offsetParent !== null);
+        const box = (e) => { const r = e.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom }; };
+        const label = (e) => (e.dataset.action || e.dataset.view || e.className || e.tagName).toString().slice(0, 30);
+        const boxes = els.map((e) => ({ name: label(e), ...box(e) }));
+        const clash = [];
+        for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+            const a = boxes[i], b = boxes[j];
+            const w = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+            const h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+            if (w > 1 && h > 1) clash.push(a.name + ' x ' + b.name);
+        }
+        const outside = boxes.filter((b) => b.left < -0.5 || b.right > innerWidth + 0.5).map((b) => b.name);
+        const head = document.querySelector('.pl-head').getBoundingClientRect();
+        return { count: boxes.length, clash, outside, headHeight: Math.round(head.height), actions: [...document.querySelectorAll('.pl-head-actions .btn')].map((b) => b.textContent.trim()) };
+    }""")
+
+
+def player_header(s):
+    """D2: with two runs, the header's controls never overlap and never leave the window."""
+    for w, hgt in ((1024, 640), (1440, 900), (1920, 1080)):
+        s.resize(w, hgt)
+        got = s.js("[innerWidth, innerHeight]")
+        r = header_overlaps(s)
+        NUMBERS[f"player_header_{w}x{hgt}"] = r
+        check(f"Player header {w}x{hgt}: the window has the size asked for", abs(got[0] - w) <= 1, json.dumps(got))
+        check(f"Player header {w}x{hgt}: Analyse, Compare in detail, Cinematic view and Change the conditions are all there", r["actions"] == ["Analyse", "Compare in detail", "Cinematic view", "Change the conditions"], json.dumps(r["actions"]))
+        check(f"Player header {w}x{hgt}: no two controls overlap", not r["clash"], "; ".join(r["clash"])[:300])
+        check(f"Player header {w}x{hgt}: every control is inside the window", not r["outside"], ", ".join(r["outside"]))
+        check(f"Player header {w}x{hgt}: the header stays compact", r["headHeight"] <= 150, f"{r['headHeight']} px")
+        check(f"Player header {w}x{hgt}: no horizontal scroll", s.no_hscroll())
+    s.resize(1440, 900)
 
 
 def ascent(s):
@@ -190,6 +241,15 @@ def ascent(s):
     ra, rb = req_map(base), req_map(exp)
     flipped = [k for k in ra if k in rb and ra[k]["status"] != rb[k]["status"]]
     check("Ascent: 600 kg payload changes which requirements pass", len(flipped) >= 1, ", ".join(flipped))
+    published = sorted(m["id"] for m in exp["metrics"] if m["id"].startswith("requirement_margin."))
+    check("Ascent: the record publishes a numeric margin for the single-bound requirements", len(published) >= 6, ", ".join(published))
+    check("Ascent: composite requirements publish none", not any(k in " ".join(published) for k in ("R1_separation_window", "R7_phase_sequence", "R8_orbit_insertion")))
+    cells = s.js("[...document.querySelectorAll('.lab-table tbody tr')].map((tr) => [tr.cells[0].textContent.trim(), tr.cells[tr.cells.length - 1].textContent.trim()])")
+    numeric = [c for c in cells if re.fullmatch(r"[+-]?[\d.e+-]+ (km|kg|Pa|g)", c[1])]
+    check("Ascent: the Lab shows a numeric margin change for the requirements that have one", len(numeric) >= 4, json.dumps(cells)[:400])
+    with_numbers = {req_map(exp)[k]["label"] for k in req_map(exp) if f"requirement_margin.{k}" in published}
+    empty = [c[0] for c in cells if any(c[0].startswith(lbl) for lbl in with_numbers) and c[1] in ("–", "")]
+    check("Ascent: no requirement that has numbers shows an empty margin", not empty, ", ".join(empty))
     NUMBERS["ascent_payload_600"] = {"base_run": base_id, "exp_run": exp_id,
                                      "base": {k: [v["status"], v["observed"]] for k, v in ra.items()},
                                      "exp": {k: [v["status"], v["observed"]] for k, v in rb.items()},
