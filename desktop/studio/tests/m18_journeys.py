@@ -238,10 +238,16 @@ def player_header(s):
     """D2: with two runs, the header's controls never overlap and never leave the window."""
     for w, hgt in ((1024, 640), (1440, 900), (1920, 1080)):
         s.resize(w, hgt)
+        # The geospatial scene can keep the window busy for a while: give the resize time to land.
+        try:
+            s.wait(f"innerWidth === {w} && innerHeight === {hgt}", 25, f"window {w}x{hgt}")
+        except TimeoutError:
+            pass
+        time.sleep(0.8)
         got = s.js("[innerWidth, innerHeight]")
         r = header_overlaps(s)
         NUMBERS[f"player_header_{w}x{hgt}"] = r
-        check(f"Player header {w}x{hgt}: the window has the size asked for", abs(got[0] - w) <= 1, json.dumps(got))
+        check(f"Player header {w}x{hgt}: the window has the size asked for", abs(got[0] - w) <= 1 and abs(got[1] - hgt) <= 1, json.dumps(got))
         check(f"Player header {w}x{hgt}: Analyse, Compare in detail, Cinematic view and Change the conditions are all there", r["actions"] == ["Analyse", "Compare in detail", "Cinematic view", "Change the conditions"], json.dumps(r["actions"]))
         check(f"Player header {w}x{hgt}: no two controls overlap", not r["clash"], "; ".join(r["clash"])[:300])
         check(f"Player header {w}x{hgt}: every control is inside the window", not r["outside"], ", ".join(r["outside"]))
