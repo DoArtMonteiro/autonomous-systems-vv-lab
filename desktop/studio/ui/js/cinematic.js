@@ -44,13 +44,13 @@ export function cinematicButton(runId, envId, rocket) {
   return b;
 }
 
-/** Settings section: status, install from a verified zip, uninstall. */
+/** Settings section: status, install from a module zip (hash shown first), uninstall. */
 export function cinematicSection() {
   const body = h('div', { class: 'sec-body' }, h('p', { class: 'dim small' }, 'Reading the module status…'));
   const fill = (s) => {
     const install = h('button', { type: 'button', class: 'btn btn-quiet', onclick: () => {
       install.disabled = true;
-      api.cinematicInstallFromFile().then((r) => { if (r) { toast(`Cinematic View ${r.version} installed and verified.`, 'info'); fill(r); status = Promise.resolve(r); } else install.disabled = false; })
+      api.cinematicInstallFromFile().then((r) => { if (r) { toast(`Cinematic View ${r.version} installed. Its files matched the module manifest.`, 'info'); fill(r); status = Promise.resolve(r); } else install.disabled = false; })
         .catch((e) => { toast(errorText(e), 'error'); install.disabled = false; });
     } }, s.installed ? 'Replace from a module zip…' : 'Install from a module zip…');
     const remove = s.installed ? h('button', { type: 'button', class: 'btn btn-quiet', onclick: () => {
@@ -58,9 +58,9 @@ export function cinematicSection() {
     } }, 'Uninstall') : null;
     clear(body).append(
       h('p', { class: 'small' }, s.installed && s.verified
-        ? `Installed: version ${s.version}, Godot ${s.godot}, ${mbText(s.disk_bytes)} on disk, every file verified against its manifest.`
+        ? `Installed: version ${s.version}, Godot ${s.godot}, ${mbText(s.disk_bytes)} on disk. Every file matched its manifest when last checked; Studio checks them again each time it opens the view.`
         : (s.reason || 'Not installed.')),
-      h('p', { class: 'dim small' }, 'An optional high-fidelity replay window built on Godot 4.7.2 (MIT). It reads the stored record and a validated environment pack and never simulates; the stage, plume and vegetation shapes are illustrative. It is installed only from a module zip with its .sha256 file beside it; Studio checks the zip, the manifest and every file, and the free disk space, before anything is copied. Nothing is downloaded.'),
+      h('p', { class: 'dim small' }, 'An optional high-fidelity replay window built on Godot 4.7.2 (MIT). It reads the stored record and a validated environment pack and never simulates; the stage, plume and vegetation shapes are illustrative. It is installed only from a module zip with its .sha256 file beside it. Studio copies the zip once, shows its SHA-256 and asks you to confirm, then compares every file with the module manifest. The .sha256 file and the manifest travel with the zip, so they show it is intact, not who built it: compare the SHA-256 with a value from a source you trust. Nothing is downloaded.'),
       h('div', { class: 'row' }, install, remove));
   };
   current().then(fill).catch((e) => clear(body).append(h('p', { class: 'error-text' }, `The module status could not be read: ${errorText(e)}`)));

@@ -638,8 +638,12 @@ fn main() {
                 &format!("engine {}", disc.paths.engine.display()),
             );
             let geo = Arc::new(geo::Geo::new(geo_paths(app, &paths.library)));
-            // VVLAB_MODULES replaces the modules folder, for tests and development.
-            let modules_root = std::env::var_os("VVLAB_MODULES")
+            // VVLAB_MODULES replaces the modules folder, for development builds only: the module
+            // is an executable the Studio launches, so an installed Studio must never take its
+            // location from the environment. No release-build test uses it.
+            let modules_root = cfg!(debug_assertions)
+                .then(|| std::env::var_os("VVLAB_MODULES"))
+                .flatten()
                 .map(PathBuf::from)
                 .or_else(|| {
                     app.path()

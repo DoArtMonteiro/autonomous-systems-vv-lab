@@ -1,30 +1,47 @@
 //! Optional modules (M17): the Cinematic View, a separately installed high-fidelity replay renderer
 //! built on Godot 4.7.2. The Studio never downloads it. The user picks a module zip; the Studio
-//! checks the zip's SHA-256 against the `.sha256` file beside it, reads the manifest
-//! (`vv-cinematic-module.v1`), checks the free disk space, extracts into a staging folder while
-//! hashing every file against the manifest, and renames the staging folder into place:
-//! `<app local data>/modules/cinematic/<version>/`. Nothing is installed if any check fails.
+//! copies it once into a staging folder, hashes that copy and compares the hash with the `.sha256`
+//! file beside the zip, shows the SHA-256 to the user for confirmation, reads the manifest
+//! (`vv-cinematic-module.v1`) from the same copy, checks the free disk space, extracts into the
+//! staging folder while hashing every file against the manifest, and swaps the staging tree into
+//! place: `<app local data>/modules/cinematic/<version>/`. Nothing is installed if any check fails;
+//! a replaced version is moved aside first and restored if the swap fails.
 //!
-//! Launching re-verifies every file of the installed module, then starts only the module's own
-//! executable with fixed arguments: the project folder, a run folder of the library (by run id) and
-//! a validated environment pack (by id). No shell, no paths from the web view. The renderer only
-//! reads the record and the pack; it never writes to the library.
+//! What the checks prove. The `.sha256` file travels with the zip, so a match shows the zip is
+//! intact (not damaged, not altered after that file was written). It does not show who built the
+//! module: an attacker who can replace the zip can replace the sidecar too. Provenance is the
+//! user's decision, which is why the computed SHA-256 is shown before anything is installed, to be
+//! compared with a value from a source the user trusts. The manifest likewise proves that the files
+//! match the manifest of the same zip, nothing more.
+//!
+//! Launching re-hashes every file of the installed module, refuses any file the manifest does not
+//! list, then starts only the module's own executable with fixed arguments: the project folder, a
+//! run folder of the library (by run id) and a validated environment pack (by id). No shell, no
+//! paths from the web view. The renderer only reads the record and the pack; it never writes to
+//! the library. The executable is hashed once more, through a handle that denies writers, right
+//! before it is started.
+//!
+//! The one place the renderer may write inside the module is `<project>/.godot/`, Godot's own
+//! script and shader cache, regenerated from the project files. The integrity check exempts that
+//! single directory and the launch deletes it before the process starts, so a cache that was
+//! planted or left over is never read.
 //!
 //! Zip extraction uses the `zip` crate already in the lock file (the platform's evidence export
 //! uses it), with the same version and features, so no new dependency is added.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::io::{Read, Write};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Component, Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
+use std::time::SystemTime;
 
 use serde::Serialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use tauri::State;
-use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use vv_platform::PlatformError;
 
 use crate::{AppState, blocking, display_path, err, log_line};
@@ -38,6 +55,14 @@ const MAX_TOTAL_BYTES: u64 = 1024 * 1024 * 1024;
 const MAX_FILES: usize = 512;
 /// Space kept free beyond the module itself during installation.
 const DISK_MARGIN_BYTES: u64 = 256 * 1024 * 1024;
+/// Largest zip the Studio copies: the module's size cap plus room for zip headers.
+const MAX_ZIP_BYTES: u64 = MAX_TOTAL_BYTES + 16 * 1024 * 1024;
+/// Folder under the modules root where an install is staged (the zip copy and the extracted tree).
+const STAGING_PREFIX: &str = ".staging-";
+/// Folder under the modules root where a replaced version waits until the new one is in place.
+const OLD_PREFIX: &str = ".old-";
+/// Godot's own cache inside the project folder (see the module header).
+const GODOT_CACHE: &str = ".godot";
 
 #[derive(Clone, Debug)]
 struct FileEntry {
@@ -60,6 +85,8 @@ struct Manifest {
 #[derive(Serialize, Clone, Debug, Default)]
 pub struct Status {
     pub installed: bool,
+    /// Every file matched the manifest at the last check (see `Modules::status`); the launch
+    /// checks again.
     pub verified: bool,
     pub version: Option<String>,
     pub godot: Option<String>,
@@ -70,17 +97,68 @@ pub struct Status {
     pub reason: Option<String>,
 }
 
-pub struct Modules {
+/// Cache key of a full check: the folder and the manifest's modification time and size.
+type CacheKey = (PathBuf, SystemTime, u64);
+
+/// The shared state of the module; `Modules` is a cheap handle to it, so a blocking job can own one.
+pub struct ModulesInner {
     /// `<app local data>/modules/cinematic`
     pub root: PathBuf,
+    /// The launched Cinematic View, if any. Install, uninstall and launch take this lock first.
     child: Mutex<Option<Child>>,
+    /// The last successful full check, so the player does not hash the whole module each time it
+    /// is built. A change of the manifest or the folder invalidates it; the launch always checks
+    /// every file again.
+    checked: Mutex<Option<(CacheKey, Status)>>,
+}
+
+#[derive(Clone)]
+pub struct Modules(Arc<ModulesInner>);
+
+impl std::ops::Deref for Modules {
+    type Target = ModulesInner;
+    fn deref(&self) -> &ModulesInner {
+        &self.0
+    }
 }
 
 impl Modules {
     pub fn new(root: PathBuf) -> Self {
-        Self {
+        Self(Arc::new(ModulesInner {
             root,
             child: Mutex::new(None),
+            checked: Mutex::new(None),
+        }))
+    }
+}
+
+impl ModulesInner {
+    /// The module status, hashing the files only when the manifest changed since the last
+    /// successful check.
+    pub fn status(&self) -> Status {
+        let key = installed_dir(&self.root).and_then(|d| {
+            let m = fs::metadata(d.join(MANIFEST)).ok()?;
+            Some((d, m.modified().ok()?, m.len()))
+        });
+        if let (Some(key), Ok(cache)) = (&key, self.checked.lock())
+            && let Some((k, s)) = cache.as_ref()
+            && k == key
+        {
+            return s.clone();
+        }
+        let s = status_of(&self.root);
+        if let Ok(mut cache) = self.checked.lock() {
+            *cache = match key {
+                Some(k) if s.verified => Some((k, s.clone())),
+                _ => None,
+            };
+        }
+        s
+    }
+
+    fn forget(&self) {
+        if let Ok(mut cache) = self.checked.lock() {
+            *cache = None;
         }
     }
 }
@@ -224,20 +302,81 @@ fn sha256_file(p: &Path) -> std::io::Result<(String, u64)> {
     sha256_reader(fs::File::open(p)?)
 }
 
-/// The single installed version folder, if any (`<root>/<x.y.z>`).
-fn installed_dir(root: &Path) -> Option<PathBuf> {
-    let mut found: Vec<PathBuf> = fs::read_dir(root)
-        .ok()?
-        .flatten()
-        .filter(|e| e.path().is_dir())
-        .filter(|e| version_ok(&e.file_name().to_string_lossy()))
-        .map(|e| e.path())
-        .collect();
-    found.sort();
-    found.pop()
+/// A version as numbers, so `0.10.0` sorts after `0.9.0`.
+fn version_key(v: &str) -> Option<(u64, u64, u64)> {
+    if !version_ok(v) {
+        return None;
+    }
+    let mut parts = v.split('.').map(|p| p.parse::<u64>().ok());
+    Some((parts.next()??, parts.next()??, parts.next()??))
 }
 
-/// Reads and checks the installed module: manifest, then every listed file's size and SHA-256.
+/// The installed version folders (`<root>/<x.y.z>`), oldest first.
+fn version_dirs(root: &Path) -> Vec<(PathBuf, (u64, u64, u64))> {
+    let mut found: Vec<_> = fs::read_dir(root)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter(|e| e.path().is_dir())
+        .filter_map(|e| {
+            let key = version_key(&e.file_name().to_string_lossy())?;
+            Some((e.path(), key))
+        })
+        .collect();
+    found.sort_by_key(|(_, k)| *k);
+    found
+}
+
+/// The newest installed version folder, if any.
+fn installed_dir(root: &Path) -> Option<PathBuf> {
+    version_dirs(root).pop().map(|(p, _)| p)
+}
+
+/// Fails on any file in the installed tree that the manifest does not list (a DLL beside the
+/// executable, an `override.cfg`, a replaced helper), on any link, and on a tree too large to be
+/// the module. Only `<project>/.godot/` is exempt; the launch deletes it.
+fn check_no_extra_files(dir: &Path, m: &Manifest) -> Result<(), String> {
+    let mut listed: BTreeSet<String> = m.files.iter().map(|f| f.path.to_lowercase()).collect();
+    listed.insert(MANIFEST.to_lowercase());
+    let cache = format!("{}/{GODOT_CACHE}", m.project).to_lowercase();
+    let unreadable = |p: &str| format!("{p} cannot be listed");
+    let mut stack = vec![(dir.to_path_buf(), String::new())];
+    let mut files = 0usize;
+    while let Some((d, rel)) = stack.pop() {
+        for e in fs::read_dir(&d).map_err(|_| unreadable(&rel))? {
+            let e = e.map_err(|_| unreadable(&rel))?;
+            let name = e.file_name().to_string_lossy().to_string();
+            let path = if rel.is_empty() {
+                name
+            } else {
+                format!("{rel}/{name}")
+            };
+            let kind = e.file_type().map_err(|_| unreadable(&path))?;
+            if kind.is_symlink() {
+                return Err(format!("{path} is a link, which a module never holds"));
+            }
+            if kind.is_dir() {
+                if path.to_lowercase() != cache {
+                    stack.push((e.path(), path));
+                }
+                continue;
+            }
+            files += 1;
+            if files > MAX_FILES + 1 {
+                return Err("the module folder holds too many files".into());
+            }
+            if !listed.contains(&path.to_lowercase()) {
+                return Err(format!(
+                    "{path} is not part of the module (it is not in the manifest)"
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Reads and checks the installed module: manifest, every listed file's size and SHA-256, and
+/// that nothing else is in the folder.
 fn verify_installed(dir: &Path) -> Result<Manifest, String> {
     let mp = dir.join(MANIFEST);
     let meta = fs::metadata(&mp).map_err(|_| "the module manifest is missing".to_string())?;
@@ -259,6 +398,7 @@ fn verify_installed(dir: &Path) -> Result<Manifest, String> {
             ));
         }
     }
+    check_no_extra_files(dir, &m)?;
     Ok(m)
 }
 
@@ -285,7 +425,7 @@ fn status_of(root: &Path) -> Status {
             verified: false,
             location: Some(display_path(&dir)),
             reason: Some(format!(
-                "The installed module failed verification: {e}. Reinstall or uninstall it."
+                "The installed module failed its integrity check: {e}. Reinstall or uninstall it."
             )),
             ..Status::default()
         },
@@ -329,8 +469,97 @@ fn free_bytes(_path: &Path) -> Option<u64> {
     None
 }
 
-/// Verifies `zip_path` against its `.sha256` sidecar and installs it under `root`.
-pub fn install_zip(root: &Path, zip_path: &Path) -> Result<Status, PlatformError> {
+/// What an install would put on the disk, shown to the user before anything is installed.
+#[derive(Clone, Debug)]
+pub struct Plan {
+    /// SHA-256 of the copy of the zip that is being installed.
+    pub sha256: String,
+    pub version: String,
+    pub godot: String,
+    pub disk_bytes: u64,
+}
+
+fn remove_path(p: &Path) {
+    if p.is_dir() {
+        let _ = fs::remove_dir_all(p);
+    } else {
+        let _ = fs::remove_file(p);
+    }
+}
+
+/// Removes staging folders left by an install that did not finish.
+fn clear_staging(root: &Path) {
+    for e in fs::read_dir(root).into_iter().flatten().flatten() {
+        if e.file_name().to_string_lossy().starts_with(STAGING_PREFIX) {
+            remove_path(&e.path());
+        }
+    }
+}
+
+/// Moves the installed versions aside, moves `new_tree` to `<root>/<version>` and deletes the old
+/// copies. If anything fails the old versions are put back and the error is returned, so a failed
+/// replacement (for instance a running Cinematic View that locks its executable) never leaves the
+/// user without a module.
+fn swap_in(root: &Path, new_tree: &Path, version: &str) -> Result<(), PlatformError> {
+    let aside = root.join(format!("{OLD_PREFIX}{}", std::process::id()));
+    let _ = fs::remove_dir_all(&aside);
+    let mut moved: Vec<(PathBuf, PathBuf)> = Vec::new();
+    let put_back = |moved: &[(PathBuf, PathBuf)]| {
+        let lost = moved
+            .iter()
+            .rev()
+            .filter(|(from, to)| fs::rename(to, from).is_err())
+            .count();
+        if lost == 0 {
+            let _ = fs::remove_dir_all(&aside);
+            String::new()
+        } else {
+            format!(
+                "; the previous module could not be put back and is in {}",
+                display_path(&aside)
+            )
+        }
+    };
+    let attempt = (|| -> std::io::Result<()> {
+        let olds = version_dirs(root);
+        if !olds.is_empty() {
+            fs::create_dir_all(&aside)?;
+        }
+        for (dir, _) in olds {
+            let Some(name) = dir.file_name() else {
+                continue;
+            };
+            let to = aside.join(name);
+            fs::rename(&dir, &to)?;
+            moved.push((dir, to));
+        }
+        fs::rename(new_tree, root.join(version))
+    })();
+    if let Err(e) = attempt {
+        let note = put_back(&moved);
+        return Err(invalid(format!(
+            "the module could not be replaced ({e}); the previous module is kept{note}. Close the Cinematic View and try again"
+        )));
+    }
+    // The new version is in place. Leftovers of this or an earlier replacement are now garbage.
+    for e in fs::read_dir(root).into_iter().flatten().flatten() {
+        if e.file_name().to_string_lossy().starts_with(OLD_PREFIX) {
+            remove_path(&e.path());
+        }
+    }
+    Ok(())
+}
+
+/// Installs the module zip at `zip_path` under `root`. The zip is copied once into a staging
+/// folder and everything (hash, manifest, files) is read from that copy, so the file the user
+/// picked cannot change between the check and the install. `confirm` sees the zip's SHA-256 and
+/// the module's identity after every check passed and before anything is extracted; returning
+/// `false` cancels (`Ok(None)`). Callers must not call this while the Cinematic View runs.
+pub fn install_zip(
+    root: &Path,
+    zip_path: &Path,
+    confirm: &dyn Fn(&Plan) -> bool,
+) -> Result<Option<Status>, PlatformError> {
     let side = PathBuf::from(format!("{}.sha256", zip_path.display()));
     let declared = fs::read_to_string(&side)
         .map_err(|_| invalid("the .sha256 file beside the module zip is missing"))?;
@@ -339,12 +568,59 @@ pub fn install_zip(root: &Path, zip_path: &Path) -> Result<Status, PlatformError
         .next()
         .unwrap_or("")
         .to_lowercase();
-    let (actual, _) = sha256_file(zip_path).map_err(err)?;
-    if declared.len() != 64 || declared != actual {
-        return Err(invalid("the module zip does not match its .sha256 file"));
+    if declared.len() != 64 || !declared.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err(invalid("the .sha256 file does not hold a SHA-256"));
     }
-    let file = fs::File::open(zip_path).map_err(err)?;
+    let zip_len = fs::metadata(zip_path).map_err(err)?.len();
+    if zip_len > MAX_ZIP_BYTES {
+        return Err(invalid("the module zip is too large"));
+    }
+    fs::create_dir_all(root).map_err(err)?;
+    clear_staging(root);
+    let staging = root.join(format!("{STAGING_PREFIX}{}", std::process::id()));
+    let result = stage_and_swap(root, zip_path, zip_len, &declared, &staging, confirm);
+    remove_path(&staging);
+    result
+}
+
+fn stage_and_swap(
+    root: &Path,
+    zip_path: &Path,
+    zip_len: u64,
+    declared: &str,
+    staging: &Path,
+    confirm: &dyn Fn(&Plan) -> bool,
+) -> Result<Option<Status>, PlatformError> {
+    let low_disk = |need: u64| -> Result<(), PlatformError> {
+        match free_bytes(root) {
+            Some(free) if free < need => Err(invalid(format!(
+                "not enough free disk space: the install needs {} MB and {} MB are free",
+                need / 1_048_576,
+                free / 1_048_576
+            ))),
+            _ => Ok(()),
+        }
+    };
+    low_disk(zip_len + DISK_MARGIN_BYTES)?;
+    fs::create_dir_all(staging).map_err(err)?;
+    let copy = staging.join("archive.zip");
+    fs::copy(zip_path, &copy).map_err(err)?;
+    // One handle: hashed here, then read as the archive.
+    let mut file = fs::File::open(&copy).map_err(err)?;
+    let (actual, _) = sha256_reader(&mut file).map_err(err)?;
+    if declared != actual {
+        return Err(invalid(format!(
+            "the module zip (SHA-256 {actual}) does not match its .sha256 file, which states {declared}"
+        )));
+    }
+    file.seek(SeekFrom::Start(0)).map_err(err)?;
     let mut zip = zip::ZipArchive::new(file).map_err(|e| invalid(format!("not a zip: {e}")))?;
+    if zip.len() > MAX_FILES + 1 {
+        return Err(invalid(format!(
+            "the zip holds {} entries; a module holds at most {MAX_FILES} files and its manifest",
+            zip.len()
+        )));
+    }
     let manifest_bytes = {
         let mut e = zip
             .by_name(MANIFEST)
@@ -375,75 +651,54 @@ pub fn install_zip(root: &Path, zip_path: &Path) -> Result<Status, PlatformError
             return Err(invalid(format!("the zip holds a link: {name:?}")));
         }
     }
-    fs::create_dir_all(root).map_err(err)?;
-    if let Some(free) = free_bytes(root)
-        && free < m.disk_bytes + DISK_MARGIN_BYTES
-    {
-        return Err(invalid(format!(
-            "not enough free disk space: the module needs {} MB and {} MB are free",
-            (m.disk_bytes + DISK_MARGIN_BYTES) / 1_048_576,
-            free / 1_048_576
-        )));
+    low_disk(m.disk_bytes + DISK_MARGIN_BYTES)?;
+    let plan = Plan {
+        sha256: actual,
+        version: m.version.clone(),
+        godot: m.godot.clone(),
+        disk_bytes: m.disk_bytes,
+    };
+    if !confirm(&plan) {
+        return Ok(None);
     }
-    let staging = root.join(format!(".staging-{}", std::process::id()));
-    let _ = fs::remove_dir_all(&staging);
-    let result = (|| -> Result<(), PlatformError> {
-        for f in &m.files {
-            let mut e = zip
-                .by_name(&f.path)
-                .map_err(|_| invalid(format!("{} is listed but not in the zip", f.path)))?;
-            if e.size() != f.bytes {
-                return Err(invalid(format!("{} has the wrong size in the zip", f.path)));
-            }
-            let dst = staging.join(&f.path);
-            if let Some(d) = dst.parent() {
-                fs::create_dir_all(d).map_err(err)?;
-            }
-            let mut out = fs::File::create(&dst).map_err(err)?;
-            let mut h = Sha256::new();
-            let mut buf = vec![0u8; 1 << 20];
-            let mut n = 0u64;
-            loop {
-                let k = e.read(&mut buf).map_err(err)?;
-                if k == 0 {
-                    break;
-                }
-                n += k as u64;
-                if n > f.bytes {
-                    return Err(invalid(format!("{} is larger than declared", f.path)));
-                }
-                h.update(&buf[..k]);
-                out.write_all(&buf[..k]).map_err(err)?;
-            }
-            if n != f.bytes || format!("{:x}", h.finalize()) != f.sha256 {
-                return Err(invalid(format!(
-                    "{} does not match its SHA-256 in the manifest",
-                    f.path
-                )));
-            }
+    let tree = staging.join("tree");
+    for f in &m.files {
+        let mut e = zip
+            .by_name(&f.path)
+            .map_err(|_| invalid(format!("{} is listed but not in the zip", f.path)))?;
+        if e.size() != f.bytes {
+            return Err(invalid(format!("{} has the wrong size in the zip", f.path)));
         }
-        fs::write(staging.join(MANIFEST), &manifest_bytes).map_err(err)?;
-        Ok(())
-    })();
-    if let Err(e) = result {
-        let _ = fs::remove_dir_all(&staging);
-        return Err(e);
-    }
-    // One installed version: earlier versions (and a damaged copy of this one) are removed first.
-    if let Ok(entries) = fs::read_dir(root) {
-        for e in entries.flatten() {
-            let n = e.file_name().to_string_lossy().to_string();
-            if e.path().is_dir() && version_ok(&n) {
-                let _ = fs::remove_dir_all(e.path());
+        let dst = tree.join(&f.path);
+        if let Some(d) = dst.parent() {
+            fs::create_dir_all(d).map_err(err)?;
+        }
+        let mut out = fs::File::create_new(&dst).map_err(err)?;
+        let mut h = Sha256::new();
+        let mut buf = vec![0u8; 1 << 20];
+        let mut n = 0u64;
+        loop {
+            let k = e.read(&mut buf).map_err(err)?;
+            if k == 0 {
+                break;
             }
+            n += k as u64;
+            if n > f.bytes {
+                return Err(invalid(format!("{} is larger than declared", f.path)));
+            }
+            h.update(&buf[..k]);
+            out.write_all(&buf[..k]).map_err(err)?;
+        }
+        if n != f.bytes || format!("{:x}", h.finalize()) != f.sha256 {
+            return Err(invalid(format!(
+                "{} does not match its SHA-256 in the manifest",
+                f.path
+            )));
         }
     }
-    let target = root.join(&m.version);
-    if let Err(e) = fs::rename(&staging, &target) {
-        let _ = fs::remove_dir_all(&staging);
-        return Err(err(e));
-    }
-    Ok(status_of(root))
+    fs::write(tree.join(MANIFEST), &manifest_bytes).map_err(err)?;
+    swap_in(root, &tree, &m.version)?;
+    Ok(Some(status_of(root)))
 }
 
 /// Removes every installed version and any staging folder.
@@ -454,18 +709,44 @@ pub fn uninstall(root: &Path) -> Result<Status, PlatformError> {
     Ok(status_of(root))
 }
 
+/// A checked launch: the executable, the fixed arguments and the hash the executable must still
+/// have when it is started.
+pub struct Launch {
+    pub exe: PathBuf,
+    pub args: Vec<String>,
+    exe_bytes: u64,
+    exe_sha256: String,
+}
+
 /// Verifies the installed module and returns the executable and the fixed arguments for a run
-/// folder and a pack folder (both resolved by the Studio).
+/// folder and a pack folder (both resolved by the Studio). Godot's cache folder is deleted so the
+/// process starts from the verified files only.
 pub fn launch_command(
     root: &Path,
     run_dir: &Path,
     env_dir: &Path,
-) -> Result<(PathBuf, Vec<String>), PlatformError> {
+) -> Result<Launch, PlatformError> {
     let dir =
         installed_dir(root).ok_or_else(|| invalid("the Cinematic View module is not installed"))?;
-    let m = verify_installed(&dir)
-        .map_err(|e| invalid(format!("the installed module failed verification: {e}")))?;
+    let m = verify_installed(&dir).map_err(|e| {
+        invalid(format!(
+            "the installed module failed its integrity check: {e}"
+        ))
+    })?;
+    let cache = dir.join(&m.project).join(GODOT_CACHE);
+    if cache.symlink_metadata().is_ok() {
+        fs::remove_dir_all(&cache).map_err(|e| {
+            invalid(format!(
+                "the module's Godot cache could not be cleared: {e}"
+            ))
+        })?;
+    }
     let exe = dir.join(&m.exe);
+    let exe_entry = m
+        .files
+        .iter()
+        .find(|f| f.path == m.exe)
+        .ok_or_else(|| invalid("the module executable is not in the file list"))?;
     let mut args = Vec::new();
     // On this Windows machine (RX 7700 XT, driver 32.0.31041) Godot's Vulkan swap chain fails on
     // every frame ("Couldn't get Vulkan surface capabilities", VkResult -13) and the window stays
@@ -484,15 +765,58 @@ pub fn launch_command(
         "--profile".to_string(),
         "auto".to_string(),
     ]);
-    Ok((exe, args))
+    Ok(Launch {
+        exe,
+        args,
+        exe_bytes: exe_entry.bytes,
+        exe_sha256: exe_entry.sha256.clone(),
+    })
+}
+
+/// Opens the executable so that nobody can write to it while the handle is held.
+fn open_exe_locked(exe: &Path) -> std::io::Result<fs::File> {
+    let mut o = fs::OpenOptions::new();
+    o.read(true);
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        o.share_mode(1); // FILE_SHARE_READ: no writers, no deleters
+    }
+    o.open(exe)
+}
+
+/// Hashes the executable once more, through a handle that denies writers, and starts it while that
+/// handle is still open.
+pub fn spawn_checked(l: &Launch) -> Result<Child, PlatformError> {
+    let mut f = open_exe_locked(&l.exe).map_err(err)?;
+    let (sha, n) = sha256_reader(&mut f).map_err(err)?;
+    if n != l.exe_bytes || sha != l.exe_sha256 {
+        return Err(invalid(
+            "the module executable changed after it was verified; it was not started",
+        ));
+    }
+    let child = Command::new(&l.exe)
+        .args(&l.args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(err)?;
+    drop(f);
+    Ok(child)
+}
+
+fn child_alive(slot: &mut Option<Child>) -> bool {
+    slot.as_mut()
+        .is_some_and(|c| matches!(c.try_wait(), Ok(None)))
 }
 
 // ---------------------------------------------------------------------------------- commands
 
 #[tauri::command]
 pub async fn cinematic_status(state: State<'_, AppState>) -> Result<Status, PlatformError> {
-    let root = state.modules.root.clone();
-    blocking(move || Ok(status_of(&root))).await
+    let modules = state.modules.clone();
+    blocking(move || Ok(modules.status())).await
 }
 
 #[tauri::command]
@@ -500,7 +824,7 @@ pub async fn cinematic_install_from_file(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<Option<Status>, PlatformError> {
-    let root = state.modules.root.clone();
+    let modules = state.modules.clone();
     let log = state.paths.log.clone();
     blocking(move || {
         let picked = app
@@ -512,27 +836,56 @@ pub async fn cinematic_install_from_file(
         let Some(zip_path) = picked.and_then(|f| f.into_path().ok()) else {
             return Ok(None);
         };
-        let s = install_zip(&root, &zip_path).inspect_err(|e| {
+        // Held until the install ends: no launch can start while the module is being replaced.
+        let mut slot = modules.child.lock().map_err(err)?;
+        if child_alive(&mut slot) {
+            return Err(invalid(
+                "the Cinematic View is open; close it before installing or replacing the module",
+            ));
+        }
+        let ask = |p: &Plan| {
+            app.dialog()
+                .message(format!(
+                    "Install Cinematic View {} (Godot {}, {} MB on disk)?\n\nSHA-256 of the zip:\n{}\n\nThe .sha256 file beside the zip matches, so the zip is intact. That does not show who built it: compare the SHA-256 above with a value from a source you trust. Studio then checks every extracted file against the module manifest.",
+                    p.version,
+                    p.godot,
+                    p.disk_bytes / 1_048_576,
+                    p.sha256
+                ))
+                .title("Install the Cinematic View module")
+                .kind(MessageDialogKind::Info)
+                .buttons(MessageDialogButtons::OkCancelCustom(
+                    "Install".into(),
+                    "Cancel".into(),
+                ))
+                .blocking_show()
+        };
+        modules.forget();
+        let s = install_zip(&modules.root, &zip_path, &ask).inspect_err(|e| {
             log_line(&log, &format!("cinematic module install refused: {e}"));
         })?;
-        log_line(&log, &format!("cinematic module installed {:?}", s.version));
-        Ok(Some(s))
+        match &s {
+            Some(s) => log_line(&log, &format!("cinematic module installed {:?}", s.version)),
+            None => log_line(&log, "cinematic module install cancelled"),
+        }
+        Ok(s)
     })
     .await
 }
 
 #[tauri::command]
 pub async fn cinematic_uninstall(state: State<'_, AppState>) -> Result<Status, PlatformError> {
-    let root = state.modules.root.clone();
+    let modules = state.modules.clone();
     let log = state.paths.log.clone();
-    if let Ok(mut c) = state.modules.child.lock()
-        && let Some(mut child) = c.take()
-    {
-        let _ = child.kill();
-        let _ = child.wait();
-    }
     blocking(move || {
-        let s = uninstall(&root)?;
+        if let Ok(mut c) = modules.child.lock()
+            && let Some(mut child) = c.take()
+        {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+        modules.forget();
+        let s = uninstall(&modules.root)?;
         log_line(&log, "cinematic module uninstalled");
         Ok(s)
     })
@@ -552,28 +905,25 @@ pub async fn cinematic_launch(
     }
     let (_, env) = state.geo.get(&env_id)?;
     let env_dir = env.dir.clone();
-    let root = state.modules.root.clone();
-    let (exe, args) = blocking(move || launch_command(&root, &run_dir, &env_dir)).await?;
-    let mut slot = state.modules.child.lock().map_err(err)?;
-    if let Some(c) = slot.as_mut()
-        && matches!(c.try_wait(), Ok(None))
-    {
-        return Err(invalid(
-            "the Cinematic View is already open; close it first",
-        ));
-    }
-    let child = Command::new(&exe)
-        .args(&args)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .map_err(err)?;
+    let modules = state.modules.clone();
+    blocking(move || {
+        // The lock is held from the check to the spawn: an install cannot swap the module between
+        // the verification and the start, and a second window cannot be opened meanwhile.
+        let mut slot = modules.child.lock().map_err(err)?;
+        if child_alive(&mut slot) {
+            return Err(invalid(
+                "the Cinematic View is already open; close it first",
+            ));
+        }
+        let launch = launch_command(&modules.root, &run_dir, &env_dir)?;
+        *slot = Some(spawn_checked(&launch)?);
+        Ok(())
+    })
+    .await?;
     log_line(
         &state.paths.log,
         &format!("cinematic view started for run {run_id} on {env_id}"),
     );
-    *slot = Some(child);
     Ok(())
 }
 
@@ -631,6 +981,22 @@ mod tests {
         ("project/project.godot", b"config_version=5\n"),
     ];
 
+    fn install(root: &Path, zp: &Path) -> Result<Status, PlatformError> {
+        install_zip(root, zp, &|_| true).map(|s| s.expect("not cancelled"))
+    }
+
+    /// The module zip of `build_zip` with another version, as `<dir>/<version>.zip`.
+    fn build_version(dir: &Path, version: &str, exe: &[u8]) -> PathBuf {
+        let sub = dir.join(version);
+        fs::create_dir_all(&sub).unwrap();
+        let files: Vec<(&str, &[u8])> = vec![
+            ("godot/g.exe", exe),
+            ("project/project.godot", b"config_version=5\n"),
+        ];
+        let v = version.to_string();
+        build_zip(&sub, &files, None, |m| m["version"] = v.clone().into())
+    }
+
     fn tmp(name: &str) -> PathBuf {
         let d = std::env::temp_dir().join(format!("vv-modules-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&d);
@@ -643,10 +1009,18 @@ mod tests {
         let d = tmp("ok");
         let zp = build_zip(&d, FILES, None, |_| {});
         let root = d.join("modules").join("cinematic");
-        let s = install_zip(&root, &zp).unwrap();
+        let s = install(&root, &zp).unwrap();
         assert!(s.installed && s.verified, "{s:?}");
         assert_eq!(s.version.as_deref(), Some("0.1.0"));
-        let (exe, args) = launch_command(&root, Path::new("R"), Path::new("E")).unwrap();
+        // Nothing but the module is left beside it.
+        let names: Vec<_> = fs::read_dir(&root)
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().to_string())
+            .collect();
+        assert_eq!(names, ["0.1.0"]);
+        let Launch { exe, args, .. } =
+            launch_command(&root, Path::new("R"), Path::new("E")).unwrap();
         assert!(exe.ends_with("0.1.0/godot/g.exe") || exe.ends_with("0.1.0\\godot\\g.exe"));
         let at = args.iter().position(|a| a == "--path").unwrap();
         assert_eq!(
@@ -718,7 +1092,7 @@ mod tests {
             let d = tmp(name);
             let zp = make(&d);
             let root = d.join("modules").join("cinematic");
-            assert!(install_zip(&root, &zp).is_err(), "{name} was accepted");
+            assert!(install(&root, &zp).is_err(), "{name} was accepted");
             assert!(
                 installed_dir(&root).is_none(),
                 "{name} left an installation"
@@ -736,9 +1110,10 @@ mod tests {
         };
         let d = tmp("real");
         let root = d.join("modules").join("cinematic");
-        let s = install_zip(&root, &zp).unwrap();
+        let s = install(&root, &zp).unwrap();
         assert!(s.installed && s.verified, "{s:?}");
-        let (exe, args) = launch_command(&root, Path::new("R"), Path::new("E")).unwrap();
+        let Launch { exe, args, .. } =
+            launch_command(&root, Path::new("R"), Path::new("E")).unwrap();
         assert!(exe.is_file());
         let at = args.iter().position(|a| a == "--path").unwrap();
         assert!(Path::new(&args[at + 1]).join("project.godot").is_file());
@@ -748,9 +1123,212 @@ mod tests {
         // Studio module folder (VV_CINEMATIC_INSTALL_TO, e.g. <app local data>/modules/cinematic)
         // and keep it, so the installed Studio can be driven without its native file dialog.
         if let Some(real) = std::env::var_os("VV_CINEMATIC_INSTALL_TO").map(PathBuf::from) {
-            let s = install_zip(&real, &zp).unwrap();
+            let s = install(&real, &zp).unwrap();
             assert!(s.installed && s.verified, "{s:?}");
         }
+    }
+
+    #[test]
+    fn a_file_the_manifest_does_not_list_fails_the_check() {
+        let d = tmp("extra");
+        let zp = build_zip(&d, FILES, None, |_| {});
+        let root = d.join("modules").join("cinematic");
+        install(&root, &zp).unwrap();
+        let v = root.join("0.1.0");
+        assert!(verify_installed(&v).is_ok());
+        for (rel, why) in [
+            ("godot/override.cfg", "beside the executable"),
+            ("godot/evil.dll", "a library beside the executable"),
+            ("project/reg.exe", "a helper in the project"),
+            ("new/deep/file.txt", "a new folder"),
+            ("project/.godot2/x", "only .godot itself is exempt"),
+            (".godot/cache", ".godot outside the project is not exempt"),
+        ] {
+            let p = v.join(rel);
+            fs::create_dir_all(p.parent().unwrap()).unwrap();
+            fs::write(&p, b"x").unwrap();
+            let e = verify_installed(&v).unwrap_err();
+            assert!(e.contains("not part of the module"), "{why}: {e}");
+            assert!(!status_of(&root).verified, "{why}");
+            fs::remove_file(&p).ok();
+            // Removing the file again restores a clean tree (empty folders are harmless).
+            assert!(verify_installed(&v).is_ok(), "{why}: still failing");
+        }
+        let _ = fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn godot_cache_is_tolerated_by_the_check_and_deleted_before_launch() {
+        let d = tmp("cache");
+        let zp = build_zip(&d, FILES, None, |_| {});
+        let root = d.join("modules").join("cinematic");
+        install(&root, &zp).unwrap();
+        let cache = root.join("0.1.0").join("project").join(".godot");
+        fs::create_dir_all(cache.join("imported")).unwrap();
+        fs::write(cache.join("extension_list.cfg"), b"res://evil.gdextension").unwrap();
+        assert!(
+            status_of(&root).verified,
+            "the cache is exempt from the check"
+        );
+        launch_command(&root, Path::new("R"), Path::new("E")).unwrap();
+        assert!(!cache.exists(), "the launch deletes the cache");
+        let _ = fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn versions_sort_numerically() {
+        let d = tmp("order");
+        for v in ["0.9.0", "0.10.0", "0.2.11", "1.0.0-x", ".staging-1"] {
+            fs::create_dir_all(d.join(v)).unwrap();
+        }
+        assert_eq!(installed_dir(&d).unwrap().file_name().unwrap(), "0.10.0");
+        assert_eq!(version_key("0.10.0"), Some((0, 10, 0)));
+        assert_eq!(version_key("1.0.0-x"), None);
+        let _ = fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn replacing_installs_the_new_version_and_leaves_no_leftovers() {
+        let d = tmp("replace");
+        let root = d.join("modules").join("cinematic");
+        install(&root, &build_version(&d, "0.1.0", b"MZ one")).unwrap();
+        // Stale staging folders of an interrupted install are removed at the start of the next one.
+        fs::create_dir_all(root.join(".staging-99999")).unwrap();
+        fs::write(root.join(".staging-99999.zip"), b"x").unwrap();
+        let s = install(&root, &build_version(&d, "0.2.0", b"MZ two")).unwrap();
+        assert_eq!(s.version.as_deref(), Some("0.2.0"));
+        assert!(s.verified, "{s:?}");
+        let mut names: Vec<_> = fs::read_dir(&root)
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().to_string())
+            .collect();
+        names.sort();
+        assert_eq!(names, ["0.2.0"]);
+        let _ = fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn a_failed_swap_keeps_the_installed_module() {
+        let d = tmp("swap");
+        let root = d.join("modules").join("cinematic");
+        install(&root, &build_version(&d, "0.1.0", b"MZ one")).unwrap();
+        // The new tree does not exist, so the final rename fails after the old one was moved aside.
+        let e = swap_in(&root, &d.join("missing"), "0.2.0").unwrap_err();
+        assert!(e.to_string().contains("previous module is kept"), "{e}");
+        let s = status_of(&root);
+        assert!(s.verified, "{s:?}");
+        assert_eq!(s.version.as_deref(), Some("0.1.0"));
+        assert!(!root.join("0.2.0").exists());
+        assert!(
+            fs::read_dir(&root)
+                .unwrap()
+                .flatten()
+                .all(|e| !e.file_name().to_string_lossy().starts_with(OLD_PREFIX)),
+            "the aside folder is gone once the old module is back"
+        );
+        let _ = fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn cancelling_installs_nothing_and_the_plan_carries_the_zip_hash() {
+        let d = tmp("cancel");
+        let zp = build_zip(&d, FILES, None, |_| {});
+        let root = d.join("modules").join("cinematic");
+        let want = sha256_file(&zp).unwrap().0;
+        let seen = std::cell::RefCell::new(None);
+        let r = install_zip(&root, &zp, &|p| {
+            *seen.borrow_mut() = Some(p.clone());
+            false
+        })
+        .unwrap();
+        assert!(r.is_none());
+        let p = seen.borrow().clone().unwrap();
+        assert_eq!(p.sha256, want);
+        assert_eq!((p.version.as_str(), p.disk_bytes), ("0.1.0", 24));
+        assert!(installed_dir(&root).is_none());
+        assert_eq!(
+            fs::read_dir(&root).unwrap().count(),
+            0,
+            "staging is removed"
+        );
+        // A sidecar mismatch names the computed hash.
+        fs::write(d.join("m.zip.sha256"), "1".repeat(64)).unwrap();
+        let e = install(&root, &zp).unwrap_err().to_string();
+        assert!(e.contains(&want), "{e}");
+        let _ = fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn a_zip_with_too_many_entries_is_refused_before_it_is_read() {
+        let d = tmp("many");
+        let zp = d.join("m.zip");
+        let mut z = zip::ZipWriter::new(fs::File::create(&zp).unwrap());
+        let o = zip::write::SimpleFileOptions::default();
+        for i in 0..MAX_FILES + 2 {
+            z.start_file(format!("f{i}"), o).unwrap();
+        }
+        z.finish().unwrap();
+        let (sha, _) = sha256_file(&zp).unwrap();
+        fs::write(d.join("m.zip.sha256"), sha).unwrap();
+        let e = install(&d.join("modules"), &zp).unwrap_err().to_string();
+        assert!(e.contains("entries"), "{e}");
+        let _ = fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn the_status_is_cached_until_the_manifest_changes_and_the_launch_still_checks() {
+        let d = tmp("cached");
+        let zp = build_zip(&d, FILES, None, |_| {});
+        let root = d.join("modules").join("cinematic");
+        let m = Modules::new(root.clone());
+        install(&root, &zp).unwrap();
+        assert!(m.status().verified);
+        // Same size, so only hashing can tell: the cached status does not rehash...
+        fs::write(root.join("0.1.0").join("godot").join("g.exe"), b"MZ evil").unwrap();
+        assert!(m.status().verified, "served from the cache");
+        // ...but the launch always does.
+        assert!(launch_command(&root, Path::new("R"), Path::new("E")).is_err());
+        m.forget();
+        assert!(!m.status().verified);
+        let _ = fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn an_executable_changed_after_the_check_is_not_started() {
+        let d = tmp("toctou");
+        let zp = build_zip(&d, FILES, None, |_| {});
+        let root = d.join("modules").join("cinematic");
+        install(&root, &zp).unwrap();
+        let l = launch_command(&root, Path::new("R"), Path::new("E")).unwrap();
+        fs::write(&l.exe, b"MZ evil").unwrap();
+        let e = spawn_checked(&l).expect_err("refused").to_string();
+        assert!(e.contains("changed after it was verified"), "{e}");
+        let _ = fs::remove_dir_all(&d);
+    }
+
+    /// The handle that denies writers must not stop the process from starting: the module here is
+    /// a copy of this test program, which exits at once on the module's arguments.
+    #[cfg(windows)]
+    #[test]
+    fn the_locked_executable_still_starts() {
+        let d = tmp("spawn");
+        let bytes = fs::read(std::env::current_exe().unwrap()).unwrap();
+        let zp = build_zip(
+            &d,
+            &[
+                ("godot/g.exe", &bytes),
+                ("project/project.godot", b"config_version=5\n"),
+            ],
+            None,
+            |_| {},
+        );
+        let root = d.join("modules").join("cinematic");
+        install(&root, &zp).unwrap();
+        let l = launch_command(&root, Path::new("R"), Path::new("E")).unwrap();
+        let mut child = spawn_checked(&l).unwrap();
+        let _ = child.wait();
+        let _ = fs::remove_dir_all(&d);
     }
 
     #[test]
