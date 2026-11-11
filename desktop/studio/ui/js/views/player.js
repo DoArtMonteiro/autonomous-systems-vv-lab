@@ -363,7 +363,7 @@ function build() {
       h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'analyse' }, title: 'Open the shown run with every channel, requirement and its provenance', onclick: () => navigate('run', { runId: pl.runs[pl.active].runId, t: pl.cursor.t }) }, 'Analyse'),
       runs.length > 1 ? h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'compare' }, onclick: () => navigate('compare', { runIds: runs.map((r) => r.runId), demo: pl.demo }) }, 'Compare in detail') : null,
       cinematicButton(() => pl.runs[pl.active].runId, () => pl.envId || (pl.envs.length ? defaultEnv(pl.envs) : null), pl.kind === 'rocket-3d'),
-      h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'configure' }, title: 'Open the shown run in the Experiment Lab: change its conditions, run a new simulation and compare', onclick: () => navigate('lab', { runId: pl.runs[pl.active].runId }) }, 'Change the conditions')))));
+      h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'configure' }, title: 'Open the shown run in the Experiment Lab: change its conditions, run a new simulation and compare', onclick: () => navigate('lab', { runId: pl.runs[pl.active].runId }) }, 'Change the conditions'))));
 
   const side = h('aside', { class: 'pl-side', 'aria-label': 'Mission briefing and result' });
   const transport = buildTransport();
