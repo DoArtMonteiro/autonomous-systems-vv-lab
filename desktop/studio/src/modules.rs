@@ -171,10 +171,15 @@ impl ModulesInner {
     }
 
     /// Starts an install or an uninstall; refused while another one is in progress.
+    /// The guard protects no data, so a lock poisoned by a panic is taken over, not refused.
     fn begin_op(&self) -> Result<std::sync::MutexGuard<'_, ()>, PlatformError> {
-        self.op
-            .try_lock()
-            .map_err(|_| invalid("an install or uninstall of the module is in progress"))
+        match self.op.try_lock() {
+            Ok(guard) => Ok(guard),
+            Err(std::sync::TryLockError::Poisoned(p)) => Ok(p.into_inner()),
+            Err(std::sync::TryLockError::WouldBlock) => Err(invalid(
+                "an install or uninstall of the module is in progress",
+            )),
+        }
     }
 
     /// Removes the module unless the Cinematic View runs. The lock is held through the removal, so
@@ -1610,6 +1615,23 @@ mod tests {
         assert!(status_of(&root).verified, "the module is untouched");
         drop(guard);
         assert!(!m.uninstall_guarded().unwrap().installed);
+        let _ = fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn a_panic_during_an_operation_does_not_block_later_ones() {
+        let d = tmp("oppoison");
+        let m = Modules::new(d.join("modules").join("cinematic"));
+        std::thread::scope(|s| {
+            let r = s
+                .spawn(|| {
+                    let _g = m.begin_op().unwrap();
+                    panic!("picker failed");
+                })
+                .join();
+            assert!(r.is_err());
+        });
+        assert!(m.begin_op().is_ok(), "a poisoned guard is taken over");
         let _ = fs::remove_dir_all(&d);
     }
 
