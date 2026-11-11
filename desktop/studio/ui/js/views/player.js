@@ -6,7 +6,7 @@
 //
 // M16: the same replay has three views that share the runs and the cursor. Engineering (the
 // lightweight Three.js scene of M15, no geographic data), Geospatial (the same scene placed on a
-// validated environment pack) and Mission Control (an operations layout over either renderer).
+// validated environment pack) and Flight console (an operations layout over either renderer).
 // Switching view remounts only the presentation; the records, the cursor time and the results stay.
 
 import { h, clear, icon, num, prose, lowerIndex, timeText } from '../dom.js';
@@ -36,7 +36,7 @@ let loading = null; // {id} of the load in progress; a newer load replaces it
 let visible = false;
 
 const SPEEDS = [0.5, 1, 2, 4];
-const VIEWS = [['engineering', 'Engineering'], ['geospatial', 'Geospatial'], ['control', 'Mission Control']];
+const VIEWS = [['engineering', 'Engineering'], ['geospatial', 'Geospatial'], ['control', 'Flight console']];
 
 export function initPlayer(el, nav) {
   root = el;
@@ -570,7 +570,7 @@ function setAnalysis(on) {
   else gateMarks(pl.cursor.t);
 }
 
-/** The analysis-mode switch, shared by the player and Mission Control. */
+/** The analysis-mode switch, shared by the player and the Flight console. */
 export function analysisToggle() {
   return h('button', { type: 'button', class: 'btn btn-quiet btn-sm pl-analysis', dataset: { action: 'analysis' }, 'aria-pressed': String(!!(pl && pl.analysis)),
     title: 'Analysis mode: show every finding and the result now, including those later in the run. Ordinary playback shows them only when it reaches them.',

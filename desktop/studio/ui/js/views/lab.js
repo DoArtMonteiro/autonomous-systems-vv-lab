@@ -539,7 +539,7 @@ function renderComparison(el) {
   eventDeltas(a, b),
   h('p', { class: 'small dim' }, `One run on seed ${b.request.seed}. A change that helps one seed may not help another: check it across seeds below.`),
   h('div', { class: 'row' },
-    h('button', { type: 'button', class: 'btn btn-primary', id: 'lab-watch', title: 'Play both runs from their records in the mission player: engineering scene, geospatial view, Mission Control and, when installed, the Cinematic View', onclick: () => watchRuns() }, 'Watch both runs'),
+    h('button', { type: 'button', class: 'btn btn-primary', id: 'lab-watch', title: 'Play both runs from their records in the mission player: engineering scene, geospatial view, Flight console and, when installed, the Cinematic View', onclick: () => watchRuns() }, 'Watch both runs'),
     h('button', { type: 'button', class: 'btn', onclick: () => navigate('compare', { runIds: [lab.base.id, lab.exp.id] }) }, 'Compare signals in detail'),
     h('button', { type: 'button', class: 'btn btn-quiet', onclick: () => navigate('run', { runId: lab.exp.id }) }, 'Analyse the experiment'),
     h('button', { type: 'button', class: 'btn btn-quiet', title: 'Make this run the new baseline and keep experimenting from it', onclick: () => { const e = lab.exp; startFrom(e.id, e.record); render(); } }, 'Use as new baseline')));

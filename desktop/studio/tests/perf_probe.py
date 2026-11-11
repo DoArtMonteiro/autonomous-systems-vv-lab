@@ -10,7 +10,7 @@ of the desktop shell on the machine that runs the script. The script prints one 
 `--flow m11` drives the 0.11 interface (Prepare, rocket domain, nominal demonstration). `--flow m15`
 drives the M15 home screen (one click on the first showcase mission). Each click is counted.
 `--flow m16` runs the m15 path, then measures the M16 views: time to the geospatial scene, its frame
-times and CPU load, Mission Control on the landscape, memory after the player is left, a 180 s
+times and CPU load, Flight console on the landscape, memory after the player is left, a 180 s
 looping session, GPU memory and 3D engine utilisation (Windows performance counters) and every
 request the web view makes, to show that none leaves the machine.
 """

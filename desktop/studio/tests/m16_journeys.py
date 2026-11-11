@@ -1,5 +1,5 @@
 r"""M16 journeys of V&V Lab Studio in the real WebView2 window: the geospatial view of a rocket
-landing on a validated environment, Mission Control for the rocket and the ground vehicle, view
+landing on a validated environment, Flight console for the rocket and the ground vehicle, view
 switching that keeps the replay, event selection and the hand-off to analysis, the release of the
 geospatial renderer when the player is left, and the behaviour with no environment and with a
 tampered one. Screenshots go to --shots. It uses a scratch library and configuration.
@@ -53,7 +53,7 @@ def open_mission(s, exp_id):
 def geospatial(s):
     open_mission(s, "first-landing")
     s.wait("document.querySelector('.pl-views')", 20, "view switch")
-    check("Geo: the player offers Engineering, Geospatial and Mission Control", s.js("[...document.querySelectorAll('.pl-views [data-view]')].map((b) => b.dataset.view).join(',')") == "engineering,geospatial,control")
+    check("Geo: the player offers Engineering, Geospatial and Flight console", s.js("[...document.querySelectorAll('.pl-views [data-view]')].map((b) => b.dataset.view).join(',')") == "engineering,geospatial,control")
     runs = player(s)["runs"]
     before = record_hashes(s, runs)
     s.page.click(".pl-views [data-view='geospatial']")
@@ -92,13 +92,13 @@ def geospatial(s):
     s.wait("!window.__studio.player().playing", 5, "paused")
     t_before = player(s)["t"]
     s.page.click(".pl-views [data-view='control']")
-    s.wait("document.querySelector('.mc')", 20, "mission control")
+    s.wait("document.querySelector('.mc')", 20, "flight console")
     wait_renderer(s, "geospatial", 30)
-    check("Geo to Mission Control keeps the playback time", abs(player(s)["t"] - t_before) < 1e-6, f"{t_before} -> {player(s)['t']}")
-    check("Mission Control keeps the landscape", player(s)["renderer"] == "geospatial")
+    check("Geo to Flight console keeps the playback time", abs(player(s)["t"] - t_before) < 1e-6, f"{t_before} -> {player(s)['t']}")
+    check("Flight console keeps the landscape", player(s)["renderer"] == "geospatial")
     s.page.click(".mc-tools .pl-views [data-view='engineering']")
     wait_renderer(s, "engineering", 20)
-    check("Mission Control to Engineering keeps the playback time", abs(player(s)["t"] - t_before) < 1e-6)
+    check("Flight console to Engineering keeps the playback time", abs(player(s)["t"] - t_before) < 1e-6)
     after = record_hashes(s, runs)
     check("Geo: placing the run on a landscape changes no record", before == after)
     # Second environment: relief that breaks the flat-ground assumption must be stated.
@@ -219,7 +219,7 @@ def gating(s):
     open_mission(s, "lying-altimeter")
     if not s.js("!!document.querySelector('.mc')"):
         s.page.click(".pl-views [data-view='control']")
-        s.wait("document.querySelector('.mc')", 20, "mission control")
+        s.wait("document.querySelector('.mc')", 20, "flight console")
     if player(s)["playing"]:
         s.page.click(".mct-play")
     s.page.keyboard.press("Home")
@@ -239,7 +239,7 @@ def control_rocket(s):
     open_mission(s, "late-gnss")
     if not s.js("!!document.querySelector('.mc')"):
         s.page.click(".pl-views [data-view='control']")
-    s.wait("document.querySelector('.mc')", 20, "mission control")
+    s.wait("document.querySelector('.mc')", 20, "flight console")
     if s.js("!!document.querySelector('.mc-tools .pl-env')"):
         s.page.select_option(".mc-tools .pl-env", "cape-canaveral")
         wait_renderer(s, "geospatial", 30)
@@ -303,7 +303,7 @@ def control_ground(s):
         s.wait("document.querySelector('.pl-head')", 10, "player")
     check("MC ground: Geospatial is unavailable for a millimetre grid, with the reason", s.js("(() => { const b = document.querySelector(\".pl-views [data-view='geospatial']\"); return !!b && b.getAttribute('aria-disabled') === 'true' && (b.title || '').includes('millimetre'); })()"))
     s.page.click(".pl-views [data-view='control']")
-    s.wait("document.querySelector('.mc')", 20, "mission control")
+    s.wait("document.querySelector('.mc')", 20, "flight console")
     s.page.click(".mc-density [data-density='technical']")
     time.sleep(0.5)
     text = s.js("document.querySelector('.mc-left').innerText")
@@ -333,10 +333,10 @@ def layout(s):
     open_mission(s, "late-gnss")
     if not s.js("!!document.querySelector('.mc')"):
         s.page.click(".pl-views [data-view='control']")
-        s.wait("document.querySelector('.mc')", 20, "mission control")
+        s.wait("document.querySelector('.mc')", 20, "flight console")
     for w, h in ((1440, 900), (1280, 800), (1024, 640)):
         s.resize(w, h)
-        check(f"Layout {w}x{h}: no horizontal scroll in Mission Control", s.no_hscroll())
+        check(f"Layout {w}x{h}: no horizontal scroll in Flight console", s.no_hscroll())
         bad = s.unnamed_buttons()
         check(f"Layout {w}x{h}: every control has a name", not bad, "; ".join(bad[:3]))
         s.shot(f"m16-control-{w}x{h}-dark")
@@ -379,8 +379,8 @@ def fallback(s, label):
     check(f"{label}: Geospatial is disabled and says why", bool(b) and b["off"] == "true" and "environment" in (b["title"] or ""), json.dumps(b))
     check(f"{label}: the engineering scene plays offline", player(s)["renderer"] == "engineering" and player(s)["scene"] == "rocket-3d")
     s.page.click(".pl-views [data-view='control']")
-    s.wait("document.querySelector('.mc')", 20, "mission control")
-    check(f"{label}: Mission Control works on the engineering scene", player(s)["renderer"] == "engineering")
+    s.wait("document.querySelector('.mc')", 20, "flight console")
+    check(f"{label}: Flight console works on the engineering scene", player(s)["renderer"] == "engineering")
     s.shot(f"m16-{label.lower().replace(' ', '-')}-control-dark")
 
 
