@@ -501,8 +501,8 @@ fn clear_staging(root: &Path) {
 /// replacement (for instance a running Cinematic View that locks its executable) never leaves the
 /// user without a module.
 fn swap_in(root: &Path, new_tree: &Path, version: &str) -> Result<(), PlatformError> {
+    // Not cleared first: after a failed put-back it may hold the only copy of the old module.
     let aside = root.join(format!("{OLD_PREFIX}{}", std::process::id()));
-    let _ = fs::remove_dir_all(&aside);
     let mut moved: Vec<(PathBuf, PathBuf)> = Vec::new();
     let put_back = |moved: &[(PathBuf, PathBuf)]| {
         let lost = moved
@@ -792,7 +792,7 @@ pub fn spawn_checked(l: &Launch) -> Result<Child, PlatformError> {
     let (sha, n) = sha256_reader(&mut f).map_err(err)?;
     if n != l.exe_bytes || sha != l.exe_sha256 {
         return Err(invalid(
-            "the module executable changed after it was verified; it was not started",
+            "the module executable changed after it was checked; it was not started",
         ));
     }
     let child = Command::new(&l.exe)
@@ -915,8 +915,11 @@ pub async fn cinematic_launch(
                 "the Cinematic View is already open; close it first",
             ));
         }
-        let launch = launch_command(&modules.root, &run_dir, &env_dir)?;
-        *slot = Some(spawn_checked(&launch)?);
+        // A refused launch means the cached "files matched" status is out of date.
+        let started = launch_command(&modules.root, &run_dir, &env_dir)
+            .and_then(|launch| spawn_checked(&launch))
+            .inspect_err(|_| modules.forget())?;
+        *slot = Some(started);
         Ok(())
     })
     .await?;
@@ -1303,7 +1306,7 @@ mod tests {
         let l = launch_command(&root, Path::new("R"), Path::new("E")).unwrap();
         fs::write(&l.exe, b"MZ evil").unwrap();
         let e = spawn_checked(&l).expect_err("refused").to_string();
-        assert!(e.contains("changed after it was verified"), "{e}");
+        assert!(e.contains("changed after it was checked"), "{e}");
         let _ = fs::remove_dir_all(&d);
     }
 

@@ -38,9 +38,13 @@ Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 $root = [System.Windows.Automation.AutomationElement]::RootElement
 $name = [System.Windows.Automation.AutomationElement]::NameProperty
+$isWindow = New-Object System.Windows.Automation.PropertyCondition ([System.Windows.Automation.AutomationElement]::ControlTypeProperty), ([System.Windows.Automation.ControlType]::Window)
 $deadline = (Get-Date).AddSeconds(40)
 while ((Get-Date) -lt $deadline) {
-    $w = $root.FindFirst([System.Windows.Automation.TreeScope]::Children, (New-Object System.Windows.Automation.PropertyCondition $name, 'Install the Cinematic View module'))
+    $w = $null
+    foreach ($c in $root.FindAll([System.Windows.Automation.TreeScope]::Descendants, $isWindow)) {
+        if ($c.Current.Name -like 'Install the Cinematic View module*') { $w = $c; break }
+    }
     if ($w) {
         $texts = ($w.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition) | ForEach-Object { $_.Current.Name }) -join ' '
         $b = $w.FindFirst([System.Windows.Automation.TreeScope]::Descendants, (New-Object System.Windows.Automation.PropertyCondition $name, 'Install'))
@@ -137,9 +141,18 @@ def main():
                 for pid in godot_pids(proc.pid):
                     subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True)
                 time.sleep(1)
-                # Godot wrote its cache inside the module folder; the integrity check must tolerate that.
-                again = status(s)
-                check("Cinematic: after a launch the module still passes its integrity check", bool(again.get("verified")), json.dumps(again)[:240])
+                # Godot wrote its cache inside the module folder. Only a launch runs the full integrity
+                # check (the status is cached), so open the view a second time: it must still start.
+                s.page.click(".pl-head [data-action='cinematic']")
+                t0 = time.time()
+                relaunched = []
+                while time.time() - t0 < 40 and not relaunched:
+                    relaunched = godot_pids(proc.pid)
+                    time.sleep(0.5)
+                check("Cinematic: a second launch passes the full integrity check after Godot wrote its cache", bool(relaunched), json.dumps(status(s))[:200])
+                for pid in relaunched:
+                    subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True)
+                time.sleep(1)
                 after = s.page.evaluate("() => window.__TAURI__.core.invoke('cinematic_uninstall')")
                 check("Cinematic: uninstall removes the module", not after.get("installed"), json.dumps(after)[:200])
                 s.page.evaluate("() => document.querySelector(\".nav-btn[data-view='home']\").click()")
