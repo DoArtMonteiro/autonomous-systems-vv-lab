@@ -2,6 +2,7 @@ r"""Benchmark of the Cinematic View, one graphics profile per process, run one a
 
     python scripts/cinematic/bench.py --godot <Godot_v4.7.2-stable_win64_console.exe> --run <run dir>
         --env <pack dir> --out <dir> [--profiles performance,balanced,high,ultra] [--seconds 12]
+        [--driver d3d12]
 
 For each profile it starts the renderer at 1440x900 with --bench (vsync off, the record replayed
 from its first to its last sample over --seconds of wall time with the Auto camera, after 120
@@ -43,7 +44,8 @@ def godot_process(proc):
 
 def run_one(a, profile):
     out_json = os.path.join(a.out, f"bench-{profile}.json")
-    cmd = [a.godot, "--path", PROJECT, "--resolution", "1440x900", "--", "--run", a.run, "--env", a.env,
+    driver = ["--rendering-driver", a.driver] if a.driver else []
+    cmd = [a.godot, *driver, "--path", PROJECT, "--resolution", "1440x900", "--", "--run", a.run, "--env", a.env,
            "--profile", profile, "--camera", "director", "--bench", out_json, "--bench-seconds", str(a.seconds)]
     t0 = time.perf_counter()
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
@@ -96,6 +98,7 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--profiles", default="performance,balanced,high,ultra")
     ap.add_argument("--seconds", type=float, default=12.0)
+    ap.add_argument("--driver", default="", help="rendering driver passed to Godot (e.g. d3d12; Vulkan shows a black window on some machines)")
     a = ap.parse_args()
     # Godot resolves relative paths against its own working directory: pass absolute ones.
     a.out, a.run, a.env = (os.path.abspath(x) for x in (a.out, a.run, a.env))
