@@ -117,7 +117,7 @@ static func texture_of(img: Image) -> ImageTexture:
 
 
 # Builds the terrain under `parent`. Returns {base, detail, beyond, materials, textures}.
-static func build(pack, parent: Node3D) -> Dictionary:
+static func build(pack, parent: Node3D, with_beyond := true) -> Dictionary:
 	var shader: Shader = load("res://shaders/terrain.gdshader")
 	var L: float = pack.extent()
 	var has_detail: bool = not pack.detail.is_empty()
@@ -171,7 +171,8 @@ static func build(pack, parent: Node3D) -> Dictionary:
 	var beyond_mat: ShaderMaterial = bm.duplicate()
 	beyond_mat.set_shader_parameter("blur_lod", 6.0)
 	mats.append(beyond_mat)
-	out["beyond"] = _beyond(pack, parent, beyond_mat)
+	if with_beyond:
+		out["beyond"] = _beyond(pack, parent, beyond_mat)
 	return out
 
 

@@ -22,13 +22,14 @@ var bench_t1 := NAN
 var play := false
 var controls := true
 var presentation := false
+var entity := "auto"   # launch ascent: the entity the follow camera tracks, or auto
 var has_camera_pose := false
 var camera_pose: PackedFloat64Array = PackedFloat64Array()  # east, north, up of the eye; of the target; vertical fov in degrees
 var error := ""
 
 
 static func usage() -> String:
-	return "usage: -- --run <run dir> [--env <pack dir>] [--pose-dump t1,t2,...] [--profile auto|performance|balanced|high|ultra|custom] [--custom key=value,...] [--vram-bytes N] [--camera director|follow|pad|closeup|wide|overhead] [--t seconds] [--play] [--controls shown|hidden] [--presentation] [--camera-pose ex,ey,ez,tx,ty,tz,fov] [--shot out.png] [--bench out.json --bench-seconds S --bench-from T --bench-to T]"
+	return "usage: -- --run <run dir> [--env <pack dir>] [--pose-dump t1,t2,...] [--profile auto|performance|balanced|high|ultra|custom] [--custom key=value,...] [--vram-bytes N] [--camera director|follow|pad|closeup|wide|overhead] [--t seconds] [--play] [--controls shown|hidden] [--presentation] [--entity auto|<entity id>] [--camera-pose ex,ey,ez,tx,ty,tz,fov] [--shot out.png] [--bench out.json --bench-seconds S --bench-from T --bench-to T]"
 
 
 static func parse(args: PackedStringArray) -> RefCounted:
@@ -36,7 +37,7 @@ static func parse(args: PackedStringArray) -> RefCounted:
 	var i := 0
 	while i < args.size():
 		var k := args[i]
-		var needs_value := k in ["--run", "--env", "--pose-dump", "--profile", "--custom", "--vram-bytes", "--camera", "--t", "--shot", "--bench", "--bench-seconds", "--bench-from", "--bench-to", "--controls", "--camera-pose"]
+		var needs_value := k in ["--run", "--env", "--pose-dump", "--profile", "--custom", "--vram-bytes", "--camera", "--t", "--shot", "--bench", "--bench-seconds", "--bench-from", "--bench-to", "--controls", "--camera-pose", "--entity"]
 		var v := ""
 		if needs_value:
 			if i + 1 >= args.size():
@@ -99,6 +100,14 @@ static func parse(args: PackedStringArray) -> RefCounted:
 				c.play = true
 			"--presentation":
 				c.presentation = true
+			"--entity":
+				var ok := v.length() >= 1 and v.length() <= 32
+				for ch in v:
+					ok = ok and (ch >= "a" and ch <= "z" or ch >= "0" and ch <= "9" or ch == "_")
+				if not ok:
+					c.error = "--entity takes auto or an entity id (lower case letters, digits and underscores)"
+					return c
+				c.entity = v
 			"--camera-pose":
 				var parts := v.split(",", false)
 				if parts.size() != 7:

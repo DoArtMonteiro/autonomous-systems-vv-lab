@@ -97,8 +97,16 @@ static func build(vehicle: Node3D) -> Dictionary:
 	if model != null:
 		body.add_child(model)
 		_finish_materials(model)
-	# Plume (illustrative): outer flame, merged core and one jet per engine along -y from the exit
-	# plane; a faint refraction shell and a small glow.
+	var out := build_plume(body)
+	out["body"] = body
+	out["model"] = model
+	return out
+
+
+# The plume (illustrative) under `body`, whose local +Y is the body axis: outer flame, merged core and
+# one jet per engine along -y from the exit plane; a faint refraction shell, a small glow, one glow
+# per engine and the exhaust light. Also used for the launch ascent's vehicles (scaled by the caller).
+static func build_plume(body: Node3D) -> Dictionary:
 	var flame := _flame_mesh(56, 28)
 	var plume_shader: Shader = load("res://shaders/plume.gdshader")
 	var mk := func(mesh: Mesh, shader: Shader, params: Dictionary) -> Array:
@@ -187,9 +195,9 @@ static func build(vehicle: Node3D) -> Dictionary:
 	body.add_child(light)
 	var materials := [outer_arr[1], core_arr[1], haze_arr[1]]
 	materials.append_array(jet_materials)
-	return {"body": body, "plume": plume, "outer": outer_arr[0], "outer_mat": outer_arr[1], "core": core_arr[0], "core_mat": core_arr[1],
+	return {"plume": plume, "outer": outer_arr[0], "outer_mat": outer_arr[1], "core": core_arr[0], "core_mat": core_arr[1],
 		"haze": haze_arr[0], "haze_mat": haze_arr[1], "eglows": eglows, "jets": jets, "jet_mats": jet_materials, "glow": glow, "light": light,
-		"materials": materials, "model": model}
+		"materials": materials}
 
 
 # Plume length in metres (0 hides it), logical time for its turbulence, the nozzle's height above the

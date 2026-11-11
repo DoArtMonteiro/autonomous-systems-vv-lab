@@ -12,6 +12,8 @@ uniform float energy = 1.0;
 uniform float cloud_cover = 0.62;
 uniform float cumulus_height = 1700.0;
 uniform float cirrus_height = 8000.0;
+uniform float dip = 0.0;      // dip of the horizon below the camera, radians (the Earth's limb)
+uniform float space = 0.0;   // 0 at the ground, 1 in space: the sky darkens with the camera's recorded altitude
 
 float h21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float vnoise(vec2 p) {
@@ -80,5 +82,10 @@ void sky() {
 	// Below the horizon: the horizon haze (the fog samples this radiance over distant ground, so
 	// fogged land meets the sky without a band); the ground colour only far below.
 	if (h < 0.0) c = mix(horizon, ground, smoothstep(0.25, 0.9, -h));
+	// With altitude the blue sky thins out to black; the sun and the horizon glow remain.
+	c *= 1.0 - 0.985 * space * (1.0 - pow(mu, 80.0));
+	// Thin bright limb of the atmosphere just above the Earth's edge, seen from space (illustrative).
+	float limb = exp(-max(h + sin(dip), 0.0) * 70.0) * step(-sin(dip) - 0.002, h);
+	c += vec3(0.28, 0.52, 1.0) * limb * space * 0.9;
 	COLOR = c * energy;
 }
