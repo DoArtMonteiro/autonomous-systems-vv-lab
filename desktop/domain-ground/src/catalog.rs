@@ -197,6 +197,7 @@ fn item(id: &str, label: &str, description: &str) -> Item {
         label: label.into(),
         description: description.into(),
         facts: Vec::new(),
+        evidence: String::new(),
     }
 }
 
@@ -525,12 +526,15 @@ pub fn catalog() -> DomainCatalog {
             unit: "tick".into(),
             label: "Logical tick (100 ms of simulated time)".into(),
         },
-        vehicles: vec![item(
-            "ground-2d",
-            "Ground vehicle, 2D kinematic",
-            "A generic unarmed ground vehicle that moves a fixed step along one axis per movement command. \
-             Integer millimetre positions, no dynamics.",
-        )],
+        vehicles: vec![
+            item(
+                "ground-2d",
+                "Ground vehicle, 2D kinematic",
+                "A generic unarmed ground vehicle that moves a fixed step along one axis per movement command. \
+                 Integer millimetre positions, no dynamics.",
+            )
+            .with_evidence("reference"),
+        ],
         scenarios: MISSIONS.iter().map(scenario).collect(),
         controllers: CONTROLLERS.iter().map(|c| item(c.0, c.1, c.2)).collect(),
         parameters: parameters(),

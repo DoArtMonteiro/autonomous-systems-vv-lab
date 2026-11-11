@@ -107,6 +107,19 @@ pub struct Item {
     /// hosts that predate it; omitted from the JSON when empty, so older catalogs are unchanged.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub facts: Vec<Fact>,
+    /// Evidence level of a vehicle, stated by the domain: `reference` (the frozen, pre-registered
+    /// case) or `exploratory` (illustrative values). Empty when the domain says nothing, which
+    /// readers treat as exploratory; omitted from the JSON when empty.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub evidence: String,
+}
+
+impl Item {
+    /// The same item with its evidence level set.
+    pub fn with_evidence(mut self, level: &str) -> Self {
+        self.evidence = level.into();
+        self
+    }
 }
 
 /// One attribute of an item: a label, a number and its unit.

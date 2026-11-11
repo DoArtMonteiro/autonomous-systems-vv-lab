@@ -17,6 +17,7 @@ fn item(id: &str, label: &str, description: &str) -> Item {
         label: label.into(),
         description: description.into(),
         facts: Vec::new(),
+        evidence: String::new(),
     }
 }
 
@@ -525,7 +526,8 @@ pub fn catalog() -> DomainCatalog {
                     "landing-stage",
                     "22 t landing stage",
                     "A rocket stage of 22 t dry mass and 8 t of propellant that falls from about 3 km at 200 m/s and brakes with one gimballed engine to a 1.5 m/s descent over the pad. The initial state is dispersed by the seed.",
-                ),
+                )
+                .with_evidence("reference"),
                 M9,
             ),
             with_facts(
@@ -533,7 +535,8 @@ pub fn catalog() -> DomainCatalog {
                     "heavy-return-stage",
                     "41 t heavy return stage (exploratory)",
                     "A heavier stage, 30 t dry and 11 t of propellant, with a 760 kN engine (thrust over full-load weight 1.89, against 2.87 for the 22 t stage), Isp 300 s and a throttle floor of 55 %. Less braking margin and less throttle range. Illustrative values of the order of a reusable first stage near landing, not a real vehicle.",
-                ),
+                )
+                .with_evidence("exploratory"),
                 HEAVY,
             ),
             with_facts(
@@ -541,7 +544,8 @@ pub fn catalog() -> DomainCatalog {
                     "light-demonstrator",
                     "7.7 t light demonstrator stage (exploratory)",
                     "A small stage, 5.5 t dry and 2.2 t of propellant, with a 230 kN engine (thrust over full-load weight 3.05), Isp 265 s, a 30 % throttle floor and a faster throttle. Illustrative values of the order of a suborbital test vehicle, not a real vehicle.",
-                ),
+                )
+                .with_evidence("exploratory"),
                 LIGHT,
             ),
         ],

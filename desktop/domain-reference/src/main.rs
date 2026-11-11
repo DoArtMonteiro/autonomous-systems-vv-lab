@@ -285,6 +285,7 @@ fn item(id: &str, label: &str, description: &str) -> Item {
         label: label.into(),
         description: description.into(),
         facts: Vec::new(),
+        evidence: String::new(),
     }
 }
 
