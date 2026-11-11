@@ -19,7 +19,9 @@
 //! run folder of the library (by run id) and a validated environment pack (by id). No shell, no
 //! paths from the web view. The renderer only reads the record and the pack; it never writes to
 //! the library. The executable is hashed once more, through a handle that denies writers, right
-//! before it is started.
+//! before it is started. Only the executable is write-locked between that hash and the start: the
+//! other files were verified moments earlier under the same lock that stops an install, and a
+//! process that can rewrite files in the user's own data folder can already run code as the user.
 //!
 //! The one place the renderer may write inside the module is `<project>/.godot/`, Godot's own
 //! script and shader cache, regenerated from the project files. The integrity check exempts that
@@ -136,6 +138,10 @@ impl ModulesInner {
     /// The module status, hashing the files only when the manifest changed since the last
     /// successful check.
     pub fn status(&self) -> Status {
+        // Not while an install or launch holds the lock: a swap in progress looks like a lost module.
+        if let Ok(_idle) = self.child.try_lock() {
+            recover_aside(&self.root);
+        }
         let key = installed_dir(&self.root).and_then(|d| {
             let m = fs::metadata(d.join(MANIFEST)).ok()?;
             Some((d, m.modified().ok()?, m.len()))
@@ -167,14 +173,31 @@ fn invalid(m: impl Into<String>) -> PlatformError {
     PlatformError::Invalid(m.into())
 }
 
-/// A relative path of plain components only (no root, no `..`, no drive, no backslash).
+/// One path component Windows can create as written: no device name (`nul`, `con.txt`, `com1`),
+/// no trailing dot or space (Windows drops them, so two names would collide), no reserved or
+/// control character.
+fn plain_component(c: &str) -> bool {
+    !c.is_empty()
+        && c != "."
+        && c != ".."
+        && !c.ends_with('.')
+        && !c.ends_with(' ')
+        && !crate::packages::windows_reserved(c)
+        && !c
+            .chars()
+            .any(|ch| ch.is_control() || "<>\"|?*".contains(ch))
+}
+
+/// A relative path of plain components only (no root, no `..`, no drive, no backslash, no
+/// Windows device names, no trailing dots or spaces).
 fn safe_relative(p: &str) -> bool {
     if p.is_empty() || p.len() > 260 || p.contains('\\') || p.contains(':') {
         return false;
     }
-    Path::new(p)
-        .components()
-        .all(|c| matches!(c, Component::Normal(_)))
+    p.split('/').all(plain_component)
+        && Path::new(p)
+            .components()
+            .all(|c| matches!(c, Component::Normal(_)))
 }
 
 fn version_ok(v: &str) -> bool {
@@ -496,6 +519,26 @@ fn clear_staging(root: &Path) {
     }
 }
 
+/// Puts back a module that a crash (or a failed put-back) left in `.old-*` when no version is
+/// installed, so an interrupted replacement never costs the user the module.
+fn recover_aside(root: &Path) {
+    if !version_dirs(root).is_empty() {
+        return;
+    }
+    for e in fs::read_dir(root).into_iter().flatten().flatten() {
+        if !e.file_name().to_string_lossy().starts_with(OLD_PREFIX) || !e.path().is_dir() {
+            continue;
+        }
+        for v in fs::read_dir(e.path()).into_iter().flatten().flatten() {
+            let name = v.file_name();
+            if version_key(&name.to_string_lossy()).is_some() && !root.join(&name).exists() {
+                let _ = fs::rename(v.path(), root.join(&name));
+            }
+        }
+        let _ = fs::remove_dir(e.path()); // only when nothing is left in it
+    }
+}
+
 /// Moves the installed versions aside, moves `new_tree` to `<root>/<version>` and deletes the old
 /// copies. If anything fails the old versions are put back and the error is returned, so a failed
 /// replacement (for instance a running Cinematic View that locks its executable) never leaves the
@@ -576,6 +619,7 @@ pub fn install_zip(
         return Err(invalid("the module zip is too large"));
     }
     fs::create_dir_all(root).map_err(err)?;
+    recover_aside(root);
     clear_staging(root);
     let staging = root.join(format!("{STAGING_PREFIX}{}", std::process::id()));
     let result = stage_and_swap(root, zip_path, zip_len, &declared, &staging, confirm);
@@ -605,8 +649,11 @@ fn stage_and_swap(
     fs::create_dir_all(staging).map_err(err)?;
     let copy = staging.join("archive.zip");
     fs::copy(zip_path, &copy).map_err(err)?;
-    // One handle: hashed here, then read as the archive.
-    let mut file = fs::File::open(&copy).map_err(err)?;
+    if fs::metadata(&copy).map_err(err)?.len() != zip_len {
+        return Err(invalid("the module zip changed while it was being copied"));
+    }
+    // One handle that denies writers: hashed here, then read as the archive.
+    let mut file = open_read_locked(&copy).map_err(err)?;
     let (actual, _) = sha256_reader(&mut file).map_err(err)?;
     if declared != actual {
         return Err(invalid(format!(
@@ -661,7 +708,8 @@ fn stage_and_swap(
     if !confirm(&plan) {
         return Ok(None);
     }
-    let tree = staging.join("tree");
+    // Named after the version so the same integrity check as at launch can run on it.
+    let tree = staging.join(&m.version);
     for f in &m.files {
         let mut e = zip
             .by_name(&f.path)
@@ -697,6 +745,12 @@ fn stage_and_swap(
         }
     }
     fs::write(tree.join(MANIFEST), &manifest_bytes).map_err(err)?;
+    // Nothing is replaced unless the new tree passes the check the launch will run.
+    verify_installed(&tree).map_err(|e| {
+        invalid(format!(
+            "the extracted module failed its integrity check: {e}"
+        ))
+    })?;
     swap_in(root, &tree, &m.version)?;
     Ok(Some(status_of(root)))
 }
@@ -773,8 +827,8 @@ pub fn launch_command(
     })
 }
 
-/// Opens the executable so that nobody can write to it while the handle is held.
-fn open_exe_locked(exe: &Path) -> std::io::Result<fs::File> {
+/// Opens a file so that nobody can write to it while the handle is held.
+fn open_read_locked(exe: &Path) -> std::io::Result<fs::File> {
     let mut o = fs::OpenOptions::new();
     o.read(true);
     #[cfg(windows)]
@@ -788,7 +842,7 @@ fn open_exe_locked(exe: &Path) -> std::io::Result<fs::File> {
 /// Hashes the executable once more, through a handle that denies writers, and starts it while that
 /// handle is still open.
 pub fn spawn_checked(l: &Launch) -> Result<Child, PlatformError> {
-    let mut f = open_exe_locked(&l.exe).map_err(err)?;
+    let mut f = open_read_locked(&l.exe).map_err(err)?;
     let (sha, n) = sha256_reader(&mut f).map_err(err)?;
     if n != l.exe_bytes || sha != l.exe_sha256 {
         return Err(invalid(
@@ -804,6 +858,15 @@ pub fn spawn_checked(l: &Launch) -> Result<Child, PlatformError> {
         .map_err(err)?;
     drop(f);
     Ok(child)
+}
+
+/// Refuses (with `why`) while the launched Cinematic View is still running.
+fn ensure_not_running(slot: &mut Option<Child>, why: &str) -> Result<(), PlatformError> {
+    if child_alive(slot) {
+        Err(invalid(why))
+    } else {
+        Ok(())
+    }
 }
 
 fn child_alive(slot: &mut Option<Child>) -> bool {
@@ -838,11 +901,10 @@ pub async fn cinematic_install_from_file(
         };
         // Held until the install ends: no launch can start while the module is being replaced.
         let mut slot = modules.child.lock().map_err(err)?;
-        if child_alive(&mut slot) {
-            return Err(invalid(
-                "the Cinematic View is open; close it before installing or replacing the module",
-            ));
-        }
+        ensure_not_running(
+            &mut slot,
+            "the Cinematic View is open; close it before installing or replacing the module",
+        )?;
         let ask = |p: &Plan| {
             app.dialog()
                 .message(format!(
@@ -878,9 +940,9 @@ pub async fn cinematic_uninstall(state: State<'_, AppState>) -> Result<Status, P
     let modules = state.modules.clone();
     let log = state.paths.log.clone();
     blocking(move || {
-        if let Ok(mut c) = modules.child.lock()
-            && let Some(mut child) = c.take()
-        {
+        // The lock is held through the removal: no launch can start on a half-removed module.
+        let mut slot = modules.child.lock().map_err(err)?;
+        if let Some(mut child) = slot.take() {
             let _ = child.kill();
             let _ = child.wait();
         }
@@ -910,11 +972,10 @@ pub async fn cinematic_launch(
         // The lock is held from the check to the spawn: an install cannot swap the module between
         // the verification and the start, and a second window cannot be opened meanwhile.
         let mut slot = modules.child.lock().map_err(err)?;
-        if child_alive(&mut slot) {
-            return Err(invalid(
-                "the Cinematic View is already open; close it first",
-            ));
-        }
+        ensure_not_running(
+            &mut slot,
+            "the Cinematic View is already open; close it first",
+        )?;
         // A refused launch means the cached "files matched" status is out of date.
         let started = launch_command(&modules.root, &run_dir, &env_dir)
             .and_then(|launch| spawn_checked(&launch))
@@ -1089,6 +1150,29 @@ mod tests {
             (
                 "size",
                 Box::new(|d| build_zip(d, FILES, None, |m| m["disk_bytes"] = 1.into())),
+            ),
+            (
+                "reserved",
+                Box::new(|d| {
+                    build_zip(d, &[FILES[0], FILES[1], ("godot/nul", b"x")], None, |_| {})
+                }),
+            ),
+            (
+                "reserved-extension",
+                Box::new(|d| {
+                    build_zip(
+                        d,
+                        &[FILES[0], FILES[1], ("project/con.txt", b"x")],
+                        None,
+                        |_| {},
+                    )
+                }),
+            ),
+            (
+                "trailing-dot",
+                Box::new(|d| {
+                    build_zip(d, &[FILES[0], FILES[1], ("project/a.", b"x")], None, |_| {})
+                }),
             ),
         ];
         for (name, make) in cases {
@@ -1335,10 +1419,159 @@ mod tests {
     }
 
     #[test]
+    fn a_bad_replacement_leaves_the_installed_module_alone() {
+        let d = tmp("badrepl");
+        let root = d.join("modules").join("cinematic");
+        install(&root, &build_version(&d, "0.1.0", b"MZ one")).unwrap();
+        let sub = d.join("0.2.0");
+        fs::create_dir_all(&sub).unwrap();
+        let bad = build_zip(
+            &sub,
+            &[FILES[0], FILES[1], ("godot/nul", b"x")],
+            None,
+            |m| m["version"] = "0.2.0".into(),
+        );
+        assert!(install(&root, &bad).is_err());
+        let s = status_of(&root);
+        assert!(s.verified, "{s:?}");
+        assert_eq!(s.version.as_deref(), Some("0.1.0"));
+        assert_eq!(fs::read_dir(&root).unwrap().count(), 1, "no leftovers");
+        let _ = fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn a_failed_swap_puts_every_version_back() {
+        let d = tmp("several");
+        for v in ["0.1.0", "0.2.0", "0.10.0"] {
+            fs::create_dir_all(d.join(v)).unwrap();
+            fs::write(d.join(v).join("marker"), v).unwrap();
+        }
+        let e = swap_in(&d, &d.join("missing"), "0.11.0").unwrap_err();
+        assert!(e.to_string().contains("previous module is kept"), "{e}");
+        for v in ["0.1.0", "0.2.0", "0.10.0"] {
+            assert_eq!(fs::read_to_string(d.join(v).join("marker")).unwrap(), v);
+        }
+        assert!(
+            fs::read_dir(&d)
+                .unwrap()
+                .flatten()
+                .all(|e| !e.file_name().to_string_lossy().starts_with(OLD_PREFIX))
+        );
+        let _ = fs::remove_dir_all(&d);
+    }
+
+    /// A file held open without delete sharing (a running executable does the same) makes the
+    /// rename of its folder fail: the install must fail and keep the module.
+    #[cfg(windows)]
+    #[test]
+    fn a_locked_old_version_fails_the_replacement_and_keeps_the_module() {
+        use std::os::windows::fs::OpenOptionsExt;
+        let d = tmp("locked");
+        let root = d.join("modules").join("cinematic");
+        install(&root, &build_version(&d, "0.1.0", b"MZ one")).unwrap();
+        let held = fs::OpenOptions::new()
+            .read(true)
+            .share_mode(1)
+            .open(root.join("0.1.0").join("godot").join("g.exe"))
+            .unwrap();
+        let e = install(&root, &build_version(&d, "0.2.0", b"MZ two")).unwrap_err();
+        assert!(e.to_string().contains("previous module is kept"), "{e}");
+        drop(held);
+        let s = status_of(&root);
+        assert!(s.verified && s.version.as_deref() == Some("0.1.0"), "{s:?}");
+        assert_eq!(
+            fs::read_dir(&root)
+                .unwrap()
+                .flatten()
+                .filter(|e| e.file_name().to_string_lossy().starts_with('.'))
+                .count(),
+            0,
+            "no staging or aside folder is left"
+        );
+        let _ = fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn a_module_left_aside_by_an_interrupted_replacement_is_recovered() {
+        let d = tmp("recover");
+        let root = d.join("modules").join("cinematic");
+        let m = Modules::new(root.clone());
+        install(&root, &build_version(&d, "0.1.0", b"MZ one")).unwrap();
+        let aside = root.join(".old-4242");
+        fs::create_dir_all(&aside).unwrap();
+        fs::rename(root.join("0.1.0"), aside.join("0.1.0")).unwrap();
+        assert!(installed_dir(&root).is_none());
+        let s = m.status();
+        assert!(s.verified, "{s:?}");
+        assert!(!aside.exists());
+        // With a module installed, an aside folder is garbage and is not moved back over it.
+        fs::create_dir_all(root.join(".old-1").join("0.0.1")).unwrap();
+        recover_aside(&root);
+        assert!(!root.join("0.0.1").exists());
+        let _ = fs::remove_dir_all(&d);
+    }
+
+    fn sleeper() -> Child {
+        #[cfg(windows)]
+        let mut c = Command::new("ping");
+        #[cfg(windows)]
+        c.args(["-n", "30", "127.0.0.1"]);
+        #[cfg(not(windows))]
+        let mut c = Command::new("sleep");
+        #[cfg(not(windows))]
+        c.arg("30");
+        c.stdout(Stdio::null()).spawn().unwrap()
+    }
+
+    #[test]
+    fn install_and_launch_are_refused_while_the_view_runs() {
+        let mut slot = None;
+        assert!(
+            ensure_not_running(&mut slot, "busy").is_ok(),
+            "nothing launched"
+        );
+        slot = Some(sleeper());
+        let e = ensure_not_running(&mut slot, "busy").unwrap_err();
+        assert!(e.to_string().contains("busy"));
+        let mut c = slot.take().unwrap();
+        c.kill().unwrap();
+        let _ = c.wait();
+        let mut exited = Some(c);
+        assert!(
+            ensure_not_running(&mut exited, "busy").is_ok(),
+            "a closed view does not block"
+        );
+    }
+
+    #[test]
     fn paths_must_be_plain_relative() {
-        for bad in ["", "../a", "/a", "C:/a", "a\\b", "a/../b"] {
+        for bad in [
+            "",
+            "../a",
+            "/a",
+            "C:/a",
+            "a\\b",
+            "a/../b",
+            "nul",
+            "godot/NUL",
+            "con.txt",
+            "a/com1.dat",
+            "lpt9",
+            "aux.tar.gz",
+            "a.",
+            "dir./x",
+            "a /b",
+            "a/./b",
+            "a//b",
+            "a<b",
+            "x?",
+            "p/q*",
+        ] {
             assert!(!safe_relative(bad), "{bad}");
         }
         assert!(safe_relative("project/scripts/main.gd"));
+        assert!(safe_relative("godot/Godot_v4.7.2-stable_win64.exe"));
+        assert!(safe_relative("LICENSES/godot-LICENSE.txt"));
+        assert!(safe_relative("com10.txt") && safe_relative("console/x"));
     }
 }

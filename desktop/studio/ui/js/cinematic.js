@@ -50,7 +50,13 @@ export function cinematicSection() {
   const fill = (s) => {
     const install = h('button', { type: 'button', class: 'btn btn-quiet', onclick: () => {
       install.disabled = true;
-      api.cinematicInstallFromFile().then((r) => { if (r) { toast(`Cinematic View ${r.version} installed. Its files matched the module manifest.`, 'info'); fill(r); status = Promise.resolve(r); } else install.disabled = false; })
+      api.cinematicInstallFromFile().then((r) => {
+        if (!r) { install.disabled = false; return; }
+        status = Promise.resolve(r);
+        fill(r);
+        if (r.installed && r.verified) toast(`Cinematic View ${r.version} installed. Its files matched the module manifest.`, 'info');
+        else toast(r.reason || 'The module was installed but did not pass its integrity check.', 'error', 8000);
+      })
         .catch((e) => { toast(errorText(e), 'error'); install.disabled = false; });
     } }, s.installed ? 'Replace from a module zip…' : 'Install from a module zip…');
     const remove = s.installed ? h('button', { type: 'button', class: 'btn btn-quiet', onclick: () => {

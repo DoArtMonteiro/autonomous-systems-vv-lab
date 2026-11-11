@@ -77,7 +77,7 @@ fn sidecar_hash(archive: &Path) -> Result<Option<String>, PlatformError> {
 }
 
 /// Names Windows treats as devices, with or without an extension (`nul.json` is the null device).
-fn windows_reserved(name: &str) -> bool {
+pub(crate) fn windows_reserved(name: &str) -> bool {
     let stem = name.split('.').next().unwrap_or("").to_ascii_lowercase();
     matches!(stem.as_str(), "con" | "prn" | "aux" | "nul")
         || ["com", "lpt"].iter().any(|p| {
