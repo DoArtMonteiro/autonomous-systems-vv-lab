@@ -37,7 +37,7 @@ export async function showLab(opts) {
   }
   if (opts && opts.runId && (!lab || lab.base.id !== opts.runId)) {
     try {
-      const record = await loadRecord(opts.runId);
+      const record = await loadIndexed(opts.runId);
       startFrom(opts.runId, record);
     } catch (e) {
       toast(errorText(e), 'error');
@@ -73,8 +73,30 @@ function failedOf(record) {
   return (record.requirements || []).filter((r) => r.status === 'fail');
 }
 
+// Numbers the domain publishes with a record: the metrics requirement_observed.<id>,
+// requirement_limit.<id> and requirement_margin.<id> (margin positive when met, in the unit of the
+// metric). They are read once per record into this table; a record without them (older records,
+// requirements that are not one quantity against one bound) falls back to the text of the requirement.
+const NUMBERS = new WeakMap();
+
+function indexNumbers(record) {
+  const byId = new Map((record.metrics || []).map((m) => [m.id, m]));
+  for (const r of record.requirements || []) {
+    const margin = byId.get(`requirement_margin.${r.id}`);
+    const limit = byId.get(`requirement_limit.${r.id}`);
+    if (margin && limit && Number.isFinite(margin.value) && Number.isFinite(limit.value)) NUMBERS.set(r, { margin: margin.value, limit: limit.value, unit: margin.unit || '' });
+  }
+  return record;
+}
+
+async function loadIndexed(runId) {
+  return indexNumbers(await loadRecord(runId));
+}
+
 /** The number and comparison of a requirement's expected text ("<= 3 m/s", ">= 0.9962 cos"). */
 function limitOf(r) {
+  const n = NUMBERS.get(r);
+  if (n) return { op: '', value: n.limit };
   const m = /^\s*(<=|>=|<|>)\s*(-?[\d.]+(?:e[-+]?\d+)?)/i.exec(r.expected || '');
   return m ? { op: m[1], value: Number(m[2]) } : null;
 }
@@ -85,10 +107,13 @@ function observedOf(r) {
 }
 
 /**
- * Margin to the limit in the requirement's unit, positive when met: parsed from the record's
- * expected and observed text, so it is only as precise as that text.
+ * Margin to the limit in the requirement's unit, positive when met. It is the number the domain
+ * published when there is one; otherwise it is parsed from the requirement's expected and observed
+ * text, so it is only as precise as that text, and a composite observation gives none.
  */
 function marginOf(r) {
+  const n = NUMBERS.get(r);
+  if (n) return n.margin;
   const lim = limitOf(r);
   const obs = observedOf(r);
   if (!lim || obs === null || !Number.isFinite(obs)) return null;
@@ -96,6 +121,8 @@ function marginOf(r) {
 }
 
 function unitOf(r) {
+  const n = NUMBERS.get(r);
+  if (n) return n.unit;
   const m = /-?[\d.]+(?:e[-+]?\d+)?\s*(.*)$/i.exec(r.expected || '');
   return m ? m[1].trim() : '';
 }
@@ -201,7 +228,7 @@ async function runExperiment() {
     const out = await api.run(req);
     await tag(out.run_id, out.reused, `Derived from run ${lab.base.id}. Changes: ${changes().join('; ') || 'none'}.`);
     emit('runs-changed');
-    lab.exp = { id: out.run_id, record: await loadRecord(out.run_id), reused: out.reused };
+    lab.exp = { id: out.run_id, record: await loadIndexed(out.run_id), reused: out.reused };
     lab.gen = null;
   } catch (e) {
     toast(errorText(e), 'error');
@@ -221,7 +248,7 @@ async function checkSeeds(n) {
   render();
   try {
     const res = await runMany([...a, ...b], (k, total) => { lab.gen.progress = k; lab.gen.total = total; renderResult(); });
-    const records = await Promise.all(res.map((r) => (r.id ? loadRecord(r.id) : null)));
+    const records = await Promise.all(res.map((r) => (r.id ? loadIndexed(r.id) : null)));
     lab.gen = { seeds, base: records.slice(0, seeds.length), exp: records.slice(seeds.length), errors: res.filter((r) => r.error).map((r) => r.error) };
   } catch (e) {
     toast(errorText(e), 'error');
@@ -249,7 +276,7 @@ async function runSweep(paramId, from, to, k) {
   render();
   try {
     const res = await runMany(reqs, (n, total) => { lab.sweep.progress = n; lab.sweep.total = total; renderResult(); });
-    const records = await Promise.all(res.map((r) => (r.id ? loadRecord(r.id) : null)));
+    const records = await Promise.all(res.map((r) => (r.id ? loadIndexed(r.id) : null)));
     lab.sweep = { paramId, values, records, ids: res.map((r) => r.id || null), errors: res.filter((r) => r.error).map((r) => r.error) };
   } catch (e) {
     toast(errorText(e), 'error');
@@ -307,7 +334,7 @@ async function startDefault(d, btn, scenarioId, openGroup) {
   try {
     const out = await api.run(req);
     emit('runs-changed');
-    startFrom(out.run_id, await loadRecord(out.run_id));
+    startFrom(out.run_id, await loadIndexed(out.run_id));
     if (openGroup) lab.openGroup = openGroup;
     render();
   } catch (e) {
@@ -363,7 +390,7 @@ function renderBase(rec) {
             marginBar(r),
             m === null ? null : h('span', { class: 'lab-req-m small' }, `${fmt(Math.abs(m))} ${unitOf(r)} ${m >= 0 ? 'inside' : 'beyond'} the limit`)));
         })),
-        h('p', { class: 'small dim' }, 'Margins are read from the expected and observed values in the record. Select a requirement to highlight the parameters the domain lists for it.'))
+        h('p', { class: 'small dim' }, 'Margins are the numbers the domain publishes with the record; where it publishes none they are read from the expected and observed text, and a requirement made of several quantities shows no margin. Select a requirement to highlight the parameters the domain lists for it.'))
       : h('p', { class: 'lab-allmet' }, 'Every requirement met. Try a harder condition to find where this configuration stops meeting them.'),
     h('div', { class: 'row lab-base-actions' },
       h('button', { type: 'button', class: 'btn btn-quiet', onclick: () => navigate('run', { runId: lab.base.id }) }, 'Analyse the baseline')),

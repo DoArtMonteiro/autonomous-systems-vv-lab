@@ -203,6 +203,128 @@ fn metric(id: &str, label: &str, value: Option<f64>, unit: &str, group: &str) ->
     }
 }
 
+/// Numeric reading of one requirement for the Experiment Lab: the value the verifier measured, the
+/// limit that binds and the margin to it, in one unit, positive when the requirement is met. The
+/// text in `requirements` stays the human statement; these numbers let a reader compute margins
+/// without parsing it. Only requirements that are one quantity against one bound have numbers:
+/// the separation window (two quantities), the phase order and the orbit insertion summary have
+/// none, and a requirement whose status disagrees with the sign of its margin (the upper-stage
+/// propellant requirement also judges the cutoff reason) is left out rather than shown wrongly.
+/// For the two invariants the value is the true state at the decisive tick: the worst tick when the
+/// invariant holds, the first tick over the limit when it fails.
+struct Reading {
+    observed: f64,
+    limit: f64,
+    margin: f64,
+    unit: &'static str,
+}
+
+fn reading(verdict: &vv_ascent::verify::Verdict, case: &Case, out: &Outputs) -> Option<Reading> {
+    let l = &case.limits;
+    let state = verdict.state.as_ref();
+    let upper_bound = |observed: f64, limit: f64, unit| Reading {
+        observed,
+        limit,
+        margin: limit - observed,
+        unit,
+    };
+    let lower_bound = |observed: f64, limit: f64, unit| Reading {
+        observed,
+        limit,
+        margin: observed - limit,
+        unit,
+    };
+    let r = match verdict.id.as_str() {
+        "stack.S1_max_dynamic_pressure" => {
+            upper_bound(state?.dynamic_pressure_pa, l.max_q_pa, "Pa")
+        }
+        "stack.S2_axial_acceleration" | "upper.S2_axial_acceleration" => {
+            upper_bound(state?.sensed_acceleration_g, l.max_axial_g, "g")
+        }
+        "booster.R2_propellant_margin" => lower_bound(
+            state?.propellant_kg,
+            case.vehicle.stages.first()?.propellant_kg * l.min_residual_fraction[0],
+            "kg",
+        ),
+        "booster.R3_recovery_zone" => {
+            let km = out.simulation.booster_impact.as_ref()?.downrange_m / 1000.0;
+            let zone = &case.mission.recovery_zone;
+            let (lo, hi) = (km - zone.downrange_min_km, zone.downrange_max_km - km);
+            Reading {
+                observed: km,
+                limit: if lo <= hi {
+                    zone.downrange_min_km
+                } else {
+                    zone.downrange_max_km
+                },
+                margin: lo.min(hi),
+                unit: "km",
+            }
+        }
+        "upper.R4_periapsis" => lower_bound(
+            out.verification
+                .insertion
+                .as_ref()?
+                .elements
+                .periapsis_alt_m
+                / 1000.0,
+            l.min_periapsis_km,
+            "km",
+        ),
+        "upper.R5_apoapsis" => {
+            let km = out
+                .verification
+                .insertion
+                .as_ref()?
+                .elements
+                .apoapsis_alt_m?
+                / 1000.0;
+            upper_bound(
+                (km - case.mission.target_altitude_km).abs(),
+                l.apoapsis_tolerance_km,
+                "km",
+            )
+        }
+        "upper.R6_propellant_margin" => lower_bound(
+            state?.propellant_kg,
+            case.vehicle.stages.get(1)?.propellant_kg * l.min_residual_fraction[1],
+            "kg",
+        ),
+        _ => return None,
+    };
+    let agrees = match verdict.status {
+        "pass" => r.margin >= 0.0,
+        "fail" => r.margin < 0.0,
+        _ => false,
+    };
+    (agrees && r.observed.is_finite() && r.limit.is_finite()).then_some(r)
+}
+
+/// The numeric readings as metrics: `requirement_observed.<id>`, `requirement_limit.<id>` and
+/// `requirement_margin.<id>`, all in the group `requirement margins`.
+fn requirement_metrics(case: &Case, out: &Outputs) -> Vec<Metric> {
+    let mut metrics = Vec::new();
+    for verdict in &out.verification.verdicts {
+        let Some(r) = reading(verdict, case, out) else {
+            continue;
+        };
+        for (kind, word, value) in [
+            ("observed", "observed", r.observed),
+            ("limit", "limit", r.limit),
+            ("margin", "margin to the limit, positive when met", r.margin),
+        ] {
+            metrics.push(metric(
+                &format!("requirement_{kind}.{}", verdict.id),
+                &format!("{}: {word}", verdict.label),
+                Some(value),
+                r.unit,
+                "requirement margins",
+            ));
+        }
+    }
+    metrics
+}
+
 pub fn build(request: &RunRequest, case: &Case, out: &Outputs) -> RunRecord {
     let v = &out.verification;
     let trace = &out.trace;
@@ -357,7 +479,7 @@ pub fn build(request: &RunRequest, case: &Case, out: &Outputs) -> RunRecord {
         .iter()
         .find(|x| x.id == "upper.R6_propellant_margin")
         .and_then(|x| x.state.as_ref());
-    let metrics = vec![
+    let mut metrics = vec![
         metric(
             "max_q_kpa",
             "Maximum dynamic pressure of the ascent",
@@ -450,6 +572,7 @@ pub fn build(request: &RunRequest, case: &Case, out: &Outputs) -> RunRecord {
             "upper",
         ),
     ];
+    metrics.extend(requirement_metrics(case, out));
     let scene = json!({
         "kind": "ascent",
         "channels": { "timebase": "mission" },
