@@ -119,6 +119,10 @@ fn a_run_stored_by_an_earlier_build_replays_as_verified_earlier_build_and_tamper
     let (p, _) = Platform::start(std::slice::from_ref(&domains), &library, "test").unwrap();
     let made = p.run(&demo_request()).unwrap();
     assert_eq!(p.replay(&made.run_id).unwrap().status, "verified");
+    // A second run is left exactly as the host wrote it.
+    let mut unchanged_request = demo_request();
+    unchanged_request.seed = 5001;
+    let unchanged = p.run(&unchanged_request).unwrap().run_id;
     let old_id = store_as_older(&p, &made.run_id);
     drop(p);
 
@@ -127,6 +131,20 @@ fn a_run_stored_by_an_earlier_build_replays_as_verified_earlier_build_and_tamper
     bytes.push(0);
     fs::write(&exe, bytes).unwrap();
     let (p, _) = Platform::start(std::slice::from_ref(&domains), &library, "test").unwrap();
+
+    // The replay is strict first: a run that still reproduces byte for byte under another build
+    // is plain `verified`, with the byte comparison and the native replay intact.
+    let report = p.replay(&unchanged).unwrap();
+    assert_eq!(report.status, "verified", "{:?}", failed(&report));
+    assert!(report.checks.iter().any(|c| c.name
+        == "recomputed artifacts equal the stored artifacts byte for byte"
+        && c.pass));
+    assert!(
+        report
+            .checks
+            .iter()
+            .any(|c| c.name.starts_with("vv-rocket replay:") && c.pass)
+    );
 
     let report = p.replay(&old_id).unwrap();
     assert_eq!(
@@ -228,4 +246,87 @@ fn perturb_first_timebase_value(path: &Path) {
     let indent: String = text[begin..end].chars().take_while(|c| *c == ' ').collect();
     let edited = format!("{}{indent}123456.5,\n{}", &text[..begin], &text[end..]);
     fs::write(path, edited).unwrap();
+}
+
+/// A run written by the host of commit 3b056cc (Studio 0.15.0, domain version 0.15.0, six
+/// parameters), copied here unchanged: `gnss_bias` 15 m from 8 s on `m91-landing` with the guarded
+/// controller, seed 5002. It is real drift, not a construction: the current catalogue has thirteen
+/// more parameters, other texts and other metrics, and the domain version string is the same.
+fn copy_fixture(label: &str) -> PathBuf {
+    let from = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/stored-by-0.15.0");
+    let dir = temp(label);
+    for entry in fs::read_dir(from).unwrap() {
+        let entry = entry.unwrap();
+        fs::copy(entry.path(), dir.join(entry.file_name())).unwrap();
+    }
+    dir
+}
+
+#[test]
+fn a_run_written_by_the_0_15_0_host_verifies_against_its_record_under_the_current_host() {
+    use vv_domain_rocket::Host;
+    use vv_platform::host_sdk::{EARLIER_BUILD_AGREEMENT_CHECK, replay, replay_earlier_build};
+
+    let dir = copy_fixture("fixture");
+    let record: RunRecord =
+        serde_json::from_slice(&fs::read(dir.join("record.json")).unwrap()).unwrap();
+    assert_eq!(record.domain.version, "0.15.0");
+    assert_eq!(
+        record.request.parameters.len(),
+        6,
+        "the stored request predates later parameters"
+    );
+    assert_eq!(record.outcome.code, "hard_landing");
+
+    // The strict replay cannot hold across the drift: this is what showed old runs as rejected.
+    let strict = replay(&Host, &dir);
+    assert_eq!(strict.status, "rejected");
+    assert!(
+        strict
+            .checks
+            .iter()
+            .any(|c| !c.pass && c.name == "stored request is valid and canonical")
+    );
+
+    let report = replay_earlier_build(&Host, &dir);
+    assert_eq!(report.status, "verified", "{:?}", failed(&report));
+    let note = report
+        .checks
+        .iter()
+        .find(|c| c.name == "stored request is valid and canonical")
+        .unwrap();
+    assert!(note.detail.starts_with("recorded by domain version 0.15.0; re-simulated with current defaults (parameters added: "), "{}", note.detail);
+    assert!(
+        report
+            .checks
+            .iter()
+            .any(|c| c.name == EARLIER_BUILD_AGREEMENT_CHECK && c.pass)
+    );
+
+    // Tampering with the stored run is still rejected: a telemetry sample, and a native file.
+    perturb_first_timebase_value(&dir.join("record.json"));
+    let tampered = replay_earlier_build(&Host, &dir);
+    assert_eq!(tampered.status, "rejected");
+    assert!(
+        failed(&tampered).iter().any(|f| f.contains("timebase")),
+        "{:?}",
+        failed(&tampered)
+    );
+    let fresh = copy_fixture("fixture-native");
+    replace_once(
+        &fresh.join("verification.json"),
+        "\"requirements_pass\":false",
+        "\"requirements_pass\":true",
+    );
+    let native = replay_earlier_build(&Host, &fresh);
+    assert_eq!(native.status, "rejected");
+    assert!(
+        native
+            .checks
+            .iter()
+            .any(|c| !c.pass && c.name == "stored artifacts match the hashes in record.json")
+    );
+    for d in [dir, fresh] {
+        let _ = fs::remove_dir_all(d);
+    }
 }

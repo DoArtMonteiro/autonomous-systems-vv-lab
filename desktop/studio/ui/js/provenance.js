@@ -25,7 +25,7 @@ export function provenancePanel(runId, record, meta) {
           h('span', { class: 'glyph' }, icon(ok ? 'check' : 'warn')),
           h('strong', null, earlier ? 'Verified against its own record' : ok ? 'Verified' : 'Rejected'),
           h('span', { class: 'dim' }, earlier
-            ? 'Recorded by an earlier build. It was recomputed with the current defaults and agrees with the stored record on every verdict and recorded number; its files are not compared byte for byte.'
+            ? 'Recorded by an earlier build. It was recomputed with the current defaults and agrees with the stored record on the outcome, the safety status, each requirement, the timebases, channels, events and metrics. Texts, the scene and the native files are not compared.'
             : ok ? 'The run was recomputed from its inputs and every check passed.' : 'At least one check failed; the stored run does not reproduce.')),
         h('ol', { class: 'checks' }, rep.checks.map((c) => h('li', { class: c.pass ? 'v-pass' : 'v-fail' },
           h('span', { class: 'glyph' }, icon(c.pass ? 'check' : 'cross')),

@@ -256,9 +256,12 @@ fn completes(stored: &RunRequest, normal: &RunRequest) -> Result<Vec<String>, St
 }
 
 /// The first way in which `fresh`, recomputed by the current build, disagrees with `stored` on what
-/// the run means: outcome, safety, every requirement verdict, every stored timebase and channel,
-/// every stored event and every stored metric. Text (labels, explanations, notes) is not compared,
-/// and `fresh` may carry channels, events and metrics that the earlier build did not write.
+/// the run means: outcome code and status, safety status, every stored requirement's status,
+/// instant and category, every stored timebase and channel, every stored event (instant, kind and
+/// severity) and every stored metric. Not compared: texts (labels, explanations, notes, the
+/// expected and observed text of a requirement), the scene, the entity and mission blocks and the
+/// native files, so a change confined to those passes on a run of another build. `fresh` may carry
+/// channels, events and metrics that the earlier build did not write.
 fn disagreement(stored: &RunRecord, fresh: &RunRecord) -> Option<String> {
     if stored.outcome.code != fresh.outcome.code || stored.outcome.status != fresh.outcome.status {
         return Some(format!(
@@ -329,10 +332,11 @@ fn disagreement(stored: &RunRecord, fresh: &RunRecord) -> Option<String> {
 /// * the current build recomputes the completed request, and the recomputed run agrees with the
 ///   stored record on outcome, safety, requirement verdicts, telemetry, events and metrics.
 ///
-/// It does not compare texts, and it does not run the native simulator replay, which needs the same
-/// simulator sources. A changed number anywhere in the telemetry, a flipped verdict or an edited
-/// file is still rejected. The platform uses it only when the host build that stored the run is not
-/// the one that is running; a run of the same build keeps the strict replay.
+/// It does not run the native simulator replay, which needs the same simulator sources, and it does
+/// not compare what [`disagreement`] lists as not compared. A changed number in the telemetry or the
+/// metrics, a flipped verdict, a changed outcome or an edited stored file is still rejected. The platform uses it only when the host build that stored the run is not
+/// the one that is running, and only after the strict [`replay`] has rejected the run: a run that
+/// still reproduces byte for byte is plain `verified`.
 pub fn replay_earlier_build<H: DomainHost>(host: &H, dir: &Path) -> ReplayReport {
     let mut checks = Vec::new();
     let parsed: Result<RunRecord, String> = read_bounded(&dir.join(RECORD_FILE), MAX_RECORD_BYTES)
@@ -424,7 +428,7 @@ fn earlier_build_files<H: DomainHost>(
             };
             let detail = match &difference {
                 None => format!(
-                    "{} channels, {} requirements, {} events, {} metrics; texts and native files are not compared",
+                    "{} channels, {} requirements, {} events, {} metrics agree; texts, the scene and the native files are not compared",
                     record.channels.len(),
                     record.requirements.len(),
                     record.events.len(),

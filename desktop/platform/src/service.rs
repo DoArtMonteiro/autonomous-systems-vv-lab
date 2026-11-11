@@ -432,10 +432,12 @@ impl Platform {
         // meta.json is what the Library shows; it must say what record.json says, and the run id
         // must be the identity of the stored request under the host build that produced it.
         let meta = self.library.read_meta(run_id);
-        // A run stored by another host build cannot pass the strict replay (see
-        // `host_sdk::replay_earlier_build`); the run id check below still binds it to its stored
-        // request and to the build that wrote it, so the flag cannot be obtained by editing files.
-        let earlier_build = matches!(&meta, Ok(m) if m.host_sha256 != entry.host_sha256);
+        // A run stored by another host build may no longer reproduce byte for byte (see
+        // `host_sdk::replay_earlier_build`). The strict replay always runs first and decides
+        // alone when it passes; the earlier-build replay is only a fallback for a run it rejects,
+        // and the run id check below still binds the run to its stored request and to the build
+        // that wrote it, so the fallback cannot be obtained by editing files.
+        let other_build = matches!(&meta, Ok(m) if m.host_sha256 != entry.host_sha256);
         let (summary_ok, id_ok, build) = match &meta {
             Ok(m) => {
                 let identity = serde_json::json!({
@@ -468,24 +470,16 @@ impl Platform {
             detail: build,
         });
         // A protected seed is never recomputed, even from a stored run.
+        let mut earlier_build = false;
         if checks.iter().all(|c| c.pass) {
             self.checked_host(entry)?;
-            let mut args: Vec<OsString> = vec!["replay".into(), dir.clone().into()];
-            if earlier_build {
-                args.push(EARLIER_BUILD_FLAG.into());
-            }
-            let out = host_call(&entry.found, args)?;
-            match serde_json::from_slice::<ReplayReport>(&out.stdout) {
-                Ok(report) if report.schema == REPLAY_SCHEMA => {
-                    let verdict = host_replay_verdict(&report, out.code, earlier_build);
-                    checks.extend(report.checks);
-                    checks.push(verdict);
-                }
-                Ok(_) => checks.push(failed("host replay report", "unknown schema")),
-                Err(e) => checks.push(failed(
-                    "host replay report",
-                    &format!("{e}: {}", out.stderr),
-                )),
+            let strict = host_replay(&entry.found, &dir, false)?;
+            if other_build && !strict.iter().all(|c| c.pass) {
+                let earlier = host_replay(&entry.found, &dir, true)?;
+                earlier_build = earlier.iter().all(|c| c.pass);
+                checks.extend(earlier);
+            } else {
+                checks.extend(strict);
             }
         }
         let ok = checks.iter().all(|c| c.pass);
@@ -529,6 +523,33 @@ impl Platform {
         crate::library::write_atomic(&path, &bytes).map_err(io)?;
         Ok(path)
     }
+}
+
+/// One host replay: the checks it reports and the platform's verdict on them. `earlier_build`
+/// asks for the replay of a run that another build of the host stored.
+fn host_replay(
+    found: &Discovered,
+    dir: &Path,
+    earlier_build: bool,
+) -> Result<Vec<ReplayCheck>, PlatformError> {
+    let mut args: Vec<OsString> = vec!["replay".into(), dir.into()];
+    if earlier_build {
+        args.push(EARLIER_BUILD_FLAG.into());
+    }
+    let out = host_call(found, args)?;
+    Ok(match serde_json::from_slice::<ReplayReport>(&out.stdout) {
+        Ok(report) if report.schema == REPLAY_SCHEMA => {
+            let verdict = host_replay_verdict(&report, out.code, earlier_build);
+            let mut checks = report.checks;
+            checks.push(verdict);
+            checks
+        }
+        Ok(_) => vec![failed("host replay report", "unknown schema")],
+        Err(e) => vec![failed(
+            "host replay report",
+            &format!("{e}: {}", out.stderr),
+        )],
+    })
 }
 
 fn failed(name: &str, detail: &str) -> ReplayCheck {

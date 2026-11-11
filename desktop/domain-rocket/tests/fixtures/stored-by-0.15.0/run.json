@@ -1,0 +1,35 @@
+{
+  "schema": "vv-rocket-landing-run.v1",
+  "source_sha256": "12b276cb182b62ee3ecda602fe5f82edec2f40163afddaa12513fdc54edcbc05",
+  "name": "Mission Control landing: gnss_bias 15 from 8 s to 40 s, guarded policy",
+  "seed": 5002,
+  "policy": "guarded",
+  "case": {
+    "path": "case.json",
+    "sha256": "dc1301dd57ee4c9844e5fddeccf3ce4b2b288957fcad366b8833ee6d32219f94"
+  },
+  "trace": {
+    "path": "trace.json",
+    "sha256": "97783cfc791b52f67fd86c28f03a3c6c10d678ca2e1a6a8f1813d2bca6529d06"
+  },
+  "verification": {
+    "path": "verification.json",
+    "sha256": "3d6f543e417e78a211af335e093b11765dd7f7517b19388c7657b010be1a4e6d"
+  },
+  "summary": {
+    "cutoff_t_s": null,
+    "end_reason": "touchdown",
+    "final_time_s": 22.955199465993744,
+    "flameout_t_s": null,
+    "ignition_t_s": 3.6,
+    "max_neglected_jet_ratio": 0.0008426480841204018,
+    "max_neglected_jet_ratio_t_s": 9.52,
+    "propellant_remaining_kg": 4312.3089399762985,
+    "propellant_used_kg": 3669.2773818281003,
+    "steps": 2296,
+    "touchdown_t_s": 22.955199465993744
+  },
+  "outcome": "hard_landing",
+  "requirements_pass": false,
+  "invariants_pass": true
+}
