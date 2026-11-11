@@ -8,7 +8,7 @@ import { h, clear, prose } from '../dom.js';
 import { api } from '../api.js';
 import { domainById, visibleDomains, emit, loadRecord } from '../store.js';
 import { toast, errorText } from '../ui.js';
-import { verdictOfOutcome, verdictOfSafety, faultText } from '../model.js';
+import { verdictOfOutcome, verdictOfSafety, faultText, distinguishingLabels } from '../model.js';
 import { verdictGlyph } from '../verification.js';
 
 const REQUEST_SCHEMA = 'vv-run-request.v1';
@@ -548,9 +548,11 @@ function renderComparison(el) {
 /** Plays the baseline and the experiment in the mission player, from their stored records. */
 function watchRuns() {
   const sc = scenarioSpec();
+  // The experiment is named by what it changes (for example the thrust factor), never by a generic word.
+  const expLabel = distinguishingLabels([lab.base.record.request, lab.exp.record.request], catalog())[1];
   navigate('mission', { runs: [
     { runId: lab.base.id, record: lab.base.record, label: 'Baseline' },
-    { runId: lab.exp.id, record: lab.exp.record, label: 'Your change' },
+    { runId: lab.exp.id, record: lab.exp.record, label: expLabel },
   ], title: sc ? `${sc.label}: baseline and your change` : 'Baseline and your change', summary: changes().join('; ') || 'The baseline and your experiment.' });
 }
 
