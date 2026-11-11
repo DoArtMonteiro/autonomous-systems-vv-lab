@@ -16,7 +16,8 @@ SHA-256 in the manifest before it is packed, so a zip never carries a pack that 
 
 The zip is deterministic: entries in a fixed order (environment.json first, then the manifest's
 files in manifest order, then NOTICE.md), a fixed timestamp (1980-01-01), fixed permissions and
-DEFLATE level 9. Rebuilding from the same pack gives the same bytes and the same SHA-256.
+DEFLATE level 9. Rebuilding from the same pack with the same zlib build gives the same bytes and
+the same SHA-256; DEFLATE output differs between zlib builds, so the index names its build (`zlib`).
 
 Pack folders: the bundled packs live in desktop/environments/<id> (they ship with the Studio); the
 catalogue packs are built into dist/packs/<id> by build_environment.py and build_features.py and are
@@ -33,6 +34,7 @@ import json
 import os
 import sys
 import zipfile
+import zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
@@ -226,6 +228,8 @@ def write_index(cat, entries):
         "schema": INDEX_SCHEMA,
         "note": "Separately installable environment packs. Each file is a zip whose root holds environment.json, the files it names and NOTICE.md; the .sha256 sidecar and the sha256 here are of the zip. Built by scripts/geo/package_environment.py from the packs described in scripts/geo/catalogue.json.",
         "tiers": cat["tiers"],
+        # Deflate output depends on the zlib build, so the zip bytes are reproducible only with it.
+        "zlib": zlib.ZLIB_RUNTIME_VERSION,
         "environments": [old[k] for k in order],
     }
     with open(INDEX, "w", encoding="utf-8", newline="\n") as f:

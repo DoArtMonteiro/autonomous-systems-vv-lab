@@ -140,7 +140,7 @@ async function fillEnvironments(body, reloadList) {
       h('tbody', null, list.rejected.map((r) => h('tr', null, h('td', { class: 'mono' }, r.folder), h('td', null, r.kind), h('td', { class: 'small' }, r.reason)))))) : null,
     h('p', { class: 'dim small' }, `${list.environments.length} environments, ${mb(total)} in total. Imported packs are kept in ${list.imported_dir}.`),
     h('div', { class: 'row' },
-      h('button', { type: 'button', class: 'btn btn-primary', dataset: { action: 'install-package' }, title: 'Install a .vvenv.zip environment package: checked against its .sha256 file, extracted to a staging folder and validated file by file before it appears', onclick: () => act(() => api.importEnvironmentPackage(), 'Environment package installed and validated.') }, 'Install a package…'),
+      h('button', { type: 'button', class: 'btn btn-primary', dataset: { action: 'install-package' }, title: 'Install a .vvenv.zip environment package: Studio shows the archive SHA-256 for you to confirm (and compares it with a .sha256 file beside the archive when there is one, which shows the archive is intact, not who made it), then extracts it to a staging folder and validates it file by file before it appears', onclick: () => act(() => api.importEnvironmentPackage(), 'Environment package installed and validated.') }, 'Install a package…'),
       h('button', { type: 'button', class: 'btn', dataset: { action: 'import-environment' }, onclick: () => act(() => api.importEnvironment(), 'Environment imported and validated.') }, 'Import a pack folder…'),
       h('button', { type: 'button', class: 'btn btn-quiet', onclick: () => api.revealEnvironments().catch((e) => toast(errorText(e), 'error')) }, 'Open the imported packs folder'))].filter(Boolean));
 }

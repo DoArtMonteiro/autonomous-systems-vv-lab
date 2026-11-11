@@ -232,7 +232,7 @@ export function verdictsAt(run, t) {
 
 /** Number formatting with a fixed number of decimals per magnitude (no jumping digits). */
 export function fmt(v, digits) {
-  if (v === null || v === undefined) return '—';
+  if (v === null || v === undefined) return 'n/a';
   if (typeof v === 'string') return v;
   if (digits !== undefined) return v.toFixed(digits);
   return hudNum(v);

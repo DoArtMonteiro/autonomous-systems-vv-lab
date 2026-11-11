@@ -1,65 +1,89 @@
-// Compact sources-and-accuracy control for a scene drawn on a geographic environment (M16). A short
-// credit line stays visible; the full provenance, accuracy limits, attribution notices and licences
-// open in a panel on hover, click, tap or the keyboard (Enter or Space; Escape closes). The same
-// details are always available in Settings, Environments.
+// Compact sources-and-accuracy control for a scene drawn on a geographic environment (M16). The short
+// credit of every source whose licence asks for one stays on the map; the full provenance, accuracy
+// limits, attribution notices and licences of every source open in a panel on hover, click, tap or
+// the keyboard (Enter or Space; Escape closes). The same details are always available in Settings,
+// Environments. The manifest comes from the shell, which validates its types; everything here still
+// treats it as data of unknown shape and never throws on a surprise.
 
 import { h } from './dom.js';
 
 let seq = 0;
 
+const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+const str = (v) => (typeof v === 'string' ? v : '');
+const list = (v) => (Array.isArray(v) ? v : []);
+const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+const sourcesOf = (m) => list(isObj(m) ? m.sources : null).filter(isObj);
+
 /** Short credit for each source: the pack's `credit` when given, else its attribution. */
 export function shortCredits(m) {
-  return [...new Set((m.sources || []).map((s) => s.credit || s.attribution).filter(Boolean))];
+  return [...new Set(sourcesOf(m).map((s) => str(s.credit) || str(s.attribution)).filter(Boolean))];
 }
 
 /**
- * Credits that stay on the map itself: the ODbL (OSMF attribution guidelines), the IGN of Spain
- * (its CC BY credit must read at the foot of the view) and swisstopo (OGD terms: the source goes
- * with the data). The Copernicus DEM (Art. 6), Sentinel and other CC BY notices are met by the
- * panel one press away, Settings, the installed NOTICE and every exported evidence package, and
- * public-domain sources ask for none. The full text of every notice stays in the panel.
+ * Whether a source's licence asks for a credit. Fails towards showing: only a licence that says it
+ * is public domain without asking for a credit (USGS, the NGA geoid) is left off the map. The NAIP
+ * policy is public domain but asks for a credit, so it stays; the ODbL, CC BY, Copernicus and
+ * Sentinel notices all stay.
  */
-export function mapCredits(m) {
-  return [...new Set((m.sources || []).filter((s) => /\bODbL\b|Orden FOM|swisstopo terms/.test(s.licence || '')).map((s) => s.credit || s.attribution).filter(Boolean))];
+export function asksForCredit(s) {
+  const l = str(isObj(s) ? s.licence : '');
+  if (/\b(ODbL|CC[- ]BY)\b/i.test(l)) return true; // never dropped, whatever else the text says
+  return !(/public domain/i.test(l) && !/request/i.test(l));
 }
 
-const n = (v) => Number(v || 0).toLocaleString('en');
+/**
+ * Credits that stay on the map itself: the short credit of each source that asks for one,
+ * one per distinct text. The full notices, with the licences, stay in the panel one press away.
+ */
+export function mapCredits(m) {
+  return [...new Set(sourcesOf(m).filter(asksForCredit).map((s) => str(s.credit) || str(s.attribution)).filter(Boolean))];
+}
+
+const n = (v) => num(v).toLocaleString('en');
 
 /** What the pack's world layer (schema v3) puts on the ground, with the source of each height. */
 export function worldText(env) {
-  const w = env.world;
-  if (!w || (!w.features && !w.vegetation)) return null;
+  const w = isObj(env) ? env.world : null;
+  if (!isObj(w) || (!isObj(w.features) && !isObj(w.vegetation))) return null;
   const parts = [];
-  const f = w.features;
+  const f = isObj(w.features) ? w.features : null;
   if (f) {
-    const hs = f.height_sources || {};
+    const hs = isObj(f.height_sources) ? f.height_sources : {};
     const by = [['lidar', 'from lidar'], ['osm-height', 'from the OSM height tag'], ['osm-levels', 'from OSM building levels'], ['default', 'estimated (a default height per kind)']]
-      .filter(([k]) => hs[k]).map(([k, t]) => `${n(hs[k])} ${t}`);
+      .filter(([k]) => num(hs[k])).map(([k, t]) => `${n(hs[k])} ${t}`);
     parts.push(`${n(f.buildings)} building footprints from OpenStreetMap${by.length ? ` (heights: ${by.join(', ')})` : ''}`);
     if (f.lidar_structures) parts.push(`${n(f.lidar_structures)} structures outlined from lidar cells with surveyed heights`);
     if (f.structures) parts.push(`${n(f.structures)} towers and masts at OSM positions`);
   }
-  const v = w.vegetation;
+  const v = isObj(w.vegetation) ? w.vegetation : null;
   if (v) parts.push(`${n(v.trees)} trees and ${n(v.shrubs)} shrub clumps at lidar positions and heights`);
   else parts.push('no vegetation (this pack has no lidar, and none is invented)');
-  const known = f ? Object.entries(f.height_sources || {}).filter(([k]) => k !== 'default').reduce((a, [, v]) => a + v, 0) : 0;
-  const est = f ? (f.height_sources || {}).default || 0 : 0;
+  const known = f ? Object.entries(hs0(f)).filter(([k]) => k !== 'default').reduce((a, [, c]) => a + num(c), 0) : 0;
+  const est = f ? num(hs0(f).default) : 0;
   const heights = f ? ` Building heights are data for ${n(known)} of ${n(f.buildings)}; the other ${n(est)} are estimates and are drawn low, in a paler tone.` : '';
   return `${parts.join('; ')}. Footprints and plant positions are data; walls, roofs and plant shapes are drawn.${heights}`;
 }
 
-const km = (m) => `${(m / 1000).toLocaleString('en', { maximumFractionDigits: 1 })} km`;
+const km = (m) => `${(num(m) / 1000).toLocaleString('en', { maximumFractionDigits: 1 })} km`;
 
 /** Resolution of each layer, finest first, from the validated manifest. */
 function contextText(env, h1, im) {
-  const d = (env.layers || []).find((l) => l.role === 'detail');
-  const base = `terrain ${h1.spacing_m || '?'} m and image ${im.spacing_m || '?'} m per pixel`;
+  const d = list(env.layers).find((l) => isObj(l) && l.role === 'detail');
+  const base = `terrain ${num(h1.spacing_m) || '?'} m and image ${num(im.spacing_m) || '?'} m per pixel`;
   if (!d) return `${base}, from the validated pack.`;
-  return `within the ${km(2 * d.extent_m)} square around the pad, terrain ${d.height.spacing_m} m and image ${d.image.spacing_m} m per pixel; beyond it, out to ${km(2 * env.extent_m)}, ${base}. From the validated pack; the ${d.blend_m} m margin where the layers meet is blended for display.`;
+  const dh = isObj(d.height) ? d.height : {};
+  const di = isObj(d.image) ? d.image : {};
+  return `within the ${km(2 * num(d.extent_m))} square around the pad, terrain ${num(dh.spacing_m) || '?'} m and image ${num(di.spacing_m) || '?'} m per pixel; beyond it, out to ${km(2 * num(env.extent_m))}, ${base}. From the validated pack; the ${num(d.blend_m)} m margin where the layers meet is blended for display.`;
+}
+
+/** Counts by source of height, or an empty object. */
+function hs0(f) {
+  return isObj(f.height_sources) ? f.height_sources : {};
 }
 
 function licenceUrl(text) {
-  const m = /(https?:\/\/\S+)/.exec(text || '');
+  const m = /(https?:\/\/\S+)/.exec(str(text));
   return m ? m[1].replace(/[.,;)]+$/, '') : null;
 }
 
@@ -69,33 +93,35 @@ function licenceUrl(text) {
  */
 export function sourcesInfo(env, { warn, onSettings } = {}) {
   const id = `src-info-${++seq}`;
-  const h1 = env.height || {};
-  const im = env.image || {};
+  const h1 = isObj(env.height) ? env.height : {};
+  const im = isObj(env.image) ? env.image : {};
+  const acc = list(env.accuracy).filter((a) => typeof a === 'string');
+  const note = str(env.site_note);
   const btn = h('button', { type: 'button', class: 'si-btn', 'aria-expanded': 'false', 'aria-controls': id, title: 'Sources, licences and accuracy' },
     h('span', { class: 'si-i', 'aria-hidden': 'true' }, 'i'), h('span', { class: 'si-btn-t' }, 'Sources'));
-  const panel = h('div', { class: 'si-panel', id, role: 'region', 'aria-label': `Sources and accuracy of ${env.name}`, hidden: true },
+  const panel = h('div', { class: 'si-panel', id, role: 'region', 'aria-label': `Sources and accuracy of ${str(env.name)}`, hidden: true },
     h('p', { class: 'si-h' }, 'What the scene shows'),
     h('dl', { class: 'si-kinds' },
       h('div', null, h('dt', null, h('span', { class: 'prov prov-sim' }, 'Simulated')), h('dd', null, 'Trajectory, attitude, throttle, estimate and events, from the run record.')),
-      h('div', null, h('dt', null, h('span', { class: 'prov prov-ctx' }, 'Context')), h('dd', null, `${env.name}: ${contextText(env, h1, im)} The model assumes flat ground at the pad; nothing is computed against this terrain.`)),
+      h('div', null, h('dt', null, h('span', { class: 'prov prov-ctx' }, 'Context')), h('dd', null, `${str(env.name)}: ${contextText(env, h1, im)} The model assumes flat ground at the pad; nothing is computed against this terrain.`)),
       worldText(env) ? h('div', null, h('dt', null, h('span', { class: 'prov prov-ctx' }, 'On the ground')), h('dd', null, worldText(env))) : null,
-      env.site_note ? h('div', null, h('dt', null, h('span', { class: 'prov prov-ctx' }, 'Site')), h('dd', null, env.site_note)) : null,
+      note ? h('div', null, h('dt', null, h('span', { class: 'prov prov-ctx' }, 'Site')), h('dd', null, note)) : null,
       h('div', null, h('dt', null, h('span', { class: 'prov prov-ill' }, 'Illustrative')), h('dd', null, `Stage shape, weathering, legs, fins, plume, the glow and dust where it meets the ground, sky, haze, sun, shadows, water finish, fine ground grain${env.world ? ', building walls and roofs, and the shapes and leaves of plants' : ''} and pad surface: drawn for legibility, not modelled.`))),
     warn ? h('p', { class: 'si-warn' }, warn) : null,
-    (env.accuracy || []).length ? h('p', { class: 'si-h' }, 'Accuracy') : null,
-    (env.accuracy || []).length ? h('ul', { class: 'si-list' }, env.accuracy.map((a) => h('li', null, a))) : null,
+    acc.length ? h('p', { class: 'si-h' }, 'Accuracy') : null,
+    acc.length ? h('ul', { class: 'si-list' }, acc.map((a) => h('li', null, a))) : null,
     h('p', { class: 'si-h' }, 'Sources and licences'),
-    h('ul', { class: 'si-list si-sources' }, (env.sources || []).map((s) => {
+    h('ul', { class: 'si-list si-sources' }, sourcesOf(env).map((s) => {
       const url = licenceUrl(s.licence);
       return h('li', null,
-        h('p', { class: 'si-prod' }, s.product),
-        s.attribution ? h('p', { class: 'si-attr' }, s.attribution) : null,
-        h('p', { class: 'si-lic' }, (s.licence || '').replace(url || '\u0000', '').trim(), url ? h('span', { class: 'si-url mono' }, ` ${url}`) : null));
+        h('p', { class: 'si-prod' }, str(s.product)),
+        str(s.attribution) ? h('p', { class: 'si-attr' }, str(s.attribution)) : null,
+        h('p', { class: 'si-lic' }, str(s.licence).replace(url || '\u0000', '').trim(), url ? h('span', { class: 'si-url mono' }, ` ${url}`) : null));
     })),
     onSettings ? h('button', { type: 'button', class: 'link small si-more', onclick: () => { close(); onSettings(); } }, 'Environment details in Settings') : null);
-  const others = shortCredits(env).length - mapCredits(env).length;
-  const credit = h('p', { class: 'si-credit', title: shortCredits(env).join(' · ') },
-    mapCredits(env).join(' · '), others > 0 ? h('span', { class: 'si-more-n' }, `${mapCredits(env).length ? ' · ' : ''}${others} more in Sources`) : null);
+  // The credit of every source whose licence asks for one; the full notices are in the panel.
+  const credits = mapCredits(env);
+  const credit = credits.length ? h('p', { class: 'si-credit', title: 'Full notices and licences: Sources' }, credits.join(' · ')) : null;
   const wrap = h('div', { class: 'si' }, h('div', { class: 'si-row' }, btn, warn ? h('span', { class: 'si-chip', title: warn }, 'Path below terrain') : null, h('span', { class: 'si-chip si-flat', title: 'The model assumes flat ground at the pad; nothing is computed against this terrain.' }, 'Terrain is context only'), credit), panel);
 
   let open = false;
