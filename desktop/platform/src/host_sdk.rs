@@ -210,6 +210,241 @@ pub fn replay<H: DomainHost>(host: &H, dir: &Path) -> ReplayReport {
     }
 }
 
+/// Command-line flag of `replay`: the platform passes it for a stored run that an earlier build of
+/// this host produced. The strict replay cannot verify such a run, because the current build
+/// normalises requests differently (new parameters with defaults) and writes other text and
+/// other metrics; see [`replay_earlier_build`].
+pub const EARLIER_BUILD_FLAG: &str = "--earlier-build";
+
+/// Name of the check that carries the semantic comparison of an earlier-build replay.
+pub const EARLIER_BUILD_AGREEMENT_CHECK: &str =
+    "recomputed result agrees with the stored record (recorded by an earlier build)";
+
+/// Whether `normal` is `stored` plus catalogue defaults only: the same inputs, with parameters and
+/// fault magnitudes that the stored request left out filled in. Returns the parameters added.
+fn completes(stored: &RunRequest, normal: &RunRequest) -> Result<Vec<String>, String> {
+    let same_inputs = stored.schema == normal.schema
+        && stored.domain == normal.domain
+        && stored.scenario == normal.scenario
+        && stored.controller == normal.controller
+        && stored.seed == normal.seed
+        && stored.faults.len() == normal.faults.len()
+        && stored.faults.iter().zip(&normal.faults).all(|(a, b)| {
+            a.kind == b.kind
+                && a.start == b.start
+                && a.end == b.end
+                && (a.magnitude.is_none() || a.magnitude == b.magnitude)
+        });
+    if !same_inputs {
+        return Err(
+            "the current catalogue changes more than defaults in the stored request".into(),
+        );
+    }
+    for (k, v) in &stored.parameters {
+        if normal.parameters.get(k) != Some(v) {
+            return Err(format!(
+                "stored parameter {k} = {v} is not kept by the current catalogue"
+            ));
+        }
+    }
+    Ok(normal
+        .parameters
+        .keys()
+        .filter(|k| !stored.parameters.contains_key(*k))
+        .cloned()
+        .collect())
+}
+
+/// The first way in which `fresh`, recomputed by the current build, disagrees with `stored` on what
+/// the run means: outcome, safety, every requirement verdict, every stored timebase and channel,
+/// every stored event and every stored metric. Text (labels, explanations, notes) is not compared,
+/// and `fresh` may carry channels, events and metrics that the earlier build did not write.
+fn disagreement(stored: &RunRecord, fresh: &RunRecord) -> Option<String> {
+    if stored.outcome.code != fresh.outcome.code || stored.outcome.status != fresh.outcome.status {
+        return Some(format!(
+            "outcome {} ({}) became {} ({})",
+            stored.outcome.code, stored.outcome.status, fresh.outcome.code, fresh.outcome.status
+        ));
+    }
+    if stored.safety.status != fresh.safety.status {
+        return Some(format!(
+            "safety {} became {}",
+            stored.safety.status, fresh.safety.status
+        ));
+    }
+    for q in &stored.requirements {
+        match fresh.requirements.iter().find(|x| x.id == q.id) {
+            None => return Some(format!("requirement {} is no longer evaluated", q.id)),
+            Some(x) if x.status != q.status || x.t != q.t || x.category != q.category => {
+                return Some(format!(
+                    "requirement {}: {} at {:?} became {} at {:?}",
+                    q.id, q.status, q.t, x.status, x.t
+                ));
+            }
+            Some(_) => {}
+        }
+    }
+    for (id, values) in &stored.timebases {
+        if fresh.timebases.get(id) != Some(values) {
+            return Some(format!("timebase {id} differs"));
+        }
+    }
+    for c in &stored.channels {
+        match fresh.channels.iter().find(|x| x.id == c.id) {
+            Some(x) if x.timebase == c.timebase && x.values == c.values => {}
+            Some(_) => return Some(format!("channel {} differs", c.id)),
+            None => return Some(format!("channel {} is no longer recorded", c.id)),
+        }
+    }
+    for e in &stored.events {
+        if !fresh
+            .events
+            .iter()
+            .any(|x| x.t == e.t && x.kind == e.kind && x.severity == e.severity)
+        {
+            return Some(format!("event {} at {} is not reproduced", e.kind, e.t));
+        }
+    }
+    for m in &stored.metrics {
+        match fresh.metrics.iter().find(|x| x.id == m.id) {
+            Some(x) if x.value == m.value => {}
+            Some(_) => return Some(format!("metric {} differs", m.id)),
+            None => return Some(format!("metric {} is no longer recorded", m.id)),
+        }
+    }
+    None
+}
+
+/// Replays a stored run that an earlier build of this host produced.
+///
+/// The strict [`replay`] requires the stored request to equal its own normal form and every
+/// recomputed file to equal the stored one byte for byte. Neither can hold across builds: a newer
+/// build adds parameters with defaults, and writes other texts, metrics and record fields, so an
+/// honest older run would be reported as tampered. This replay instead verifies, and says what it
+/// verified:
+///
+/// * the stored files still match the hashes written with them (the same integrity check);
+/// * the stored request is valid and only needs catalogue defaults added (reported with the
+///   domain version that recorded it);
+/// * the current build recomputes the completed request, and the recomputed run agrees with the
+///   stored record on outcome, safety, requirement verdicts, telemetry, events and metrics.
+///
+/// It does not compare texts, and it does not run the native simulator replay, which needs the same
+/// simulator sources. A changed number anywhere in the telemetry, a flipped verdict or an edited
+/// file is still rejected. The platform uses it only when the host build that stored the run is not
+/// the one that is running; a run of the same build keeps the strict replay.
+pub fn replay_earlier_build<H: DomainHost>(host: &H, dir: &Path) -> ReplayReport {
+    let mut checks = Vec::new();
+    let parsed: Result<RunRecord, String> = read_bounded(&dir.join(RECORD_FILE), MAX_RECORD_BYTES)
+        .and_then(|b| serde_json::from_slice(&b).map_err(|e| e.to_string()));
+    let mut valid_seed = None;
+    match parsed {
+        Err(e) => checks.push(check("record.json is a valid run record", false, e)),
+        Ok(record) => {
+            checks.push(check("record.json is a valid run record", true, ""));
+            let name = "stored request is valid and canonical";
+            match validate_request(host, &record.request) {
+                Err(e) => checks.push(check(
+                    name,
+                    false,
+                    format!(
+                        "recorded by domain version {}; the current catalogue refuses the stored request: {e}",
+                        record.domain.version
+                    ),
+                )),
+                Ok(normal) => match completes(&record.request, &normal) {
+                    Err(e) => checks.push(check(name, false, e)),
+                    Ok(added) => {
+                        let completed = if added.is_empty() {
+                            "no parameter added".to_string()
+                        } else {
+                            format!("parameters added: {}", added.join(", "))
+                        };
+                        checks.push(check(
+                            name,
+                            true,
+                            format!(
+                                "recorded by domain version {}; re-simulated with current defaults ({completed})",
+                                record.domain.version
+                            ),
+                        ));
+                        valid_seed = Some(normal.seed);
+                        earlier_build_files(host, dir, &record, &normal, &mut checks);
+                    }
+                },
+            }
+        }
+    }
+    if let Some(seed) = valid_seed {
+        checks.extend(native_seed_check(host, dir, seed));
+    }
+    let ok = !checks.is_empty() && checks.iter().all(|c| c.pass);
+    ReplayReport {
+        schema: REPLAY_SCHEMA.into(),
+        status: if ok { "verified" } else { "rejected" }.into(),
+        checks,
+    }
+}
+
+fn earlier_build_files<H: DomainHost>(
+    host: &H,
+    dir: &Path,
+    record: &RunRecord,
+    normal: &RunRequest,
+    checks: &mut Vec<ReplayCheck>,
+) {
+    let name = "stored artifacts match the hashes in record.json";
+    match hash_artifacts(dir) {
+        Ok(on_disk) if on_disk == record.provenance.artifacts => {
+            checks.push(check(name, true, format!("{} files", on_disk.len())))
+        }
+        Ok(_) => checks.push(check(name, false, "a file was added, removed or changed")),
+        Err(e) => checks.push(check(name, false, e)),
+    }
+    let scratch = scratch_dir();
+    let rerun = fs::create_dir_all(&scratch)
+        .map_err(|e| e.to_string())
+        .and_then(|_| {
+            execute(host, normal, &scratch).map_err(|e| match e {
+                HostError::Invalid(m) | HostError::Simulation(m) => m,
+            })
+        });
+    match rerun {
+        Err(e) => checks.push(check("the run is recomputed from its request", false, e)),
+        Ok(_) => {
+            checks.push(check("the run is recomputed from its request", true, ""));
+            // Both records are read from their files, so both numbers went through the same
+            // printing and parsing; the in-memory record of the run would differ in the last bit.
+            let fresh: Result<RunRecord, String> =
+                read_bounded(&scratch.join(RECORD_FILE), MAX_RECORD_BYTES)
+                    .and_then(|b| serde_json::from_slice(&b).map_err(|e| e.to_string()));
+            let difference = match &fresh {
+                Ok(fresh) => disagreement(record, fresh),
+                Err(e) => Some(format!("the recomputed record cannot be read: {e}")),
+            };
+            let detail = match &difference {
+                None => format!(
+                    "{} channels, {} requirements, {} events, {} metrics; texts and native files are not compared",
+                    record.channels.len(),
+                    record.requirements.len(),
+                    record.events.len(),
+                    record.metrics.len()
+                ),
+                Some(d) => format!(
+                    "{d}; the current simulator does not reproduce what version {} recorded",
+                    record.domain.version
+                ),
+            };
+            checks.push(check(
+                EARLIER_BUILD_AGREEMENT_CHECK,
+                difference.is_none(),
+                detail,
+            ));
+        }
+    }
+    let _ = fs::remove_dir_all(&scratch);
+}
+
 fn replay_files<H: DomainHost>(
     host: &H,
     dir: &Path,
@@ -324,6 +559,13 @@ pub fn host_main<H: DomainHost>(host: &H) -> ExitCode {
                 Err(HostError::Simulation(e)) => return fail(EXIT_SIMULATION_ERROR, &e),
             }
         }
+        ["replay", dir, flag] if *flag == EARLIER_BUILD_FLAG => {
+            let report = replay_earlier_build(host, Path::new(dir));
+            print_json(&report);
+            if report.status != "verified" {
+                return ExitCode::from(EXIT_REPLAY_REJECTED as u8);
+            }
+        }
         ["replay", dir] => {
             let report = replay(host, Path::new(dir));
             print_json(&report);
@@ -334,7 +576,7 @@ pub fn host_main<H: DomainHost>(host: &H) -> ExitCode {
         _ => {
             return fail(
                 EXIT_INVALID_REQUEST,
-                "usage: manifest | describe | validate <request.json> | run <request.json> --output <dir> | replay <dir>",
+                "usage: manifest | describe | validate <request.json> | run <request.json> --output <dir> | replay <dir> [--earlier-build]",
             );
         }
     }

@@ -18,6 +18,10 @@ pub const RECORD_SCHEMA: &str = "vv-run.v1";
 /// record has neither field and serialises exactly as before.
 pub const RECORD_SCHEMA_V2: &str = "vv-run.v2";
 pub const REPLAY_SCHEMA: &str = "vv-run-replay.v1";
+/// Replay status of a run that an earlier host build stored: it still verifies against its own
+/// record (integrity, a request that only needs current defaults, a recomputed result that agrees
+/// on every verdict and every number), but not byte for byte, so it is not plain `verified`.
+pub const REPLAY_VERIFIED_EARLIER_BUILD: &str = "verified_earlier_build";
 
 /// File a domain host writes into its run directory, next to its native artifacts.
 pub const RECORD_FILE: &str = "record.json";
@@ -529,7 +533,8 @@ pub struct ReplayCheck {
 #[serde(deny_unknown_fields)]
 pub struct ReplayReport {
     pub schema: String,
-    /// verified or rejected; a host must recompute from the stored inputs to say verified.
+    /// verified or rejected; a host must recompute from the stored inputs to say verified. The
+    /// platform alone adds `verified_earlier_build` (see [`REPLAY_VERIFIED_EARLIER_BUILD`]).
     pub status: String,
     pub checks: Vec<ReplayCheck>,
 }

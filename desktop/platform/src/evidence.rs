@@ -11,7 +11,9 @@ use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, DateTime, ZipWriter};
 
 use crate::canonical::{pretty_bytes, sha256_hex};
-use crate::contract::{FileHash, META_FILE, ReplayReport, RunRecord};
+use crate::contract::{
+    FileHash, META_FILE, REPLAY_VERIFIED_EARLIER_BUILD, ReplayReport, RunRecord,
+};
 use crate::host_sdk::read_bounded;
 
 pub const EVIDENCE_SCHEMA: &str = "vv-evidence.v1";
@@ -56,7 +58,11 @@ fn readme(run_id: &str, record: &RunRecord, replay: &ReplayReport) -> String {
         text.push_str(line);
         text.push('\n');
     }
-    text.push_str("\nThe desktop application replays a stored run by recomputing it from request.json and comparing every file byte for byte; replay.json lists each check.\n\n## Notes\n\n");
+    text.push_str("\nThe desktop application replays a stored run by recomputing it from request.json and comparing every file byte for byte; replay.json lists each check.\n");
+    if replay.status == REPLAY_VERIFIED_EARLIER_BUILD {
+        text.push_str("\nThis run was recorded by an earlier build of the domain host. It was recomputed with the current defaults and agrees with the stored record on every requirement verdict and every recorded number; the files are not byte-identical and the native simulator replay was not run. replay.json states what was checked.\n");
+    }
+    text.push_str("\n## Notes\n\n");
     for note in &record.notes {
         text.push_str("- ");
         text.push_str(note);

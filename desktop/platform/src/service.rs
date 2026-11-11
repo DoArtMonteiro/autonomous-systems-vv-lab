@@ -15,7 +15,10 @@ use crate::contract::*;
 use crate::discovery::{Discovered, Rejected, discover};
 use crate::evidence;
 use crate::host::{HostOutput, call};
-use crate::host_sdk::{MAX_RECORD_BYTES, hash_artifacts, read_bounded};
+use crate::host_sdk::{
+    EARLIER_BUILD_AGREEMENT_CHECK, EARLIER_BUILD_FLAG, MAX_RECORD_BYTES, hash_artifacts,
+    read_bounded,
+};
 use crate::library::{Library, META_SCHEMA, RunMeta, now_utc, summary_of};
 use crate::seeds::check_seed;
 use crate::validate::normalise;
@@ -429,6 +432,10 @@ impl Platform {
         // meta.json is what the Library shows; it must say what record.json says, and the run id
         // must be the identity of the stored request under the host build that produced it.
         let meta = self.library.read_meta(run_id);
+        // A run stored by another host build cannot pass the strict replay (see
+        // `host_sdk::replay_earlier_build`); the run id check below still binds it to its stored
+        // request and to the build that wrote it, so the flag cannot be obtained by editing files.
+        let earlier_build = matches!(&meta, Ok(m) if m.host_sha256 != entry.host_sha256);
         let (summary_ok, id_ok, build) = match &meta {
             Ok(m) => {
                 let identity = serde_json::json!({
@@ -463,10 +470,14 @@ impl Platform {
         // A protected seed is never recomputed, even from a stored run.
         if checks.iter().all(|c| c.pass) {
             self.checked_host(entry)?;
-            let out = host_call(&entry.found, vec!["replay".into(), dir.clone().into()])?;
+            let mut args: Vec<OsString> = vec!["replay".into(), dir.clone().into()];
+            if earlier_build {
+                args.push(EARLIER_BUILD_FLAG.into());
+            }
+            let out = host_call(&entry.found, args)?;
             match serde_json::from_slice::<ReplayReport>(&out.stdout) {
                 Ok(report) if report.schema == REPLAY_SCHEMA => {
-                    let verdict = host_replay_verdict(&report, out.code);
+                    let verdict = host_replay_verdict(&report, out.code, earlier_build);
                     checks.extend(report.checks);
                     checks.push(verdict);
                 }
@@ -480,7 +491,14 @@ impl Platform {
         let ok = checks.iter().all(|c| c.pass);
         Ok(ReplayReport {
             schema: REPLAY_SCHEMA.into(),
-            status: if ok { "verified" } else { "rejected" }.into(),
+            status: if !ok {
+                "rejected"
+            } else if earlier_build {
+                REPLAY_VERIFIED_EARLIER_BUILD
+            } else {
+                "verified"
+            }
+            .into(),
             checks,
         })
     }
@@ -499,10 +517,10 @@ impl Platform {
             .map_err(PlatformError::Invalid)?;
         let bytes = evidence::package(&dir, run_id, &record, &replay, &self.version).map_err(io)?;
         let path = dest.unwrap_or_else(|| {
-            let suffix = if replay.status == "verified" {
-                ""
-            } else {
+            let suffix = if replay.status == "rejected" {
                 "-REJECTED"
+            } else {
+                ""
             };
             self.library
                 .exports_dir()
@@ -570,8 +588,13 @@ fn check_record(
 
 /// A host is a separate program: its replay counts only if it exited cleanly, said "verified" and
 /// reported the recomputation checks of the contract as passed. An empty or partial report fails.
-fn host_replay_verdict(report: &ReplayReport, code: i32) -> ReplayCheck {
-    let recomputed = RECOMPUTE_CHECKS
+fn host_replay_verdict(report: &ReplayReport, code: i32, earlier_build: bool) -> ReplayCheck {
+    let names = if earlier_build {
+        EARLIER_BUILD_RECOMPUTE_CHECKS
+    } else {
+        RECOMPUTE_CHECKS
+    };
+    let recomputed = names
         .iter()
         .all(|n| report.checks.iter().any(|c| c.name == *n && c.pass));
     let clean = code == EXIT_OK && report.status == "verified";
@@ -600,6 +623,13 @@ pub const RECOMPUTE_CHECKS: [&str; 2] = [
     "recomputed artifacts equal the stored artifacts byte for byte",
 ];
 
+/// The same for a run stored by an earlier host build: recomputed, and agreeing with the stored
+/// record (the strict byte comparison cannot hold across builds).
+pub const EARLIER_BUILD_RECOMPUTE_CHECKS: [&str; 2] = [
+    "the run is recomputed from its request",
+    EARLIER_BUILD_AGREEMENT_CHECK,
+];
+
 #[cfg(test)]
 mod replay_verdict_tests {
     use super::*;
@@ -621,18 +651,37 @@ mod replay_verdict_tests {
 
     #[test]
     fn a_host_report_without_recomputation_is_not_verified() {
-        assert!(!host_replay_verdict(&report("verified", &[]), EXIT_OK).pass);
+        assert!(!host_replay_verdict(&report("verified", &[]), EXIT_OK, false).pass);
         let partial = report("verified", &[(RECOMPUTE_CHECKS[0], true)]);
-        assert!(!host_replay_verdict(&partial, EXIT_OK).pass);
+        assert!(!host_replay_verdict(&partial, EXIT_OK, false).pass);
     }
 
     #[test]
     fn a_host_verdict_needs_status_exit_code_and_passed_recomputation() {
         let full = [(RECOMPUTE_CHECKS[0], true), (RECOMPUTE_CHECKS[1], true)];
-        assert!(host_replay_verdict(&report("verified", &full), EXIT_OK).pass);
-        assert!(!host_replay_verdict(&report("rejected", &full), EXIT_OK).pass);
-        assert!(!host_replay_verdict(&report("verified", &full), 3).pass);
+        assert!(host_replay_verdict(&report("verified", &full), EXIT_OK, false).pass);
+        assert!(!host_replay_verdict(&report("rejected", &full), EXIT_OK, false).pass);
+        assert!(!host_replay_verdict(&report("verified", &full), 3, false).pass);
         let failed = [(RECOMPUTE_CHECKS[0], true), (RECOMPUTE_CHECKS[1], false)];
-        assert!(!host_replay_verdict(&report("verified", &failed), EXIT_OK).pass);
+        assert!(!host_replay_verdict(&report("verified", &failed), EXIT_OK, false).pass);
+    }
+
+    #[test]
+    fn an_earlier_build_needs_the_agreement_check_and_the_strict_byte_check_does_not_count() {
+        let strict = [(RECOMPUTE_CHECKS[0], true), (RECOMPUTE_CHECKS[1], true)];
+        // A report that only passes the strict byte comparison is not an earlier-build verification.
+        assert!(!host_replay_verdict(&report("verified", &strict), EXIT_OK, true).pass);
+        let agreed = [
+            (EARLIER_BUILD_RECOMPUTE_CHECKS[0], true),
+            (EARLIER_BUILD_RECOMPUTE_CHECKS[1], true),
+        ];
+        assert!(host_replay_verdict(&report("verified", &agreed), EXIT_OK, true).pass);
+        // And the earlier-build checks never satisfy the strict verdict of a run of the same build.
+        assert!(!host_replay_verdict(&report("verified", &agreed), EXIT_OK, false).pass);
+        let disagreed = [
+            (EARLIER_BUILD_RECOMPUTE_CHECKS[0], true),
+            (EARLIER_BUILD_RECOMPUTE_CHECKS[1], false),
+        ];
+        assert!(!host_replay_verdict(&report("verified", &disagreed), EXIT_OK, true).pass);
     }
 }

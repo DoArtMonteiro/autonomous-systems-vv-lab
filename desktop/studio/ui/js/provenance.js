@@ -17,12 +17,16 @@ export function provenancePanel(runId, record, meta) {
     clear(replayOut).append(h('p', { class: 'dim' }, 'Recomputing the run from its stored request in the domain host…'));
     try {
       const rep = await api.replay(runId);
-      const ok = rep.status === 'verified';
+      // An earlier build's run is checked against its own record, not byte for byte: say so, and never call it rejected.
+      const earlier = rep.status === 'verified_earlier_build';
+      const ok = rep.status === 'verified' || earlier;
       clear(replayOut).append(
         h('div', { class: ['replay-verdict', ok ? 'v-pass' : 'v-unsafe'] },
           h('span', { class: 'glyph' }, icon(ok ? 'check' : 'warn')),
-          h('strong', null, ok ? 'Verified' : 'Rejected'),
-          h('span', { class: 'dim' }, ok ? 'The run was recomputed from its inputs and every check passed.' : 'At least one check failed; the stored run does not reproduce.')),
+          h('strong', null, earlier ? 'Verified against its own record' : ok ? 'Verified' : 'Rejected'),
+          h('span', { class: 'dim' }, earlier
+            ? 'Recorded by an earlier build. It was recomputed with the current defaults and agrees with the stored record on every verdict and recorded number; its files are not compared byte for byte.'
+            : ok ? 'The run was recomputed from its inputs and every check passed.' : 'At least one check failed; the stored run does not reproduce.')),
         h('ol', { class: 'checks' }, rep.checks.map((c) => h('li', { class: c.pass ? 'v-pass' : 'v-fail' },
           h('span', { class: 'glyph' }, icon(c.pass ? 'check' : 'cross')),
           h('span', null, c.name),
