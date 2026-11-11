@@ -33,6 +33,7 @@ import json
 import os
 import sys
 import zipfile
+import zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
@@ -226,6 +227,8 @@ def write_index(cat, entries):
         "schema": INDEX_SCHEMA,
         "note": "Separately installable environment packs. Each file is a zip whose root holds environment.json, the files it names and NOTICE.md; the .sha256 sidecar and the sha256 here are of the zip. Built by scripts/geo/package_environment.py from the packs described in scripts/geo/catalogue.json.",
         "tiers": cat["tiers"],
+        # Deflate output depends on the zlib build, so the zip bytes are reproducible only with it.
+        "zlib": zlib.ZLIB_RUNTIME_VERSION,
         "environments": [old[k] for k in order],
     }
     with open(INDEX, "w", encoding="utf-8", newline="\n") as f:
