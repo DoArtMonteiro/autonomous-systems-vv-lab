@@ -35,6 +35,7 @@ static func build(parent: Node3D, pack, cx: float, cy: float) -> Node3D:
 	decal.upper_fade = 0.1
 	decal.lower_fade = 0.1
 	decal.normal_fade = 0.3
+	decal.cull_mask = 1   # terrain and world only: the masts, lights and the stage are on layer 2
 	root.add_child(decal)
 	var props := Assets.load_glb("pad_props.glb")
 	if props == null:
@@ -54,6 +55,8 @@ static func build(parent: Node3D, pack, cx: float, cy: float) -> Node3D:
 		n.position = Vector3(x, pack.ground(x, y), -y)
 		n.rotation.y = yaw
 		root.add_child(n)
+		for gi in n.find_children("*", "GeometryInstance3D", true, false):
+			gi.layers = 2
 	for k in 24:
 		var a := TAU * k / 24.0
 		place.call(edge, cx + 35.0 * cos(a), cy + 35.0 * sin(a), a)

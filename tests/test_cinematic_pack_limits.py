@@ -32,10 +32,10 @@ class PackLimits(unittest.TestCase):
         if not self.godot or not os.path.isfile(self.godot):
             self.skipTest("VV_GODOT is not set to a Godot 4.7.2 console executable")
 
-    def run_pack(self, edit):
+    def run_pack(self, edit, pack=None):
         with tempfile.TemporaryDirectory() as tmp:
             dst = os.path.join(tmp, "pack")
-            shutil.copytree(PACK, dst)
+            shutil.copytree(os.path.join(REPO, "desktop", "environments", pack) if pack else PACK, dst)
             mp = os.path.join(dst, "environment.json")
             with open(mp, encoding="utf-8") as f:
                 m = json.load(f)
@@ -61,6 +61,14 @@ class PackLimits(unittest.TestCase):
     def test_non_numeric_columns(self):
         out = self.run_pack(lambda m, d: m["height"].update({"columns": {"a": 1}}))
         self.refused(out, "declared size")
+
+    def test_detail_layer_entry_of_the_wrong_type(self):
+        def edit(m, d):
+            for layer in m["layers"]:
+                if layer.get("role") == "detail":
+                    layer["height"] = "x"
+        out = self.run_pack(edit, "cape-canaveral")
+        self.refused(out, "detail layer")
 
     def test_image_larger_than_the_limit(self):
         def edit(m, d):

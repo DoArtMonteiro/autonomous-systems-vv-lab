@@ -213,6 +213,7 @@ func _build() -> void:
 	world = World.build(pack, self, settings)
 	stage = Stage.build(vehicle)
 	for n in vehicle.find_children("*", "MeshInstance3D", true, false):
+		n.layers = 2   # not on the decals' layer (pad slab, contact shadow): they paint the ground only
 		if not n.get_parent().name.begins_with("Plume"):
 			n.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	var pp: Dictionary = record.pad()

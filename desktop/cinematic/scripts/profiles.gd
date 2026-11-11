@@ -33,7 +33,8 @@ static func detect_vram(cli_bytes: int) -> Dictionary:
 		var out := []
 		# The system's own reg.exe by absolute path: a bare name could be shadowed by a file planted
 		# next to the executable or in the working directory.
-		var reg := OS.get_environment("SystemRoot").path_join("System32/reg.exe")
+		var root := OS.get_environment("SystemRoot")
+		var reg := root.path_join("System32/reg.exe") if root.is_absolute_path() else ""
 		var code := OS.execute(reg, ["query", DISPLAY_CLASS, "/s", "/v", "HardwareInformation.qwMemorySize"], out, true)
 		if code == 0 and out.size() > 0:
 			var best := -1
@@ -96,7 +97,7 @@ static func step_down(name: String) -> String:
 
 # Applies the drawing settings to the viewport, the environment and the sun.
 static func apply(s: Dictionary, vp: Viewport, env: Environment, sun: DirectionalLight3D) -> void:
-	RenderingServer.camera_attributes_set_dof_blur_quality(RenderingServer.DOF_BLUR_QUALITY_HIGH if str(s["name"]) == "ultra" else RenderingServer.DOF_BLUR_QUALITY_MEDIUM, true)
+	RenderingServer.camera_attributes_set_dof_blur_quality(RenderingServer.DOF_BLUR_QUALITY_HIGH if str(s["name"]) == "ultra" else RenderingServer.DOF_BLUR_QUALITY_MEDIUM, false)
 	RenderingServer.directional_shadow_atlas_set_size(int(s["shadow_size"]), true)
 	RenderingServer.directional_soft_shadow_filter_set_quality(RenderingServer.SHADOW_QUALITY_SOFT_HIGH if s["soft_shadows"] else RenderingServer.SHADOW_QUALITY_SOFT_LOW)
 	var modes := [DirectionalLight3D.SHADOW_ORTHOGONAL, DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS, DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS, DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS]

@@ -28,7 +28,7 @@ import time
 import psutil
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-PROJECT = os.path.join(REPO, "desktop", "cinematic")
+PROJECT = os.path.join(REPO, "desktop", "cinematic")  # --project overrides (e.g. an exported older revision)
 
 
 def godot_process(proc):
@@ -45,7 +45,7 @@ def godot_process(proc):
 def run_one(a, profile):
     out_json = os.path.join(a.out, f"bench-{profile}.json")
     driver = ["--rendering-driver", a.driver] if a.driver else []
-    cmd = [a.godot, *driver, "--path", PROJECT, "--resolution", "1440x900", "--", "--run", a.run, "--env", a.env,
+    cmd = [a.godot, *driver, "--path", a.project, "--resolution", "1440x900", "--", "--run", a.run, "--env", a.env,
            "--profile", profile, "--camera", "director", "--bench", out_json, "--bench-seconds", str(a.seconds)]
     t0 = time.perf_counter()
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
@@ -98,6 +98,7 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--profiles", default="performance,balanced,high,ultra")
     ap.add_argument("--seconds", type=float, default=12.0)
+    ap.add_argument("--project", default=PROJECT, help="Godot project directory to benchmark (default: this repository's)")
     ap.add_argument("--driver", default="", help="rendering driver passed to Godot (e.g. d3d12; Vulkan shows a black window on some machines)")
     a = ap.parse_args()
     # Godot resolves relative paths against its own working directory: pass absolute ones.

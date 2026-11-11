@@ -192,7 +192,7 @@ static func set_plume(s: Dictionary, length: float, logical_t: float, clear_m :=
 		_set_shell(s["jets"][i], s["jet_mats"][i], jet_len, 0.42, {"logical_t": logical_t, "throttle": throttle, "length_m": jet_len, "radius_m": 0.42, "clip_m": clip})
 	_set_shell(s["haze"], s["haze_mat"], length * 1.5, 4.0, {"logical_t": logical_t, "length_m": length * 1.5, "radius_m": 4.0, "clip_m": clip, "strength": 0.0035 + 0.0045 * throttle})
 	var gk: float = 1.0 if clear_m > 20.0 else clampf(clear_m / 20.0, 0.2, 1.0)
-	s["glow"].material_override.albedo_color = Color(1.0, 0.78, 0.55) * (0.30 + 0.30 * throttle) * gk
+	s["glow"].material_override.albedo_color = Color(1.0, 0.78, 0.55) * (0.30 + 0.30 * throttle) * maxf(gk, 0.8)
 	s["light"].light_energy = 6.0 * minf(1.0, length / 28.0)
 
 

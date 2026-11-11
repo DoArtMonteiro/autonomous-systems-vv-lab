@@ -76,6 +76,9 @@ func _load() -> void:
 		return
 	for l in m.get("layers", []):
 		if typeof(l) == TYPE_DICTIONARY and str(l.get("role", "")) == "detail":
+			if typeof(l.get("height", {})) != TYPE_DICTIONARY or typeof(l.get("image", {})) != TYPE_DICTIONARY:
+				_fail("the detail layer's height or image entry is not an object")
+				return
 			detail = _layer(l.get("height", {}), l.get("image", {}), "detail-height.u16", "detail-image.jpg")
 			if error != "":
 				return

@@ -7,7 +7,7 @@
 # the playback reaches the end of the run (V shows them earlier).
 extends RefCounted
 
-const ILLUSTRATIVE := "Illustrative, not data: stage geometry (42 m), plume and exhaust, glow and dust, crown shapes and foliage cards, building walls and roofs, sky, haze, water finish, ground beyond the pack."
+const ILLUSTRATIVE := "Illustrative, not data: stage geometry (42 m), landing pad, lights and masts, plume and exhaust, glow and dust, crown shapes and foliage cards, building walls and roofs, sky, haze, water finish, ground beyond the pack."
 const DATA := "Data: stage pose from the record (interpolated for display), throttle, verdicts; terrain, imagery, footprints, heights, plant positions from the validated pack. Nothing here is simulated."
 const MARGIN := 18
 
