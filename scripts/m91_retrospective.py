@@ -38,7 +38,8 @@ def stored_runs(campaign: Path) -> list[Path]:
 
 
 def check_one(
-    binary: Path, campaign: Path, run_dir: Path, scratch: Path, index: int, deadline: float
+    binary: Path, campaign: Path, run_dir: Path, scratch: Path, index: int, deadline: float,
+    budget: float,
 ) -> dict:
     manifest = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
     stored_verification = json.loads((run_dir / "verification.json").read_text(encoding="utf-8"))
@@ -56,7 +57,8 @@ def check_one(
             [str(binary), "land", str(run_dir / "case.json"), "--seed", str(manifest["seed"]),
              "--output", str(out)],
             cwd=m9.ROOT,
-            timeout_seconds=deadline - time.monotonic(),
+            # started + budget - now can round above the budget when the clock has not moved.
+            timeout_seconds=min(budget, deadline - time.monotonic()),
             max_output_bytes=m9.OUTPUT_LIMIT_BYTES,
             description=f"land {entry['run']}",
         )
@@ -114,7 +116,8 @@ def main() -> int:
         scratch = Path(tmp)
         with ThreadPoolExecutor(max_workers=args.jobs) as pool:
             entries = list(pool.map(
-                lambda a: check_one(args.binary, args.campaign, a[1], scratch, a[0], deadline),
+                lambda a: check_one(args.binary, args.campaign, a[1], scratch, a[0], deadline,
+                                    args.time_budget_seconds),
                 enumerate(runs)))
 
     identical = sum(1 for e in entries if e["trace_identical"])

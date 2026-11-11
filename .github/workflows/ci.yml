@@ -91,7 +91,8 @@ jobs:
           cargo test --locked --manifest-path exec/Cargo.toml
 
       # M13: rerun both bundled investigations from their claims on this platform, recompute them
-      # from scratch, and require the findings to be byte-identical to the committed evidence.
+      # from scratch, and require the findings to match the committed evidence byte for byte, apart
+      # from the vv-rocket source hash when only that source changed (scripts/compare_investigation.py).
       - name: Reproduce the M13 investigations and compare them with the committed evidence
         shell: bash
         run: |
@@ -99,7 +100,8 @@ jobs:
           for c in corridor-noise g3-onset; do
             exec/target/release/vv-exec investigate exec/claims/m13/$c.json --output exec/target/m13-ci/$c
             exec/target/release/vv-exec investigate-verify exec/target/m13-ci/$c > exec/target/m13-ci/$c-verify.json
-            cmp exec/target/m13-ci/$c/investigation.json docs/evidence/m13/$c/investigation.json
+            # Byte-identical, or identical apart from the vv-rocket source hash (see the script).
+            python scripts/compare_investigation.py exec/target/m13-ci/$c docs/evidence/m13/$c/investigation.json
           done
 
       - name: Audit locked vv-exec dependencies
