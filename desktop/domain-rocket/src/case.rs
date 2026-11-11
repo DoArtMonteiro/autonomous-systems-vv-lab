@@ -33,6 +33,9 @@ pub fn parameter_path(id: &str) -> Option<&'static [&'static str]> {
         "cutoff_altitude_m" => &["controller", "gains", "cutoff_altitude_m"],
         "lateral_position_gain" => &["controller", "gains", "lateral_position_gain"],
         "tilt_max_tan" => &["controller", "gains", "tilt_max_tan"],
+        "altimeter_residual_threshold_m" => {
+            &["controller", "gains", "altimeter_residual_threshold_m"]
+        }
         _ => return None,
     })
 }

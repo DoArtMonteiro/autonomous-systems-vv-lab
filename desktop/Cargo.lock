@@ -4156,7 +4156,7 @@ dependencies = [
 
 [[package]]
 name = "vv-domain-ground"
-version = "0.11.0"
+version = "0.15.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -4165,7 +4165,7 @@ dependencies = [
 
 [[package]]
 name = "vv-domain-reference"
-version = "0.11.0"
+version = "0.15.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -4174,7 +4174,7 @@ dependencies = [
 
 [[package]]
 name = "vv-domain-rocket"
-version = "0.11.0"
+version = "0.15.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -4184,7 +4184,7 @@ dependencies = [
 
 [[package]]
 name = "vv-platform"
-version = "0.11.0"
+version = "0.15.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -4203,7 +4203,7 @@ dependencies = [
 
 [[package]]
 name = "vv-studio"
-version = "0.11.0"
+version = "0.15.0"
 dependencies = [
  "serde",
  "serde_json",

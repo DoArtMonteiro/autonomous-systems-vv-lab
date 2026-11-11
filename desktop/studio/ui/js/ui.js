@@ -82,14 +82,14 @@ export function askName({ title, label = 'Name', initial = '', confirm = 'Save' 
 }
 
 export const SHORTCUTS = [
-  ['Space', 'Play or pause the run'],
+  ['Space', 'Play or pause the mission or the run'],
   ['Left / Right', 'Step one recorded sample'],
   ['Shift + Left / Right', 'Step ten samples'],
   ['[ and ]', 'Previous or next event'],
   ['Home / End', 'Start or end of the run'],
   ['Ctrl + Enter', 'Run the mission being prepared'],
   ['Ctrl + K', 'Command and search palette'],
-  ['1 to 6', 'Go to Discover, Prepare, Run, Compare, Library, Settings'],
+  ['1 to 8', 'Go to Home, Missions, Investigate, Configure, Analyse, Compare, Records, Settings'],
   ['?', 'This help'],
   ['Escape', 'Close a dialog or panel'],
 ];

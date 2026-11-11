@@ -25,7 +25,7 @@ pub struct Mission {
     actuator: Option<&'static str>,
 }
 
-pub const MISSIONS: [Mission; 3] = [
+pub const MISSIONS: [Mission; 4] = [
     Mission {
         id: "nominal_stop",
         label: "Nominal stop",
@@ -52,6 +52,13 @@ pub const MISSIONS: [Mission; 3] = [
         scenario: include_str!("../../../scenarios/m3/delayed-after-fallback.json"),
         actuator: Some(include_str!("../../../scenarios/m3/actuator-delayed.json")),
     },
+    Mission {
+        id: "zone_corridor",
+        label: "Corridor beside a restricted zone",
+        description: "Drive of 4000 mm east along a corridor 250 mm above a restricted zone, at 250 mm per tick                       in a 32-tick horizon (M2 f-zone-nominal). Registered with ideal sensors and an arrival                       radius of 0 mm; the GPS noise and the arrival radius are parameters.",
+        scenario: include_str!("../../../scenarios/m2/f-zone-nominal.json"),
+        actuator: None,
+    },
 ];
 
 pub fn mission(id: &str) -> Option<&'static Mission> {
@@ -70,6 +77,11 @@ impl Mission {
     pub fn has_builtin_faults(&self) -> bool {
         self.id == "delayed_after_fallback"
     }
+
+    /// Missions whose GPS noise and arrival radius a request may change.
+    pub fn has_sensor_parameters(&self) -> bool {
+        self.id == "zone_corridor"
+    }
 }
 
 #[derive(Debug, Default, PartialEq)]
@@ -86,6 +98,10 @@ pub struct Overrides {
     pub actuator: Option<ActuatorOverride>,
     /// Python "none": remove the built-in fault of a target that the request does not override.
     pub clear_builtin: bool,
+    /// Largest GPS noise per axis, when it differs from the mission's value.
+    pub gps_noise_mm: Option<u32>,
+    /// Arrival radius of the mission, when it differs from the mission's value.
+    pub arrival_radius_mm: Option<u32>,
 }
 
 pub struct Inputs {
@@ -114,6 +130,16 @@ pub fn build(mission: &Mission, overrides: &Overrides) -> Result<Inputs, String>
         Some((start, end)) => *windows = json!([{"start_tick": start, "end_tick": end}]),
         None if overrides.clear_builtin => *windows = json!([]),
         None => {}
+    }
+    if let Some(noise) = overrides.gps_noise_mm {
+        *scenario
+            .pointer_mut("/sensors/gps/noise_max_mm")
+            .ok_or("embedded scenario has no GPS noise")? = json!(noise);
+    }
+    if let Some(radius) = overrides.arrival_radius_mm {
+        *scenario
+            .pointer_mut("/mission/arrival_radius_mm")
+            .ok_or("embedded scenario has no arrival radius")? = json!(radius);
     }
     match &overrides.actuator {
         Some(fault) => {

@@ -33,10 +33,21 @@ fn fault_order(kind: &str) -> usize {
         .unwrap_or(usize::MAX)
 }
 
+fn changed_u32(request: &RunRequest, id: &str, default: f64) -> Option<u32> {
+    request
+        .parameters
+        .get(id)
+        .filter(|v| **v != default)
+        .map(|v| *v as u32)
+}
+
 /// Overrides of a request that `check` has accepted.
 fn overrides(request: &RunRequest) -> Overrides {
     let mut out = Overrides {
         clear_builtin: request.parameters.get(catalog::PARAM_CLEAR_BUILTIN) == Some(&1.0),
+        // Defaults are not written, so a default request keeps the embedded scenario byte for byte.
+        gps_noise_mm: changed_u32(request, catalog::PARAM_GPS_NOISE, 0.0),
+        arrival_radius_mm: changed_u32(request, catalog::PARAM_ARRIVAL_RADIUS, 0.0),
         ..Overrides::default()
     };
     for fault in &request.faults {

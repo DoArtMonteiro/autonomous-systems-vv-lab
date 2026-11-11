@@ -11,8 +11,14 @@ import { initCompare, showCompare, compareKey, rethemeCompare } from './views/co
 import { initLibrary, showLibrary } from './views/library.js';
 import { initSettings, showSettings } from './views/settings.js';
 import { initDiscover, showDiscover, rethemeDiscover } from './views/discover.js';
+import { initHome, showHome } from './views/home.js';
+import { initMissions, showMissions } from './views/missions.js';
+import { initPlayer, showPlayer, leavePlayer, playerKey, rethemePlayer, playerState } from './views/player.js';
+import { EXPERIENCES } from './experiences.js';
 
-const VIEWS = ['discover', 'prepare', 'run', 'compare', 'library', 'settings'];
+// Keyboard digits follow this order; `mission` (the player) has no digit and lights "Missions".
+const VIEWS = ['home', 'missions', 'discover', 'prepare', 'run', 'compare', 'library', 'settings', 'mission'];
+const NAV_OF = { mission: 'missions' };
 let currentView = null;
 
 // ----------------------------------------------------------------------------- theme
@@ -28,20 +34,24 @@ function applyTheme() {
 }
 dark.addEventListener('change', applyTheme);
 on('prefs', ({ key }) => { if (key === 'theme') applyTheme(); });
-on('theme', () => { rethemeRun(); rethemeCompare(); rethemeDiscover(); });
+on('theme', () => { rethemeRun(); rethemeCompare(); rethemeDiscover(); rethemePlayer(); });
 
 // ----------------------------------------------------------------------------- routing
 
 export async function navigate(view, opts) {
   if (!VIEWS.includes(view)) return;
   currentView = view;
+  if (view !== 'mission') leavePlayer();
   for (const v of VIEWS) document.getElementById(`view-${v}`).hidden = v !== view;
   for (const b of document.querySelectorAll('.nav-btn')) {
-    if (b.dataset.view === view) b.setAttribute('aria-current', 'page');
+    if (b.dataset.view === (NAV_OF[view] || view)) b.setAttribute('aria-current', 'page');
     else b.removeAttribute('aria-current');
   }
   try {
-    if (view === 'discover') await showDiscover();
+    if (view === 'home') showHome();
+    else if (view === 'missions') showMissions(opts);
+    else if (view === 'mission') await showPlayer(opts);
+    else if (view === 'discover') await showDiscover(opts);
     else if (view === 'prepare') showPrepare();
     else if (view === 'run') await showRun(opts);
     else if (view === 'compare') await showCompare(opts);
@@ -130,7 +140,7 @@ async function boot() {
   const broken = state.domains.filter((d) => !d.catalog);
   setStatus(`${visibleDomains().filter((d) => d.catalog).length} domains ready`, 'ok');
   if (state.rejected.length || broken.length) toast(`${state.rejected.length + broken.length} domain${state.rejected.length + broken.length > 1 ? 's' : ''} could not be loaded; see Settings for the reasons.`, 'error', 8000);
-  navigate(currentView || 'discover');
+  navigate(currentView || 'home');
 }
 
 on('prefs', ({ key }) => {
@@ -150,10 +160,11 @@ function typing(e) {
 
 function paletteItems() {
   const items = [];
-  for (const v of VIEWS) items.push({ group: 'go to', title: v[0].toUpperCase() + v.slice(1), run: () => navigate(v) });
+  for (const b of document.querySelectorAll('.nav-btn')) items.push({ group: 'go to', title: b.textContent.trim(), run: () => navigate(b.dataset.view) });
+  for (const x of EXPERIENCES) items.push({ group: 'mission', title: x.title, hint: x.summary, run: () => navigate('mission', { experienceId: x.id }) });
   for (const d of visibleDomains()) {
     if (!d.catalog) continue;
-    for (const demo of d.catalog.demos) items.push({ group: 'demo', title: demo.title, hint: d.manifest.id, run: () => startDemo(d.manifest.id, demo.id) });
+    for (const demo of d.catalog.demos) items.push({ group: 'demo', title: demo.title, hint: `${d.manifest.id}, in the analysis workspace`, run: () => startDemo(d.manifest.id, demo.id) });
   }
   items.push({ group: 'action', title: 'Run the mission being prepared', hint: 'Ctrl+Enter', run: () => { navigate('prepare'); runMission(); } });
   items.push({ group: 'action', title: 'Keyboard shortcuts', hint: '?', run: () => showHelp() });
@@ -182,11 +193,12 @@ document.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (typing(e)) return;
   if (e.key === '?') { e.preventDefault(); showHelp(); return; }
-  if (/^[1-6]$/.test(e.key) && !(e.target && e.target.closest && e.target.closest('[role="slider"]'))) { navigate(VIEWS[Number(e.key) - 1]); e.preventDefault(); return; }
+  if (/^[1-8]$/.test(e.key) && !(e.target && e.target.closest && e.target.closest('[role="slider"], input[type="range"]'))) { navigate(VIEWS[Number(e.key) - 1]); e.preventDefault(); return; }
   if (e.target && e.target.closest && (e.target.closest('button, a, [role="tab"], [role="radio"], summary') && (e.key === ' ' || e.key === 'Enter'))) return;
   if (e.target && e.target.closest && e.target.closest('.r3d canvas') && e.key.startsWith('Arrow')) return;
   let handled = false;
   if (currentView === 'run') handled = runKey(e);
+  else if (currentView === 'mission') handled = playerKey(e);
   else if (currentView === 'compare') handled = compareKey(e);
   if (handled) e.preventDefault();
 });
@@ -195,6 +207,9 @@ for (const b of document.querySelectorAll('.nav-btn')) b.addEventListener('click
 document.getElementById('open-help').addEventListener('click', () => showHelp());
 document.getElementById('open-palette').addEventListener('click', () => openPalette());
 
+initHome(document.getElementById('view-home'), navigate);
+initMissions(document.getElementById('view-missions'), navigate);
+initPlayer(document.getElementById('view-mission'), navigate);
 initDiscover(document.getElementById('view-discover'));
 initPrepare(document.getElementById('view-prepare'), navigate);
 initRun(document.getElementById('view-run'), navigate);
@@ -205,6 +220,7 @@ initSettings(document.getElementById('view-settings'), async () => { await refre
 // Test and debugging hook: read-only facts about the visible state.
 window.__studio = {
   view: () => currentView,
+  player: () => playerState(),
   run: () => { const w = runWorkspace(); return w ? { runId: w.runId, t: w.cursor.t, t0: w.model.t0, t1: w.model.t1, scene: w.record.scene.kind } : null; },
 };
 
