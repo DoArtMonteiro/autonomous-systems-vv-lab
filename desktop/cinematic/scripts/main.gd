@@ -13,6 +13,8 @@ const Pack := preload("res://scripts/pack.gd")
 const Terrain := preload("res://scripts/terrain.gd")
 const World := preload("res://scripts/world.gd")
 const Stage := preload("res://scripts/stage.gd")
+const Effects := preload("res://scripts/effects.gd")
+const Pad := preload("res://scripts/pad.gd")
 const Profiles := preload("res://scripts/profiles.gd")
 const Hud := preload("res://scripts/hud.gd")
 
@@ -45,11 +47,8 @@ var director_shot := ""
 var transition := {}
 var observer = null
 var top_z := 3000.0
-var dust: MeshInstance3D
-var splash: MeshInstance3D
-var splash_mat: ShaderMaterial
+var fx: Dictionary = {}
 var drop: MeshInstance3D
-var ground_light: OmniLight3D
 var ready_ok := false
 var frames := 0
 var started_usec := 0
@@ -175,7 +174,8 @@ func _build() -> void:
 	env.glow_bloom = 0.05
 	env.glow_hdr_threshold = 3.0
 	env.adjustment_enabled = true
-	env.adjustment_saturation = 1.05
+	env.adjustment_saturation = 1.08
+	env.adjustment_contrast = 1.07
 	we.environment = env
 	add_child(we)
 	sun = DirectionalLight3D.new()
@@ -194,6 +194,7 @@ func _build() -> void:
 	camera.near = 0.5
 	camera.far = 250000.0
 	camera.fov = 30.0
+	camera.attributes = CameraAttributesPractical.new()
 	add_child(camera)
 	camera.make_current()
 	# Profile.
@@ -214,8 +215,10 @@ func _build() -> void:
 	for n in vehicle.find_children("*", "MeshInstance3D", true, false):
 		if not n.get_parent().name.begins_with("Plume"):
 			n.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	var pp: Dictionary = record.pad()
+	Pad.build(self, pack, pp["cx"], pp["cy"])
 	_pad_rings()
-	_ground_effect_nodes()
+	fx = Effects.build(self, g(_sun_dir_enu()).normalized())
 	# Top of the trajectory box (centre of mass), as the technical view's wide preset uses.
 	var mz := 0.0
 	for v in record.channels.get(record.position_ids[2], []):
@@ -342,65 +345,6 @@ func _update_drop(vp: Vector3) -> void:
 	drop.mesh = im
 
 
-func _ground_effect_nodes() -> void:
-	# Where the plume meets the ground: a warm light and a pale dust disc (illustration from the
-	# applied throttle and the nozzle's height above the drawn terrain only).
-	ground_light = OmniLight3D.new()
-	ground_light.light_color = Color(1.0, 0.66, 0.38)
-	ground_light.omni_range = 140.0
-	ground_light.omni_attenuation = 1.6
-	ground_light.light_volumetric_fog_energy = 0.0
-	add_child(ground_light)
-	var img := Image.create(128, 128, true, Image.FORMAT_RGBA8)
-	for y in 128:
-		for x in 128:
-			var r := Vector2(x - 63.5, y - 63.5).length() / 64.0
-			var a := 0.0
-			if r < 1.0:
-				a = smoothstep(0.06, 0.45, r) * (1.0 - smoothstep(0.45, 1.0, r)) * 0.75 / 0.25
-			img.set_pixel(x, y, Color(0.92, 0.88, 0.8, clampf(a, 0.0, 1.0)))
-	img.generate_mipmaps()
-	var mat := StandardMaterial3D.new()
-	mat.albedo_texture = ImageTexture.create_from_image(img)
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	var q := QuadMesh.new()
-	q.size = Vector2(2, 2)
-	q.orientation = PlaneMesh.FACE_Y
-	dust = MeshInstance3D.new()
-	dust.mesh = q
-	dust.material_override = mat
-	dust.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(dust)
-	# Exhaust spreading over the ground when the plume reaches it (illustration): a flat, warm,
-	# additive glow on the ground, brightest under the nozzle, so a burning engine stays visible
-	# down to contact.
-	var si := Image.create(128, 128, true, Image.FORMAT_RGBA8)
-	for yy in 128:
-		for xx in 128:
-			var rr := Vector2(xx - 63.5, yy - 63.5).length() / 64.0
-			var a := clampf(1.0 - rr, 0.0, 1.0)
-			si.set_pixel(xx, yy, Color(1.0, 0.6, 0.3, a * a * a))
-	si.generate_mipmaps()
-	var sm := StandardMaterial3D.new()
-	sm.albedo_texture = ImageTexture.create_from_image(si)
-	sm.albedo_color = Color(1.6, 1.2, 0.9)
-	sm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	sm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	sm.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	sm.cull_mode = BaseMaterial3D.CULL_DISABLED
-	var sq := QuadMesh.new()
-	sq.size = Vector2(2, 2)
-	sq.orientation = PlaneMesh.FACE_Y
-	splash_mat = null
-	splash = MeshInstance3D.new()
-	splash.mesh = sq
-	splash.material_override = sm
-	splash.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(splash)
-
-
 # --- playback -----------------------------------------------------------------------------------
 
 func _set_playing(on: bool) -> void:
@@ -415,38 +359,18 @@ func _set_time(at: float) -> void:
 	# The axial plume stops at the ground; below that it is drawn as the ground spread.
 	var vp := _enu(vehicle.position)
 	var clear_m: float = maxf(0.0, vp.z - pack.ground(vp.x, vp.y))
-	Stage.set_plume(stage, len, t, clear_m)
+	var thr = record.sample_value("act_throttle", t)
+	var thr_f := clampf(float(thr), 0.0, 1.0) if thr != null else 0.6
+	Stage.set_plume(stage, len, t, clear_m, thr_f)
+	# Exposure as a function of the recorded state: a lit plume pulls it down a little (no automatic
+	# exposure: that evolves with the wall clock and a frame at a given t would not repeat).
+	env.tonemap_exposure = 0.95 - 0.14 * thr_f * (1.0 if len > 0.0 else 0.0)
 	for m in terrain.get("materials", []):
 		m.set_shader_parameter("logical_t", t)
-	_ground_effect(len)
+	Effects.update(fx, vp, pack.ground(vp.x, vp.y), len, thr_f, t, g)
 	_update_drop(vp)
 	hud.set_time(t, record)
 	_place_camera()
-
-
-func _ground_effect(len: float) -> void:
-	var p := _enu(vehicle.position)
-	var gz: float = pack.ground(p.x, p.y)
-	var h := p.z - gz
-	var reach := 70.0
-	var on := len > 0.0 and h < reach
-	dust.visible = on
-	ground_light.visible = on
-	splash.visible = len > 0.0 and h < len
-	if splash.visible:
-		var ks: float = clampf(1.0 - maxf(0.0, h) / len, 0.0, 1.0)
-		var rs: float = 5.0 + 14.0 * ks
-		splash.position = g(Vector3(p.x, p.y, gz + 0.35))
-		splash.scale = Vector3(rs, 1.0, rs)
-	if not on:
-		return
-	var k := (1.0 - maxf(0.0, h) / reach) * minf(1.0, len / 28.0)
-	var r := 8.0 + 34.0 * k
-	dust.position = g(Vector3(p.x, p.y, gz + 0.25))
-	dust.scale = Vector3(r, 1, r)
-	dust.transparency = 1.0 - k
-	ground_light.position = g(Vector3(p.x, p.y, gz + maxf(2.0, minf(h, 30.0) * 0.4)))
-	ground_light.light_energy = 14.0 * k
 
 
 static func _enu(v: Vector3) -> Vector3:
@@ -523,20 +447,22 @@ func pose(m: String) -> Dictionary:
 	var pv := _pad_v()
 	match m:
 		"follow":
-			return {"pos": aim + bearing(152, 7) * 190.0, "target": aim, "fov": 30.0}
+			return {"pos": aim + bearing(152, 7) * 190.0, "target": aim, "fov": lens_fov(45.0), "sx": 0.34, "sy": 0.10, "shake": 0.05}
 		"pad":
 			var at := _observer()
 			var dd := at.distance_to(aim)
-			return {"pos": at, "target": aim, "fov": clampf(rad_to_deg(2.0 * atan(STAGE_LENGTH * 1.2 / dd)), 3.0, 40.0)}
+			return {"pos": at, "target": aim, "fov": clampf(rad_to_deg(2.0 * atan(STAGE_LENGTH * 1.2 / dd)), 3.0, 40.0), "sx": 0.28, "sy": 0.0, "shake": 0.06}
 		"closeup":
-			var at := pv + bearing(38, 0) * 150.0
-			at.z = pack.ground(at.x, at.y) + 20.0
+			# Low hero angle (cinematic only): 165 m out, 22 m above the ground, a 50 mm lens
+			# looking up at the stage, which stands on the left third of the frame.
+			var at := pv + bearing(38, 0) * 165.0
+			at.z = pack.ground(at.x, at.y) + 22.0
 			var g0: float = pack.ground(pv.x, pv.y)
 			var tg := aim
 			tg.z = clampf(tg.z, g0 + 17.0, g0 + 24.0)
 			tg.x = pv.x + (tg.x - pv.x) * 0.5
 			tg.y = pv.y + (tg.y - pv.y) * 0.5
-			return {"pos": at, "target": tg, "fov": minf(40.0, rad_to_deg(2.0 * atan(STAGE_LENGTH * 0.95 / at.distance_to(tg))))}
+			return {"pos": at, "target": tg, "fov": lens_fov(50.0), "sx": -0.30, "sy": -0.06, "shake": 0.10, "dof": at.distance_to(tg)}
 		"wide":
 			var dw := top_z * 1.35
 			return {"pos": Vector3(pv.x + 0.5 * dw, pv.y - 0.95 * dw, top_z * 0.62), "target": Vector3(pv.x, pv.y, top_z * 0.42), "fov": 40.0}
@@ -550,6 +476,19 @@ func pose(m: String) -> Dictionary:
 		return {"pos": at, "target": tg, "fov": 38.0}
 	var span := 3200.0
 	return {"pos": Vector3(pv.x, pv.y - span * 0.02, span / (2.0 * tan(deg_to_rad(20.0)))), "target": pv, "fov": 40.0}
+
+
+# Vertical field of view of a lens of focal length `mm` on a 24 mm tall sensor.
+static func lens_fov(mm: float) -> float:
+	return rad_to_deg(2.0 * atan(12.0 / mm))
+
+
+# Camera shake as a function of the record time only (a handheld look: slow drift plus a faint
+# tremor), in degrees about the camera's right and up axes.
+static func shake_deg(at: float, amp: float) -> Vector2:
+	var x := sin(TAU * 0.37 * at + 1.1) * 0.55 + sin(TAU * 1.31 * at + 0.3) * 0.3 + sin(TAU * 3.7 * at + 2.0) * 0.15
+	var y := sin(TAU * 0.29 * at + 4.0) * 0.55 + sin(TAU * 1.07 * at + 5.1) * 0.3 + sin(TAU * 4.3 * at + 0.7) * 0.15
+	return Vector2(x, y) * amp
 
 
 func set_mode(m: String) -> void:
@@ -589,16 +528,50 @@ func _place_camera() -> void:
 	else:
 		transition = {}
 	var gz: float = pack.ground(pos.x, pos.y)
-	if pos.z < gz + 3.0:
-		pos.z = gz + 3.0
+	if pos.z < gz + 2.5:
+		pos.z = gz + 2.5
 	camera.fov = fov
 	var gp := g(pos)
 	var gt := g(target)
 	if gp.distance_to(gt) > 1e-3:
 		camera.look_at_from_position(gp, gt, Vector3.UP)
+		# Composition: the subject sits at screen (sx, sy) (in half-frame units, +x right, +y up)
+		# instead of the centre, by panning the aim point the other way; then the shake.
+		var vs := get_viewport().get_visible_rect().size
+		var dist := gp.distance_to(gt)
+		var half_h := dist * tan(deg_to_rad(fov) * 0.5)
+		var sx: float = want.get("sx", 0.0)
+		var sy: float = want.get("sy", 0.0)
+		if sx != 0.0 or sy != 0.0:
+			var b := camera.global_transform.basis
+			gt = gt - b.x * sx * half_h * (vs.x / vs.y) - b.y * sy * half_h
+			camera.look_at_from_position(gp, gt, Vector3.UP)
+		var amp: float = want.get("shake", 0.0)
+		if amp > 0.0 and transition.is_empty():
+			var sh := shake_deg(t, amp)
+			camera.rotate_object_local(Vector3.UP, deg_to_rad(sh.x))
+			camera.rotate_object_local(Vector3.RIGHT, deg_to_rad(sh.y))
+		_set_dof(want.get("dof", 0.0))
 	# Shadows cover what the shot shows: the stage and its shadow, or the whole descent.
 	var wide := mode == "wide" or mode == "overhead" or (mode == "director" and director_shot == "wide")
 	sun.directional_shadow_max_distance = 6000.0 if wide else 1500.0
+
+
+# Depth of field on close shots only: the subject at `focus` metres stays sharp, the far landscape and
+# the near ground soften. Off (0) elsewhere and in the Performance profile.
+func _set_dof(focus: float) -> void:
+	var ca: CameraAttributesPractical = camera.attributes
+	if ca == null:
+		return
+	var on := focus > 0.0 and bool(settings.get("dof", false))
+	ca.dof_blur_far_enabled = on
+	ca.dof_blur_near_enabled = on
+	if on:
+		ca.dof_blur_far_distance = focus * 1.25
+		ca.dof_blur_far_transition = focus * 1.6
+		ca.dof_blur_near_distance = focus * 0.5
+		ca.dof_blur_near_transition = focus * 0.35
+		ca.dof_blur_amount = 0.06
 
 
 # --- frame loop ---------------------------------------------------------------------------------

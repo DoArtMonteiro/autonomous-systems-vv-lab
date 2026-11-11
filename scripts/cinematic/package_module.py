@@ -40,7 +40,7 @@ GODOT_ZIP_SHA512 = "83decd58fdf67b9d657958a1ae6bf1929c20785315a81effe245874cdc57
 MIN_VRAM_BYTES = 2 * 1000 ** 3
 STUDIO_CONTRACT = {"interface": "vv-cinematic-launch.v1", "studio_min": "0.16.2"}
 PROJECT_FILES = ("project.godot", "main.tscn")
-PROJECT_DIRS = ("scripts", "shaders")
+PROJECT_DIRS = ("scripts", "shaders", "assets")
 
 MODULE_LICENCE = """MIT License
 
