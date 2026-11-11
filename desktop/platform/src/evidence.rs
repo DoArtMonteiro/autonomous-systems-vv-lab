@@ -24,6 +24,33 @@ pub const EVIDENCE_SCHEMA: &str = "vv-evidence.v1";
 pub const EVIDENCE_CLASS: &str = "development_demonstration";
 const MAX_PACKAGE_BYTES: u64 = 96 * 1024 * 1024;
 
+/// File name of an evidence package: `<run id>-evidence.zip`, with `-REJECTED` when the replay
+/// rejected the run and `-EARLIER-BUILD` when it was verified only against its own record. The
+/// default export and the save dialog both use it.
+pub fn file_name(run_id: &str, replay_status: &str) -> String {
+    let suffix = match replay_status {
+        "rejected" => "-REJECTED",
+        REPLAY_VERIFIED_EARLIER_BUILD => "-EARLIER-BUILD",
+        _ => "",
+    };
+    format!("{run_id}-evidence{suffix}.zip")
+}
+
+#[cfg(test)]
+mod name_tests {
+    use super::*;
+
+    #[test]
+    fn the_name_carries_the_replay_status() {
+        assert_eq!(file_name("abc", "verified"), "abc-evidence.zip");
+        assert_eq!(file_name("abc", "rejected"), "abc-evidence-REJECTED.zip");
+        assert_eq!(
+            file_name("abc", REPLAY_VERIFIED_EARLIER_BUILD),
+            "abc-evidence-EARLIER-BUILD.zip"
+        );
+    }
+}
+
 #[derive(Serialize)]
 struct Manifest<'a> {
     schema: &'static str,

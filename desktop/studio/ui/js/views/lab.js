@@ -44,12 +44,19 @@ export async function showLab(opts) {
     }
   }
   if (opts && opts.runId && (!lab || lab.base.id !== opts.runId)) {
+    // Starting from another stored run also replaces an experiment in progress: ask first.
+    if (isDirty() && !(await askConfirm({
+      title: 'Replace the experiment in progress?',
+      message: 'The Lab holds a baseline with changes, runs or checks you have made. Starting from this run replaces them with a new baseline. Nothing already stored in the library is deleted.',
+      confirm: 'Replace it',
+    }))) { render(); return; }
     const mine = ++requestToken;
     try {
       const record = await loadIndexed(opts.runId);
       if (mine !== requestToken) return; // a newer request replaced this one
       startFrom(opts.runId, record);
     } catch (e) {
+      if (mine !== requestToken) return; // an older request failing must not speak for the newer one
       toast(errorText(e), 'error');
     }
   }

@@ -260,7 +260,11 @@ fn completes(stored: &RunRequest, normal: &RunRequest) -> Result<Vec<String>, St
 /// instant and category, every stored timebase and channel, every stored event (instant, kind and
 /// severity) and every stored metric. Not compared: texts (labels, explanations, notes, the
 /// expected and observed text of a requirement), the scene, the entity and mission blocks and the
-/// native files, so a change confined to those passes on a run of another build. `fresh` may carry
+/// native files, so a change confined to those passes on a run of another build. Both directions are
+/// checked for requirements (a fresh one the stored record lacks is accepted only if it passes and
+/// the domain version differs) and for violation and warning events (a fresh one the stored record
+/// lacks is a disagreement, except that for another domain version an event kind found nowhere in
+/// the stored record is taken as new in the later build). `fresh` may carry
 /// channels, events and metrics that the earlier build did not write.
 fn disagreement(stored: &RunRecord, fresh: &RunRecord) -> Option<String> {
     if stored.outcome.code != fresh.outcome.code || stored.outcome.status != fresh.outcome.status {
@@ -290,13 +294,13 @@ fn disagreement(stored: &RunRecord, fresh: &RunRecord) -> Option<String> {
     // The other direction: what the recomputation found must be in the stored record, or deleting
     // a failed requirement from it would pass. A requirement the stored record lacks is accepted
     // only when the build that wrote it could not have known it (another domain version) and it
-    // passes; a failed one is never accepted.
+    // passes; a failed or not evaluated one is never accepted.
     let same_version = stored.domain.version == fresh.domain.version;
     for x in &fresh.requirements {
         if stored.requirements.iter().any(|q| q.id == x.id) {
             continue;
         }
-        if x.status == "fail" || same_version {
+        if x.status != "pass" || same_version {
             return Some(format!(
                 "requirement {} ({}) is missing from the stored record",
                 x.id, x.status
@@ -324,9 +328,16 @@ fn disagreement(stored: &RunRecord, fresh: &RunRecord) -> Option<String> {
             return Some(format!("event {} at {} is not reproduced", e.kind, e.t));
         }
     }
-    // Likewise a violation or warning the recomputation reports must be in the stored record.
+    // Likewise a violation or warning the recomputation reports must be in the stored record. The
+    // one exception: for another domain version, an event kind that appears nowhere in the stored
+    // record may be a kind a later build introduced, and does not alone reject. A missing event of
+    // a kind the stored record knows is always a disagreement, and so is any missing event when the
+    // domain version is the same.
     for x in &fresh.events {
         if !matches!(x.severity.as_str(), "violation" | "warning") {
+            continue;
+        }
+        if !same_version && !stored.events.iter().any(|e| e.kind == x.kind) {
             continue;
         }
         if !stored
@@ -729,4 +740,102 @@ pub fn host_main<H: DomainHost>(host: &H) -> ExitCode {
         }
     }
     ExitCode::SUCCESS
+}
+
+#[cfg(test)]
+mod disagreement_tests {
+    use super::*;
+
+    fn record() -> RunRecord {
+        let mut r: RunRecord = serde_json::from_str(include_str!(
+            "../../studio/tests/fixtures/rocket-record-trimmed.json"
+        ))
+        .unwrap();
+        let q = |id: &str, status: &str| RequirementResult {
+            id: id.into(),
+            label: id.into(),
+            category: "requirement".into(),
+            status: status.into(),
+            expected: String::new(),
+            observed: String::new(),
+            t: Some(1.0),
+            explanation: String::new(),
+        };
+        r.requirements = vec![q("R1", "pass")];
+        r.events = vec![Event {
+            t: 1.0,
+            kind: "known_violation".into(),
+            label: String::new(),
+            severity: "violation".into(),
+            source: "verifier".into(),
+            detail: serde_json::Value::Null,
+        }];
+        r
+    }
+
+    fn requirement(id: &str, status: &str) -> RequirementResult {
+        let mut q = record().requirements.remove(0);
+        q.id = id.into();
+        q.status = status.into();
+        q
+    }
+
+    fn event(kind: &str, t: f64) -> Event {
+        let mut e = record().events.remove(0);
+        e.kind = kind.into();
+        e.t = t;
+        e
+    }
+
+    #[test]
+    fn a_requirement_that_is_not_evaluated_counts_as_missing_like_a_failed_one() {
+        let stored = record();
+        let mut fresh = record();
+        fresh.domain.version = "later".into();
+        // A new passing requirement of another version is fine.
+        fresh.requirements.push(requirement("R2", "pass"));
+        assert_eq!(disagreement(&stored, &fresh), None);
+        // A new one that is failed or not evaluated is not.
+        for status in ["fail", "not_evaluated"] {
+            fresh.requirements[1] = requirement("R2", status);
+            let d = disagreement(&stored, &fresh).unwrap();
+            assert!(
+                d.contains("R2") && d.contains("missing from the stored record"),
+                "{d}"
+            );
+        }
+        // With the same domain version even a passing one is a disagreement.
+        let mut same = record();
+        same.requirements.push(requirement("R2", "pass"));
+        assert!(disagreement(&stored, &same).is_some());
+    }
+
+    #[test]
+    fn a_new_event_kind_of_another_version_does_not_reject_but_a_known_kind_does() {
+        let stored = record();
+        let mut fresh = record();
+        fresh.domain.version = "later".into();
+        // A violation of a kind the stored record has nowhere: a later build introduced it.
+        fresh.events.push(event("new_kind_violation", 2.0));
+        assert_eq!(disagreement(&stored, &fresh), None);
+        // The same kind the stored record knows, at an instant it lacks: a disagreement.
+        fresh.events[1] = event("known_violation", 2.0);
+        let d = disagreement(&stored, &fresh).unwrap();
+        assert!(
+            d.contains("known_violation") && d.contains("missing from the stored record"),
+            "{d}"
+        );
+        // With the same domain version, a new kind is a disagreement too.
+        let mut same = record();
+        same.events.push(event("new_kind_violation", 2.0));
+        assert!(disagreement(&stored, &same).is_some());
+        // A second violation of the known kind deleted from the stored record is caught.
+        let mut two = record();
+        two.events.push(event("known_violation", 2.0));
+        let mut deleted = two.clone();
+        deleted.events.pop();
+        two.domain.version = "later".into();
+        let d = disagreement(&deleted, &two).unwrap();
+        assert!(d.contains("known_violation"), "{d}");
+    }
 }

@@ -505,6 +505,22 @@ impl Platform {
         run_id: &str,
         dest: Option<PathBuf>,
     ) -> Result<PathBuf, PlatformError> {
+        let exports = self.library.exports_dir();
+        let exported = self.export_evidence_with(run_id, |name| {
+            Some(dest.unwrap_or_else(|| exports.join(name)))
+        })?;
+        exported.ok_or_else(|| PlatformError::Invalid("no destination".into()))
+    }
+
+    /// Replays the run, then asks `choose` for the destination, giving it the file name the
+    /// package gets by default (it carries the replay status, see [`evidence::file_name`]), so a
+    /// save dialog and the default export name a package the same way. `choose` returning `None`
+    /// cancels: nothing is written and this returns `Ok(None)`.
+    pub fn export_evidence_with(
+        &self,
+        run_id: &str,
+        choose: impl FnOnce(&str) -> Option<PathBuf>,
+    ) -> Result<Option<PathBuf>, PlatformError> {
         let record = self.record(run_id)?;
         let replay = self.replay(run_id)?;
         let dir = self
@@ -512,18 +528,12 @@ impl Platform {
             .run_dir(run_id)
             .map_err(PlatformError::Invalid)?;
         let bytes = evidence::package(&dir, run_id, &record, &replay, &self.version).map_err(io)?;
-        let path = dest.unwrap_or_else(|| {
-            let suffix = match replay.status.as_str() {
-                "rejected" => "-REJECTED",
-                REPLAY_VERIFIED_EARLIER_BUILD => "-EARLIER-BUILD",
-                _ => "",
-            };
-            self.library
-                .exports_dir()
-                .join(format!("{run_id}-evidence{suffix}.zip"))
-        });
+        let name = evidence::file_name(run_id, &replay.status);
+        let Some(path) = choose(&name) else {
+            return Ok(None);
+        };
         crate::library::write_atomic(&path, &bytes).map_err(io)?;
-        Ok(path)
+        Ok(Some(path))
     }
 }
 

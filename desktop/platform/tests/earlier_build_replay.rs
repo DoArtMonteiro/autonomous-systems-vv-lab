@@ -138,14 +138,18 @@ impl DomainHost for Mock {
             "{\"requirements_pass\":false,\"invariants_pass\":true,\"requirements\":[{\"id\":\"R1\",\"pass\":false},{\"id\":\"R2\",\"pass\":true}]}",
         )
         .map_err(|e| HostError::Simulation(e.to_string()))?;
-        r.events = vec![Event {
-            t: 1.0,
-            kind: "limit_exceeded".into(),
-            label: "Limit exceeded".into(),
-            severity: "violation".into(),
-            source: "verifier".into(),
-            detail: Value::Null,
-        }];
+        // Two violations of one kind: the stored record keeps knowing the kind when one is deleted.
+        r.events = [1.0, 2.0]
+            .into_iter()
+            .map(|t| Event {
+                t,
+                kind: "limit_exceeded".into(),
+                label: "Limit exceeded".into(),
+                severity: "violation".into(),
+                source: "verifier".into(),
+                detail: Value::Null,
+            })
+            .collect();
         let requirement = |id: &str, status: &str| RequirementResult {
             id: id.into(),
             label: id.into(),
