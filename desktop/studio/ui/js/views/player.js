@@ -269,7 +269,7 @@ function phaseAt(t) {
   if (end) {
     // A failed contact says how hard it was and that the impact itself is not drawn.
     const vz = td && !met ? metricValue(run, 'touchdown_vertical_speed') : null;
-    const bad = vz !== null && Number.isFinite(vz) ? `Contact at ${Math.abs(vz).toFixed(1)} m/s, requirements not met; impact not modelled` : 'Touchdown, requirements not met';
+    const bad = vz !== null && Number.isFinite(vz) ? `Contact at ${Math.abs(vz).toFixed(1)} m/s, requirements not met; impact not modelled` : 'Reached the ground, requirements not met';
     return { text: td ? (met ? 'Touchdown' : bad) : 'End of run', kind: met ? 'end' : 'end-bad', end: true };
   }
   return { text: ph ? ph.label : '', kind: ph ? ph.kind : '', end: false };
@@ -472,7 +472,7 @@ function onTime(t) {
   const ph = phaseAt(t);
   const td = run.record.scene && run.record.scene.touchdown;
   const clock = pl.unit === 'tick' ? `tick ${Math.floor(t)}` : `T+${t.toFixed(1)} s`;
-  const ended = ph.end && t > run.model.t1 + 1e-9 ? (pl.unit === 'tick' ? `run ended at tick ${run.model.t1}` : `${td ? 'touched down' : 'ended'} at ${run.model.t1.toFixed(1)} s`) : null;
+  const ended = ph.end && t > run.model.t1 + 1e-9 ? (pl.unit === 'tick' ? `run ended at tick ${run.model.t1}` : `${td ? (run.record.outcome.status === 'success' ? 'touched down' : 'reached the ground') : 'ended'} at ${run.model.t1.toFixed(1)} s`) : null;
   pl.dom.phaseTag.replaceChildren(...[
     h('span', { class: 'pl-clock mono' }, clock),
     ph.text ? h('span', { class: ['pl-phase-name', `ph-${ph.kind}`] }, ph.text) : null,
