@@ -31,7 +31,10 @@ static func detect_vram(cli_bytes: int) -> Dictionary:
 		return {"bytes": rd.get_device_total_memory(), "source": "RenderingDevice"}
 	if OS.get_name() == "Windows":
 		var out := []
-		var code := OS.execute("reg.exe", ["query", DISPLAY_CLASS, "/s", "/v", "HardwareInformation.qwMemorySize"], out, true)
+		# The system's own reg.exe by absolute path: a bare name could be shadowed by a file planted
+		# next to the executable or in the working directory.
+		var reg := OS.get_environment("SystemRoot").path_join("System32/reg.exe")
+		var code := OS.execute(reg, ["query", DISPLAY_CLASS, "/s", "/v", "HardwareInformation.qwMemorySize"], out, true)
 		if code == 0 and out.size() > 0:
 			var best := -1
 			for line in str(out[0]).split("\n"):

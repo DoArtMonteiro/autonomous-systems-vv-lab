@@ -201,6 +201,12 @@ static func slerp_three(qa: Array, qb: Array, t: float) -> Array:
 	return [w * ra + bw * rb, x * ra + bx * rb, y * ra + by * rb, z * ra + bz * rb]
 
 
+# The channel `id` if it has one value per sample, else an empty array.
+func _full_channel(id: String) -> Array:
+	var c = channels.get(id, [])
+	return c if (c is Array and c.size() == times.size()) else []
+
+
 # Pose of the stage at logical time t, as rocket.js setTime draws it: the nozzle exit plane
 # position (interpolated) and the attitude slerped between the two recorded samples.
 # Returns {position: [e, n, u] or null, quaternion: [w, x, y, z], index: i}.
@@ -213,12 +219,14 @@ func pose_at(t: float) -> Dictionary:
 	if nx != null and ny != null and nz != null:
 		pos = [float(nx), float(ny), float(nz)]
 	var q := [1.0, 0.0, 0.0, 0.0]
-	var has_q := channels.has(attitude_ids[0])
+	var has_q := _full_channel(attitude_ids[0]).size() > 0
 	if has_q:
-		var cw: Array = channels[attitude_ids[0]]
-		var cx: Array = channels[attitude_ids[1]] if channels.has(attitude_ids[1]) else []
-		var cy: Array = channels[attitude_ids[2]] if channels.has(attitude_ids[2]) else []
-		var cz: Array = channels[attitude_ids[3]] if channels.has(attitude_ids[3]) else []
+		# All four components must have exactly one value per sample; a component with another
+		# length counts as absent (0, and the attitude is the identity if w is absent).
+		var cw: Array = _full_channel(attitude_ids[0])
+		var cx: Array = _full_channel(attitude_ids[1])
+		var cy: Array = _full_channel(attitude_ids[2])
+		var cz: Array = _full_channel(attitude_ids[3])
 		var qa := _normalize(_q(cw[i], cx[i] if cx.size() else 0.0, cy[i] if cy.size() else 0.0, cz[i] if cz.size() else 0.0))
 		if i < times.size() - 1 and cw[i + 1] != null:
 			var qb := _normalize(_q(cw[i + 1], cx[i + 1] if cx.size() else 0.0, cy[i + 1] if cy.size() else 0.0, cz[i + 1] if cz.size() else 0.0))

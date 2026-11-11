@@ -8,6 +8,9 @@ extends RefCounted
 const SCHEMAS := ["vv-geo-environment.v1", "vv-geo-environment.v2", "vv-geo-environment.v3"]
 const MAX_MANIFEST_BYTES := 1024 * 1024
 const MAX_FILE_BYTES := 64 * 1024 * 1024
+# Largest image side accepted (pixels). The JPEG header is read before decoding, so a pack cannot
+# make the decoder allocate more than 16384 x 16384 RGB pixels (about 800 MB) and is refused first.
+const MAX_IMAGE_SIDE := 16384
 
 var dir := ""
 var m: Dictionary = {}
@@ -47,14 +50,24 @@ func _load() -> void:
 		_fail("environment.json is not a JSON object")
 		return
 	m = parsed
+	if typeof(m.get("sources", [])) != TYPE_ARRAY:
+		_fail("environment.json field sources is not a list")
+		return
+	for key in ["frame", "height", "image"]:
+		if typeof(m.get(key, {})) != TYPE_DICTIONARY:
+			_fail("environment.json field %s is not an object" % key)
+			return
+	if typeof(m.get("layers", [])) != TYPE_ARRAY:
+		_fail("environment.json field layers is not a list")
+		return
 	if not (str(m.get("schema", "")) in SCHEMAS):
 		_fail("unknown pack schema %s" % str(m.get("schema", "")))
 		return
-	var frame = m.get("frame", {})
-	if typeof(frame) != TYPE_DICTIONARY or str(frame.get("kind", "")) != "enu-tangent-plane":
+	var frame: Dictionary = m.get("frame", {})
+	if str(frame.get("kind", "")) != "enu-tangent-plane":
 		_fail("the pack frame is not an ENU tangent plane")
 		return
-	if float(frame.get("heading_deg", NAN)) != 0.0:
+	if _num(frame.get("heading_deg", NAN), NAN) != 0.0:
 		_fail("only packs with heading 0 are supported (as vv-geo)")
 		return
 	# Base layer.
@@ -66,8 +79,8 @@ func _load() -> void:
 			detail = _layer(l.get("height", {}), l.get("image", {}), "detail-height.u16", "detail-image.jpg")
 			if error != "":
 				return
-			detail["half"] = float(l.get("extent_m", 0.0))
-			detail["blend"] = float(l.get("blend_m", 0.0))
+			detail["half"] = _num(l.get("extent_m", 0.0), 0.0)
+			detail["blend"] = _num(l.get("blend_m", 0.0), 0.0)
 	var w = m.get("world", null)
 	if typeof(w) == TYPE_DICTIONARY:
 		if typeof(w.get("features")) == TYPE_DICTIONARY:
@@ -99,7 +112,7 @@ func _verified_bytes(e: Dictionary, name: String) -> PackedByteArray:
 		return PackedByteArray()
 	var f := FileAccess.open(path, FileAccess.READ)
 	var n := f.get_length()
-	if n > MAX_FILE_BYTES or n != int(e.get("bytes", -1)):
+	if n > MAX_FILE_BYTES or float(n) != _num(e.get("bytes", -1), -1.0):
 		_fail("%s has %d bytes, the manifest declares %s" % [name, n, str(e.get("bytes", "?"))])
 		return PackedByteArray()
 	var bytes := f.get_buffer(n)
@@ -114,20 +127,51 @@ func _verified_bytes(e: Dictionary, name: String) -> PackedByteArray:
 	return bytes
 
 
+# A JSON number as float, else `fallback` (strings, null, arrays and objects are not numbers).
+static func _num(v, fallback: float) -> float:
+	return float(v) if (typeof(v) == TYPE_INT or typeof(v) == TYPE_FLOAT) else fallback
+
+
+# Width and height declared in the header of a JPEG (the first SOFn marker); (0, 0) if none is found.
+static func _jpeg_size(b: PackedByteArray) -> Vector2i:
+	var i := 2
+	var n := b.size()
+	if n < 4 or b[0] != 0xFF or b[1] != 0xD8:
+		return Vector2i.ZERO
+	while i + 9 < n:
+		if b[i] != 0xFF:
+			return Vector2i.ZERO
+		var mk := b[i + 1]
+		if mk == 0xFF:
+			i += 1
+			continue
+		if mk >= 0xC0 and mk <= 0xCF and mk != 0xC4 and mk != 0xC8 and mk != 0xCC:
+			return Vector2i((b[i + 7] << 8) | b[i + 8], (b[i + 5] << 8) | b[i + 6])
+		if mk == 0xD8 or (mk >= 0xD0 and mk <= 0xD7) or mk == 0x01:
+			i += 2
+			continue
+		i += 2 + ((b[i + 2] << 8) | b[i + 3])
+	return Vector2i.ZERO
+
+
 func _layer(hm: Dictionary, im: Dictionary, hname: String, iname: String) -> Dictionary:
 	var hb := _verified_bytes(hm, hname)
 	if error != "":
 		return {}
-	var cols := int(hm.get("columns", 0))
-	var rows := int(hm.get("rows", 0))
-	if cols < 2 or rows < 2 or hb.size() != cols * rows * 2:
+	var cols := int(_num(hm.get("columns", 0), 0.0))
+	var rows := int(_num(hm.get("rows", 0), 0.0))
+	if cols < 2 or rows < 2 or cols > 65536 or rows > 65536 or hb.size() != cols * rows * 2:
 		_fail("%s does not have the declared size" % hname)
 		return {}
 	if str(hm.get("encoding", "")) != "uint16-le":
 		_fail("%s is not uint16-le" % hname)
 		return {}
-	var scale := float(hm.get("scale_m", 0.0))
-	var offset := float(hm.get("offset_m", 0.0))
+	var scale := _num(hm.get("scale_m", 0.0), 0.0)
+	var offset := _num(hm.get("offset_m", 0.0), 0.0)
+	var first = hm.get("first_node_m", [0.0, 0.0])
+	if not (first is Array and first.size() == 2 and not is_nan(_num(first[0], NAN)) and not is_nan(_num(first[1], NAN))):
+		_fail("%s has no valid first_node_m" % hname)
+		return {}
 	var up := PackedFloat32Array()
 	up.resize(cols * rows)
 	for i in cols * rows:
@@ -135,12 +179,19 @@ func _layer(hm: Dictionary, im: Dictionary, hname: String, iname: String) -> Dic
 	var ib := _verified_bytes(im, iname)
 	if error != "":
 		return {}
+	var dims := _jpeg_size(ib)
+	if dims.x < 1 or dims.y < 1 or dims.x > MAX_IMAGE_SIDE or dims.y > MAX_IMAGE_SIDE:
+		_fail("%s declares %d x %d pixels (accepted: 1 to %d per side)" % [iname, dims.x, dims.y, MAX_IMAGE_SIDE])
+		return {}
 	var img := Image.new()
 	if img.load_jpg_from_buffer(ib) != OK:
 		_fail("%s is not a readable JPEG" % iname)
 		return {}
-	var first = hm.get("first_node_m", [0.0, 0.0])
-	return {"up": up, "cols": cols, "rows": rows, "s": float(hm.get("spacing_m", 1.0)), "x0": float(first[0]), "y0": float(first[1]), "image": img}
+	var spacing := _num(hm.get("spacing_m", 1.0), 1.0)
+	if not (spacing > 0.0):
+		_fail("%s has no positive spacing_m" % hname)
+		return {}
+	return {"up": up, "cols": cols, "rows": rows, "s": spacing, "x0": float(first[0]), "y0": float(first[1]), "image": img}
 
 
 func _parse_vegetation(b: PackedByteArray) -> void:
@@ -176,7 +227,7 @@ func extent() -> float:
 
 func orthometric_origin() -> float:
 	var o = m.get("origin", {})
-	return float(o.get("orthometric_height_m", NAN)) if typeof(o) == TYPE_DICTIONARY else NAN
+	return _num(o.get("orthometric_height_m", NAN), NAN) if typeof(o) == TYPE_DICTIONARY else NAN
 
 
 # ENU up of one height grid at (east, north) on its drawn triangles; NAN outside (gridAt).

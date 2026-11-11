@@ -87,7 +87,7 @@ func build(root: Node, record, pack, t0: float, t1: float, profiles: Array, came
 	verdict.custom_minimum_size = Vector2(340, 0)
 	var o: Dictionary = record.outcome()
 	var s: Dictionary = record.safety()
-	verdict_text = "Outcome (record): %s. %s\nSafety (record): %s. %s" % [str(o.get("label", o.get("code", "n/a"))), str(o.get("explanation", "")), str(s.get("status", "n/a")), str(s.get("explanation", ""))]
+	verdict_text = "From the record, shown as written and not re-verified here.\nOutcome: %s. %s\nSafety: %s. %s" % [str(o.get("label", o.get("code", "n/a"))), str(o.get("explanation", "")), str(s.get("status", "n/a")), str(s.get("explanation", ""))]
 	vr.add_child(verdict)
 	_show_verdict(false)
 	layer.add_child(vr)
