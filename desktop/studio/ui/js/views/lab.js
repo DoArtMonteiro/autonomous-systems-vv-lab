@@ -7,7 +7,7 @@
 import { h, clear, prose } from '../dom.js';
 import { api } from '../api.js';
 import { domainById, visibleDomains, emit, loadRecord } from '../store.js';
-import { toast, errorText } from '../ui.js';
+import { toast, errorText, askConfirm } from '../ui.js';
 import { verdictOfOutcome, verdictOfSafety, faultText, distinguishingLabels } from '../model.js';
 import { verdictGlyph } from '../verification.js';
 
@@ -17,6 +17,7 @@ const DEV_SEED = 5000;
 
 let root;
 let navigate = () => {};
+let requestToken = 0; // the newest request to start a baseline; an older one finishing late is dropped
 let lab = null; // {domain, base:{id, record}, form, exp:{id, record}, gen, sweep, busy, focus:Set}
 
 export function initLab(el, nav) {
@@ -29,21 +30,38 @@ export async function showLab(opts) {
   if (opts && opts.scenario && opts.domain) {
     const d = domainById(opts.domain);
     if (d && d.catalog) {
-      clear(root).append(h('div', { class: 'lab lab-empty' }, h('p', { class: 'eyebrow' }, 'Experiment Lab'), h('h1', null, 'Simulating the baseline…'),
+      // An experiment in progress is replaced only when the person says so.
+      if (isDirty() && !(await askConfirm({
+        title: 'Replace the experiment in progress?',
+        message: 'The Lab holds a baseline with changes, runs or checks you have made. Starting this vehicle replaces them with a new baseline. Nothing already stored in the library is deleted.',
+        confirm: 'Replace it',
+      }))) { render(); return; }
+      // The page says what is happening, as a status, while the baseline runs.
+      clear(root).append(h('div', { class: 'lab lab-empty', role: 'status', 'aria-live': 'polite' }, h('p', { class: 'eyebrow' }, 'Experiment Lab'), h('h1', null, 'Simulating the baseline…'),
         h('p', { class: 'lab-lede' }, 'The platform runs the vehicle as it is defined, on a development seed. That run becomes the baseline every change is compared with.')));
       await startDefault(d, null, opts.scenario, opts.open);
       return;
     }
   }
   if (opts && opts.runId && (!lab || lab.base.id !== opts.runId)) {
+    const mine = ++requestToken;
     try {
       const record = await loadIndexed(opts.runId);
+      if (mine !== requestToken) return; // a newer request replaced this one
       startFrom(opts.runId, record);
     } catch (e) {
       toast(errorText(e), 'error');
     }
   }
   render();
+}
+
+/** Whether the Lab holds work a new baseline would discard: changes, an experiment or a check. */
+function isDirty() {
+  if (!lab) return false;
+  let changed = false;
+  try { changed = changes().length > 0; } catch { changed = true; }
+  return changed || !!lab.exp || !!lab.gen || !!(lab.sweep && lab.sweep.records);
 }
 
 /** For tests and the palette: the Lab's state without its records. */
@@ -331,13 +349,19 @@ async function startDefault(d, btn, scenarioId, openGroup) {
   const sc = cat.scenarios.find((s) => s.id === scenarioId) || cat.scenarios[0];
   const req = { schema: REQUEST_SCHEMA, domain: d.manifest.id, scenario: sc.id, controller: sc.default_controller, seed: DEV_SEED, faults: [], parameters: {} };
   if (btn) { btn.classList.add('is-busy'); btn.disabled = true; }
+  // Only the newest request may set the Lab: an ascent baseline takes minutes, and a slower, older
+  // one finishing late must not replace the vehicle the person has since chosen.
+  const mine = ++requestToken;
   try {
     const out = await api.run(req);
     emit('runs-changed');
-    startFrom(out.run_id, await loadIndexed(out.run_id));
+    const record = await loadIndexed(out.run_id);
+    if (mine !== requestToken) return;
+    startFrom(out.run_id, record);
     if (openGroup) lab.openGroup = openGroup;
     render();
   } catch (e) {
+    if (mine !== requestToken) return;
     toast(errorText(e), 'error');
     if (btn) { btn.classList.remove('is-busy'); btn.disabled = false; }
     if (!btn) render();

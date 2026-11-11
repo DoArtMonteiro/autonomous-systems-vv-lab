@@ -91,7 +91,7 @@ export function showHome() {
       thumbnail(e.id).then((u) => { img.src = u; }).catch(() => img.remove());
       mosaic.append(img);
     }
-  }).catch(() => { envCount.textContent = '0'; envNames.textContent = 'No environment could be read.'; });
+  }).catch(() => { envCount.textContent = 'n/a'; envNames.textContent = 'No environment could be read.'; });
 
   const quick = (id, label) => {
     const x = byId.get(id);
@@ -143,10 +143,12 @@ export function showHome() {
     h('ol', null,
       flowStep('Pick a vehicle', 'Hangar', () => navigate('vehicles')),
       flowStep('Pick a landscape', 'Environments', () => navigate('environments')),
-      flowStep('Run the mission', 'Hangar, Design and fly', () => navigate('vehicles')),
-      flowStep('Change a parameter', 'Lab, vehicle design', () => navigate('lab')),
-      flowStep('Compare the runs', 'Lab and Compare', () => navigate('lab')),
-      flowStep('Watch both', 'Lab, Watch both runs', () => navigate('lab'))));
+      // Steps 3 to 6 happen inside the Experiment Lab, which needs a baseline run from the hangar:
+      // they are descriptions, not links, so none opens an empty page.
+      flowInfo('Run the mission', 'In the hangar: Design and fly'),
+      flowInfo('Change a parameter', 'In the Lab: vehicle design'),
+      flowInfo('Compare the runs', 'In the Lab: the comparison'),
+      flowInfo('Watch both', 'In the Lab: Watch both runs')));
 
   const featured = h('section', { class: 'hm-featured' },
     h('header', null, h('h2', null, 'Featured missions'), h('button', { type: 'button', class: 'link', onclick: () => navigate('missions') }, `All ${missions} missions →`)),
@@ -175,6 +177,11 @@ export function showHome() {
 
 function flowStep(title, where, run) {
   return h('li', null, h('button', { type: 'button', class: 'hm-step', onclick: run }, h('b', null, title), h('span', null, where)));
+}
+
+/** A step of the strip that only describes where it happens: no link, no focus stop. */
+function flowInfo(title, where) {
+  return h('li', null, h('div', { class: 'hm-step hm-step-info' }, h('b', null, title), h('span', null, where)));
 }
 
 function step(title, text) {

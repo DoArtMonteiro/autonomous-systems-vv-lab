@@ -104,7 +104,27 @@ def environments(s):
     s.wait("document.querySelector(\".at-card[data-env='wallops-island']\").classList.contains('is-current')", 10, "chosen")
     chosen = s.js("[...document.querySelectorAll('.at-card.is-current')].map((e) => e.dataset.env)")
     check("Environments: Wallops Island is the one chosen environment", chosen == ["wallops-island"], json.dumps(chosen))
+    focus = s.js("(() => { const a = document.activeElement; const c = a && a.closest('.at-card'); return { env: c && c.dataset.env, tag: a && a.tagName, inBody: a === document.body }; })()")
+    check("Environments: focus stays on the card that was chosen after the cards are redrawn", focus["env"] == "wallops-island" and not focus["inBody"], json.dumps(focus))
+    said = s.js("document.querySelector('.at [role=status]').textContent")
+    check("Environments: the choice is announced in a polite status", "Wallops Island" in said and s.js("document.querySelector('.at [role=status]').getAttribute('aria-live')") == "polite", said)
     s.shot("m18-environments-dark")
+
+
+def player_follows_environment(s):
+    """The player held for a mission shows the environment chosen later from Environments."""
+    def land_on(env):
+        s.nav("environments")
+        s.wait("document.querySelectorAll('.at-card').length === 8", 30, "environments")
+        s.page.click(f".at-card[data-env='{env}'] [data-action='fly']")
+        s.wait(f"(() => {{ const p = window.__studio.player(); return p && p.experience === 'first-landing' && p.environment === '{env}' && p.view === 'geospatial'; }})()", 120, f"player on {env}")
+        return s.player()
+    a = land_on("cape-canaveral")
+    check("Player: Land a rocket here opens the mission on the chosen environment", a["environment"] == "cape-canaveral" and a["view"] == "geospatial", json.dumps({k: a[k] for k in ("environment", "view")}))
+    b = land_on("wallops-island")
+    check("Player: choosing another environment while the same mission is held changes what the player shows", b["environment"] == "wallops-island" and b["experience"] == a["experience"], json.dumps({k: b[k] for k in ("environment", "experience")}))
+    named = s.js("document.querySelector('.pl-env') && document.querySelector('.pl-env').value")
+    check("Player: the environment selector shows the new environment", named == "wallops-island", str(named))
 
 
 def vehicle_experiment(s):
@@ -191,12 +211,13 @@ def watch(s, base_id, exp_id):
     check("Flight console: the player's operations layout is called Flight console", views == [["engineering", "Engineering"], ["geospatial", "Geospatial"], ["control", "Flight console"]], json.dumps(views))
     check("Flight console: the player does not use the name of the home page", "Mission Control" not in s.js("document.querySelector('#view-mission').innerText"))
     player_header(s)
-    b = s.js("(() => { const b = document.querySelector(\"[data-action='cinematic']\"); return b ? { disabled: b.disabled, title: b.title } : null; })()")
+    b = s.js("(() => { const b = document.querySelector(\"[data-action='cinematic']\"); return b ? { disabled: b.getAttribute('aria-disabled') === 'true', title: b.title, focusable: !b.disabled && b.tabIndex >= 0, described: !!document.getElementById(b.getAttribute('aria-describedby')) && document.getElementById(b.getAttribute('aria-describedby')).textContent.length > 0 } : null; })()")
     NUMBERS["cinematic_button"] = b
     status = s.page.evaluate("() => window.__TAURI__.core.invoke('cinematic_status')")
     NUMBERS["cinematic_status"] = {k: status.get(k) for k in ("installed", "verified", "version")}
     should_open = bool(status.get("installed") and status.get("verified"))
     check("Cinematic: the button is enabled exactly when the module is installed and verified", bool(b) and (not b["disabled"]) == should_open, f"{json.dumps(b)} status {json.dumps(NUMBERS['cinematic_status'])}")
+    check("Cinematic: the button is focusable and names its reason or its action through aria-describedby", bool(b) and b["focusable"] and b["described"], json.dumps(b))
     if should_open and b and not b["disabled"]:
         check("Cinematic: the enabled button says which module version opens this record", str(status.get("version", "")) in b["title"], b["title"])
         s.page.click("[data-action='cinematic']")
@@ -258,8 +279,24 @@ def player_header(s):
 
 def ascent(s):
     s.nav("vehicles")
+    before = lab(s)["base"]
     s.page.click(".hg-card[data-vehicle='small'] [data-action='design']")
+    # The Lab holds the heavy-stage experiment: starting another vehicle must ask before replacing it.
+    s.wait("document.querySelector('#modal-root [role=dialog] [data-action=keep]')", 10, "replace dialog")
+    title = s.js("document.querySelector('#modal-root [role=dialog] h2').textContent")
+    check("Lab: starting another vehicle asks before replacing an experiment in progress", title == "Replace the experiment in progress?", title)
+    s.page.click("#modal-root [data-action='keep']")
+    s.wait("document.querySelector('#modal-root').hidden", 10, "dialog closed")
+    check("Lab: keeping it leaves the heavy-stage baseline in place", lab(s)["base"] == before and s.js("window.__studio.view()") == "lab", f"{before} {lab(s)['base']}")
+    s.nav("vehicles")
+    s.page.click(".hg-card[data-vehicle='small'] [data-action='design']")
+    s.wait("document.querySelector('#modal-root [role=dialog] [data-action=discard]')", 10, "replace dialog")
+    s.page.click("#modal-root [data-action='discard']")
+    s.wait("document.querySelector('#view-lab [role=status] h1') || (window.__studio.lab() && window.__studio.lab().base !== " + json.dumps(before) + ")", 30, "baseline simulating")
+    if s.js("!!document.querySelector('#view-lab [role=status] h1')"):
+        check("Lab: the baseline in progress is announced as a status", s.js("document.querySelector('#view-lab [role=status]').getAttribute('aria-live')") == "polite")
     s.wait("window.__studio.view() === 'lab' && window.__studio.lab() && document.querySelector('.lab-base')", 180, "ascent baseline")
+    check("Lab: replacing it starts the new vehicle's baseline", lab(s)["base"] != before and record(s, lab(s)["base"])["request"]["scenario"].startswith("small"), lab(s)["base"])
     base_id = lab(s)["base"]
     base = record(s, base_id)
     set_param(s, "small_payload_kg", 600)
@@ -336,7 +373,7 @@ def main():
             except Exception as e:  # noqa: BLE001
                 check("vehicle experiment journey completed", False, repr(e)[:300])
                 s.shot("m18-failure-vehicle")
-            for part in (ascent, layout):
+            for part in (player_follows_environment, ascent, layout):
                 try:
                     part(s)
                 except Exception as e:  # noqa: BLE001

@@ -64,12 +64,41 @@ export async function showPlayer(opts) {
   } else if (!pl && !loading) {
     renderEmpty();
   } else if (pl) {
+    // The environment and the view are preferences other pages write ("Land a rocket here" in
+    // Environments chooses a landscape and the geospatial view, then opens this same mission):
+    // when they differ from what is on screen, the screen follows them.
+    if (syncWithPrefs()) return;
     // A challenge run elsewhere may have changed what the claim card should say.
     forgetClaims();
     if (!pl.control) renderSide();
     if (pl.suspended) { pl.suspended = false; mountScene(); }
     if (pl.scene && pl.scene.redraw) requestAnimationFrame(() => { if (pl && pl.scene && pl.scene.redraw) pl.scene.redraw(); });
   }
+}
+
+/**
+ * Makes the held mission show the environment and view the preferences name. Returns true when it
+ * rebuilt the page (time and play state are kept, as in a view change), false when nothing differed.
+ */
+function syncWithPrefs() {
+  const savedEnv = pref('missionEnvironment');
+  const envId = pl.envs.some((x) => x.id === savedEnv) ? savedEnv : pl.envId;
+  const want = pref('missionView');
+  let view = pl.view;
+  if (want === 'engineering' || want === 'control' || (want === 'geospatial' && geoPossible())) view = want;
+  let env = envId;
+  if (view === 'geospatial' && !env && pl.envs.length) env = defaultEnv(pl.envs);
+  if (env === pl.envId && view === pl.view) return false;
+  if (view !== pl.view && pl.view !== 'control') pl.lastView = pl.view;
+  pl.envId = env;
+  pl.view = view;
+  const t = pl.cursor.t;
+  const playing = pl.cursor.playing;
+  pl.suspended = false;
+  build();
+  pl.cursor.set(t);
+  if (playing) pl.cursor.play();
+  return true;
 }
 
 /** Called when another view is shown: playback stops, nothing renders off screen. */
@@ -573,7 +602,12 @@ function gateMarks(t) {
   for (const m of pl.gated) {
     const allowed = open || m.t <= t + 1e-9;
     if (allowed && !m.el) { m.el = m.button(m); pl.tr.marks.append(m.el); }
-    else if (!allowed && m.el) { m.el.remove(); m.el = null; }
+    else if (!allowed && m.el) {
+      // A marker the viewer scrubbed back past leaves the page; focus must not fall to the body.
+      if (document.activeElement === m.el) pl.tr.range.focus();
+      m.el.remove();
+      m.el = null;
+    }
   }
 }
 

@@ -60,7 +60,7 @@ function card(e, current, onPick) {
       h('span', { class: `at-level at-level-${lv.tone}` }, lv.word),
       chosen ? h('span', { class: 'at-using' }, 'Used by the missions') : null),
     h('div', { class: 'at-body' },
-      h('h3', { class: 'at-name' }, e.name),
+      h('h3', { class: 'at-name', tabindex: '-1' }, e.name),
       h('p', { class: 'at-sum' }, prose(e.summary)),
       h('ul', { class: 'at-facts' },
         ...resolutionLines(e).slice(0, 1).map((x) => h('li', null, x)),
@@ -70,7 +70,7 @@ function card(e, current, onPick) {
       h('p', { class: 'at-credit' }, shortCredits(e).join(' · ')),
       h('div', { class: 'at-actions' },
         h('button', { type: 'button', class: 'btn btn-primary btn-sm', dataset: { action: 'fly', env: e.id }, title: 'Play the first landing on this landscape in the geospatial view', onclick: () => fly('first-landing') }, 'Land a rocket here'),
-        chosen ? null : h('button', { type: 'button', class: 'btn btn-sm', dataset: { action: 'use', env: e.id }, onclick: () => { useEnv(e.id); onPick(); } }, 'Use for missions'))));
+        chosen ? null : h('button', { type: 'button', class: 'btn btn-sm', dataset: { action: 'use', env: e.id }, onclick: () => { useEnv(e.id); onPick(e); } }, 'Use for missions'))));
 }
 
 export async function showAtlas() {
@@ -84,22 +84,12 @@ export async function showAtlas() {
       h('p', { class: 'at-lede' }, 'Real places built from open geographic data: orthophotos, lidar and survey terrain, OpenStreetMap buildings and lidar-measured vegetation. Each pack is validated on this machine before it is listed: file hashes, grid sizes and its own geodetic check points. The simulation runs on flat ground in every case; the landscape is context, never an input to the physics.'),
       status),
     grid, cine);
+  // A polite status that says what a choice did; the cards are redrawn, so it lives outside them.
+  const announce = h('p', { class: 'sr-only', role: 'status', 'aria-live': 'polite' });
+  page.append(announce);
   clear(root).append(page);
-  let list;
-  try {
-    list = await listEnvironments();
-  } catch (e) {
-    status.textContent = `The environments could not be read: ${errorText(e)}`;
-    status.className = 'error-text';
-    return;
-  }
-  const envs = list.environments;
-  const render = () => {
-    const current = pref('missionEnvironment');
-    clear(grid).append(...envs.map((e) => card(e, current, render)));
-  };
-  status.textContent = `${envs.length} environments validated and installed, ${mb(envs.reduce((a, e) => a + (e.bytes || 0), 0))} in all.${list.rejected && list.rejected.length ? ` ${list.rejected.length} pack${list.rejected.length > 1 ? 's were' : ' was'} rejected; see Settings, Environments.` : ''}`;
-  render();
+  let envs = [];
+  // The Cinematic section does not depend on the packs: it is drawn whether or not they could be read.
   cine.append(h('div', null,
     h('p', { class: 'eyebrow' }, 'Cinematic View'),
     h('h2', null, 'The same record, rendered for the eye'),
@@ -112,4 +102,27 @@ export async function showAtlas() {
   cine.append(h('div', { class: 'row' },
     h('button', { type: 'button', class: 'btn btn-primary', onclick: () => { const id = pref('missionEnvironment') || (envs[0] && envs[0].id); if (id) useEnv(id); navigate('mission', { experienceId: 'first-landing' }); } }, 'Open a landing in the player'),
     h('button', { type: 'button', class: 'btn btn-quiet', onclick: () => navigate('settings') }, 'Module settings')));
+
+  let list;
+  try {
+    list = await listEnvironments();
+  } catch (e) {
+    status.textContent = `The environments could not be read: ${errorText(e)}`;
+    status.className = 'error-text';
+    return;
+  }
+  envs = list.environments;
+  // Choosing a pack redraws every card. The redraw puts focus back on the card that was chosen (its
+  // heading, which takes programmatic focus) and the status says what changed.
+  const render = (picked) => {
+    const current = pref('missionEnvironment');
+    clear(grid).append(...envs.map((e) => card(e, current, render)));
+    if (picked) {
+      announce.textContent = `${picked.name} is now the environment used by the missions.`;
+      const title = grid.querySelector(`.at-card[data-env="${picked.id}"] .at-name`);
+      if (title) title.focus();
+    }
+  };
+  status.textContent = `${envs.length} environments validated and installed, ${mb(envs.reduce((a, e) => a + (e.bytes || 0), 0))} in all.${list.rejected && list.rejected.length ? ` ${list.rejected.length} pack${list.rejected.length > 1 ? 's were' : ' was'} rejected; see Settings, Environments.` : ''}`;
+  render();
 }

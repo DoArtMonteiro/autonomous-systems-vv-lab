@@ -43,6 +43,8 @@
 .hm-flow li:first-child { border-left: 0; }
 .hm-step { width: 100%; height: 100%; display: grid; gap: 4px; padding: 14px 14px 16px; text-align: left; background: var(--bg-1); border: 0; color: inherit; cursor: pointer; transition: background-color var(--dur-1) var(--ease); }
 .hm-step:hover { background: var(--accent-wash); }
+.hm-step-info { cursor: default; }
+.hm-step-info:hover { background: var(--bg-1); }
 .hm-step b { font: 600 13.5px/1.3 var(--sans); color: var(--fg-1); }
 .hm-step b::before { content: counter(fl, decimal-leading-zero) "  "; font: 500 11px var(--mono); color: var(--accent); }
 .hm-step span { font-size: 11.5px; color: var(--fg-3); }
@@ -136,6 +138,9 @@
 .hm-mosaic { grid-template-rows: repeat(2, minmax(0, 1fr)); overflow: hidden; min-height: 0; }
 .hm-mosaic img { min-height: 0; }
 .nav { min-width: 0; flex: 1 1 auto; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+/* The scrolling nav clips anything drawn outside its box, and its buttons fill its height: the
+   keyboard focus ring is drawn inside the button so it is never cut off. */
+.nav .nav-btn:focus-visible { outline-offset: -3px; }
 .nav::-webkit-scrollbar { height: 4px; }
 .nav::-webkit-scrollbar-thumb { background: var(--rule-strong); border-radius: 2px; }
 .nav-btn { white-space: nowrap; flex: none; }

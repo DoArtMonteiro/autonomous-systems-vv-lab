@@ -7,6 +7,7 @@ import { api } from './api.js';
 import { toast, errorText } from './ui.js';
 
 let status = null; // Promise of the shell's status
+let cinSeq = 0; // ids of the reason texts of the player's Cinematic buttons
 
 function current(reload = false) {
   if (!status || reload) {
@@ -24,29 +25,36 @@ const mbText = (b) => `${(b / 1048576).toFixed(0)} MB`;
 
 /**
  * "Cinematic view" button for the player: opens the stored run `runId()` on environment `envId()`
- * in the module. Disabled, with the reason as its title, when the module is not installed or not
- * verified, when there is no environment, or when the scene is not a rocket landing.
+ * in the module. Unavailable, when the module is not installed or not verified, when there is no
+ * environment, or when the scene is not a rocket landing: the button then stays focusable with
+ * aria-disabled, does nothing, and its reason is both its title and a text that
+ * aria-describedby points to, so a keyboard or screen-reader user can read why. Returns a wrapper
+ * (the button and that text); the button carries data-action="cinematic".
  */
 export function cinematicButton(runId, envId, rocket) {
-  const b = h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'cinematic' }, disabled: true, 'aria-disabled': 'true', title: 'Checking the Cinematic View module…' }, 'Cinematic view');
-  const off = (why) => { b.disabled = true; b.setAttribute('aria-disabled', 'true'); b.title = why; };
-  if (!rocket) { off('The Cinematic View replays rocket landings only.'); return b; }
+  const reasonId = `cin-why-${++cinSeq}`;
+  const why = h('span', { class: 'sr-only', id: reasonId });
+  const b = h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'cinematic' }, 'aria-disabled': 'true', 'aria-describedby': reasonId, title: 'Checking the Cinematic View module…' }, 'Cinematic view');
+  const wrap = h('span', { class: 'cin-wrap' }, b, why);
+  why.textContent = 'Checking the Cinematic View module…';
+  const off = (text) => { b.setAttribute('aria-disabled', 'true'); b.title = text; why.textContent = text; };
+  if (!rocket) { off('The Cinematic View replays rocket landings only.'); return wrap; }
   // Read afresh each time the player is built: the module folder can change outside this window
   // (another Studio window, an uninstall, a manual removal), and a stale "installed" would offer a
   // launch that cannot work.
   current(true).then((s) => {
     if (!s.installed || !s.verified) return off(s.reason || 'The Cinematic View module is not installed.');
     if (!envId()) return off('The Cinematic View needs a geographic environment; none is installed.');
-    b.disabled = false;
     b.removeAttribute('aria-disabled');
     b.title = `Open this run in the Cinematic View ${s.version} (a separate window; read-only replay of the record)`;
+    why.textContent = b.title;
   }).catch((e) => off(`The module status could not be read: ${errorText(e)}`));
   b.addEventListener('click', () => {
-    if (b.disabled) return;
+    if (b.getAttribute('aria-disabled') === 'true') return;
     api.cinematicLaunch(runId(), envId()).then(() => toast('The Cinematic View opens in its own window.', 'info'))
       .catch((e) => toast(errorText(e), 'error'));
   });
-  return b;
+  return wrap;
 }
 
 /** Settings section: status, install from a module zip (hash shown first), uninstall. */
