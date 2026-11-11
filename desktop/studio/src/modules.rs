@@ -28,6 +28,10 @@
 //! single directory and the launch deletes it before the process starts, so a cache that was
 //! planted or left over is never read.
 //!
+//! One Studio instance is supported (the single-instance plugin enforces it): the `.staging-*` and
+//! `.old-*` folders are named after the process id and cleaned without coordinating with another
+//! process, so two Studios sharing one modules folder could remove each other's work.
+//!
 //! Zip extraction uses the `zip` crate already in the lock file (the platform's evidence export
 //! uses it), with the same version and features, so no new dependency is added.
 
@@ -162,6 +166,18 @@ impl ModulesInner {
         s
     }
 
+    /// Removes the module unless the Cinematic View runs. The lock is held through the removal, so
+    /// no launch can start on a half-removed module.
+    fn uninstall_guarded(&self) -> Result<Status, PlatformError> {
+        let mut slot = self.child.lock().map_err(err)?;
+        ensure_not_running(
+            &mut slot,
+            "the Cinematic View is open; close it before uninstalling the module",
+        )?;
+        self.forget();
+        uninstall(&self.root)
+    }
+
     fn forget(&self) {
         if let Ok(mut cache) = self.checked.lock() {
             *cache = None;
@@ -241,6 +257,23 @@ fn parse_manifest(bytes: &[u8]) -> Result<Manifest, PlatformError> {
             "the module entry point is not a plain relative path",
         ));
     }
+    // Shown in the install dialog: plain version characters only.
+    let godot = v
+        .pointer("/godot/version")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+    if !(1..=32).contains(&godot.len())
+        || !godot
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-')
+    {
+        return Err(invalid(
+            "the module's Godot version is missing or malformed",
+        ));
+    }
+    // Godot's own cache folder: never part of the module (the launch deletes it).
+    let cache = format!("{project}/{GODOT_CACHE}").to_lowercase();
     let mut files = Vec::new();
     let mut seen = BTreeMap::new();
     let mut total = 0u64;
@@ -262,6 +295,12 @@ fn parse_manifest(bytes: &[u8]) -> Result<Manifest, PlatformError> {
             .to_lowercase();
         if !safe_relative(&path) || path == MANIFEST {
             return Err(invalid(format!("manifest lists an unsafe path {path:?}")));
+        }
+        let lower = path.to_lowercase();
+        if lower == cache || lower.starts_with(&format!("{cache}/")) {
+            return Err(invalid(format!(
+                "manifest lists {path:?}, inside the Godot cache folder"
+            )));
         }
         if bytes > MAX_FILE_BYTES || sha.len() != 64 || !sha.chars().all(|c| c.is_ascii_hexdigit())
         {
@@ -295,11 +334,7 @@ fn parse_manifest(bytes: &[u8]) -> Result<Manifest, PlatformError> {
         version,
         exe,
         project,
-        godot: v
-            .pointer("/godot/version")
-            .and_then(Value::as_str)
-            .unwrap_or("")
-            .to_string(),
+        godot,
         disk_bytes,
         min_vram_bytes: v.get("min_vram_bytes").and_then(Value::as_u64).unwrap_or(0),
         files,
@@ -597,11 +632,12 @@ fn swap_in(root: &Path, new_tree: &Path, version: &str) -> Result<(), PlatformEr
 /// folder and everything (hash, manifest, files) is read from that copy, so the file the user
 /// picked cannot change between the check and the install. `confirm` sees the zip's SHA-256 and
 /// the module's identity after every check passed and before anything is extracted; returning
-/// `false` cancels (`Ok(None)`). Callers must not call this while the Cinematic View runs.
+/// `false` cancels (`Ok(None)`) and an error stops the install. The confirmation is also where a
+/// caller takes the lock that keeps the Cinematic View from running during the swap.
 pub fn install_zip(
     root: &Path,
     zip_path: &Path,
-    confirm: &dyn Fn(&Plan) -> bool,
+    confirm: &dyn Fn(&Plan) -> Result<bool, PlatformError>,
 ) -> Result<Option<Status>, PlatformError> {
     let side = PathBuf::from(format!("{}.sha256", zip_path.display()));
     let declared = fs::read_to_string(&side)
@@ -633,7 +669,7 @@ fn stage_and_swap(
     zip_len: u64,
     declared: &str,
     staging: &Path,
-    confirm: &dyn Fn(&Plan) -> bool,
+    confirm: &dyn Fn(&Plan) -> Result<bool, PlatformError>,
 ) -> Result<Option<Status>, PlatformError> {
     let low_disk = |need: u64| -> Result<(), PlatformError> {
         match free_bytes(root) {
@@ -705,7 +741,7 @@ fn stage_and_swap(
         godot: m.godot.clone(),
         disk_bytes: m.disk_bytes,
     };
-    if !confirm(&plan) {
+    if !confirm(&plan)? {
         return Ok(None);
     }
     // Named after the version so the same integrity check as at launch can run on it.
@@ -899,14 +935,13 @@ pub async fn cinematic_install_from_file(
         let Some(zip_path) = picked.and_then(|f| f.into_path().ok()) else {
             return Ok(None);
         };
-        // Held until the install ends: no launch can start while the module is being replaced.
-        let mut slot = modules.child.lock().map_err(err)?;
-        ensure_not_running(
-            &mut slot,
-            "the Cinematic View is open; close it before installing or replacing the module",
-        )?;
-        let ask = |p: &Plan| {
-            app.dialog()
+        // The user confirms first, without any lock; then the lock is taken and the Cinematic
+        // View is checked again. The guard stays in `held` until the install ends, so no launch
+        // can start while the module is being replaced.
+        let held = std::cell::RefCell::new(None);
+        let ask = |p: &Plan| -> Result<bool, PlatformError> {
+            let yes = app
+                .dialog()
                 .message(format!(
                     "Install Cinematic View {} (Godot {}, {} MB on disk)?\n\nSHA-256 of the zip:\n{}\n\nThe .sha256 file beside the zip matches, so the zip is intact. That does not show who built it: compare the SHA-256 above with a value from a source you trust. Studio then checks every extracted file against the module manifest.",
                     p.version,
@@ -920,7 +955,17 @@ pub async fn cinematic_install_from_file(
                     "Install".into(),
                     "Cancel".into(),
                 ))
-                .blocking_show()
+                .blocking_show();
+            if !yes {
+                return Ok(false);
+            }
+            let mut slot = modules.child.lock().map_err(err)?;
+            ensure_not_running(
+                &mut slot,
+                "the Cinematic View is open; close it before installing or replacing the module",
+            )?;
+            *held.borrow_mut() = Some(slot);
+            Ok(true)
         };
         modules.forget();
         let s = install_zip(&modules.root, &zip_path, &ask).inspect_err(|e| {
@@ -940,14 +985,7 @@ pub async fn cinematic_uninstall(state: State<'_, AppState>) -> Result<Status, P
     let modules = state.modules.clone();
     let log = state.paths.log.clone();
     blocking(move || {
-        // The lock is held through the removal: no launch can start on a half-removed module.
-        let mut slot = modules.child.lock().map_err(err)?;
-        if let Some(mut child) = slot.take() {
-            let _ = child.kill();
-            let _ = child.wait();
-        }
-        modules.forget();
-        let s = uninstall(&modules.root)?;
+        let s = modules.uninstall_guarded()?;
         log_line(&log, "cinematic module uninstalled");
         Ok(s)
     })
@@ -1046,7 +1084,7 @@ mod tests {
     ];
 
     fn install(root: &Path, zp: &Path) -> Result<Status, PlatformError> {
-        install_zip(root, zp, &|_| true).map(|s| s.expect("not cancelled"))
+        install_zip(root, zp, &|_| Ok(true)).map(|s| s.expect("not cancelled"))
     }
 
     /// The module zip of `build_zip` with another version, as `<dir>/<version>.zip`.
@@ -1167,6 +1205,29 @@ mod tests {
                         |_| {},
                     )
                 }),
+            ),
+            (
+                "godot-cache-entry",
+                Box::new(|d| {
+                    build_zip(
+                        d,
+                        &[FILES[0], FILES[1], ("project/.godot/cache.cfg", b"x")],
+                        None,
+                        |_| {},
+                    )
+                }),
+            ),
+            (
+                "godot-version-markup",
+                Box::new(|d| {
+                    build_zip(d, FILES, None, |m| {
+                        m["godot"]["version"] = "4.7 <b>x</b>".into()
+                    })
+                }),
+            ),
+            (
+                "godot-version-missing",
+                Box::new(|d| build_zip(d, FILES, None, |m| m["godot"]["version"] = "".into())),
             ),
             (
                 "trailing-dot",
@@ -1326,7 +1387,7 @@ mod tests {
         let seen = std::cell::RefCell::new(None);
         let r = install_zip(&root, &zp, &|p| {
             *seen.borrow_mut() = Some(p.clone());
-            false
+            Ok(false)
         })
         .unwrap();
         assert!(r.is_none());
@@ -1511,6 +1572,24 @@ mod tests {
         let _ = fs::remove_dir_all(&d);
     }
 
+    #[test]
+    fn uninstall_is_refused_while_the_view_runs() {
+        let d = tmp("uninst");
+        let root = d.join("modules").join("cinematic");
+        let m = Modules::new(root.clone());
+        install(&root, &build_version(&d, "0.1.0", b"MZ one")).unwrap();
+        *m.child.lock().unwrap() = Some(sleeper());
+        let e = m.uninstall_guarded().unwrap_err().to_string();
+        assert!(e.contains("close it before uninstalling"), "{e}");
+        assert!(status_of(&root).verified, "the module is untouched");
+        let mut c = m.child.lock().unwrap().take().unwrap();
+        c.kill().unwrap();
+        let _ = c.wait();
+        *m.child.lock().unwrap() = Some(c);
+        assert!(!m.uninstall_guarded().unwrap().installed);
+        let _ = fs::remove_dir_all(&d);
+    }
+
     fn sleeper() -> Child {
         #[cfg(windows)]
         let mut c = Command::new("ping");
@@ -1557,6 +1636,9 @@ mod tests {
             "con.txt",
             "a/com1.dat",
             "lpt9",
+            "godot/nul .txt",
+            "x/com\u{b9}",
+            "x/CONIN$",
             "aux.tar.gz",
             "a.",
             "dir./x",

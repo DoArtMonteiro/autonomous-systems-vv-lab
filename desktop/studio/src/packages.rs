@@ -76,14 +76,41 @@ fn sidecar_hash(archive: &Path) -> Result<Option<String>, PlatformError> {
     Ok(Some(word))
 }
 
-/// Names Windows treats as devices, with or without an extension (`nul.json` is the null device).
+/// Names Windows treats as devices, with or without an extension (`nul.json` is the null device)
+/// and with trailing spaces before the extension (`nul .txt`). `COM¹`, `COM²`, `COM³` and the
+/// `LPT` equivalents count, as do `CONIN$` and `CONOUT$`.
 pub(crate) fn windows_reserved(name: &str) -> bool {
-    let stem = name.split('.').next().unwrap_or("").to_ascii_lowercase();
-    matches!(stem.as_str(), "con" | "prn" | "aux" | "nul")
-        || ["com", "lpt"].iter().any(|p| {
-            stem.strip_prefix(p)
-                .is_some_and(|n| matches!(n.as_bytes(), [b'0'..=b'9']))
+    let stem = name
+        .split('.')
+        .next()
+        .unwrap_or("")
+        .trim_end_matches(' ')
+        .to_lowercase();
+    if matches!(
+        stem.as_str(),
+        "con" | "prn" | "aux" | "nul" | "conin$" | "conout$"
+    ) {
+        return true;
+    }
+    ["com", "lpt"].iter().any(|p| {
+        stem.strip_prefix(p).is_some_and(|n| {
+            n.chars().count() == 1
+                && n.chars()
+                    .all(|c| c.is_ascii_digit() || matches!(c, '\u{b9}' | '\u{b2}' | '\u{b3}'))
         })
+    })
+}
+
+/// Opens a file so that nobody can write to it while the handle is held.
+fn open_read_locked(path: &Path) -> std::io::Result<fs::File> {
+    let mut o = fs::OpenOptions::new();
+    o.read(true);
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        o.share_mode(1); // FILE_SHARE_READ: no writers, no deleters
+    }
+    o.open(path)
 }
 
 /// A plain file name: no directory part, no parent reference, no drive or stream syntax, no
@@ -282,7 +309,12 @@ fn stage_and_move(
     // One copy, one handle: hashed here, then read as the archive.
     let copy = root.join("archive.zip");
     fs::copy(archive, &copy).map_err(err)?;
-    let mut file = fs::File::open(&copy).map_err(err)?;
+    if fs::metadata(&copy).map_err(err)?.len() != len {
+        return Err(PlatformError::Invalid(
+            "the archive changed while it was being copied".into(),
+        ));
+    }
+    let mut file = open_read_locked(&copy).map_err(err)?;
     let sha256 = sha256_reader(&mut file)?;
     if let Some(want) = &sidecar
         && *want != sha256
@@ -503,6 +535,7 @@ mod tests {
             "con",
             "CON",
             "nul.json",
+            "nul .json",
             "aux.tar.gz",
             "Prn",
             "com1",
@@ -525,6 +558,33 @@ mod tests {
             "NOTICE.md",
         ] {
             assert!(plain_name(ok), "{ok}");
+        }
+    }
+
+    #[test]
+    fn device_names_with_spaces_superscripts_and_console_names_are_reserved() {
+        for bad in [
+            "nul .txt",
+            "CON  ",
+            "COM\u{b9}",
+            "com\u{b2}.txt",
+            "LPT\u{b3}",
+            "CONIN$",
+            "conout$.x",
+            "com0",
+            "LPT9",
+        ] {
+            assert!(windows_reserved(bad), "{bad:?}");
+        }
+        for ok in [
+            "com",
+            "com10",
+            "lpt\u{b9}\u{b9}",
+            "conin",
+            "console$",
+            "a.nul",
+        ] {
+            assert!(!windows_reserved(ok), "{ok:?}");
         }
     }
 
