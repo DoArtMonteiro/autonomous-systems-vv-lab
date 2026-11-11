@@ -30,7 +30,7 @@ import zipfile
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 PROJECT = os.path.join(REPO, "desktop", "cinematic")
-MODULE_VERSION = "0.1.0"
+MODULE_VERSION = "0.2.0"
 GODOT_VERSION = "4.7.2-stable"
 GODOT_EXE = "Godot_v4.7.2-stable_win64.exe"
 GODOT_CONSOLE = "Godot_v4.7.2-stable_win64_console.exe"
