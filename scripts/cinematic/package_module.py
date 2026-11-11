@@ -90,6 +90,9 @@ def stage(godot_dir, root):
         sys.exit("could not dump the Godot licence texts: " + out.stderr[-500:])
     with open(os.path.join(lic, "vv-cinematic-LICENSE.txt"), "w", encoding="utf-8", newline="\n") as f:
         f.write(MODULE_LICENCE)
+    notice = os.path.join(PROJECT, "assets", "cc0", "NOTICE-cc0.md")
+    if os.path.isfile(notice):
+        shutil.copy2(notice, os.path.join(lic, "NOTICE-cc0.md"))
 
 
 def manifest(root):
@@ -103,6 +106,25 @@ def manifest(root):
             total += size
             files.append({"path": rel, "bytes": size, "sha256": sha256(p)})
     files.sort(key=lambda e: e["path"])
+    # Third-party assets (CC0): provenance of every shipped file, with the sha256 of the file in the module.
+    third_party = []
+    prov = os.path.join(PROJECT, "assets", "cc0", "PROVENANCE.json")
+    licences = [
+        {"component": "Godot Engine 4.7.2-stable", "licence": "MIT", "file": "LICENSES/godot-LICENSE.txt"},
+        {"component": "Third-party components of the Godot binary", "licence": "various (listed)", "file": "LICENSES/godot-COPYRIGHT.txt"},
+        {"component": "VV Lab Cinematic View", "licence": "MIT", "file": "LICENSES/vv-cinematic-LICENSE.txt"},
+    ]
+    if os.path.isfile(prov):
+        with open(prov, encoding="utf-8") as f:
+            for a in json.load(f):
+                third_party.append({
+                    "id": a["id"], "title": a["title"], "category": a["category"], "source": a["source"],
+                    "page_url": a["page_url"], "author": a.get("author"), "licence": "CC0 1.0",
+                    "licence_evidence_url": a.get("licence_evidence_url"), "date_accessed": a.get("date_accessed"),
+                    "processing": a.get("processing"),
+                    "files": [{"path": "project/assets/" + e["path"], "bytes": e["bytes"], "sha256": e["sha256"]} for e in a["files"]],
+                })
+        licences.append({"component": "CC0 assets (Poly Haven, ambientCG): HDRI, ground, hull, rocks, shrubs, trees", "licence": "CC0 1.0", "file": "LICENSES/NOTICE-cc0.md"})
     return {
         "schema": "vv-cinematic-module.v1",
         "module": "cinematic",
@@ -114,11 +136,8 @@ def manifest(root):
         "renderer": "Godot Forward+ (Vulkan); poses read from the run record, never simulated",
         "min_vram_bytes": MIN_VRAM_BYTES,
         "disk_bytes": total,
-        "licences": [
-            {"component": "Godot Engine 4.7.2-stable", "licence": "MIT", "file": "LICENSES/godot-LICENSE.txt"},
-            {"component": "Third-party components of the Godot binary", "licence": "various (listed)", "file": "LICENSES/godot-COPYRIGHT.txt"},
-            {"component": "VV Lab Cinematic View", "licence": "MIT", "file": "LICENSES/vv-cinematic-LICENSE.txt"},
-        ],
+        "licences": licences,
+        "third_party_assets": third_party,
         "files": files,
     }
 
