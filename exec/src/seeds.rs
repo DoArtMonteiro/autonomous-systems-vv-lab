@@ -333,6 +333,41 @@ mod tests {
         }
     }
 
+    /// The M13 reserve is declared in the guards of this crate and in the manifest of every desktop
+    /// domain. They must name exactly the same closed range, so none can drift and let a seed through.
+    #[test]
+    fn every_declaration_of_the_confirmation_reserve_agrees() {
+        use crate::investigate::INVESTIGATION_PROTECTED;
+        const RESERVE: (u64, u64) = (44_000, 44_999);
+        let overlapping = |start: u64, end: u64| start <= RESERVE.1 && end >= RESERVE.0;
+        for (name, list) in [
+            ("ROCKET_PROTECTED", ROCKET_PROTECTED),
+            ("GROUND_PROTECTED", GROUND_PROTECTED),
+            ("INVESTIGATION_PROTECTED", INVESTIGATION_PROTECTED),
+        ] {
+            let hits: Vec<(u64, u64)> = list
+                .iter()
+                .filter(|r| overlapping(r.start, r.end))
+                .map(|r| (r.start, r.end))
+                .collect();
+            assert_eq!(hits, vec![RESERVE], "{name}");
+        }
+        let desktop = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../desktop");
+        for domain in ["domain-ascent", "domain-ground", "domain-rocket"] {
+            let path = desktop.join(domain).join("domain.json");
+            let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+            let manifest: serde_json::Value = serde_json::from_str(&text).unwrap();
+            let hits: Vec<(u64, u64)> = manifest["seeds"]["protected"]
+                .as_array()
+                .unwrap_or_else(|| panic!("{domain}: no protected seed ranges"))
+                .iter()
+                .map(|r| (r["start"].as_u64().unwrap(), r["end"].as_u64().unwrap()))
+                .filter(|(start, end)| overlapping(*start, *end))
+                .collect();
+            assert_eq!(hits, vec![RESERVE], "{domain}/domain.json");
+        }
+    }
+
     #[test]
     fn repeated_listed_seeds_are_refused() {
         let l = SeedSpec::List { values: vec![5, 5] };
