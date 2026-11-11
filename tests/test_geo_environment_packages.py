@@ -73,6 +73,11 @@ class EnvironmentIndex(unittest.TestCase):
                     self.assertEqual(z.namelist(), e["files"], e["id"])
                     for n in e["files"][:-1]:
                         self.assertEqual(z.read(n), pkg.read(os.path.join(pack, n)), f"{e['id']}/{n}")
+                    with open(os.path.join(pack, "environment.json"), encoding="utf-8") as f:
+                        m = json.load(f)
+                    want = pkg.notice(m, self.cat["environments"][e["id"]])
+                    want = want.encode("utf-8") if isinstance(want, str) else want
+                    self.assertEqual(z.read("NOTICE.md"), want, f"{e['id']}/NOTICE.md")
                 # Deflate output depends on the zlib build; the indexed zip bytes are those of the
                 # build named in the index, so they are compared only under that build.
                 if zlib.ZLIB_RUNTIME_VERSION == self.idx.get("zlib"):
@@ -85,7 +90,7 @@ class EnvironmentIndex(unittest.TestCase):
             if not os.path.exists(p):
                 continue
             b = pkg.read(p)
-            if hashlib.sha256(b).hexdigest() != e["sha256"]:
+            if zlib.ZLIB_RUNTIME_VERSION == self.idx.get("zlib") and hashlib.sha256(b).hexdigest() != e["sha256"]:
                 self.fail(f"{e['file']} in dist does not match the index (rebuild with package_environment.py)")
             with zipfile.ZipFile(p) as z:
                 names = z.namelist()

@@ -16,7 +16,8 @@ SHA-256 in the manifest before it is packed, so a zip never carries a pack that 
 
 The zip is deterministic: entries in a fixed order (environment.json first, then the manifest's
 files in manifest order, then NOTICE.md), a fixed timestamp (1980-01-01), fixed permissions and
-DEFLATE level 9. Rebuilding from the same pack gives the same bytes and the same SHA-256.
+DEFLATE level 9. Rebuilding from the same pack with the same zlib build gives the same bytes and
+the same SHA-256; DEFLATE output differs between zlib builds, so the index names its build (`zlib`).
 
 Pack folders: the bundled packs live in desktop/environments/<id> (they ship with the Studio); the
 catalogue packs are built into dist/packs/<id> by build_environment.py and build_features.py and are
