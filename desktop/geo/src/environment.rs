@@ -410,7 +410,7 @@ fn read_grid(dir: &Path, h: &Height, extent: f64, name: &str) -> Result<(Grid, V
 fn read_image(dir: &Path, im: &Image, extent: f64, name: &str) -> Result<Vec<u8>, GeoError> {
     if im.file != name || !(16..=16384).contains(&im.columns) || !(16..=16384).contains(&im.rows) {
         return invalid(format!(
-            "the image must be {name}, 16 to 16384 texels a side"
+            "the image must be {name}, 16 to 16384 texels a side and at most 8192 x 8192 in all"
         ));
     }
     if im.columns * im.rows > MAX_IMAGE_PIXELS {

@@ -293,19 +293,21 @@
 .mc-left, .mc-right { overflow-x: hidden; }
 .pl-env-cat { padding: 0 6px; white-space: nowrap; }
 
-/* M17 Stream A: the sources control is one quiet row. The short credit of every source whose licence
-   asks for one stays on it, at 11 px and never clipped: it sits beside the button when it fits and
-   otherwise wraps onto its own line below it. The full notices and licences of every source are one
-   press away in the panel. The overlays keep their own space: the telemetry card stops above the
-   camera bar and the phase pill wraps before it reaches the card. */
+/* M17 Stream A: the sources control is one quiet row plus the credit line. The short credit of every
+   source whose licence asks for one is its own line below the button, at 11 px and never clipped; it
+   wraps to a second line on a narrow window (measured: one line up to about 1000 px of stage width
+   for Cape Canaveral, 1200 px for Santa Maria). The full notices and licences of every source are one
+   press away in the panel. The overlays keep their own space: the run bar and the camera bar stand
+   clear of two credit lines, the telemetry card stops above the camera bar and the phase pill wraps
+   before it reaches the card. */
 .si-row { flex-wrap: wrap; row-gap: 4px; min-width: 0; }
-.si-credit { flex: 1 1 auto; min-width: 0; max-width: none; min-height: 22px; display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 11px; border: 1px solid var(--glass-rule); background: var(--glass); backdrop-filter: blur(var(--glass-blur)); font-size: 11px; line-height: 1.35; color: var(--fg-1); white-space: normal; }
-.pl-geo .pl-runs, .pl-geo .pl-cams { bottom: 46px; }
+.si-credit { flex: 1 1 100%; min-width: 0; max-width: none; min-height: 22px; display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 11px; border: 1px solid var(--glass-rule); background: var(--glass); backdrop-filter: blur(var(--glass-blur)); font-size: 11px; line-height: 1.35; color: var(--fg-1); white-space: normal; }
+.pl-geo .pl-runs, .pl-geo .pl-cams { bottom: 84px; }
 .pl-geo .pl-scene-note.is-geo { bottom: 12px; max-width: calc(100% - 32px); }
-.pl-geo .pl-hud { max-height: calc(100% - 32px - 76px); overflow-y: auto; scrollbar-width: thin; }
+.pl-geo .pl-hud { max-height: calc(100% - 32px - 114px); overflow-y: auto; scrollbar-width: thin; }
 .pl-geo .pl-phase { right: auto; max-width: calc(100% - 300px); flex-wrap: wrap; row-gap: 6px; }
 .pl-geo .pl-phase-name { white-space: normal; line-height: 1.35; }
-.mc .pl-scene-note.is-geo { bottom: 126px; }
+.mc .pl-scene-note.is-geo { bottom: 126px; max-width: min(760px, calc(100% - 460px)); }
 @media (max-width: 1100px) {
   .pl-geo .pl-phase { max-width: calc(100% - 262px); }
   .pl-geo .pl-runs { max-width: calc(100% - 32px - 480px); }

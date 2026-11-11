@@ -28,6 +28,7 @@ export function shortCredits(m) {
  */
 export function asksForCredit(s) {
   const l = str(isObj(s) ? s.licence : '');
+  if (/\b(ODbL|CC[- ]BY)\b/i.test(l)) return true; // never dropped, whatever else the text says
   return !(/public domain/i.test(l) && !/request/i.test(l));
 }
 
