@@ -620,20 +620,21 @@ export function rethemePlayer() {
 
 function revealNow() {
   if (!pl) return;
-  // The button that asked for the result is replaced by the result itself: if focus was in the
-  // side panel (on that button), it moves to the Result heading instead of falling to the page.
-  const hadFocus = !!(pl.dom && pl.dom.live && pl.dom.live.contains(document.activeElement));
   pl.cursor.pause();
   pl.cursor.set(pl.cursor.t1);
   reveal();
-  if (hadFocus && pl.dom && pl.dom.resultHeading) pl.dom.resultHeading.focus();
 }
 
 function reveal() {
   if (!pl || pl.revealed) return;
   pl.revealed = true;
-  // Update the live region and the cards below it in place; the panel is not rebuilt.
+  // The button that asks for the result is replaced by the result itself. Wherever the reveal
+  // comes from (that button, the end of the playback, analysis mode), if focus was on it, focus
+  // moves to the Result heading instead of falling to the page. The live region and the cards
+  // below it are updated in place; the panel is not rebuilt.
+  const hadFocus = !!(pl.dom && pl.dom.live && pl.dom.live.contains(document.activeElement));
   if (pl.dom && pl.dom.live) { fillResult(); fillAfter(); } else renderSide();
+  if (hadFocus && pl.dom.resultHeading) pl.dom.resultHeading.focus();
   gateMarks(pl.cursor.t);
 }
 

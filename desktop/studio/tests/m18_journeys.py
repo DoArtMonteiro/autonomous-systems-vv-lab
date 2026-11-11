@@ -150,11 +150,32 @@ def compare(s, base_id, exp_id):
     s.wait("document.querySelector('#lab-watch')", 20, "lab result")
 
 
+def reveal_in_place(s):
+    """D8: nothing the viewer has not reached is drawn; the result arrives in a live region that was
+    already there, and focus follows the button that asked for it."""
+    if s.player()["playing"]:
+        s.page.click(".pl-play")
+    s.page.evaluate("(() => { const r = document.querySelector('.pl-range'); r.value = String(Number(r.min) + 0.25 * (Number(r.max) - Number(r.min))); r.dispatchEvent(new Event('input', { bubbles: true })); })()")
+    time.sleep(0.4)
+    p = s.player()
+    drawn = s.js("[...document.querySelectorAll('.pl-mark[data-gated]')].map((b) => Number(b.dataset.t))")
+    check("Player: the run holds findings later than the playback time", p["findings"] > p["findingsDrawn"], f"{p['findings']} findings, {p['findingsDrawn']} drawn at t = {p['t']:.2f}")
+    check("Player: no finding marker later than the playback time is in the page", all(t <= p["t"] + 1e-6 for t in drawn), json.dumps(drawn))
+    check("Player: the live region exists and holds no result before it is asked for", s.js("(() => { const l = document.querySelector('.pl-live'); window.__live = l; return !!l && l.getAttribute('aria-live') === 'polite' && !l.querySelector('.pl-result') && !!l.querySelector(\"[data-action='reveal']\"); })()"))
+    s.page.focus("[data-action='reveal']")
+    s.page.keyboard.press("Enter")
+    s.wait("document.querySelector('.pl-result')", 10, "result card")
+    check("Player: the result fills the live region that was there, which is not replaced", s.js("document.querySelector('.pl-live') === window.__live && window.__live.contains(document.querySelector('.pl-result'))"))
+    check("Player: focus moves to the Result heading when its button goes away", s.js("!!document.activeElement && document.activeElement.id === 'pl-result-h' && document.activeElement.textContent === 'Result'"))
+    check("Player: once the result is shown, every finding marker is drawn", s.player()["findingsDrawn"] == s.player()["findings"], json.dumps([s.player()["findings"], s.player()["findingsDrawn"]]))
+
+
 def watch(s, base_id, exp_id):
     s.page.click("#lab-watch")
     s.wait("(() => { const p = window.__studio.player(); return p && p.experience.startsWith('runs:') && document.querySelector('.pl-hud dl'); })()", 120, "player")
     p = s.player()
     check("Player: plays the baseline and the experiment from their records", p["runs"] == [base_id, exp_id], json.dumps(p["runs"]))
+    reveal_in_place(s)
     s.page.click(".pl-views [data-view='engineering']")
     s.wait("(() => { const p = window.__studio.player(); return p && p.view === 'engineering' && p.renderer === 'engineering'; })()", 60, "engineering scene")
     check("Player: the same two records play in the engineering scene", s.player()["runs"] == [base_id, exp_id])
