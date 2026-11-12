@@ -1,0 +1,19 @@
+{
+ "machine": {
+  "platform": "Windows-11-10.0.26300-SP0",
+  "processor": "AMD64 Family 25 Model 97 Stepping 2, AuthenticAMD",
+  "python": "3.14.6"
+ },
+ "rows": [
+  {
+   "profile": "ultra",
+   "first_frame_s": 5.13,
+   "p50_ms": 4.08,
+   "p99_ms": 10.41,
+   "frames": 2467,
+   "vram_used_mb": 1425,
+   "working_set_mb": 718,
+   "private_mb": 2072
+  }
+ ]
+}

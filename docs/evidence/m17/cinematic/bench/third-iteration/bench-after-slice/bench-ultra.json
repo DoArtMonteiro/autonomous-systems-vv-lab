@@ -1,0 +1,70 @@
+{
+ "adapter": "AMD Radeon RX 7700 XT",
+ "bench_seconds": 12.0,
+ "buffer_mem_used_bytes": 95733064,
+ "draw_calls_in_frame": 610,
+ "driver": "d3d12",
+ "frame_ms_max": 12.202,
+ "frame_ms_p50": 3.761,
+ "frame_ms_p95": 8.815,
+ "frame_ms_p99": 9.146,
+ "frames": 2513,
+ "primitives_in_frame": 24986741,
+ "profile": "ultra",
+ "profile_reason": "Chosen on the command line",
+ "replay_from_t": 0.0,
+ "replay_to_t": 23.3361272857644,
+ "settings": {
+  "aa": "fsr2",
+  "cascades": 4,
+  "dof": true,
+  "foliage_cards": true,
+  "glow": true,
+  "lod_far_m": 4500.0,
+  "lod_near_m": 1000.0,
+  "min_vram_gb": 11.0,
+  "msaa": 4,
+  "name": "ultra",
+  "render_scale": 1.0,
+  "shadow_size": 8192,
+  "soft_shadows": true,
+  "ssao": true,
+  "ssil": true,
+  "ssr": true,
+  "vegetation_density": 1.0,
+  "vegetation_shadows": true,
+  "volumetric_fog": true
+ },
+ "static_memory_bytes": 251165822,
+ "t": 23.3361272857644,
+ "texture_mem_used_bytes": 1035030528,
+ "video_mem_used_bytes": 1445285888,
+ "vram_capacity_bytes": 12868124672,
+ "vram_capacity_source": "registry qwMemorySize",
+ "vsync": "disabled",
+ "window": [
+  1440.0,
+  900.0
+ ],
+ "world": {
+  "buildings": 687,
+  "drawn_vegetation": 105727,
+  "lidar_structures": 8,
+  "shrubs": 97479,
+  "structures": 39,
+  "tiles": 207,
+  "trees": 8248
+ },
+ "harness": {
+  "command": "--rendering-driver d3d12 --path <repo>\\desktop\\cinematic --resolution 1440x900 -- --run <repo>\\tests\\fixtures\\cinematic\\landing-run --env <repo>\\desktop\\environments\\cape-canaveral --profile ultra --camera director --bench <scratch>\\visual\\bench-after-slice\\bench-ultra.json --bench-seconds 12.0",
+  "wall_s_to_first_frame": 4.85,
+  "engine_ms_to_first_frame": 3340,
+  "peak_working_set_bytes": 748314624,
+  "peak_private_bytes": 2168274944,
+  "exit": 0,
+  "log_tail": [
+   "cinematic: pack cape-canaveral verified (6 files, SHA-256 against environment.json)",
+   "cinematic: scene built in 2900 ms (profile ultra: Chosen on the command line)"
+  ]
+ }
+}

@@ -23,6 +23,21 @@ uniform vec3 land_avg : source_color = vec3(0.2);
 uniform vec3 water_avg : source_color = vec3(0.05, 0.08, 0.1);
 uniform float edge_fade_m = 2500.0;
 uniform float beyond_sea = 0.5;  // fraction of the pack edge that is sea: one neutral colour beyond
+// Near the pad (within about 320 m) the photograph's tint is toned down and a procedural ground
+// (sand, dry scrub, grain, a fine normal and varied roughness) is blended over it, so the ground
+// reads as ground and not as a smooth pale surface. Deterministic: functions of position only.
+uniform vec2 pad_xy = vec2(0.0);
+uniform float near_inner_m = 60.0;
+uniform float near_outer_m = 320.0;
+// Scanned ground (CC0, see assets/cc0): layers 0 sand, 1 soil, 2 scrub, 3 burnt ground, 4 worn
+// concrete (the pad's slab). The photograph picks the mix (greenness and brightness), a low-frequency
+// noise adds macro variation and two tilings at different scales break the repetition.
+uniform float scans = 0.0;
+uniform sampler2DArray ground_alb : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2DArray ground_nrm : filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2DArray ground_rgh : filter_linear_mipmap_anisotropic, repeat_enable;
+uniform float tile_m = 3.0;
+uniform float slab_r = 36.5;
 
 varying vec2 v_xy;
 varying float v_sea;
@@ -59,12 +74,82 @@ void fragment() {
 		float gn = vnoise(v_xy * 2.3) * 0.55 + vnoise(v_xy * 7.9) * 0.3 + vnoise(v_xy * 23.0) * 0.15;
 		c *= 1.0 + gk * (gn - 0.5) * 2.0;
 	}
+	float near_k = 1.0 - smoothstep(near_inner_m, near_outer_m, length(v_xy - pad_xy));
+	float gn1 = vnoise(v_xy * 0.05);
+	float gn2 = vnoise(v_xy * 0.31 + 9.0);
+	float gn3 = vnoise(v_xy * 1.7 + 3.0);
+	float gn4 = vnoise(v_xy * 7.0 + 1.0);
+	if (near_k > 0.0 && role != 0 && scans < 0.5) {
+		float l_ph = dot(c, vec3(0.2126, 0.7152, 0.0722));
+		c = mix(c, vec3(l_ph), 0.7 * near_k);   // the photograph's pink and orange tints
+		vec3 sand = vec3(0.52, 0.42, 0.29);
+		vec3 scrub = vec3(0.26, 0.29, 0.14);
+		vec3 dry = vec3(0.42, 0.36, 0.26);
+		vec3 g = mix(sand, scrub, smoothstep(0.45, 0.7, gn1 * 0.6 + gn2 * 0.5));
+		g = mix(g, dry, 0.5 * gn2);
+		g *= 0.7 + 0.3 * gn3 + 0.2 * gn4;
+		float rel = clamp(l_ph / 0.4, 0.55, 1.35);   // keep the photograph's light and dark layout
+		c = mix(c, g * (0.6 + 0.4 * rel), 0.72 * near_k);
+	}
 	// Aerial photographs are exposed brightly: bring them towards ground albedos, and clamp the
 	// brightest surfaces (concrete, sand) to an albedo of about 0.55 so they do not read white.
 	c *= 0.8;
 	float l0 = dot(c, vec3(0.2126, 0.7152, 0.0722));
 	if (l0 > 0.3) c *= min(0.3 + (l0 - 0.3) * 0.25, 0.38) / l0;
 	float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
+	float scan_rough = -1.0;
+	vec3 scan_n = vec3(0.0, 1.0, 0.0);   // tangent-ish perturbation in world axes (x east, y up, z south)
+	float scan_k = 0.0;
+	if (scans > 0.5 && role != 0 && near_k > 0.0) {
+		vec2 p = v_xy - pad_xy;
+		float greenness = c.g - 0.5 * (c.r + c.b);
+		float w_scrub = smoothstep(0.012, 0.05, greenness);
+		float w_dark = (1.0 - w_scrub) * smoothstep(0.20, 0.09, lum);
+		float w_soil = (1.0 - w_scrub - w_dark) * smoothstep(0.38, 0.66, gn1 * 0.7 + gn2 * 0.5);
+		float w_sand = max(1.0 - w_scrub - w_dark - w_soil, 0.0);
+		float wl[4] = float[4](w_sand, w_soil, w_scrub, w_dark);
+		vec2 uvA = p / tile_m;
+		vec2 uvB = p / (tile_m * 4.3) + vec2(0.37, 0.71);
+		vec2 dxA = dFdx(uvA); vec2 dyA = dFdy(uvA);
+		vec2 dxB = dFdx(uvB); vec2 dyB = dFdy(uvB);
+		float mixAB = 0.35 + 0.3 * gn1;
+		vec3 alb = vec3(0.0); float rgh = 0.0; vec3 nm = vec3(0.0);
+		float wsum = 0.0;
+		for (int i = 0; i < 4; i++) {
+			if (wl[i] > 0.01) {
+				float fi = float(i);
+				vec3 aA = textureGrad(ground_alb, vec3(uvA, fi), dxA, dyA).rgb;
+				vec3 aB = textureGrad(ground_alb, vec3(uvB, fi), dxB, dyB).rgb;
+				alb += wl[i] * mix(aA, aB, mixAB);
+				rgh += wl[i] * mix(textureGrad(ground_rgh, vec3(uvA, fi), dxA, dyA).r, textureGrad(ground_rgh, vec3(uvB, fi), dxB, dyB).r, mixAB);
+				nm += wl[i] * (textureGrad(ground_nrm, vec3(uvA, fi), dxA, dyA).xyz * 2.0 - 1.0);
+				wsum += wl[i];
+			}
+		}
+		alb /= max(wsum, 1e-3); rgh /= max(wsum, 1e-3); nm /= max(wsum, 1e-3);
+		// Macro variation (patches of lighter and darker ground) and the photograph's own light and dark.
+		float macro = 0.78 + 0.5 * gn1 + 0.2 * (gn2 - 0.5);
+		float rel = clamp(lum / 0.3, 0.6, 1.3);
+		alb *= macro * (0.7 + 0.3 * rel);
+		scan_k = near_k * 0.92;
+		c = mix(c, alb, scan_k);
+		scan_rough = rgh;
+		scan_n = vec3(nm.x, nm.z, nm.y);
+		// The pad's slab: worn concrete inside the (slightly irregular) edge; the markings are a decal.
+		float rr = length(p) + (gn1 - 0.5) * 3.0 + (gn3 - 0.5) * 0.6;
+		float slab = 1.0 - smoothstep(slab_r - 0.4, slab_r + 0.3, rr);
+		if (slab > 0.001) {
+			vec2 uvC = p / 4.0;
+			vec2 dxC = dFdx(uvC); vec2 dyC = dFdy(uvC);
+			vec3 cc = textureGrad(ground_alb, vec3(uvC, 4.0), dxC, dyC).rgb;
+			float cr = textureGrad(ground_rgh, vec3(uvC, 4.0), dxC, dyC).r;
+			vec3 cn = textureGrad(ground_nrm, vec3(uvC, 4.0), dxC, dyC).xyz * 2.0 - 1.0;
+			c = mix(c, min(cc * 2.7, vec3(0.62)) * (0.85 + 0.3 * gn2), slab);
+			scan_rough = mix(scan_rough, cr, slab);
+			scan_n = mix(scan_n, vec3(cn.x, cn.z, cn.y), slab);
+			scan_k = max(scan_k, slab);
+		}
+	}
 	// Water: heights at mean sea level (data) and an image that is not bright (no beach or slab).
 	// Its colour is a water body colour, not darkened imagery, so the pack and the ground beyond it
 	// match; the look comes from a low roughness that reflects the sky.
@@ -72,6 +157,20 @@ void fragment() {
 	c = mix(c, c * 0.7 + vec3(0.0, 0.006, 0.01), water);
 	ALBEDO = c;
 	ROUGHNESS = mix(mix(0.92, 0.45, edge_e * beyond_sea), 0.05, water);
+	if (near_k > 0.0 && role != 0 && scans < 0.5) {
+		ROUGHNESS = mix(ROUGHNESS, 0.72 + 0.25 * gn3, near_k);
+		float fine = near_k * (1.0 - smoothstep(60.0, 260.0, dist));
+		NORMAL = normalize(NORMAL + vec3(gn3 - 0.5, gn4 - 0.5, 0.0) * 0.9 * fine);
+	}
+	if (scan_k > 0.0) {
+		ROUGHNESS = mix(ROUGHNESS, clamp(scan_rough, 0.2, 1.0), scan_k);
+		// Perturb the surface normal (world axes) by the scan's normal map, fading with distance.
+		float fine2 = scan_k * (1.0 - smoothstep(120.0, 420.0, dist));
+		vec3 n_w = normalize((INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).xyz);
+		vec3 pert = vec3(scan_n.x, 0.0, scan_n.z) * fine2;
+		n_w = normalize(n_w + pert);
+		NORMAL = normalize((VIEW_MATRIX * vec4(n_w, 0.0)).xyz);
+	}
 	SPECULAR = mix(0.35, 0.5, water);
 	if (water > 0.01) {
 		// Illustrative ripple on the water normal, driven by the record time (no wall clock).

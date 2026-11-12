@@ -3,12 +3,14 @@
 extends RefCounted
 
 const CAMERAS := ["director", "follow", "pad", "closeup", "wide", "overhead", "lowwide"]
+const POSE_LIMIT_M := 1.0e8
 const PROFILES := ["auto", "performance", "balanced", "high", "ultra", "custom"]
 
 var run_dir := ""
 var env_dir := ""
 var pose_dump: PackedFloat64Array = PackedFloat64Array()
 var has_pose_dump := false
+var has_policy_dump := false  # headless: print the automatic profile choice and the presentation line, then exit
 var profile := "auto"
 var custom := {}
 var vram_bytes := -1
@@ -21,11 +23,15 @@ var bench_t0 := NAN
 var bench_t1 := NAN
 var play := false
 var controls := true
+var presentation := false
+var entity := "auto"   # launch ascent: the entity the follow camera tracks, or auto
+var has_camera_pose := false
+var camera_pose: PackedFloat64Array = PackedFloat64Array()  # east, north, up of the eye; of the target; vertical fov in degrees
 var error := ""
 
 
 static func usage() -> String:
-	return "usage: -- --run <run dir> [--env <pack dir>] [--pose-dump t1,t2,...] [--profile auto|performance|balanced|high|ultra|custom] [--custom key=value,...] [--vram-bytes N] [--camera director|follow|pad|closeup|wide|overhead] [--t seconds] [--play] [--controls shown|hidden] [--shot out.png] [--bench out.json --bench-seconds S --bench-from T --bench-to T]"
+	return "usage: -- --run <run dir> [--env <pack dir>] [--pose-dump t1,t2,...] [--profile auto|performance|balanced|high|ultra|custom] [--custom key=value,...] [--vram-bytes N] [--camera director|follow|pad|closeup|wide|overhead|lowwide] [--t seconds] [--play] [--controls shown|hidden] [--presentation] [--policy-dump] [--entity auto|<entity id>] [--camera-pose ex,ey,ez,tx,ty,tz,fov] [--shot out.png] [--bench out.json --bench-seconds S --bench-from T --bench-to T]"
 
 
 static func parse(args: PackedStringArray) -> RefCounted:
@@ -33,7 +39,7 @@ static func parse(args: PackedStringArray) -> RefCounted:
 	var i := 0
 	while i < args.size():
 		var k := args[i]
-		var needs_value := k in ["--run", "--env", "--pose-dump", "--profile", "--custom", "--vram-bytes", "--camera", "--t", "--shot", "--bench", "--bench-seconds", "--bench-from", "--bench-to", "--controls"]
+		var needs_value := k in ["--run", "--env", "--pose-dump", "--profile", "--custom", "--vram-bytes", "--camera", "--t", "--shot", "--bench", "--bench-seconds", "--bench-from", "--bench-to", "--controls", "--camera-pose", "--entity"]
 		var v := ""
 		if needs_value:
 			if i + 1 >= args.size():
@@ -94,6 +100,39 @@ static func parse(args: PackedStringArray) -> RefCounted:
 				c.bench_t1 = v.to_float()
 			"--play":
 				c.play = true
+			"--presentation":
+				c.presentation = true
+			"--policy-dump":
+				c.has_policy_dump = true
+			"--entity":
+				var ok := v.length() >= 1 and v.length() <= 32
+				for ch in v:
+					ok = ok and (ch >= "a" and ch <= "z" or ch >= "0" and ch <= "9" or ch == "_")
+				if not ok:
+					c.error = "--entity takes auto or an entity id (lower case letters, digits and underscores)"
+					return c
+				c.entity = v
+			"--camera-pose":
+				var parts := v.split(",", false)
+				if parts.size() != 7:
+					c.error = "--camera-pose takes seven numbers: eye east,north,up; target east,north,up; vertical fov in degrees"
+					return c
+				# Built afresh for each occurrence, so a repeated option replaces the earlier one.
+				var pose := PackedFloat64Array()
+				for part in parts:
+					var txt := part.strip_edges()
+					if not txt.is_valid_float() or not is_finite(txt.to_float()) or absf(txt.to_float()) >= POSE_LIMIT_M:
+						c.error = "--camera-pose takes seven finite numbers separated by commas, each below 1e8 in magnitude"
+						return c
+					pose.append(txt.to_float())
+				if pose[6] < 1.0 or pose[6] > 120.0:
+					c.error = "--camera-pose fov must be between 1 and 120 degrees"
+					return c
+				if Vector3(pose[0], pose[1], pose[2]).distance_to(Vector3(pose[3], pose[4], pose[5])) < 1.0e-3:
+					c.error = "--camera-pose eye and target must differ"
+					return c
+				c.camera_pose = pose
+				c.has_camera_pose = true
 			"--controls":
 				if not (v in ["shown", "hidden"]):
 					c.error = "--controls takes shown or hidden"
@@ -104,6 +143,6 @@ static func parse(args: PackedStringArray) -> RefCounted:
 				return c
 	if c.run_dir == "":
 		c.error = "--run is required"
-	elif c.env_dir == "" and not c.has_pose_dump:
-		c.error = "--env is required (except with --pose-dump)"
+	elif c.env_dir == "" and not c.has_pose_dump and not c.has_policy_dump:
+		c.error = "--env is required (except with --pose-dump or --policy-dump)"
 	return c

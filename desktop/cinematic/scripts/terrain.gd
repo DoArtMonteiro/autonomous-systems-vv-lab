@@ -108,6 +108,35 @@ static func _class_colours(pack) -> Array:
 	return out
 
 
+const GROUND_SETS := ["Ground093A", "Ground079L", "Ground003", "burned_ground_01", "concrete_floor_worn_001"]
+
+
+# Scanned ground (CC0, assets/cc0/ground): sand, soil, scrub, burnt ground and the pad's worn concrete,
+# as three texture arrays (albedo, normal, roughness) the terrain shader blends near the pad. The side
+# length follows the profile (512 to 2048). Returns false, leaving the procedural ground, on failure.
+static func set_scans(out: Dictionary, max_side: int, slab_r: float) -> bool:
+	var Assets := preload("res://scripts/assets.gd")
+	var alb := []
+	var nrm := []
+	var rgh := []
+	for s in GROUND_SETS:
+		alb.append("cc0/ground/%s/%s_albedo.jpg" % [s, s])
+		nrm.append("cc0/ground/%s/%s_normal_gl.jpg" % [s, s])
+		rgh.append("cc0/ground/%s/%s_roughness.jpg" % [s, s])
+	var a = Assets.texture_array(alb, max_side)
+	var n = Assets.texture_array(nrm, max_side, true)
+	var r = Assets.texture_array(rgh, max_side)
+	if a == null or n == null or r == null:
+		return false
+	for m in out["materials"]:
+		m.set_shader_parameter("ground_alb", a)
+		m.set_shader_parameter("ground_nrm", n)
+		m.set_shader_parameter("ground_rgh", r)
+		m.set_shader_parameter("slab_r", slab_r)
+		m.set_shader_parameter("scans", 1.0)
+	return true
+
+
 static func texture_of(img: Image) -> ImageTexture:
 	var im := img.duplicate()
 	if im.get_format() != Image.FORMAT_RGB8:
@@ -117,7 +146,7 @@ static func texture_of(img: Image) -> ImageTexture:
 
 
 # Builds the terrain under `parent`. Returns {base, detail, beyond, materials, textures}.
-static func build(pack, parent: Node3D) -> Dictionary:
+static func build(pack, parent: Node3D, with_beyond := true) -> Dictionary:
 	var shader: Shader = load("res://shaders/terrain.gdshader")
 	var L: float = pack.extent()
 	var has_detail: bool = not pack.detail.is_empty()
@@ -171,7 +200,8 @@ static func build(pack, parent: Node3D) -> Dictionary:
 	var beyond_mat: ShaderMaterial = bm.duplicate()
 	beyond_mat.set_shader_parameter("blur_lod", 6.0)
 	mats.append(beyond_mat)
-	out["beyond"] = _beyond(pack, parent, beyond_mat)
+	if with_beyond:
+		out["beyond"] = _beyond(pack, parent, beyond_mat)
 	return out
 
 

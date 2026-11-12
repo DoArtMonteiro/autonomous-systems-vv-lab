@@ -1,0 +1,678 @@
+[
+ {
+  "id": "spiaggia_di_mondello",
+  "title": "Spiaggia di Mondello",
+  "category": "hdri",
+  "source": "Poly Haven",
+  "page_url": "https://polyhaven.com/a/spiaggia_di_mondello",
+  "download_urls": [
+   "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/4k/spiaggia_di_mondello_4k.hdr"
+  ],
+  "licence": "CC0 License",
+  "licence_evidence_url": "https://polyhaven.com/license",
+  "author": "Andreas Mischok",
+  "date_accessed": "2026-11-11",
+  "processing": "Downloaded 4k .hdr unchanged (md5 verified against API); copied without modification.",
+  "files": [
+   {
+    "path": "cc0/hdri/spiaggia_di_mondello/spiaggia_di_mondello_4k.hdr",
+    "bytes": 24922166,
+    "sha256": "9a7457dc9ded3e6676740323d05d81feb4f834869af0b594017885bdd927dcf5"
+   }
+  ]
+ },
+ {
+  "id": "Ground093A",
+  "title": "Ground 093 A",
+  "category": "ground",
+  "source": "ambientCG",
+  "page_url": "https://ambientcg.com/a/Ground093A",
+  "download_urls": [
+   "https://ambientcg.com/get?file=Ground093A_2K-JPG.zip"
+  ],
+  "licence": "All assets are released under the Creative Commons CC0 license, making them free to use without attribution - even in commercial circumstances",
+  "licence_evidence_url": "https://docs.ambientcg.com/license/",
+  "author": null,
+  "date_accessed": "2026-11-11",
+  "processing": "2K-JPG zip downloaded, size checked; extracted only Color, NormalGL, Roughness, AmbientOcclusion, Metalness (when present), renamed; DX normal and displacement dropped.",
+  "files": [
+   {
+    "path": "cc0/ground/Ground093A/Ground093A_albedo.jpg",
+    "bytes": 3258825,
+    "sha256": "52d3147ea352a41694f8d2448bce76c7ee6748a9a202632fba7eed8f30430fb9"
+   },
+   {
+    "path": "cc0/ground/Ground093A/Ground093A_normal_gl.jpg",
+    "bytes": 5480832,
+    "sha256": "2bccd77c05f2a33e66c35bb8ccd8ad071aaaa57c2bf4f85f4ef8df294d53398a"
+   },
+   {
+    "path": "cc0/ground/Ground093A/Ground093A_roughness.jpg",
+    "bytes": 2758236,
+    "sha256": "402bbee7ff77faced236020d59c5bbe71bbef3f385737ee0b33d3178593ce9db"
+   }
+  ]
+ },
+ {
+  "id": "Ground079L",
+  "title": "Ground 079 L",
+  "category": "ground",
+  "source": "ambientCG",
+  "page_url": "https://ambientcg.com/a/Ground079L",
+  "download_urls": [
+   "https://ambientcg.com/get?file=Ground079L_2K-JPG.zip"
+  ],
+  "licence": "All assets are released under the Creative Commons CC0 license, making them free to use without attribution - even in commercial circumstances",
+  "licence_evidence_url": "https://docs.ambientcg.com/license/",
+  "author": null,
+  "date_accessed": "2026-11-11",
+  "processing": "2K-JPG zip downloaded, size checked; extracted only Color, NormalGL, Roughness, AmbientOcclusion, Metalness (when present), renamed; DX normal and displacement dropped.",
+  "files": [
+   {
+    "path": "cc0/ground/Ground079L/Ground079L_albedo.jpg",
+    "bytes": 7038111,
+    "sha256": "fa431166200cb123e175e4c87a937132871333ffa9c658932ff9aa3c186818f3"
+   },
+   {
+    "path": "cc0/ground/Ground079L/Ground079L_normal_gl.jpg",
+    "bytes": 9180698,
+    "sha256": "765350b9d9b5c753d12c474fb7c8f3b1bd7d2ffdd1930264d947df14b7e42c61"
+   },
+   {
+    "path": "cc0/ground/Ground079L/Ground079L_roughness.jpg",
+    "bytes": 2601910,
+    "sha256": "fd4ce50e666fc4d8cc75513c5b77876950e912b30f98f5a980964575abeab9ad"
+   }
+  ]
+ },
+ {
+  "id": "Ground003",
+  "title": "Ground 003",
+  "category": "ground",
+  "source": "ambientCG",
+  "page_url": "https://ambientcg.com/a/Ground003",
+  "download_urls": [
+   "https://ambientcg.com/get?file=Ground003_2K-JPG.zip"
+  ],
+  "licence": "All assets are released under the Creative Commons CC0 license, making them free to use without attribution - even in commercial circumstances",
+  "licence_evidence_url": "https://docs.ambientcg.com/license/",
+  "author": null,
+  "date_accessed": "2026-11-11",
+  "processing": "2K-JPG zip downloaded, size checked; extracted only Color, NormalGL, Roughness, AmbientOcclusion, Metalness (when present), renamed; DX normal and displacement dropped.",
+  "files": [
+   {
+    "path": "cc0/ground/Ground003/Ground003_albedo.jpg",
+    "bytes": 7083577,
+    "sha256": "47630114b2489cec37885eef4c83c933eebccd73b0c37a1354f960754b536092"
+   },
+   {
+    "path": "cc0/ground/Ground003/Ground003_normal_gl.jpg",
+    "bytes": 9850201,
+    "sha256": "b2f15d680300f59f9a3846c6683e1045b622a9c1db60ce30a4fb66bd530a70c4"
+   },
+   {
+    "path": "cc0/ground/Ground003/Ground003_roughness.jpg",
+    "bytes": 2856923,
+    "sha256": "95bdff30569b6680d9fdfc93c1e251ee443e8f9e5df3680fe69ace876fd553c6"
+   }
+  ]
+ },
+ {
+  "id": "burned_ground_01",
+  "title": "Burned Ground 01",
+  "category": "ground",
+  "source": "Poly Haven",
+  "page_url": "https://polyhaven.com/a/burned_ground_01",
+  "download_urls": [
+   "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/burned_ground_01/burned_ground_01_diff_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/burned_ground_01/burned_ground_01_nor_gl_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/burned_ground_01/burned_ground_01_rough_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/burned_ground_01/burned_ground_01_ao_2k.jpg"
+  ],
+  "licence": "CC0 License",
+  "licence_evidence_url": "https://polyhaven.com/license",
+  "author": "Rob Tuytel",
+  "date_accessed": "2026-11-11",
+  "processing": "2k JPG maps (albedo, GL normal, roughness, AO) downloaded, md5 verified, copied unchanged; displacement, arm and DX normal not kept.",
+  "files": [
+   {
+    "path": "cc0/ground/burned_ground_01/burned_ground_01_albedo.jpg",
+    "bytes": 4127752,
+    "sha256": "3d7f67558e6ec57a50b56e196c37665ea4a1b3d7f8dc4049618f9002e08c109d"
+   },
+   {
+    "path": "cc0/ground/burned_ground_01/burned_ground_01_normal_gl.jpg",
+    "bytes": 1433507,
+    "sha256": "703e907fe5cdf952aea61134600be985453da66d1a6d88519e5b7cd71d93c9f0"
+   },
+   {
+    "path": "cc0/ground/burned_ground_01/burned_ground_01_roughness.jpg",
+    "bytes": 1358903,
+    "sha256": "7ab3d961e8d6bf8ae56e993dc32df3b5466d257f4c7547e8739b91615f45d1a9"
+   }
+  ]
+ },
+ {
+  "id": "concrete_floor_worn_001",
+  "title": "Concrete Floor Worn 001",
+  "category": "ground",
+  "source": "Poly Haven",
+  "page_url": "https://polyhaven.com/a/concrete_floor_worn_001",
+  "download_urls": [
+   "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_floor_worn_001/concrete_floor_worn_001_diff_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_floor_worn_001/concrete_floor_worn_001_nor_gl_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_floor_worn_001/concrete_floor_worn_001_rough_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_floor_worn_001/concrete_floor_worn_001_ao_2k.jpg"
+  ],
+  "licence": "CC0 License",
+  "licence_evidence_url": "https://polyhaven.com/license",
+  "author": "Dimitrios Savva, Rico Cilliers",
+  "date_accessed": "2026-11-11",
+  "processing": "2k JPG maps (albedo, GL normal, roughness, AO) downloaded, md5 verified, copied unchanged; displacement, arm and DX normal not kept.",
+  "files": [
+   {
+    "path": "cc0/ground/concrete_floor_worn_001/concrete_floor_worn_001_albedo.jpg",
+    "bytes": 482906,
+    "sha256": "e29b45cdcd6d02fae3c087c456196ffa750779a9b62e7071aa3831dc322a0cc4"
+   },
+   {
+    "path": "cc0/ground/concrete_floor_worn_001/concrete_floor_worn_001_normal_gl.jpg",
+    "bytes": 870609,
+    "sha256": "3b782137e34d63fd59b2e92b4e27b2ee4d082caf9dd23f00dc7ab4da5513daef"
+   },
+   {
+    "path": "cc0/ground/concrete_floor_worn_001/concrete_floor_worn_001_roughness.jpg",
+    "bytes": 735249,
+    "sha256": "b904992f0d75da2c41edf832bbb838622cca076f48f7913065a152c3b640690e"
+   }
+  ]
+ },
+ {
+  "id": "Metal016",
+  "title": "Metal 016",
+  "category": "hull",
+  "source": "ambientCG",
+  "page_url": "https://ambientcg.com/a/Metal016",
+  "download_urls": [
+   "https://ambientcg.com/get?file=Metal016_2K-JPG.zip"
+  ],
+  "licence": "All assets are released under the Creative Commons CC0 license, making them free to use without attribution - even in commercial circumstances",
+  "licence_evidence_url": "https://docs.ambientcg.com/license/",
+  "author": null,
+  "date_accessed": "2026-11-11",
+  "processing": "2K-JPG zip downloaded, size checked; extracted only Color, NormalGL, Roughness, AmbientOcclusion, Metalness (when present), renamed; DX normal and displacement dropped.",
+  "files": [
+   {
+    "path": "cc0/hull/Metal016/Metal016_albedo.jpg",
+    "bytes": 4901650,
+    "sha256": "55a181fc32dc34a730bdc93a51e76557179bd712d7a5272bad4e1b92a5667dcf"
+   },
+   {
+    "path": "cc0/hull/Metal016/Metal016_metalness.jpg",
+    "bytes": 1618670,
+    "sha256": "d789b9f70a0bd122c3d4b124d0c4ae2cb995d8c42013f37cdd61aabc1083bd11"
+   },
+   {
+    "path": "cc0/hull/Metal016/Metal016_normal_gl.jpg",
+    "bytes": 6321628,
+    "sha256": "c530c6493b2f85997936f6231d8ff3f53d9a04bddd7ae55afb2bcbf966db3223"
+   },
+   {
+    "path": "cc0/hull/Metal016/Metal016_roughness.jpg",
+    "bytes": 1840459,
+    "sha256": "385d848939f85bc4f25de1be519b9bcf795ffa3ca611d06becff316d1757fe18"
+   }
+  ]
+ },
+ {
+  "id": "Metal027",
+  "title": "Metal 027",
+  "category": "hull",
+  "source": "ambientCG",
+  "page_url": "https://ambientcg.com/a/Metal027",
+  "download_urls": [
+   "https://ambientcg.com/get?file=Metal027_2K-JPG.zip"
+  ],
+  "licence": "All assets are released under the Creative Commons CC0 license, making them free to use without attribution - even in commercial circumstances",
+  "licence_evidence_url": "https://docs.ambientcg.com/license/",
+  "author": null,
+  "date_accessed": "2026-11-11",
+  "processing": "2K-JPG zip downloaded, size checked; extracted only Color, NormalGL, Roughness, AmbientOcclusion, Metalness (when present), renamed; DX normal and displacement dropped.",
+  "files": [
+   {
+    "path": "cc0/hull/Metal027/Metal027_albedo.jpg",
+    "bytes": 3659788,
+    "sha256": "690e45e89203ab1a1b1863e90197334eb33418cec56db403616cbc0d28fb0294"
+   },
+   {
+    "path": "cc0/hull/Metal027/Metal027_normal_gl.jpg",
+    "bytes": 6850809,
+    "sha256": "b2a65d05e79b8a1cd327b7d2205314cd4e866680fcb3d0e9aaa2d3e751b3d524"
+   },
+   {
+    "path": "cc0/hull/Metal027/Metal027_roughness.jpg",
+    "bytes": 2695719,
+    "sha256": "e6954bfb0bb8c7d3751e93982d00449681e5b6b3b730e98e5b6430b6d008712d"
+   }
+  ]
+ },
+ {
+  "id": "Metal046B",
+  "title": "Metal 046 B",
+  "category": "hull",
+  "source": "ambientCG",
+  "page_url": "https://ambientcg.com/a/Metal046B",
+  "download_urls": [
+   "https://ambientcg.com/get?file=Metal046B_2K-JPG.zip"
+  ],
+  "licence": "All assets are released under the Creative Commons CC0 license, making them free to use without attribution - even in commercial circumstances",
+  "licence_evidence_url": "https://docs.ambientcg.com/license/",
+  "author": null,
+  "date_accessed": "2026-11-11",
+  "processing": "2K-JPG zip downloaded, size checked; extracted only Color, NormalGL, Roughness, AmbientOcclusion, Metalness (when present), renamed; DX normal and displacement dropped.",
+  "files": [
+   {
+    "path": "cc0/hull/Metal046B/Metal046B_albedo.jpg",
+    "bytes": 2737143,
+    "sha256": "8263145285430210a6867010abeb09402aad5b9195366e18817a07ab5badc6fe"
+   },
+   {
+    "path": "cc0/hull/Metal046B/Metal046B_metalness.jpg",
+    "bytes": 3444518,
+    "sha256": "99516799d99d6071787461bb58c2ae7b9fedb5dee70ba818ad3cb06757f01a36"
+   },
+   {
+    "path": "cc0/hull/Metal046B/Metal046B_normal_gl.jpg",
+    "bytes": 5281560,
+    "sha256": "496ef9170979a0dc51f227f326885afffeb0dcfd2d1d5e1233eaaa9406b8586f"
+   },
+   {
+    "path": "cc0/hull/Metal046B/Metal046B_roughness.jpg",
+    "bytes": 1770723,
+    "sha256": "82cf613070e28568613b8ed71093c04664015da4f925f13e91928c692edd958a"
+   }
+  ]
+ },
+ {
+  "id": "namaqualand_boulder_03",
+  "title": "Namaqualand Boulder 03",
+  "category": "rocks",
+  "source": "Poly Haven",
+  "page_url": "https://polyhaven.com/a/namaqualand_boulder_03",
+  "download_urls": [
+   "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/namaqualand_boulder_03/namaqualand_boulder_03_2k.gltf",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/namaqualand_boulder_03/namaqualand_boulder_03_arm_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/namaqualand_boulder_03/namaqualand_boulder_03.bin",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/namaqualand_boulder_03/namaqualand_boulder_03_nor_gl_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/namaqualand_boulder_03/namaqualand_boulder_03_diff_2k.jpg"
+  ],
+  "licence": "CC0 License",
+  "licence_evidence_url": "https://polyhaven.com/license",
+  "author": "Jenelle van Heerden, Dario Barresi",
+  "date_accessed": "2026-11-11",
+  "processing": "Imported the 2k glTF (md5 verified) in Blender 5.0 (--factory-startup --disable-autoexec). Kept the variants listed, applied transforms, origin at bottom centre, variants laid out in a row along X. Collapse decimation (Blender 5.0 Decimate, no bake: the original 2k normal map is reused); budget 20000 tris per variant. Result (boulder_03_LOD0: 64826->19999 tris). Exported single .glb, embedded 2k textures, no Draco. doubleSided restored from the source glTF; alphaMode set to MASK 0.5 only where the base-colour image has an alpha channel, otherwise opaque (Poly Haven leaf shapes are real geometry and their diffuse maps carry no alpha). Variants of the source model not listed were dropped; per-variant tri counts: [19999].",
+  "verification": {
+   "triangles_total": 19999,
+   "max_texture_px": 2048,
+   "alpha_modes": {
+    "boulder_03": "OPAQUE"
+   }
+  },
+  "files": [
+   {
+    "path": "cc0/rocks/namaqualand_boulder_03/namaqualand_boulder_03.glb",
+    "bytes": 9165588,
+    "sha256": "d94d57a94b8f6136a620d3f74d8f304f7a0ae43c1b4dc3c1d16bcb4e4dda2f40"
+   }
+  ]
+ },
+ {
+  "id": "namaqualand_boulder_04",
+  "title": "Namaqualand Boulder 04",
+  "category": "rocks",
+  "source": "Poly Haven",
+  "page_url": "https://polyhaven.com/a/namaqualand_boulder_04",
+  "download_urls": [
+   "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/namaqualand_boulder_04/namaqualand_boulder_04_2k.gltf",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/namaqualand_boulder_04/namaqualand_boulder_04_nor_gl_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/namaqualand_boulder_04/namaqualand_boulder_04_arm_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/namaqualand_boulder_04/namaqualand_boulder_04_diff_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/namaqualand_boulder_04/namaqualand_boulder_04.bin"
+  ],
+  "licence": "CC0 License",
+  "licence_evidence_url": "https://polyhaven.com/license",
+  "author": "Jenelle van Heerden",
+  "date_accessed": "2026-11-11",
+  "processing": "Imported the 2k glTF (md5 verified) in Blender 5.0 (--factory-startup --disable-autoexec). Kept the variants listed, applied transforms, origin at bottom centre, variants laid out in a row along X. Collapse decimation (Blender 5.0 Decimate, no bake: the original 2k normal map is reused); budget 20000 tris per variant. Result (boulder_04: 59066->20000 tris). Exported single .glb, embedded 2k textures, no Draco. doubleSided restored from the source glTF; alphaMode set to MASK 0.5 only where the base-colour image has an alpha channel, otherwise opaque (Poly Haven leaf shapes are real geometry and their diffuse maps carry no alpha). Variants of the source model not listed were dropped; per-variant tri counts: [20000].",
+  "verification": {
+   "triangles_total": 20000,
+   "max_texture_px": 2048,
+   "alpha_modes": {
+    "boulder_04": "OPAQUE"
+   }
+  },
+  "files": [
+   {
+    "path": "cc0/rocks/namaqualand_boulder_04/namaqualand_boulder_04.glb",
+    "bytes": 9262600,
+    "sha256": "68fe975273265fc6fcc2f3b4d2be9cd974f07d5d017864fb2156267ba226c40c"
+   }
+  ]
+ },
+ {
+  "id": "namaqualand_boulder_05",
+  "title": "Namaqualand Boulder 05",
+  "category": "rocks",
+  "source": "Poly Haven",
+  "page_url": "https://polyhaven.com/a/namaqualand_boulder_05",
+  "download_urls": [
+   "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/namaqualand_boulder_05/namaqualand_boulder_05_2k.gltf",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/namaqualand_boulder_05/namaqualand_boulder_05_arm_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/namaqualand_boulder_05/namaqualand_boulder_05_nor_gl_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/namaqualand_boulder_05/namaqualand_boulder_05.bin",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/namaqualand_boulder_05/namaqualand_boulder_05_diff_2k.jpg"
+  ],
+  "licence": "CC0 License",
+  "licence_evidence_url": "https://polyhaven.com/license",
+  "author": "Jenelle van Heerden, Dario Barresi",
+  "date_accessed": "2026-11-11",
+  "processing": "Imported the 2k glTF (md5 verified) in Blender 5.0 (--factory-startup --disable-autoexec). Kept the variants listed, applied transforms, origin at bottom centre, variants laid out in a row along X. Collapse decimation (Blender 5.0 Decimate, no bake: the original 2k normal map is reused); budget 20000 tris per variant. Result (namaqualand_boulder_05: 89618->19999 tris). Exported single .glb, embedded 2k textures, no Draco. doubleSided restored from the source glTF; alphaMode set to MASK 0.5 only where the base-colour image has an alpha channel, otherwise opaque (Poly Haven leaf shapes are real geometry and their diffuse maps carry no alpha). Variants of the source model not listed were dropped; per-variant tri counts: [19999].",
+  "verification": {
+   "triangles_total": 19999,
+   "max_texture_px": 2048,
+   "alpha_modes": {
+    "namaqualand_boulder_05": "OPAQUE"
+   }
+  },
+  "files": [
+   {
+    "path": "cc0/rocks/namaqualand_boulder_05/namaqualand_boulder_05.glb",
+    "bytes": 10392912,
+    "sha256": "6c19dbbbefc4f2fe9e155f51a456b25a029eb20fa56a31a50815dcb95d176f62"
+   }
+  ]
+ },
+ {
+  "id": "namaqualand_boulder_06",
+  "title": "Namaqualand Boulder 06",
+  "category": "rocks",
+  "source": "Poly Haven",
+  "page_url": "https://polyhaven.com/a/namaqualand_boulder_06",
+  "download_urls": [
+   "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/namaqualand_boulder_06/namaqualand_boulder_06_2k.gltf",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/namaqualand_boulder_06/namaqualand_boulder_06_nor_gl_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/namaqualand_boulder_06/namaqualand_boulder_06_diff_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/namaqualand_boulder_06/namaqualand_boulder_06_arm_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/namaqualand_boulder_06/namaqualand_boulder_06.bin"
+  ],
+  "licence": "CC0 License",
+  "licence_evidence_url": "https://polyhaven.com/license",
+  "author": "Greg Zaal, Jenelle van Heerden",
+  "date_accessed": "2026-11-11",
+  "processing": "Imported the 2k glTF (md5 verified) in Blender 5.0 (--factory-startup --disable-autoexec). Kept the variants listed, applied transforms, origin at bottom centre, variants laid out in a row along X. Collapse decimation (Blender 5.0 Decimate, no bake: the original 2k normal map is reused); budget 20000 tris per variant. Result (namaqualand_boulder_06: 109114->19999 tris). Exported single .glb, embedded 2k textures, no Draco. doubleSided restored from the source glTF; alphaMode set to MASK 0.5 only where the base-colour image has an alpha channel, otherwise opaque (Poly Haven leaf shapes are real geometry and their diffuse maps carry no alpha). Variants of the source model not listed were dropped; per-variant tri counts: [19999].",
+  "verification": {
+   "triangles_total": 19999,
+   "max_texture_px": 2048,
+   "alpha_modes": {
+    "namaqualand_boulder_06": "OPAQUE"
+   }
+  },
+  "files": [
+   {
+    "path": "cc0/rocks/namaqualand_boulder_06/namaqualand_boulder_06.glb",
+    "bytes": 11258028,
+    "sha256": "5597b0d2d1135b80a6571391ba95c0ce3a39361909072c24c0067e68d40dbc87"
+   }
+  ]
+ },
+ {
+  "id": "namaqualand_boulders_01",
+  "title": "Namaqualand Boulders 01",
+  "category": "rocks",
+  "source": "Poly Haven",
+  "page_url": "https://polyhaven.com/a/namaqualand_boulders_01",
+  "download_urls": [
+   "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/namaqualand_boulders_01/namaqualand_boulders_01_2k.gltf",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/namaqualand_boulders_01/namaqualand_boulders_01_arm_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/namaqualand_boulders_01/namaqualand_boulders_01_nor_gl_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/namaqualand_boulders_01/namaqualand_boulders_01.bin",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/namaqualand_boulders_01/namaqualand_boulders_01_diff_2k.jpg"
+  ],
+  "licence": "CC0 License",
+  "licence_evidence_url": "https://polyhaven.com/license",
+  "author": "Greg Zaal, Jenelle van Heerden",
+  "date_accessed": "2026-11-11",
+  "processing": "Imported the 2k glTF (md5 verified) in Blender 5.0 (--factory-startup --disable-autoexec). Kept the variants listed, applied transforms, origin at bottom centre, variants laid out in a row along X. Collapse decimation (Blender 5.0 Decimate, no bake: the original 2k normal map is reused); budget 20000 tris per variant. Result (namaqualand_rocks_01_a: 16058->16058 tris; namaqualand_rocks_01_b: 24792->20000 tris). Exported single .glb, embedded 2k textures, no Draco. doubleSided restored from the source glTF; alphaMode set to MASK 0.5 only where the base-colour image has an alpha channel, otherwise opaque (Poly Haven leaf shapes are real geometry and their diffuse maps carry no alpha). Variants of the source model not listed were dropped; per-variant tri counts: [16058, 20000].",
+  "verification": {
+   "triangles_total": 36058,
+   "max_texture_px": 2048,
+   "alpha_modes": {
+    "namaqualand_rocks_01": "OPAQUE"
+   }
+  },
+  "files": [
+   {
+    "path": "cc0/rocks/namaqualand_boulders_01/namaqualand_boulders_01.glb",
+    "bytes": 10403112,
+    "sha256": "85bfcc3f150fa74454c6a195539530698a764a0203349e8098563677bf5f333b"
+   }
+  ]
+ },
+ {
+  "id": "searsia_lucida",
+  "title": "Searsia Lucida",
+  "category": "shrubs",
+  "source": "Poly Haven",
+  "page_url": "https://polyhaven.com/a/searsia_lucida",
+  "download_urls": [
+   "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/searsia_lucida/searsia_lucida_2k.gltf",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/searsia_lucida/searsia_lucida_diff_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/searsia_lucida/searsia_lucida_nor_gl_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/searsia_lucida/searsia_lucida.bin",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/searsia_lucida/searsia_lucida_arm_2k.jpg"
+  ],
+  "licence": "CC0 License",
+  "licence_evidence_url": "https://polyhaven.com/license",
+  "author": "James Ray Cock, Jenelle van Heerden",
+  "date_accessed": "2026-11-11",
+  "processing": "Imported the 2k glTF (md5 verified) in Blender 5.0 (--factory-startup --disable-autoexec). Kept the variants listed, applied transforms, origin at bottom centre, variants laid out in a row along X. Leaf/needle card island subsampling with fixed seed 20261111 and compensating island scale, trunk/solid parts collapse-decimated; budget 15000 tris per variant. Result (searsia_lucida_d_LOD0: 56320->14366 tris; searsia_lucida_e_LOD0: 27701->14305 tris; searsia_lucida_f_LOD0: 7232->7232 tris). Exported single .glb, embedded 2k textures, no Draco. doubleSided restored from the source glTF; alphaMode set to MASK 0.5 only where the base-colour image has an alpha channel, otherwise opaque (Poly Haven leaf shapes are real geometry and their diffuse maps carry no alpha). Variants of the source model not listed were dropped; per-variant tri counts: [14366, 14305, 7232].",
+  "verification": {
+   "triangles_total": 35903,
+   "max_texture_px": 2048,
+   "alpha_modes": {
+    "searsia_lucida": "OPAQUE",
+    "searsia_lucida_leaves": "OPAQUE",
+    "searsia_lucida_twigs": "OPAQUE"
+   }
+  },
+  "files": [
+   {
+    "path": "cc0/shrubs/searsia_lucida/searsia_lucida.glb",
+    "bytes": 12359028,
+    "sha256": "31265f85d4398d79b9b83ec12960e673ec107bff0c56827c23735a7c156d6509"
+   }
+  ]
+ },
+ {
+  "id": "wild_rooibos_bush",
+  "title": "Wild Rooibos Bush",
+  "category": "shrubs",
+  "source": "Poly Haven",
+  "page_url": "https://polyhaven.com/a/wild_rooibos_bush",
+  "download_urls": [
+   "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/wild_rooibos_bush/wild_rooibos_bush_2k.gltf",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wild_rooibos_bush/wild_rooibos_bush_diff_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wild_rooibos_bush/wild_rooibos_bush_arm_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wild_rooibos_bush/wild_rooibos_bush_nor_gl_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/wild_rooibos_bush/wild_rooibos_bush.bin"
+  ],
+  "licence": "CC0 License",
+  "licence_evidence_url": "https://polyhaven.com/license",
+  "author": "James Ray Cock, Jenelle van Heerden",
+  "date_accessed": "2026-11-11",
+  "processing": "Imported the 2k glTF (md5 verified) in Blender 5.0 (--factory-startup --disable-autoexec). Kept the variants listed, applied transforms, origin at bottom centre, variants laid out in a row along X. Leaf/needle card island subsampling with fixed seed 20261111 and compensating island scale, trunk/solid parts collapse-decimated; budget 15000 tris per variant. Result (wild_rooibos_bush_a: 13151->13151 tris; wild_rooibos_bush_b: 6287->6287 tris; wild_rooibos_bush_c: 4204->4204 tris). Exported single .glb, embedded 2k textures, no Draco. doubleSided restored from the source glTF; alphaMode set to MASK 0.5 only where the base-colour image has an alpha channel, otherwise opaque (Poly Haven leaf shapes are real geometry and their diffuse maps carry no alpha). Variants of the source model not listed were dropped; per-variant tri counts: [13151, 6287, 4204].",
+  "verification": {
+   "triangles_total": 23642,
+   "max_texture_px": 2048,
+   "alpha_modes": {
+    "wild_rooibos_bush_twigs": "OPAQUE",
+    "wild_rooibos_bush_leaves": "OPAQUE",
+    "wild_rooibos_bush": "OPAQUE"
+   }
+  },
+  "files": [
+   {
+    "path": "cc0/shrubs/wild_rooibos_bush/wild_rooibos_bush.glb",
+    "bytes": 8899504,
+    "sha256": "6a310b411ce62e75a0ff9f8196d3b8fe38e4f62eeb22f234efa2d3ce7449227a"
+   }
+  ]
+ },
+ {
+  "id": "othonna_cerarioides",
+  "title": "Othonna Cerarioides",
+  "category": "shrubs",
+  "source": "Poly Haven",
+  "page_url": "https://polyhaven.com/a/othonna_cerarioides",
+  "download_urls": [
+   "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/othonna_cerarioides/othonna_cerarioides_2k.gltf",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/othonna_cerarioides/othonna_cerarioides_nor_gl_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/othonna_cerarioides/othonna_cerarioides_arm_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/othonna_cerarioides/othonna_cerarioides.bin",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/othonna_cerarioides/othonna_cerarioides_diff_2k.jpg"
+  ],
+  "licence": "CC0 License",
+  "licence_evidence_url": "https://polyhaven.com/license",
+  "author": "James Ray Cock, Jenelle van Heerden",
+  "date_accessed": "2026-11-11",
+  "processing": "Imported the 2k glTF (md5 verified) in Blender 5.0 (--factory-startup --disable-autoexec). Kept the variants listed, applied transforms, origin at bottom centre, variants laid out in a row along X. Leaf/needle card island subsampling with fixed seed 20261111 and compensating island scale, trunk/solid parts collapse-decimated; budget 15000 tris per variant. Result (othonna_cerarioides_a: 57067->14247 tris; othonna_cerarioides_b: 29175->14245 tris; othonna_cerarioides_c: 12491->12491 tris). Exported single .glb, embedded 2k textures, no Draco. doubleSided restored from the source glTF; alphaMode set to MASK 0.5 only where the base-colour image has an alpha channel, otherwise opaque (Poly Haven leaf shapes are real geometry and their diffuse maps carry no alpha). Variants of the source model not listed were dropped; per-variant tri counts: [14247, 14245, 12491].",
+  "verification": {
+   "triangles_total": 40983,
+   "max_texture_px": 2048,
+   "alpha_modes": {
+    "othonna_cerarioides": "OPAQUE",
+    "othonna_cerarioides_leaves": "OPAQUE"
+   }
+  },
+  "files": [
+   {
+    "path": "cc0/shrubs/othonna_cerarioides/othonna_cerarioides.glb",
+    "bytes": 16030280,
+    "sha256": "db2aa9f3a214c10025a0e0e5b3b52e9dbbff8fb70bd2a03543984537f778eca8"
+   }
+  ]
+ },
+ {
+  "id": "searsia_burchellii",
+  "title": "Searsia Burchellii",
+  "category": "shrubs",
+  "source": "Poly Haven",
+  "page_url": "https://polyhaven.com/a/searsia_burchellii",
+  "download_urls": [
+   "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/searsia_burchellii/searsia_burchellii_2k.gltf",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/searsia_burchellii/searsia_burchellii_nor_gl_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/searsia_burchellii/searsia_burchellii.bin",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/searsia_burchellii/searsia_burchellii_diff_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/searsia_burchellii/searsia_burchellii_arm_2k.jpg"
+  ],
+  "licence": "CC0 License",
+  "licence_evidence_url": "https://polyhaven.com/license",
+  "author": "James Ray Cock, Jenelle van Heerden",
+  "date_accessed": "2026-11-11",
+  "processing": "Imported the 2k glTF (md5 verified) in Blender 5.0 (--factory-startup --disable-autoexec). Kept the variants listed, applied transforms, origin at bottom centre, variants laid out in a row along X. Leaf/needle card island subsampling with fixed seed 20261111 and compensating island scale, trunk/solid parts collapse-decimated; budget 15000 tris per variant. Result (searsia_burchellii_small_LOD0: 44516->14244 tris). Exported single .glb, embedded 2k textures, no Draco. doubleSided restored from the source glTF; alphaMode set to MASK 0.5 only where the base-colour image has an alpha channel, otherwise opaque (Poly Haven leaf shapes are real geometry and their diffuse maps carry no alpha). Variants of the source model not listed were dropped; per-variant tri counts: [14244].",
+  "verification": {
+   "triangles_total": 14244,
+   "max_texture_px": 2048,
+   "alpha_modes": {
+    "searsia_burchellii_leaves": "OPAQUE",
+    "searsia_burchellii": "OPAQUE",
+    "searsia_burchellii_twigs": "OPAQUE"
+   }
+  },
+  "files": [
+   {
+    "path": "cc0/shrubs/searsia_burchellii/searsia_burchellii.glb",
+    "bytes": 9016732,
+    "sha256": "b243dcbcfa24c6a254ea37ea6ef6076a13623da9d2d2f44825a8e2d3973e229a"
+   }
+  ]
+ },
+ {
+  "id": "island_tree_02",
+  "title": "Island Tree 02",
+  "category": "trees",
+  "source": "Poly Haven",
+  "page_url": "https://polyhaven.com/a/island_tree_02",
+  "download_urls": [
+   "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/island_tree_02/island_tree_02_2k.gltf",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/island_tree_02/island_tree_02_nor_gl_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/island_tree_02/island_tree_02_diff_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/island_tree_02/island_tree_02_arm_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/island_tree_02/island_tree_02_leaves_nor_gl_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/island_tree_02/island_tree_02_leaves_diff_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/island_tree_02/island_tree_02_leaves_arm_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/island_tree_02/island_tree_02_branches_nor_gl_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/island_tree_02/island_tree_02_branches_diff_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/island_tree_02/island_tree_02_branches_arm_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/island_tree_02/island_tree_02.bin"
+  ],
+  "licence": "CC0 License",
+  "licence_evidence_url": "https://polyhaven.com/license",
+  "author": "Rob Tuytel, Rico Cilliers",
+  "date_accessed": "2026-11-11",
+  "processing": "Imported the 2k glTF (md5 verified) in Blender 5.0 (--factory-startup --disable-autoexec). Kept the variants listed, applied transforms, origin at bottom centre, variants laid out in a row along X. Leaf/needle card island subsampling with fixed seed 20261111 and compensating island scale, trunk/solid parts collapse-decimated; budget 60000 tris per variant. Result (island_tree_02_LOD0: 1072212->58013 tris). Exported single .glb, embedded 2k textures, no Draco. doubleSided restored from the source glTF; alphaMode set to MASK 0.5 only where the base-colour image has an alpha channel, otherwise opaque (Poly Haven leaf shapes are real geometry and their diffuse maps carry no alpha). Variants of the source model not listed were dropped; per-variant tri counts: [58013].",
+  "verification": {
+   "triangles_total": 58013,
+   "max_texture_px": 2048,
+   "alpha_modes": {
+    "island_tree_02": "OPAQUE",
+    "island_tree_02_leaves": "OPAQUE",
+    "island_tree_02_branches": "OPAQUE"
+   }
+  },
+  "files": [
+   {
+    "path": "cc0/trees/island_tree_02/island_tree_02.glb",
+    "bytes": 21286660,
+    "sha256": "0d587a10b93d38d6c70614e877384637010e488fa3458806733e4782298cecf1"
+   }
+  ]
+ },
+ {
+  "id": "pine_sapling_small",
+  "title": "Pine Sapling Small",
+  "category": "trees",
+  "source": "Poly Haven",
+  "page_url": "https://polyhaven.com/a/pine_sapling_small",
+  "download_urls": [
+   "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/pine_sapling_small/pine_sapling_small_2k.gltf",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/pine_sapling_small/pine_sapling_small_bark_arm_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/pine_sapling_small/pine_sapling_small_twig_nor_gl_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/pine_sapling_small/pine_sapling_small_bark_diff_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/pine_sapling_small/pine_sapling_small_twig_diff_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/pine_sapling_small/pine_sapling_small.bin",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/pine_sapling_small/pine_sapling_small_bark_nor_gl_2k.jpg",
+   "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/pine_sapling_small/pine_sapling_small_twig_arm_2k.jpg"
+  ],
+  "licence": "CC0 License",
+  "licence_evidence_url": "https://polyhaven.com/license",
+  "author": "Rob Tuytel, Rico Cilliers",
+  "date_accessed": "2026-11-11",
+  "processing": "Imported the 2k glTF (md5 verified) in Blender 5.0 (--factory-startup --disable-autoexec). Kept the variants listed, applied transforms, origin at bottom centre, variants laid out in a row along X. Leaf/needle card island subsampling with fixed seed 20261111 and compensating island scale, trunk/solid parts collapse-decimated; budget 30000 tris per variant. Result (pine_sapling_small_a: 142506->28526 tris; pine_sapling_small_c: 133403->28525 tris). Exported single .glb, embedded 2k textures, no Draco. doubleSided restored from the source glTF; alphaMode set to MASK 0.5 only where the base-colour image has an alpha channel, otherwise opaque (Poly Haven leaf shapes are real geometry and their diffuse maps carry no alpha). Variants of the source model not listed were dropped; per-variant tri counts: [28526, 28525].",
+  "verification": {
+   "triangles_total": 57051,
+   "max_texture_px": 2048,
+   "alpha_modes": {
+    "pine_sapling_small_bark": "OPAQUE",
+    "pine_sapling_small_twig": "OPAQUE"
+   }
+  },
+  "files": [
+   {
+    "path": "cc0/trees/pine_sapling_small/pine_sapling_small.glb",
+    "bytes": 18878344,
+    "sha256": "ad5ab63381e5a17e435912589ee3a9e2abc642050b28a9f1a41c6c7a0a7afc46"
+   }
+  ]
+ }
+]

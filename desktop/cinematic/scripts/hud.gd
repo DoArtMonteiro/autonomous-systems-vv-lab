@@ -7,7 +7,9 @@
 # the playback reaches the end of the run (V shows them earlier).
 extends RefCounted
 
-const ILLUSTRATIVE := "Illustrative, not data: stage geometry (42 m), plume and exhaust, glow and dust, crown shapes and foliage cards, building walls and roofs, sky, haze, water finish, ground beyond the pack."
+const ILLUSTRATIVE := "Illustrative, not data: stage geometry (42 m), landing pad, lights and masts, ground texture and boulders near the pad, scanned plants (their positions and sizes are the pack's), HDRI sky, plume and exhaust, glow and dust, crown shapes, scrub colour and foliage cards, building walls and roofs, sky, haze, water finish, ground beyond the pack."
+const ILLUSTRATIVE_ASCENT := "Illustrative, not data: vehicle shapes (from the record's visual block), body axis drawn along the recorded velocity, reversed (tail first) while an engine burns in a steep descent (no attitude is recorded or simulated), the direction east (the record has no heading), the upper stage drawn offset from the first stage's recorded point, plume and exhaust, glow and dust, landing pad and lights, the Earth beyond the pack as a plain sphere with no geography, atmosphere, sky and haze."
+const DATA_ASCENT := "Data: each entity's position, altitude, speed and throttle from the record (interpolated between its samples for display); an entity exists from its first to its last sample; terrain and imagery of the pad's surroundings from the validated pack. Nothing here is simulated."
 const DATA := "Data: stage pose from the record (interpolated for display), throttle, verdicts; terrain, imagery, footprints, heights, plant positions from the validated pack. Nothing here is simulated."
 const MARGIN := 18
 
@@ -27,6 +29,8 @@ var speed_menu: OptionButton
 var note: Label
 var bar: PanelContainer
 var rows: Array = []
+var entity_buttons := {}
+var is_v2 := false
 var _block_slider := false
 
 
@@ -60,6 +64,7 @@ static func _anchor(c: Control, left: float, top: float, right: float, bottom: f
 
 
 func build(root: Node, record, pack, t0: float, t1: float, profiles: Array, cameras: Array) -> void:
+	is_v2 = record.is_v2
 	layer = CanvasLayer.new()
 	root.add_child(layer)
 	# Top left: what is shown and the readout.
@@ -87,20 +92,25 @@ func build(root: Node, record, pack, t0: float, t1: float, profiles: Array, came
 	verdict.custom_minimum_size = Vector2(340, 0)
 	var o: Dictionary = record.outcome()
 	var s: Dictionary = record.safety()
-	verdict_text = "Outcome (record): %s. %s\nSafety (record): %s. %s" % [str(o.get("label", o.get("code", "n/a"))), str(o.get("explanation", "")), str(s.get("status", "n/a")), str(s.get("explanation", ""))]
+	verdict_text = "From the record, shown as written and not re-verified here.\nOutcome: %s. %s\nSafety: %s. %s" % [str(o.get("label", o.get("code", "n/a"))), str(o.get("explanation", "")), str(s.get("status", "n/a")), str(s.get("explanation", ""))]
 	vr.add_child(verdict)
 	_show_verdict(false)
 	layer.add_child(vr)
 	# Bottom left: the persistent illustrative label.
 	status = _label(10, Color(0.88, 0.9, 0.92))
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	status.text = ILLUSTRATIVE + "\n" + DATA + "\nRings (record): green R5 landing radius, red S2 keep-out. White line: nozzle track on the ground."
+	if is_v2:
+		status.text = ILLUSTRATIVE_ASCENT + "\n" + DATA_ASCENT + "\nColoured lines (record): the recorded path of each entity."
+	else:
+		status.text = ILLUSTRATIVE + "\n" + DATA + "\nRings (record): green R5 landing radius, red S2 keep-out. White line: nozzle track on the ground."
 	var sp := PanelContainer.new()
 	sp.add_theme_stylebox_override("panel", _panel(0.45))
 	_anchor(sp, 0, 1, 0, 1)
 	sp.offset_left = MARGIN
 	sp.offset_right = MARGIN + 560
-	sp.offset_top = -MARGIN - 86
+	# Grows upwards from the bottom margin: the label is as tall as its text needs, whatever its length.
+	sp.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	sp.offset_top = -MARGIN - 20
 	sp.offset_bottom = -MARGIN - 8
 	status.custom_minimum_size = Vector2(540, 0)
 	sp.add_child(status)
@@ -164,6 +174,9 @@ func build(root: Node, record, pack, t0: float, t1: float, profiles: Array, came
 	col.add_child(row2)
 	rows = [row, row2]
 	var names := {"director": "Auto", "follow": "Follow", "pad": "Ground", "closeup": "Pad", "wide": "Wide", "overhead": "Top", "lowwide": "Low"}
+	if is_v2:
+		names["pad"] = "Pad view"
+		names["wide"] = "Trajectory"
 	for c in cameras:
 		var b := Button.new()
 		b.text = names.get(c, c)
@@ -171,11 +184,60 @@ func build(root: Node, record, pack, t0: float, t1: float, profiles: Array, came
 		b.add_theme_font_size_override("font_size", 12)
 		row2.add_child(b)
 		cam_buttons[c] = b
+	if is_v2:
+		# Entity of the follow camera: Auto follows the most relevant one by the recorded state.
+		var ent_row := HBoxContainer.new()
+		col.add_child(ent_row)
+		rows.append(ent_row)
+		var ea := Button.new()
+		ea.text = "Entity: Auto"
+		ea.toggle_mode = true
+		ea.add_theme_font_size_override("font_size", 12)
+		ent_row.add_child(ea)
+		entity_buttons["auto"] = ea
+		for en in record.entities:
+			var eb := Button.new()
+			eb.text = str(en["label"]).get_slice(" (", 0)
+			eb.toggle_mode = true
+			eb.add_theme_font_size_override("font_size", 12)
+			ent_row.add_child(eb)
+			entity_buttons[en["id"]] = eb
 	note = _label(10, Color(1.0, 0.86, 0.55))
 	note.clip_text = true
 	note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row2.add_child(note)
 	layer.add_child(bar)
+
+
+# Presentation: hides the engineering panels (readout, verdicts, legend, playback bar) and keeps
+# the attribution line and one small permanent line saying that the picture is an illustration and
+# what the record says the outcome was, so a clip never shows a run without its result.
+static func presentation_line(record) -> String:
+	var line := "Illustrative replay of a recorded run"
+	if record != null:
+		var o: Dictionary = record.outcome()
+		line += ". Recorded outcome: %s (from the record, not re-verified here)" % str(o.get("label", o.get("code", "n/a")))
+	return line
+
+
+func set_presentation(on: bool, record = null) -> void:
+	if not on:
+		return
+	for c in layer.get_children():
+		if c != credit_line:
+			c.visible = false
+	var l := _label(10, Color(0.9, 0.92, 0.95))
+	l.text = presentation_line(record)
+	# One line from the left margin to the credit line (420 px wide at the right); a label that does
+	# not fit in a narrow window is cut with an ellipsis instead of running under the credit line.
+	l.clip_text = true
+	l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_anchor(l, 0, 1, 1, 1)
+	l.offset_left = MARGIN
+	l.offset_right = -420 - 2 * MARGIN
+	l.offset_top = -MARGIN - 16
+	l.offset_bottom = -MARGIN
+	layer.add_child(l)
 
 
 func set_controls_visible(on: bool) -> void:
@@ -200,6 +262,9 @@ func reveal() -> void:
 func set_time(t: float, record) -> void:
 	if not revealed and t >= record.t1() - 1e-9:
 		reveal()
+	if record.is_v2:
+		_set_time_ascent(t, record)
+		return
 	var i: int = record.lower_index(t)
 	var st: float = record.times[i]
 	var v := func(id: String, d: int) -> String:
@@ -209,6 +274,35 @@ func set_time(t: float, record) -> void:
 	_block_slider = true
 	slider.value = t
 	_block_slider = false
+
+
+# Launch ascent readout: the mission clock and, for each entity, its own record at t: altitude,
+# speed and throttle (before its first sample it has not started; after its last it has ended).
+func _set_time_ascent(t: float, record) -> void:
+	var lines := PackedStringArray()
+	lines.append("t %.2f s (mission clock)" % t)
+	for e in record.entities:
+		var short := str(e["label"]).get_slice(" (", 0)
+		if t < e["t_start"] - 1e-9:
+			lines.append("%s: starts at t %.1f s" % [short, e["t_start"]])
+		elif t > e["t_end"] + 1e-9:
+			lines.append("%s: ended at t %.1f s (%s)" % [short, e["t_end"], e["end_reason"]])
+		else:
+			var v := func(name: String, d: int, scale: float) -> String:
+				var x = record.entity_value(e, name, t)
+				return "n/a" if x == null else String.num(float(x) * scale, d)
+			lines.append("%s: alt %s km   speed %s m/s   throttle %s" % [short, v.call("altitude_km", 2, 1.0), v.call("speed_m_s", 1, 1.0), v.call("throttle", 2, 1.0)])
+	readout.text = "\n".join(lines)
+	_block_slider = true
+	slider.value = t
+	_block_slider = false
+	if not revealed and t >= record.t1() - 1e-9:
+		reveal()
+
+
+func set_entity(id: String) -> void:
+	for k in entity_buttons:
+		entity_buttons[k].button_pressed = k == id
 
 
 func slider_blocked() -> bool:

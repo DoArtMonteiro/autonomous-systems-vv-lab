@@ -6,17 +6,19 @@
 # RenderingDevice.get_device_total_memory() returned 0), so the capacity comes from --vram-bytes
 # (Studio reads the display adapter's HardwareInformation.qwMemorySize from the registry), else from
 # that registry value read here with reg.exe and fixed arguments, else it is unknown and Balanced is
-# used with a visible note. While running, if the video memory in use passes 85 % of the capacity,
-# the profile steps down one level instead of failing.
+# used with a visible note. The automatic choice never goes above High: capacity says nothing about
+# frame time, and Ultra measured above the 16.7 ms budget on the reference machine (docs/m17-cinematic.md),
+# so Ultra is only chosen by hand. While running, if the video memory in use passes 85 % of the
+# capacity, the profile steps down one level instead of failing.
 extends RefCounted
 
 const ORDER := ["performance", "balanced", "high", "ultra"]
 
 const TABLE := {
-	"performance": {"shadow_size": 2048, "cascades": 2, "soft_shadows": false, "ssao": false, "ssil": false, "volumetric_fog": false, "ssr": false, "render_scale": 0.75, "aa": "fxaa", "msaa": 0, "vegetation_density": 0.35, "lod_near_m": 350.0, "lod_far_m": 1500.0, "foliage_cards": false, "vegetation_shadows": false, "glow": true, "min_vram_gb": 2.0},
-	"balanced": {"shadow_size": 4096, "cascades": 3, "soft_shadows": true, "ssao": true, "ssil": false, "volumetric_fog": false, "ssr": false, "render_scale": 1.0, "aa": "taa", "msaa": 0, "vegetation_density": 0.6, "lod_near_m": 500.0, "lod_far_m": 2400.0, "foliage_cards": true, "vegetation_shadows": false, "glow": true, "min_vram_gb": 4.0},
-	"high": {"shadow_size": 4096, "cascades": 4, "soft_shadows": true, "ssao": true, "ssil": true, "volumetric_fog": true, "ssr": true, "render_scale": 1.0, "aa": "taa", "msaa": 2, "vegetation_density": 1.0, "lod_near_m": 700.0, "lod_far_m": 3200.0, "foliage_cards": true, "vegetation_shadows": true, "glow": true, "min_vram_gb": 8.0},
-	"ultra": {"shadow_size": 8192, "cascades": 4, "soft_shadows": true, "ssao": true, "ssil": true, "volumetric_fog": true, "ssr": true, "render_scale": 1.0, "aa": "fsr2", "msaa": 4, "vegetation_density": 1.0, "lod_near_m": 1000.0, "lod_far_m": 4500.0, "foliage_cards": true, "vegetation_shadows": true, "glow": true, "min_vram_gb": 11.0},
+	"performance": {"tex_max": 512, "scan_veg": 0.0, "dof": false, "shadow_size": 2048, "cascades": 2, "soft_shadows": false, "ssao": false, "ssil": false, "volumetric_fog": false, "ssr": false, "render_scale": 0.75, "aa": "fxaa", "msaa": 0, "vegetation_density": 0.35, "lod_near_m": 350.0, "lod_far_m": 1500.0, "foliage_cards": false, "vegetation_shadows": false, "glow": true, "min_vram_gb": 2.0},
+	"balanced": {"tex_max": 1024, "scan_veg": 0.4, "dof": true, "shadow_size": 4096, "cascades": 3, "soft_shadows": true, "ssao": true, "ssil": false, "volumetric_fog": false, "ssr": false, "render_scale": 1.0, "aa": "taa", "msaa": 0, "vegetation_density": 0.6, "lod_near_m": 500.0, "lod_far_m": 2400.0, "foliage_cards": true, "vegetation_shadows": false, "glow": true, "min_vram_gb": 4.0},
+	"high": {"tex_max": 2048, "scan_veg": 1.0, "dof": true, "shadow_size": 4096, "cascades": 4, "soft_shadows": true, "ssao": true, "ssil": true, "volumetric_fog": true, "ssr": true, "render_scale": 1.0, "aa": "taa", "msaa": 2, "vegetation_density": 1.0, "lod_near_m": 700.0, "lod_far_m": 3200.0, "foliage_cards": true, "vegetation_shadows": true, "glow": true, "min_vram_gb": 8.0},
+	"ultra": {"tex_max": 2048, "scan_veg": 1.0, "dof": true, "shadow_size": 8192, "cascades": 4, "soft_shadows": true, "ssao": true, "ssil": true, "volumetric_fog": true, "ssr": true, "render_scale": 1.0, "aa": "fsr2", "msaa": 4, "vegetation_density": 1.0, "lod_near_m": 1000.0, "lod_far_m": 4500.0, "foliage_cards": true, "vegetation_shadows": true, "glow": true, "min_vram_gb": 11.0},
 }
 
 const DISPLAY_CLASS := "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}"
@@ -31,7 +33,11 @@ static func detect_vram(cli_bytes: int) -> Dictionary:
 		return {"bytes": rd.get_device_total_memory(), "source": "RenderingDevice"}
 	if OS.get_name() == "Windows":
 		var out := []
-		var code := OS.execute("reg.exe", ["query", DISPLAY_CLASS, "/s", "/v", "HardwareInformation.qwMemorySize"], out, true)
+		# The system's own reg.exe by absolute path: a bare name could be shadowed by a file planted
+		# next to the executable or in the working directory.
+		var root := OS.get_environment("SystemRoot")
+		var reg := root.path_join("System32/reg.exe") if root.is_absolute_path() else ""
+		var code := OS.execute(reg, ["query", DISPLAY_CLASS, "/s", "/v", "HardwareInformation.qwMemorySize"], out, true)
 		if code == 0 and out.size() > 0:
 			var best := -1
 			for line in str(out[0]).split("\n"):
@@ -53,9 +59,11 @@ static func auto_pick(vram: Dictionary) -> Dictionary:
 	var gb := b / 1.0e9
 	var pick := "performance"
 	for p in ORDER:
+		if p == "ultra":
+			break # Ultra is only ever chosen by hand
 		if gb >= TABLE[p]["min_vram_gb"]:
 			pick = p
-	return {"profile": pick, "reason": "%.1f GB of video memory (%s)" % [gb, vram["source"]]}
+	return {"profile": pick, "reason": "%.1f GB of video memory (%s); automatic choice stops at High" % [gb, vram["source"]]}
 
 
 # Settings of `name`; "custom" starts from Balanced and applies `custom` (key=value strings).
@@ -93,6 +101,7 @@ static func step_down(name: String) -> String:
 
 # Applies the drawing settings to the viewport, the environment and the sun.
 static func apply(s: Dictionary, vp: Viewport, env: Environment, sun: DirectionalLight3D) -> void:
+	RenderingServer.camera_attributes_set_dof_blur_quality(RenderingServer.DOF_BLUR_QUALITY_HIGH if str(s["name"]) == "ultra" else RenderingServer.DOF_BLUR_QUALITY_MEDIUM, false)
 	RenderingServer.directional_shadow_atlas_set_size(int(s["shadow_size"]), true)
 	RenderingServer.directional_soft_shadow_filter_set_quality(RenderingServer.SHADOW_QUALITY_SOFT_HIGH if s["soft_shadows"] else RenderingServer.SHADOW_QUALITY_SOFT_LOW)
 	var modes := [DirectionalLight3D.SHADOW_ORTHOGONAL, DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS, DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS, DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS]
