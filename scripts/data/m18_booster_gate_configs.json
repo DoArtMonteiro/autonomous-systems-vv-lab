@@ -1,6 +1,7 @@
-﻿{
+{
   "schema": "vv-booster-gate-configs.v1",
   "note": "configurations chosen on tuning seeds 5000 to 5009 only, committed before the held-out run",
   "small-leo": {"altimeter_sigma_m": 0.5, "n_engines": 13, "plan_share": 0.5, "terminal_alt_m": 5.0, "touchdown_target_m_s": 1.5, "tuning_result": "9 of 10 (seed 5005: needs about 390 m/s of trim, beyond the propellant)"},
-  "medium-leo": {"altimeter_sigma_m": 0.5, "n_engines": 13, "plan_share": 0.5, "tuning_result": "9 of 10 (seed 5006: true propellant 720 kg below the nominal estimate, depleted before touchdown)"}
+  "medium-leo": {"altimeter_sigma_m": 0.5, "n_engines": 13, "plan_share": 0.5, "tuning_result": "9 of 10 (seed 5006: true propellant 720 kg below the nominal estimate, depleted before touchdown)"},
+  "held_out_result_run_once": {"small-leo": "8 of 10: seed 5017 (separation 87 km short, trim and landing exhaust the propellant) and seed 5019 (369 kg on board at separation, depleted)", "medium-leo": "9 of 10: seed 5019 (10.1 t on board, the landing needs about 12.5 t, depleted)", "gate": "FAILED for both vehicles: 10 of 10 required"}
 }
