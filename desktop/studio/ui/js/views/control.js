@@ -1,4 +1,4 @@
-// Mission Control (M16): an operations layout over the replay the mission player already holds.
+// Flight console (M16, called Mission Control until M18, when that name went to the home page): an operations layout over the replay the mission player already holds.
 // Same runs, same cursor, same renderer choice; switching here never runs or reloads anything.
 // Two densities: cinematic (the scene, the clock, four key values and the timeline) and technical
 // (telemetry groups, live verdicts, sensors, events, comparison and the ways into analysis).
@@ -69,7 +69,7 @@ export function buildControl(pl, ctx) {
   const top = h('header', { class: 'mc-top' },
     h('div', { class: 'mc-id' },
       h('button', { type: 'button', class: 'mc-back', title: 'Back to the mission player', onclick: () => ctx.setView(pl.lastView && pl.lastView !== 'control' ? pl.lastView : 'engineering') }, h('span', { 'aria-hidden': 'true' }, '←'), ' Player'),
-      h('div', { class: 'mc-id-t' }, h('p', { class: 'mc-eyebrow' }, `Mission Control · ${ctx.domainName}`), h('h1', { class: 'mc-title' }, pl.exp.title))),
+      h('div', { class: 'mc-id-t' }, h('p', { class: 'mc-eyebrow' }, `Flight console · ${ctx.domainName}`), h('h1', { class: 'mc-title' }, pl.exp.title))),
     h('div', { class: 'mc-time' }, h('span', { class: 'mc-eyebrow' }, pl.unit === 'tick' ? 'Mission tick' : 'Mission elapsed time'), clock, phase),
     h('div', { class: 'mc-tools' }, ctx.viewSwitch(), ctx.envSelect(), densitySeg));
   const left = h('aside', { class: 'mc-left', 'aria-label': 'Telemetry at the playback time' });

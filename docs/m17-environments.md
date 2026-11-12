@@ -110,6 +110,10 @@ Tudo o que já era ilustrativo no M16.2 continua a sê-lo: paredes, telhados pla
 
 `docs/images/m17-environments/` tem uma captura por pacote novo da vista geoespacial do Studio 0.16.2 instalado (missão «Land a rocket», T+6 s, câmara «Whole descent», janela de 1440x900), com os pacotes descompactados dos zips e indicados ao Studio por `VVLAB_ENVIRONMENTS`. Os oito pacotes foram validados pelo Studio e nenhum foi recusado. As capturas mostram que os pacotes abrem e se desenham; não são uma avaliação de qualidade visual.
 
+## Pacotes incluídos no Studio
+
+Os cinco pacotes novos (`wallops-island`, `mahia-peninsula`, `el-arenosillo`, `goms-alpine-valley`, `adventdalen-svalbard`) passam a ir em `desktop/environments`, como os três primeiros, e o instalador leva os oito. Antes só se instalavam por um diálogo nativo de ficheiros, a partir de zips fora do git, por isso um utilizador não os descobria. Acrescentam 26 909 526 bytes de ficheiros de pacote ao git (cerca de 23 MB nos zips, porque as imagens JPEG e as grelhas já estão comprimidas), de propósito. O `NOTICE.md` de `desktop/environments` reúne agora as fontes, as licenças e as atribuições dos oito, incluindo o texto de licença do Norwegian Polar Institute reproduzido sem modificação. Os pacotes são os mesmos bytes dos zips com os SHA-256 do índice; `bundled` está a `true` no catálogo e no índice, e o teste `indexed_packs_validate_with_the_indexed_schema_and_files` exige agora oito pacotes incluídos.
+
 ## Verificação
 
 - `vv-geo`: o teste novo `indexed_packs_validate_with_the_indexed_schema_and_files` abre cada pacote do índice com o validador do Studio e confirma o esquema e a lista de ficheiros. Os pacotes do catálogo não estão no git; o teste valida-os a partir dos zips descompactados na pasta indicada por `VV_GEO_PACK_ROOT` e falha se faltar algum. Corrido com os oito: 3 incluídos e 5 do catálogo validados.

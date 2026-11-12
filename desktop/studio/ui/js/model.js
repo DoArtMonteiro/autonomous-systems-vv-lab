@@ -117,26 +117,44 @@ export function faultText(f, catalog) {
 /**
  * Labels for a set of requests that name only what differs between them (controller, scenario,
  * seed, faults, parameters), so two runs that differ by one parameter are still told apart.
+ * Parameters are compared one by one against the catalogue default, so a stored request that lists
+ * every default and one that lists only the changed value are read as the same configuration, and
+ * only the parameters that really differ appear in the label.
  */
 export function distinguishingLabels(requests, catalog) {
-  const keys = ['scenario', 'controller', 'seed', 'faults', 'parameters'];
-  const val = (r, k) => (k === 'faults' ? JSON.stringify(r.faults) : k === 'parameters' ? JSON.stringify(r.parameters) : String(r[k]));
-  const differing = keys.filter((k) => new Set(requests.map((r) => val(r, k))).size > 1);
-  return requests.map((r, i) => {
+  const specs = new Map(((catalog && catalog.parameters) || []).map((p) => [p.id, p]));
+  const paramValue = (r, id) => {
+    const v = r.parameters ? r.parameters[id] : undefined;
+    if (v !== undefined && v !== null) return v;
+    const spec = specs.get(id);
+    return spec ? spec.default : undefined;
+  };
+  const paramIds = [...new Set(requests.flatMap((r) => Object.keys(r.parameters || {})))];
+  const differingParams = paramIds.filter((id) => new Set(requests.map((r) => String(paramValue(r, id)))).size > 1);
+  const val = (r, k) => (k === 'faults' ? JSON.stringify(r.faults) : String(r[k]));
+  const differing = ['scenario', 'controller', 'seed', 'faults'].filter((k) => new Set(requests.map((r) => val(r, k))).size > 1);
+  if (differingParams.length) differing.push('parameters');
+  const labels = requests.map((r, i) => {
     const t = requestText(r, catalog);
     const parts = [];
     for (const k of differing.length ? differing : ['controller']) {
       if (k === 'scenario') parts.push(t.scenario);
       else if (k === 'controller') parts.push(t.controller);
       else if (k === 'seed') parts.push(`seed ${r.seed}`);
-      else if (k === 'faults') parts.push(r.faults.length ? r.faults.map((f) => words(f.kind)).join(' + ') : 'no fault');
+      else if (k === 'faults') parts.push(r.faults.length ? r.faults.map((f) => faultText(f, catalog)).join(' + ') : 'no fault');
       else if (k === 'parameters') {
-        const ps = Object.entries(r.parameters);
-        parts.push(ps.length ? ps.map(([p, v]) => `${p} = ${num(v)}`).join(', ') : 'default parameters');
+        for (const id of differingParams) {
+          const spec = specs.get(id);
+          const v = paramValue(r, id);
+          const isDefault = spec && v === spec.default;
+          parts.push(`${spec ? spec.label : words(id)} ${num(v)}${spec && spec.unit ? ` ${spec.unit}` : ''}${isDefault ? ' (default)' : ''}`);
+        }
       }
     }
     return parts.join(' · ') || `run ${i + 1}`;
   });
+  // Last resort: the requests differ in something not listed above; never show two equal labels.
+  return labels.map((l, i) => (labels.indexOf(l) !== labels.lastIndexOf(l) ? `${l} (run ${i + 1})` : l));
 }
 
 /** One colour per run in a comparison: Okabe-Ito order, safe for the common colour-vision deficiencies. */

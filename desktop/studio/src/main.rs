@@ -280,23 +280,27 @@ async fn export_evidence(
     choose: bool,
 ) -> Result<Option<String>, PlatformError> {
     let p = state.platform()?;
-    let dest = if choose {
-        let name = format!("{run_id}-evidence.zip");
-        let picked = app
-            .dialog()
-            .file()
-            .set_title("Save evidence package")
-            .set_file_name(&name)
-            .add_filter("Evidence package", &["zip"])
-            .blocking_save_file();
-        match picked.and_then(|f| f.into_path().ok()) {
-            Some(path) => Some(path),
-            None => return Ok(None),
+    // The package is replayed first, so its default name (with -REJECTED or -EARLIER-BUILD when
+    // they apply) is known when the dialog opens: the platform's name logic is used for both.
+    let exported = blocking(move || {
+        if choose {
+            p.export_evidence_with(&run_id, |name| {
+                app.dialog()
+                    .file()
+                    .set_title("Save evidence package")
+                    .set_file_name(name)
+                    .add_filter("Evidence package", &["zip"])
+                    .blocking_save_file()
+                    .and_then(|f| f.into_path().ok())
+            })
+        } else {
+            p.export_evidence(&run_id, None).map(Some)
         }
-    } else {
-        None
+    })
+    .await?;
+    let Some(path) = exported else {
+        return Ok(None);
     };
-    let path = blocking(move || p.export_evidence(&run_id, dest)).await?;
     if let Ok(mut set) = state.exports.lock() {
         set.insert(path.clone());
     }

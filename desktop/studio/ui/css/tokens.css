@@ -90,7 +90,7 @@
 
 
 /* M16 additions: one scale for space, type, motion and surfaces, plus the severity and evidence
-   vocabulary shared by the mission player, Mission Control, Analyse and Compare. */
+   vocabulary shared by the mission player, the Flight console, Analyse and Compare. */
 :root {
   --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --sp-6: 32px; --sp-7: 48px;
   --t-micro: 600 10.5px/1.2 var(--sans);      /* uppercase labels, tracked .14em */

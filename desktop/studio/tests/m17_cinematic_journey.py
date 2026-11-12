@@ -121,7 +121,7 @@ def main():
                 time.sleep(1.0)
                 s.shot("m17-settings-cinematic-installed-dark")
                 open_mission(s, "lying-altimeter")
-                s.wait("document.querySelector('.pl-head [data-action=\"cinematic\"]:not([disabled])')", 30, "cinematic button enabled")
+                s.wait("document.querySelector('.pl-head [data-action=\"cinematic\"]:not([aria-disabled=\"true\"])')", 30, "cinematic button enabled")
                 s.page.click(".pl-head [data-action='cinematic']")
                 t0 = time.time()
                 launched = []
@@ -158,8 +158,8 @@ def main():
                 s.page.evaluate("() => document.querySelector(\".nav-btn[data-view='home']\").click()")
                 open_mission(s, "first-landing")
                 time.sleep(1.5)
-                off = s.js("(() => { const b = document.querySelector('.pl-head [data-action=\"cinematic\"]'); return b ? { d: b.disabled, t: b.title } : null; })()")
-                check("Cinematic: without the module the button is disabled and says why", bool(off) and off["d"], json.dumps(off))
+                off = s.js("(() => { const b = document.querySelector('.pl-head [data-action=\"cinematic\"]'); return b ? { d: b.getAttribute('aria-disabled') === 'true', t: b.title, described: !!document.getElementById(b.getAttribute('aria-describedby')) } : null; })()")
+                check("Cinematic: without the module the button is aria-disabled, focusable and says why", bool(off) and off["d"] and off["described"] and bool(off["t"]), json.dumps(off))
                 check("Cinematic: the technical view still plays", s.js("window.__studio.player().scene") is not None)
             except Exception as e:  # noqa: BLE001
                 check("Cinematic journey completed", False, repr(e)[:300])

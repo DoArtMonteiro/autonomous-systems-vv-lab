@@ -32,7 +32,7 @@ function bytesOf(b) {
 }
 
 /** A small thumbnail of the pack's base image (object URL, cached for the session). */
-function thumbnail(id) {
+export function thumbnail(id) {
   if (!thumbs.has(id)) {
     const p = (async () => {
       const b = await api.environmentFile(id, 'image.jpg');

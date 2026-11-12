@@ -1,4 +1,4 @@
-/* M16: geospatial view and Mission Control. The scene fills the space; instruments sit on quiet
+/* M16: geospatial view and Flight console. The scene fills the space; instruments sit on quiet
    glass at the edges, with hairline rules, tracked micro labels and tabular numerals. Nothing
    moves unless the mission does. Colour states are paired with a glyph and a word. */
 
@@ -27,7 +27,7 @@
 @keyframes mc-sweep { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .pl-geo-loading::after { animation: none; } }
 
-/* ------------------------------------------------------------------ Mission Control */
+/* ------------------------------------------------------------------ Flight console */
 .pl-control { grid-template-rows: minmax(0, 1fr); }
 .mc { position: relative; height: 100%; overflow: hidden; background: #05070a; color: var(--fg-1); }
 :root[data-theme="light"] .mc { background: var(--bg-0); }

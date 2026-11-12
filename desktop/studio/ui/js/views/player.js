@@ -6,11 +6,11 @@
 //
 // M16: the same replay has three views that share the runs and the cursor. Engineering (the
 // lightweight Three.js scene of M15, no geographic data), Geospatial (the same scene placed on a
-// validated environment pack) and Mission Control (an operations layout over either renderer).
+// validated environment pack) and Flight console (an operations layout over either renderer).
 // Switching view remounts only the presentation; the records, the cursor time and the results stay.
 
 import { h, clear, icon, num, prose, lowerIndex, timeText } from '../dom.js';
-import { loadRecord, emit, pref, setPref } from '../store.js';
+import { loadRecord, emit, pref, setPref, domainById } from '../store.js';
 import { modelOf } from '../model.js';
 import { TimeCursor } from '../cursor.js';
 import { SERIES } from '../charts.js';
@@ -36,7 +36,7 @@ let loading = null; // {id} of the load in progress; a newer load replaces it
 let visible = false;
 
 const SPEEDS = [0.5, 1, 2, 4];
-const VIEWS = [['engineering', 'Engineering'], ['geospatial', 'Geospatial'], ['control', 'Mission Control']];
+const VIEWS = [['engineering', 'Engineering'], ['geospatial', 'Geospatial'], ['control', 'Flight console']];
 
 export function initPlayer(el, nav) {
   root = el;
@@ -47,11 +47,16 @@ export function initPlayer(el, nav) {
 export function playerState() {
   if (!pl) return null;
   return { experience: pl.exp.id, runs: pl.runs.map((r) => r.runId), active: pl.active, t: pl.cursor.t, t1: pl.cursor.t1, revealed: pl.revealed, analysis: !!pl.analysis, playing: pl.cursor.playing, scene: pl.scene ? (pl.scene.ok === false ? 'fallback' : pl.kind) : null,
-    view: pl.view, environment: pl.envId, renderer: pl.renderer || null, geoError: pl.geoError || null, geoStats: pl.scene && pl.scene.stats ? pl.scene.stats() : null, mounts: pl.mounts || 0 };
+    view: pl.view, environment: pl.envId, renderer: pl.renderer || null, geoError: pl.geoError || null, geoStats: pl.scene && pl.scene.stats ? pl.scene.stats() : null, mounts: pl.mounts || 0,
+    findings: pl.gated ? pl.gated.length : 0, findingsDrawn: pl.gated ? pl.gated.filter((m) => m.el).length : 0 };
 }
 
 export async function showPlayer(opts) {
   visible = true;
+  // M18: a set of stored runs (from the Experiment Lab or the vehicle hangar) plays as a mission of
+  // its own. It is registered as an experience for this session and replays the same requests, so
+  // the platform reuses the stored records: the player never computes a flight of its own.
+  if (opts && opts.runs && opts.runs.length) opts = { experienceId: registerRuns(opts) };
   const id = opts && opts.experienceId;
   if (id && loading && loading.id === id) return; // the same mission is already loading
   if (id && (!pl || pl.exp.id !== id)) {
@@ -59,12 +64,41 @@ export async function showPlayer(opts) {
   } else if (!pl && !loading) {
     renderEmpty();
   } else if (pl) {
+    // The environment and the view are preferences other pages write ("Land a rocket here" in
+    // Environments chooses a landscape and the geospatial view, then opens this same mission):
+    // when they differ from what is on screen, the screen follows them.
+    if (syncWithPrefs()) return;
     // A challenge run elsewhere may have changed what the claim card should say.
     forgetClaims();
     if (!pl.control) renderSide();
     if (pl.suspended) { pl.suspended = false; mountScene(); }
     if (pl.scene && pl.scene.redraw) requestAnimationFrame(() => { if (pl && pl.scene && pl.scene.redraw) pl.scene.redraw(); });
   }
+}
+
+/**
+ * Makes the held mission show the environment and view the preferences name. Returns true when it
+ * rebuilt the page (time and play state are kept, as in a view change), false when nothing differed.
+ */
+function syncWithPrefs() {
+  const savedEnv = pref('missionEnvironment');
+  const envId = pl.envs.some((x) => x.id === savedEnv) ? savedEnv : pl.envId;
+  const want = pref('missionView');
+  let view = pl.view;
+  if (want === 'engineering' || want === 'control' || (want === 'geospatial' && geoPossible())) view = want;
+  let env = envId;
+  if (view === 'geospatial' && !env && pl.envs.length) env = defaultEnv(pl.envs);
+  if (env === pl.envId && view === pl.view) return false;
+  if (view !== pl.view && pl.view !== 'control') pl.lastView = pl.view;
+  pl.envId = env;
+  pl.view = view;
+  const t = pl.cursor.t;
+  const playing = pl.cursor.playing;
+  pl.suspended = false;
+  build();
+  pl.cursor.set(t);
+  if (playing) pl.cursor.play();
+  return true;
 }
 
 /** Called when another view is shown: playback stops, nothing renders off screen. */
@@ -103,9 +137,33 @@ function dispose() {
 
 // ----------------------------------------------------------------------------- loading
 
+// The flagship pack is the default landscape when none is chosen (the list is alphabetical).
+function defaultEnv(envs) {
+  return (envs.find((e) => e.id === 'cape-canaveral') || envs[0]).id;
+}
+
+const custom = new Map(); // experience id -> {exp, r} for runs played from the Lab or the hangar
+
+/** Registers stored runs as a session experience; returns its id. runs: [{runId, record, label}]. */
+function registerRuns({ runs, title, summary }) {
+  const first = runs[0].record;
+  const id = `runs:${runs.map((x) => x.runId).join("+")}`;
+  const domain = domainById(first.request.domain);
+  const exp = {
+    id, domain: first.request.domain, kicker: 'Your experiment', title: title || 'Your runs', summary: summary || 'Runs you made in this Studio, replayed from their records.',
+    objective: 'Watch the runs you made play back from their records. The verdicts are those the platform computed for each run.',
+    watch: ['Where the runs part: the timeline marks the first divergence.', 'Which requirement each run passes or fails, shown at the end.'],
+    runs: runs.map((x) => x.label), grade: 'experiment', next: null, claim: null,
+  };
+  const demo = { id, requests: runs.map((x) => x.record.request), narrative: 'These are runs you made. Each was simulated by the platform and judged against its requirements on the true state; the player replays the same requests, so the stored records are reused, not recomputed differently.' };
+  custom.set(id, { exp, r: { demo, domain, reason: domain && domain.catalog ? null : 'The domain of these runs is not installed.' } });
+  return id;
+}
+
 async function load(id) {
-  const exp = experienceById(id);
-  const r = exp ? resolve(exp) : null;
+  const c = custom.get(id);
+  const exp = c ? c.exp : experienceById(id);
+  const r = c ? c.r : exp ? resolve(exp) : null;
   if (!exp || !r.demo) {
     loading = null;
     dispose();
@@ -162,7 +220,7 @@ async function load(id) {
   pl = { exp, demo: r.demo, domain: r.domain, runs, cursor, active: 0, scene: null, revealed: false, unit, kind, envs, envId, view: 'engineering', lastView: 'engineering', mounts: 0 };
   const want = pref('missionView');
   if (want === 'control' || (want === 'geospatial' && geoPossible())) pl.view = want;
-  if (pl.view === 'geospatial' && !pl.envId) pl.envId = envs[0].id;
+  if (pl.view === 'geospatial' && !pl.envId) pl.envId = defaultEnv(envs);
   build();
   cursor.set(t0);
   if (visible && !matchMedia('(prefers-reduced-motion: reduce)').matches) cursor.play();
@@ -214,7 +272,7 @@ function setView(v) {
   if (pl.view !== 'control') pl.lastView = pl.view;
   pl.view = v;
   setPref('missionView', v);
-  if (v === 'geospatial' && !pl.envId && pl.envs.length) pl.envId = pl.envs[0].id;
+  if (v === 'geospatial' && !pl.envId && pl.envs.length) pl.envId = defaultEnv(pl.envs);
   const t = pl.cursor.t;
   const playing = pl.cursor.playing;
   build();
@@ -241,7 +299,7 @@ function phaseAt(t) {
   if (end) {
     // A failed contact says how hard it was and that the impact itself is not drawn.
     const vz = td && !met ? metricValue(run, 'touchdown_vertical_speed') : null;
-    const bad = vz !== null && Number.isFinite(vz) ? `Contact at ${Math.abs(vz).toFixed(1)} m/s, requirements not met; impact not modelled` : 'Touchdown, requirements not met';
+    const bad = vz !== null && Number.isFinite(vz) ? `Contact at ${Math.abs(vz).toFixed(1)} m/s, requirements not met; impact not modelled` : 'Reached the ground, requirements not met';
     return { text: td ? (met ? 'Touchdown' : bad) : 'End of run', kind: met ? 'end' : 'end-bad', end: true };
   }
   return { text: ph ? ph.label : '', kind: ph ? ph.kind : '', end: false };
@@ -326,12 +384,15 @@ function build() {
       h('p', { class: 'eyebrow' }, `${DOMAIN_NAMES[exp.domain] || exp.domain} · ${exp.kicker}`),
       h('h1', null, exp.title)),
     h('span', { class: `grade grade-${grade.tone}`, title: grade.text }, grade.label),
+    // Second row: what the player shows on the left, what to do with the run on the right. Each
+    // group wraps inside its own row, so no control can sit on top of another at any width.
+    h('div', { class: 'pl-toolbar' },
     h('div', { class: 'pl-viewtools' }, viewSwitch(), pl.view === 'geospatial' ? envSelect() : null),
-    h('div', { class: 'pl-head-actions' },
+    h('div', { class: 'pl-head-actions', role: 'group', 'aria-label': 'Actions for the shown run' },
       h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'analyse' }, title: 'Open the shown run with every channel, requirement and its provenance', onclick: () => navigate('run', { runId: pl.runs[pl.active].runId, t: pl.cursor.t }) }, 'Analyse'),
       runs.length > 1 ? h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'compare' }, onclick: () => navigate('compare', { runIds: runs.map((r) => r.runId), demo: pl.demo }) }, 'Compare in detail') : null,
-      cinematicButton(() => pl.runs[pl.active].runId, () => pl.envId || (pl.envs[0] && pl.envs[0].id), pl.kind === 'rocket-3d'),
-      h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'configure' }, title: 'Open the shown run in the Experiment Lab: change its conditions, run a new simulation and compare', onclick: () => navigate('lab', { runId: pl.runs[pl.active].runId }) }, 'Change the conditions')));
+      cinematicButton(() => pl.runs[pl.active].runId, () => pl.envId || (pl.envs.length ? defaultEnv(pl.envs) : null), pl.kind === 'rocket-3d'),
+      h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'configure' }, title: 'Open the shown run in the Experiment Lab: change its conditions, run a new simulation and compare', onclick: () => navigate('lab', { runId: pl.runs[pl.active].runId }) }, 'Change the conditions'))));
 
   const side = h('aside', { class: 'pl-side', 'aria-label': 'Mission briefing and result' });
   const transport = buildTransport();
@@ -444,7 +505,7 @@ function onTime(t) {
   const ph = phaseAt(t);
   const td = run.record.scene && run.record.scene.touchdown;
   const clock = pl.unit === 'tick' ? `tick ${Math.floor(t)}` : `T+${t.toFixed(1)} s`;
-  const ended = ph.end && t > run.model.t1 + 1e-9 ? (pl.unit === 'tick' ? `run ended at tick ${run.model.t1}` : `${td ? 'touched down' : 'ended'} at ${run.model.t1.toFixed(1)} s`) : null;
+  const ended = ph.end && t > run.model.t1 + 1e-9 ? (pl.unit === 'tick' ? `run ended at tick ${run.model.t1}` : `${td ? (run.record.outcome.status === 'success' ? 'touched down' : 'reached the ground') : 'ended'} at ${run.model.t1.toFixed(1)} s`) : null;
   pl.dom.phaseTag.replaceChildren(...[
     h('span', { class: 'pl-clock mono' }, clock),
     ph.text ? h('span', { class: ['pl-phase-name', `ph-${ph.kind}`] }, ph.text) : null,
@@ -502,10 +563,18 @@ function drawBand() {
   for (const p of pl.phases[pl.active]) band.append(h('span', { class: `pl-seg ${p.kind}`, style: { left: pos(p.t0), width: `${(100 * Math.max(p.t1 - p.t0, span / 400)) / span}%` }, title: `${p.label} (derived from the recorded engine or mode channel)` }));
   clear(marks);
   const run = pl.runs[pl.active];
-  // Findings and outcomes (detections, violations, warnings, where the runs part) appear when the
-  // playback reaches them, unless the result is shown or analysis mode is on. Injected fault onsets
-  // are part of the configured scenario and are always shown.
-  const mark = (cls, t, label, gated) => marks.append(h('button', { type: 'button', class: `pl-mark ${cls}`, style: { left: pos(t) }, 'aria-label': label, title: label, dataset: gated ? { t: String(t), gated: '1' } : {}, onclick: () => { c.pause(); c.set(t); } }));
+  // Injected fault onsets are part of the configured scenario and are always drawn. Findings and
+  // outcomes (detections, violations, warnings, where the runs part) are not drawn at all until the
+  // playback reaches them, or analysis mode is on, or the result is shown: they are kept here as
+  // data and created by gateMarks when allowed, so neither the page nor assistive technology holds
+  // an outcome the viewer has not reached.
+  const button = (m) => h('button', { type: 'button', class: `pl-mark ${m.cls}`, style: { left: pos(m.t) }, 'aria-label': m.label, title: m.label, dataset: m.gated ? { t: String(m.t), gated: '1' } : {}, onclick: () => { c.pause(); c.set(m.t); } });
+  pl.gated = [];
+  const mark = (cls, t, label, gated) => {
+    const m = { cls, t, label, gated: !!gated, el: null, button };
+    if (gated) pl.gated.push(m);
+    else marks.append(button(m));
+  };
   const seen = new Set();
   for (const e of run.model.events || []) {
     if (!['fault', 'detection', 'violation', 'warning'].includes(e.severity) || !Number.isFinite(e.t)) continue;
@@ -528,9 +597,18 @@ export function evidenceOpen() {
 }
 
 function gateMarks(t) {
-  if (!pl || !pl.tr) return;
+  if (!pl || !pl.tr || !pl.gated) return;
   const open = evidenceOpen();
-  for (const b of pl.tr.marks.querySelectorAll('[data-gated]')) b.hidden = !open && Number(b.dataset.t) > t + 1e-9;
+  for (const m of pl.gated) {
+    const allowed = open || m.t <= t + 1e-9;
+    if (allowed && !m.el) { m.el = m.button(m); pl.tr.marks.append(m.el); }
+    else if (!allowed && m.el) {
+      // A marker the viewer scrubbed back past leaves the page; focus must not fall to the body.
+      if (document.activeElement === m.el) pl.tr.range.focus();
+      m.el.remove();
+      m.el = null;
+    }
+  }
 }
 
 function setAnalysis(on) {
@@ -542,7 +620,7 @@ function setAnalysis(on) {
   else gateMarks(pl.cursor.t);
 }
 
-/** The analysis-mode switch, shared by the player and Mission Control. */
+/** The analysis-mode switch, shared by the player and the Flight console. */
 export function analysisToggle() {
   return h('button', { type: 'button', class: 'btn btn-quiet btn-sm pl-analysis', dataset: { action: 'analysis' }, 'aria-pressed': String(!!(pl && pl.analysis)),
     title: 'Analysis mode: show every finding and the result now, including those later in the run. Ordinary playback shows them only when it reaches them.',
@@ -584,7 +662,13 @@ function revealNow() {
 function reveal() {
   if (!pl || pl.revealed) return;
   pl.revealed = true;
-  renderSide();
+  // The button that asks for the result is replaced by the result itself. Wherever the reveal
+  // comes from (that button, the end of the playback, analysis mode), if focus was on it, focus
+  // moves to the Result heading instead of falling to the page. The live region and the cards
+  // below it are updated in place; the panel is not rebuilt.
+  const hadFocus = !!(pl.dom && pl.dom.live && pl.dom.live.contains(document.activeElement));
+  if (pl.dom && pl.dom.live) { fillResult(); fillAfter(); } else renderSide();
+  if (hadFocus && pl.dom.resultHeading) pl.dom.resultHeading.focus();
   gateMarks(pl.cursor.t);
 }
 
@@ -638,27 +722,47 @@ function changeSummary() {
     h('p', { class: 'pl-fine' }, 'Derived from the recorded true positions, sample by sample. It marks where the motion differs, not why.')) : null;
 }
 
+/** The Result card, or the card that promises it. It fills the live region, which exists from the start, so the result is announced when it arrives. */
+function fillResult() {
+  const live = pl.dom.live;
+  if (!pl.revealed) {
+    pl.dom.resultHeading = null;
+    clear(live).append(h('section', { class: 'pl-card pl-pending' }, h('h2', null, 'Result'), h('p', { class: 'small dim' }, 'Shown when the playback reaches the end of the run.'),
+      h('button', { type: 'button', class: 'btn', dataset: { action: 'reveal' }, onclick: () => revealNow() }, 'Show the result now')));
+    return;
+  }
+  const reqOnly = pl.runs.some((r) => r.record.safety.status === 'safe' && (r.record.requirements || []).some((q) => q.status === 'fail'));
+  const heading = h('h2', { id: 'pl-result-h', tabindex: '-1' }, 'Result');
+  pl.dom.resultHeading = heading;
+  clear(live).append(h('section', { class: 'pl-card pl-result', 'aria-labelledby': 'pl-result-h' }, heading, pl.runs.map((r) => runResult(r)),
+    reqOnly ? h('p', { class: 'pl-fine' }, 'Mission requirements judge the landing or the goal; safety rules are judged on the true state throughout the run. A hard or off-target landing fails a requirement without breaking a safety rule.') : null));
+}
+
+/** What follows the result: where the runs part and why it happened. Empty until the result is shown. */
+function fillAfter() {
+  const after = clear(pl.dom.after);
+  if (!pl.revealed) return;
+  const { demo } = pl;
+  const parted = changeSummary();
+  if (parted) after.append(parted);
+  after.append(h('section', { class: 'pl-card pl-why' }, h('h2', null, 'Why it happened'), h('p', null, prose(demo.narrative)),
+    h('details', { class: 'pl-more' }, h('summary', null, 'What the simulator reported'),
+      pl.runs.map((r) => h('div', null, h('p', { class: 'small' }, h('b', null, `${r.label}. `), prose(r.record.outcome.explanation)), h('p', { class: 'small dim' }, prose(r.record.safety.explanation)))))));
+}
+
 function renderSide() {
   if (!pl.dom.side) return;
-  const { exp, demo } = pl;
+  const { exp } = pl;
   const side = clear(pl.dom.side);
+  pl.dom.live = h('div', { class: 'pl-live', 'aria-live': 'polite' });
+  pl.dom.after = h('div', { class: 'pl-after' });
   side.append(
     h('section', { class: 'pl-card pl-brief' },
       h('h2', null, 'Objective'), h('p', null, exp.objective),
-      h('h3', null, 'Watch for'), h('ul', { class: 'pl-list' }, exp.watch.map((w) => h('li', null, w)))));
-  if (!pl.revealed) {
-    side.append(h('section', { class: 'pl-card pl-pending' }, h('h2', null, 'Result'), h('p', { class: 'small dim' }, 'Shown when the playback reaches the end of the run.'),
-      h('button', { type: 'button', class: 'btn', dataset: { action: 'reveal' }, onclick: () => revealNow() }, 'Show the result now')));
-  } else {
-    const reqOnly = pl.runs.some((r) => r.record.safety.status === 'safe' && (r.record.requirements || []).some((q) => q.status === 'fail'));
-    side.append(h('section', { class: 'pl-card pl-result', 'aria-live': 'polite' }, h('h2', null, 'Result'), pl.runs.map((r) => runResult(r)),
-      reqOnly ? h('p', { class: 'pl-fine' }, 'Mission requirements judge the landing or the goal; safety rules are judged on the true state throughout the run. A hard or off-target landing fails a requirement without breaking a safety rule.') : null));
-    const parted = changeSummary();
-    if (parted) side.append(parted);
-    side.append(h('section', { class: 'pl-card pl-why' }, h('h2', null, 'Why it happened'), h('p', null, prose(demo.narrative)),
-      h('details', { class: 'pl-more' }, h('summary', null, 'What the simulator reported'),
-        pl.runs.map((r) => h('div', null, h('p', { class: 'small' }, h('b', null, `${r.label}. `), prose(r.record.outcome.explanation)), h('p', { class: 'small dim' }, prose(r.record.safety.explanation)))))));
-  }
+      h('h3', null, 'Watch for'), h('ul', { class: 'pl-list' }, exp.watch.map((w) => h('li', null, w)))),
+    pl.dom.live, pl.dom.after);
+  fillResult();
+  fillAfter();
   const claimHost = h('section', { class: 'pl-card pl-claim' });
   side.append(claimHost);
   renderClaim(claimHost);

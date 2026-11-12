@@ -164,6 +164,7 @@ export class CinemaRocket extends Rocket3D {
     if (!this.ok) return;
     if (this.stage) for (const m of this.stage.materials) for (const k of ['map', 'alphaMap']) if (m[k]) m[k].dispose();
     if (this.envRT) this.envRT.dispose();
+    if (this.groundDisc && this.groundDisc.material && this.groundDisc.material.map) this.groundDisc.material.map.dispose();
     super.dispose();
   }
 

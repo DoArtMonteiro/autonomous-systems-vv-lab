@@ -244,3 +244,109 @@ fn demonstrations_show_what_they_claim() {
         let _ = fs::remove_dir_all(&dir);
     }
 }
+
+fn number(r: &RunRecord, kind: &str, id: &str) -> Option<f64> {
+    r.metrics
+        .iter()
+        .find(|m| m.id == format!("requirement_{kind}.{id}"))
+        .and_then(|m| m.value)
+}
+
+/// First number that follows `word` in a verdict text, so the published numbers can be checked
+/// against the statement a person reads.
+fn after(text: &str, word: &str) -> f64 {
+    let rest = &text[text
+        .find(word)
+        .unwrap_or_else(|| panic!("{word} in {text}"))
+        + word.len()..];
+    let end = rest
+        .find(|c: char| !(c.is_ascii_digit() || matches!(c, '.' | '-' | '+')))
+        .unwrap_or(rest.len());
+    rest[..end]
+        .parse()
+        .unwrap_or_else(|_| panic!("number after {word} in {text}"))
+}
+
+#[test]
+fn requirements_publish_numeric_observations_that_agree_with_their_text() {
+    for demo in catalog().demos {
+        let (r, dir) = run(&demo.requests[0], &format!("numbers-{}", demo.id));
+        let mut with_numbers = 0;
+        for q in &r.requirements {
+            let (obs, lim, margin) = (
+                number(&r, "observed", &q.id),
+                number(&r, "limit", &q.id),
+                number(&r, "margin", &q.id),
+            );
+            let Some(margin) = margin else {
+                assert!(
+                    obs.is_none() && lim.is_none(),
+                    "{} has partial numbers",
+                    q.id
+                );
+                continue;
+            };
+            with_numbers += 1;
+            // Met means a margin of zero or more; failed means a negative margin.
+            assert_eq!(
+                q.status == "pass",
+                margin >= 0.0,
+                "{}: {} {margin}",
+                demo.id,
+                q.id
+            );
+            let unit = r
+                .metrics
+                .iter()
+                .find(|m| m.id == format!("requirement_margin.{}", q.id))
+                .unwrap()
+                .unit
+                .clone();
+            assert!(["Pa", "g", "kg", "km"].contains(&unit.as_str()), "{}", q.id);
+            match q.id.as_str() {
+                "upper.R4_periapsis" => {
+                    assert!((obs.unwrap() - after(&q.observed, "periapsis ")).abs() < 0.006);
+                    assert!((lim.unwrap() - after(&q.expected, "at least ")).abs() < 1e-9);
+                }
+                "upper.R5_apoapsis" => {
+                    assert!((obs.unwrap() - after(&q.observed, "error ").abs()).abs() < 0.006);
+                }
+                "booster.R2_propellant_margin" => {
+                    assert!((obs.unwrap() - after(&q.observed, "residual ")).abs() < 0.06);
+                    assert!((margin - after(&q.observed, "margin ")).abs() < 0.06);
+                }
+                "booster.R3_recovery_zone" => {
+                    assert!((obs.unwrap() - after(&q.observed, "impact at ")).abs() < 0.006);
+                }
+                _ => {}
+            }
+        }
+        let expected = if demo.id.ends_with("-to-orbit") { 8 } else { 2 };
+        assert!(
+            with_numbers >= expected,
+            "{}: {with_numbers} requirements have numbers, expected {expected}",
+            demo.id
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+    // The requirements without a single scalar bound publish no numbers.
+    let (r, dir) = run(&request(SMALL, 5000, &[]), "numbers-composite");
+    for id in [
+        "stack.R1_separation_window",
+        "mission.R7_phase_sequence",
+        "mission.R8_orbit_insertion",
+    ] {
+        assert!(number(&r, "margin", id).is_none(), "{id}");
+    }
+    // A failed bound has a negative margin: the dynamic pressure of the steep kick.
+    let steep = catalog()
+        .demos
+        .into_iter()
+        .find(|d| d.id == "kick-too-steep")
+        .unwrap();
+    let (s, dir2) = run(&steep.requests[0], "numbers-steep");
+    assert!(number(&s, "margin", "stack.S1_max_dynamic_pressure").unwrap() < 0.0);
+    for d in [dir, dir2] {
+        let _ = fs::remove_dir_all(d);
+    }
+}

@@ -984,7 +984,7 @@ mod tests {
                 catalogue += 1;
             }
         }
-        assert_eq!(bundled, 3, "the three bundled packs are indexed");
+        assert_eq!(bundled, 8, "all eight packs are bundled and indexed");
         if !unchecked.is_empty() {
             eprintln!(
                 "catalogue packs not checked (set VV_GEO_PACK_ROOT to the unpacked zips): {unchecked:?}"

@@ -15,10 +15,12 @@ import { initHome, showHome } from './views/home.js';
 import { initMissions, showMissions } from './views/missions.js';
 import { initPlayer, showPlayer, leavePlayer, playerKey, rethemePlayer, playerState } from './views/player.js';
 import { initLab, showLab, labState } from './views/lab.js';
+import { initVehicles, showVehicles } from './views/vehicles.js';
+import { initAtlas, showAtlas } from './views/atlas.js';
 import { EXPERIENCES } from './experiences.js';
 
 // Keyboard digits follow this order; `mission` (the player) has no digit and lights "Missions".
-const VIEWS = ['home', 'missions', 'discover', 'prepare', 'run', 'compare', 'library', 'settings', 'mission', 'lab'];
+const VIEWS = ['home', 'missions', 'discover', 'prepare', 'run', 'compare', 'library', 'settings', 'mission', 'lab', 'vehicles', 'environments'];
 const NAV_OF = { mission: 'missions' };
 let currentView = null;
 
@@ -59,6 +61,8 @@ export async function navigate(view, opts) {
     else if (view === 'library') await showLibrary(opts);
     else if (view === 'settings') showSettings();
     else if (view === 'lab') await showLab(opts);
+    else if (view === 'vehicles') showVehicles();
+    else if (view === 'environments') await showAtlas();
   } catch (e) {
     logUiError(`navigate ${view}: ${e && e.stack ? e.stack : JSON.stringify(e)}`);
     toast(errorText(e), 'error');
@@ -237,6 +241,8 @@ initHome(document.getElementById('view-home'), navigate);
 initMissions(document.getElementById('view-missions'), navigate);
 initPlayer(document.getElementById('view-mission'), navigate);
 initLab(document.getElementById('view-lab'), navigate);
+initVehicles(document.getElementById('view-vehicles'), navigate);
+initAtlas(document.getElementById('view-environments'), navigate);
 initDiscover(document.getElementById('view-discover'));
 initPrepare(document.getElementById('view-prepare'), navigate);
 initRun(document.getElementById('view-run'), navigate);

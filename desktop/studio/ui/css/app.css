@@ -96,7 +96,8 @@ main { min-height: 0; min-width: 0; overflow: hidden; position: relative; }
   transition: background .12s, border-color .12s;
 }
 .btn:hover:not(:disabled) { background: var(--bg-3); border-color: var(--fg-3); }
-.btn:disabled { opacity: .5; cursor: default; }
+.btn:disabled, .btn[aria-disabled="true"] { opacity: .5; cursor: default; }
+.cin-wrap { display: inline-flex; position: relative; }
 .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .btn-primary:hover:not(:disabled) { background: var(--accent); filter: brightness(1.08); border-color: var(--accent); }
 .btn-quiet { background: transparent; border-color: transparent; color: var(--fg-2); padding: 0 8px; }
@@ -410,6 +411,7 @@ span.req-t { border-color: transparent; color: var(--fg-3); cursor: default; }
 .readouts { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 0 14px; margin: 4px 0 2px; }
 .ro { display: grid; grid-template-columns: 12px 15px minmax(0, 1fr) auto auto; gap: 6px; align-items: center; font-size: 11.5px; color: var(--fg-2); min-width: 0; padding: 1px 0; }
 .ro-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmp .ro-label { white-space: normal; overflow-wrap: anywhere; line-height: 1.25; }
 .ro-val { color: var(--fg-1); text-align: right; min-width: 64px; }
 .ro-unit { font-size: 10.5px; min-width: 22px; }
 .swatch { width: 12px; height: 0; border-top: 2px solid var(--sw); }
@@ -484,7 +486,7 @@ span.req-t { border-color: transparent; color: var(--fg-3); cursor: default; }
 .run-legend { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px 14px; }
 .run-key { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 2px 8px; align-items: center; padding: 4px 0; font-size: 12px; }
 .run-key .key-swatch { width: 14px; height: 4px; border-radius: 1px; }
-.run-key .key-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.run-key .key-label { white-space: normal; overflow-wrap: anywhere; font-weight: 600; }
 .run-key .key-verdicts { display: flex; gap: 4px; align-items: center; }
 .run-key .key-sub { grid-column: 2 / -1; font-size: 11px; color: var(--fg-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cmp-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); height: clamp(360px, 52vh, 520px); min-height: 0; }

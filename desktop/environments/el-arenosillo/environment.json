@@ -1,0 +1,629 @@
+{
+  "schema": "vv-geo-environment.v3",
+  "id": "el-arenosillo",
+  "name": "El Arenosillo coast, Huelva, Spain",
+  "summary": "Sand plain about 35 m above the sea, behind a cliff and a long beach on the Gulf of Cádiz, under Mediterranean scrub and stone pine. The simulation's pad centre is placed on an open sand area with sparse shrubs, south of a straight unpaved sand strip, measured on the July 2025 PNOA orthophoto, about 300 m inland of the beach. Nearly flat around the pad.",
+  "site_note": "The detail image covers part of an existing rocket launch and test centre. The simulated vehicle, pad and mission are generic: they are not that centre, its facilities, its operations or its operator, and imply no affiliation.",
+  "built": {
+    "by": "scripts/geo/build_environment.py",
+    "date": "2026-11-04",
+    "pyproj": "3.8.0",
+    "proj": "9.8.1",
+    "rasterio": "1.5.2",
+    "gdal": "3.12.2",
+    "features_by": "scripts/geo/build_features.py",
+    "features_date": "2026-11-05"
+  },
+  "origin": {
+    "lat_deg": 37.09606,
+    "lon_deg": -6.73142,
+    "h_ellipsoid_m": 87.05,
+    "orthometric_height_m": 36.484,
+    "geoid_undulation_m": 50.566,
+    "geoid_undulation_spread_m": 1.904,
+    "note": "The simulation's pad centre (model origin, z = 0) is placed on the detail terrain at this point; the orthometric height is that ellipsoidal height minus the EGM2008 undulation. The geoid undulation is treated as constant over the extent (its spread across the corners is given)."
+  },
+  "frame": {
+    "kind": "enu-tangent-plane",
+    "ellipsoid": "WGS84",
+    "axes": {
+      "x": "east",
+      "y": "north",
+      "z": "up"
+    },
+    "heading_deg": 0.0,
+    "note": "Model x, y, z map to east, north, up of the tangent plane at the origin. Terrain heights are ENU up, so they include the curvature of the Earth."
+  },
+  "extent_m": 9000.0,
+  "height": {
+    "file": "height.u16",
+    "encoding": "uint16-le",
+    "scale_m": 0.01,
+    "offset_m": -51.0,
+    "columns": 601,
+    "rows": 601,
+    "spacing_m": 30.0,
+    "first_node_m": [
+      -9000.0,
+      9000.0
+    ],
+    "order": "row-major, row 0 at the north edge, column 0 at the west edge",
+    "bytes": 722402,
+    "sha256": "5ff5438f9eb2701f64c6039756feb12404d5c9a1b43e478b3e10694df9845937",
+    "min_up_m": -49.2,
+    "max_up_m": 61.88
+  },
+  "image": {
+    "file": "image.jpg",
+    "columns": 1800,
+    "rows": 1800,
+    "spacing_m": 10.0,
+    "first_texel_centre_m": [
+      -8995.0,
+      8995.0
+    ],
+    "nodata_fraction": 0.0452,
+    "registration": {
+      "agreement_at_zero_shift": 0.9972,
+      "best_agreement": 0.9992,
+      "best_shift_east_m": -30.0,
+      "best_shift_north_m": -30.0,
+      "method": "Fraction of texels where the DEM says land (> 1 m) and the image is not dark water, at zero shift and at the best shift on a 30 m lattice within 300 m."
+    },
+    "bytes": 594606,
+    "sha256": "0b8189e3a693c2132e292923e3d89b4e8d003ace7e8245eae16e4c5c6ef3555f",
+    "processing": "Bilinear resampling of the TCI asset onto the ENU grid, JPEG quality 88. No colour editing."
+  },
+  "layers": [
+    {
+      "role": "detail",
+      "extent_m": 1024.0,
+      "blend_m": 192.0,
+      "height": {
+        "file": "detail-height.u16",
+        "encoding": "uint16-le",
+        "scale_m": 0.01,
+        "offset_m": -39.0,
+        "columns": 513,
+        "rows": 513,
+        "spacing_m": 4.0,
+        "first_node_m": [
+          -1024.0,
+          1024.0
+        ],
+        "order": "row-major, row 0 at the north edge, column 0 at the west edge",
+        "bytes": 526338,
+        "sha256": "7cb58857422ed2fb604952bb62f7541deadab9a6ed1812f6a835540cc28e1447",
+        "min_up_m": -37.22,
+        "max_up_m": 18.91
+      },
+      "image": {
+        "file": "detail-image.jpg",
+        "columns": 4096,
+        "rows": 4096,
+        "spacing_m": 0.5,
+        "first_texel_centre_m": [
+          -1023.75,
+          1023.75
+        ],
+        "nodata_fraction": 0.0,
+        "base_fill_fraction": 0.0,
+        "colour_fit": [
+          [
+            [
+              39.27,
+              45.25,
+              45.9,
+              46.56,
+              47.23,
+              48.19,
+              51.54,
+              61.31,
+              69.85,
+              75.55,
+              79.59,
+              82.57,
+              85.26,
+              87.86,
+              90.25,
+              92.86,
+              95.68,
+              98.73,
+              102.02,
+              105.63,
+              110.24,
+              114.91,
+              120.11,
+              125.64,
+              131.22,
+              136.8,
+              142.58,
+              148.52,
+              154.64,
+              162.33,
+              170.86,
+              182.92,
+              208.44
+            ],
+            [
+              1.26,
+              2.6,
+              3.0,
+              3.93,
+              5.11,
+              7.44,
+              10.43,
+              31.75,
+              51.16,
+              58.19,
+              62.68,
+              66.51,
+              70.07,
+              73.61,
+              77.41,
+              81.63,
+              86.19,
+              90.87,
+              96.32,
+              103.0,
+              111.05,
+              119.84,
+              129.67,
+              140.29,
+              151.5,
+              163.48,
+              176.57,
+              190.4,
+              206.04,
+              221.34,
+              238.36,
+              252.74,
+              255.0
+            ]
+          ],
+          [
+            [
+              42.69,
+              52.25,
+              52.96,
+              53.68,
+              54.42,
+              55.4,
+              58.3,
+              63.5,
+              67.52,
+              70.46,
+              72.78,
+              74.97,
+              77.04,
+              79.02,
+              81.08,
+              83.26,
+              85.62,
+              88.21,
+              90.99,
+              94.2,
+              97.9,
+              102.06,
+              106.81,
+              111.81,
+              117.18,
+              122.41,
+              128.03,
+              133.87,
+              140.38,
+              148.49,
+              157.5,
+              168.92,
+              199.58
+            ],
+            [
+              22.48,
+              29.01,
+              30.16,
+              34.87,
+              39.6,
+              43.61,
+              46.19,
+              48.22,
+              50.07,
+              52.02,
+              54.0,
+              56.04,
+              58.2,
+              60.61,
+              63.34,
+              66.19,
+              69.33,
+              72.84,
+              76.96,
+              82.15,
+              87.91,
+              94.78,
+              101.89,
+              109.59,
+              118.19,
+              127.9,
+              138.39,
+              149.21,
+              163.07,
+              180.72,
+              205.14,
+              238.01,
+              255.0
+            ]
+          ],
+          [
+            [
+              42.83,
+              57.31,
+              59.33,
+              60.08,
+              60.6,
+              61.1,
+              61.67,
+              62.37,
+              63.56,
+              65.58,
+              67.77,
+              69.7,
+              71.61,
+              73.36,
+              75.05,
+              76.89,
+              78.75,
+              80.76,
+              83.04,
+              85.66,
+              88.63,
+              91.97,
+              95.87,
+              99.99,
+              104.59,
+              109.47,
+              114.6,
+              119.74,
+              125.67,
+              132.78,
+              141.69,
+              152.78,
+              192.6
+            ],
+            [
+              6.92,
+              21.19,
+              22.4,
+              23.33,
+              24.16,
+              25.12,
+              26.27,
+              27.33,
+              28.44,
+              29.83,
+              31.58,
+              33.44,
+              35.2,
+              37.27,
+              39.43,
+              41.73,
+              44.22,
+              46.83,
+              49.84,
+              53.22,
+              57.28,
+              61.85,
+              67.05,
+              72.85,
+              79.23,
+              86.01,
+              93.77,
+              102.35,
+              112.13,
+              124.24,
+              142.02,
+              178.27,
+              255.0
+            ]
+          ]
+        ],
+        "bytes": 4554653,
+        "sha256": "d798bd6005320bb48d582d528e21a00eec5e812119b59fb186a13462a48bc4d8",
+        "processing": "Area-averaged to the texel size from the source, bilinear resampling onto the ENU grid, per-channel tone curves (colour_fit: 33 percentiles of the detail and of the base image on 10 m blocks, linearly interpolated) matching the detail image to the base image, texels without source data filled from the base image, JPEG quality 86.",
+        "geodetic_lattice_residual_mm": 0.002
+      },
+      "note": "Within 192 m of the edge of this layer the drawn heights blend linearly into the base grid and the image fades into the base image, so the two surfaces meet. That margin is a display adjustment of the context data."
+    }
+  ],
+  "relief": [
+    {
+      "radius_m": 10.0,
+      "min_up_m": -0.0,
+      "max_up_m": 0.46
+    },
+    {
+      "radius_m": 50.0,
+      "min_up_m": -1.0,
+      "max_up_m": 1.0
+    },
+    {
+      "radius_m": 500.0,
+      "min_up_m": -36.05,
+      "max_up_m": 9.01
+    },
+    {
+      "radius_m": 3000.0,
+      "min_up_m": -37.19,
+      "max_up_m": 35.65
+    }
+  ],
+  "accuracy": [
+    "Copernicus GLO-30 is a surface model: heights include buildings and vegetation canopy. Its stated absolute vertical accuracy is better than 4 m (90 % linear error); it does not resolve pads, roads or ground conditions.",
+    "The 10 m image does not resolve structures; it is context only.",
+    "The simulation assumes flat ground at z = 0 and computes no interaction with this terrain. Where the terrain rises above z = 0 the drawn trajectory may pass through it; this is a property of the geographic placement, not of the simulated flight.",
+    "Horizontal registration of image and terrain follows the sources' georeferencing; Sentinel-2 L2A geolocation is of the order of 10 m.",
+    "Detail layer (2.048 km square around the origin): heights from MDT05 digital terrain model, 5 m grid from PNOA lidar (WCS coverage Elevacion25830_5), heights orthometric above the Alicante datum (REDNAP, EPSG:5782), sampled every 4 m and converted from EPSG:25830+5782 to EPSG:4937 ellipsoidal heights with PROJ (Inverse of UTM zone 30N + Inverse of ETRS89 to Alicante height (1) (with axis order normalized for visualization)); those are used as WGS84 heights. The origin is on this surface.",
+    "MDT05 is a 5 m bare-earth model: it does not resolve dune crests, tracks or the edge of the low cliff above the beach. The WCS does not state the date of the lidar flight behind the coverage at this site.",
+    "Detail image: the 2025 orthophoto rendered by its WMS at 0.5 m per texel, in EPSG:4326 tiles resampled onto the ENU grid. Its georeferencing is the publisher's; a residual offset of a few metres against the base layers cannot be excluded.",
+    "IGN data are on ETRS89, read here as WGS84: an offset of the order of 1 m on the ground. In the south-east corner of the detail layer the WMS mosaic is visibly coarser than elsewhere although its mosaic metadata give the same date and 0.15 m; the reason is not recorded.",
+    "Within 192 m of the edge of the detail layer the drawn heights blend into the base grid and the detail image fades into the base image; this display adjustment is the only change made to the context data."
+  ],
+  "sources": [
+    {
+      "provider": "European Space Agency and European Union (Copernicus programme); WorldDEM-30 produced by DLR and Airbus",
+      "product": "Copernicus DEM GLO-30 (digital surface model, 1 arc-second; vertical datum EGM2008, EPSG 3855; horizontal WGS84-G1150, EPSG 4326)",
+      "licence": "Licence for the use of the Copernicus WorldDEM-30: free of charge; reproduction, distribution, communication to the public and adaptation are permitted (Art. 4, 5), with the notices of Art. 6; no endorsement may be implied and later users are bound by the same obligations. https://documentation.dataspace.copernicus.eu/APIs/SentinelHub/Data/DEM/resources/license/License-COPDEM-30.pdf",
+      "attribution": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved. The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+      "access": "AWS Open Data, s3://copernicus-dem-30m (no account)",
+      "credit": "Copernicus WorldDEM-30 © DLR e.V. 2010-2014, © Airbus 2014-2018",
+      "item": "Copernicus_DSM_COG_10_N36_00_W007_00_DEM + Copernicus_DSM_COG_10_N37_00_W007_00_DEM",
+      "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N36_00_W007_00_DEM/Copernicus_DSM_COG_10_N36_00_W007_00_DEM.tif https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N37_00_W007_00_DEM/Copernicus_DSM_COG_10_N37_00_W007_00_DEM.tif",
+      "raster_tags": {
+        "AREA_OR_POINT": "Point"
+      },
+      "absent_tiles": [],
+      "sea_fill_fraction": 0.0,
+      "sea_fill_note": "The product has no tile for a degree square of open sea; those squares are filled with 0 m above EGM2008."
+    },
+    {
+      "provider": "European Union, Copernicus Sentinel-2 (ESA), Level-2A processing; cloud-optimised copy by Element 84 on AWS Open Data",
+      "product": "Sentinel-2 Level-2A true-colour image (TCI, 10 m)",
+      "licence": "Legal notice on the use of Copernicus Sentinel data and service information (European Commission): free, full and open access, including reproduction, distribution, communication to the public, adaptation and combination; users waive claims for damages. https://sentinels.copernicus.eu/documents/247904/690755/Sentinel_Data_Legal_Notice",
+      "attribution": "Contains modified Copernicus Sentinel data 2026",
+      "access": "Earth Search STAC API https://earth-search.aws.element84.com/v1, collection sentinel-2-c1-l2a (no account)",
+      "credit": "Contains modified Copernicus Sentinel data 2026",
+      "items": [
+        {
+          "item": "S2A_T29SPB_20260924T111256_L2A",
+          "url": "https://e84-earth-search-sentinel-data.s3.us-west-2.amazonaws.com/sentinel-2-c1-l2a/29/S/PB/2026/9/S2A_T29SPB_20260924T111256_L2A/TCI.tif",
+          "acquired": "2026-09-24T11:21:12.180000Z",
+          "cloud_cover_percent": 0.00677,
+          "crs": "EPSG:32629",
+          "texel_fraction": 0.9548
+        },
+        {
+          "item": "S2C_T29SPB_20261022T111855_L2A",
+          "url": "https://e84-earth-search-sentinel-data.s3.us-west-2.amazonaws.com/sentinel-2-c1-l2a/29/S/PB/2026/10/S2C_T29SPB_20261022T111855_L2A/TCI.tif",
+          "acquired": "2026-10-22T11:20:58.348000Z",
+          "cloud_cover_percent": 0.848995,
+          "crs": "EPSG:32629",
+          "texel_fraction": 0.0
+        }
+      ]
+    },
+    {
+      "provider": "U.S. National Geospatial-Intelligence Agency, EGM2008, through the PROJ data grid us_nga_egm08_25",
+      "product": "Geoid undulation at the origin (EGM2008 to the WGS84 ellipsoid)",
+      "licence": "Public domain (U.S. Government work); PROJ-data grid redistributed under its stated terms. https://cdn.proj.org",
+      "attribution": "EGM2008, NGA",
+      "access": "PROJ network grid (cdn.proj.org)",
+      "credit": "EGM2008, NGA"
+    },
+    {
+      "provider": "Instituto Geográfico Nacional de España (IGN), through the IGN WCS of the digital terrain models",
+      "product": "MDT05 digital terrain model, 5 m grid from PNOA lidar (WCS coverage Elevacion25830_5), heights orthometric above the Alicante datum (REDNAP, EPSG:5782)",
+      "licence": "CC BY 4.0 under the IGN licence for its geographic data products and services (Orden FOM/2807/2015), as for the PNOA source above. The WCS states \"CC BY 4.0 scne.es\" in its AccessConstraints. https://www.ign.es/resources/licencia/Condiciones_licenciaUso_IGN.pdf",
+      "attribution": "Obra derivada de MDT05 CC-BY 4.0 scne.es",
+      "credit": "Obra derivada de MDT05 CC-BY 4.0 scne.es",
+      "access": "WCS 2.0.1 https://servicios.idee.es/wcs-inspire/mdt, coverage Elevacion25830_5 (no account)",
+      "layer": "detail",
+      "items": [
+        {
+          "item": "Elevacion25830_5",
+          "url": "https://servicios.idee.es/wcs-inspire/mdt?SERVICE=WCS&VERSION=2.0.1&REQUEST=GetCoverage&COVERAGEID=Elevacion25830_5&SUBSET=x%28166900%2C169800%29&SUBSET=y%284110600%2C4113500%29&FORMAT=image%2Ftiff",
+          "res_m": 5.0,
+          "crs": "EPSG:25830"
+        }
+      ],
+      "vertical_crs": "EPSG:25830+5782",
+      "ellipsoidal_crs": "EPSG:4937",
+      "vertical_transformation": "Inverse of UTM zone 30N + Inverse of ETRS89 to Alicante height (1) (with axis order normalized for visualization)",
+      "fill_fraction": 0.0,
+      "fill_note": "Detail nodes where the DEM has no value (sea, gaps) take the base DEM height there."
+    },
+    {
+      "provider": "Instituto Geográfico Nacional de España (IGN) and the autonomous communities, Plan Nacional de Ortofotografía Aérea (PNOA), through the IGN WMS",
+      "product": "PNOA orthophoto mosaic of latest coverage (WMS layer OI.OrthoimageCoverage; at the pad origin the mosaic element is of July 2025, 0.15 m), rendered by the WMS at the texel size",
+      "licence": "CC BY 4.0 under the IGN licence for its geographic data products and services (Orden FOM/2807/2015): \"el uso de los productos y servicios de información geográfica del IGN [...] conlleva la aceptación por el usuario de una licencia CC-BY 4.0\"; derived works add \"Obra derivada de\" to the attribution. The WMS states \"CC BY 4.0 scne.es\" in its AccessConstraints. https://www.ign.es/resources/licencia/Condiciones_licenciaUso_IGN.pdf",
+      "attribution": "Obra derivada de PNOA 2025 CC-BY 4.0 scne.es",
+      "credit": "Obra derivada de PNOA 2025 CC-BY 4.0 scne.es",
+      "access": "WMS 1.3.0 https://www.ign.es/wms-inspire/pnoa-ma, layer OI.OrthoimageCoverage (no account)",
+      "layer": "detail",
+      "requests": 9,
+      "request_example": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A4326&BBOX=37.09839282509962%2C-6.745877327247286%2C37.10759153153153%2C-6.734344712626742&WIDTH=2048&HEIGHT=2048&FORMAT=image%2Fjpeg"
+    },
+    {
+      "provider": "OpenStreetMap contributors, through the Overpass API",
+      "product": "Building footprints and tall structures (OpenStreetMap data as of the recorded timestamp)",
+      "licence": "Open Data Commons Open Database License (ODbL) 1.0. features.json is a derived database of OpenStreetMap data and is made available under the ODbL. https://www.openstreetmap.org/copyright",
+      "attribution": "Buildings and structures: © OpenStreetMap contributors, ODbL 1.0",
+      "credit": "© OpenStreetMap contributors",
+      "access": "Overpass API https://overpass-api.de/api/interpreter (no account)",
+      "layer": "world:osm"
+    }
+  ],
+  "checks": [
+    {
+      "lat_deg": 37.17711122512886,
+      "lon_deg": -6.8327645814112685,
+      "h_ellipsoid_m": 85.29265668566728,
+      "enu_m": [
+        -9000.0,
+        9000.0,
+        -14.46831067619659
+      ],
+      "layer": "base"
+    },
+    {
+      "lat_deg": 37.1771111710611,
+      "lon_deg": -6.630075486013871,
+      "h_ellipsoid_m": 89.53572706663965,
+      "enu_m": [
+        9000.0,
+        9000.0,
+        -10.225231827033591
+      ],
+      "layer": "base"
+    },
+    {
+      "lat_deg": 37.014920795177616,
+      "lon_deg": -6.832549351423814,
+      "h_ellipsoid_m": 50.56592434758352,
+      "enu_m": [
+        -9000.0,
+        -9000.0,
+        -49.19522845705868
+      ],
+      "layer": "base"
+    },
+    {
+      "lat_deg": 37.014920795177616,
+      "lon_deg": -6.6302906485761826,
+      "h_ellipsoid_m": 50.56592434758352,
+      "enu_m": [
+        9000.0,
+        -9000.0,
+        -49.19522845694954
+      ],
+      "layer": "base"
+    },
+    {
+      "lat_deg": 37.09606,
+      "lon_deg": -6.731420000000001,
+      "h_ellipsoid_m": 90.89198656657189,
+      "enu_m": [
+        0.0,
+        0.0,
+        3.8421561980901013
+      ],
+      "layer": "base"
+    },
+    {
+      "lat_deg": 37.136602359408585,
+      "lon_deg": -6.697656678845827,
+      "h_ellipsoid_m": 117.76585953561572,
+      "enu_m": [
+        3000.0,
+        4500.0,
+        28.41908276649936
+      ],
+      "layer": "base"
+    },
+    {
+      "lat_deg": 37.07575845233154,
+      "lon_deg": -6.812388055120896,
+      "h_ellipsoid_m": 50.56592434758352,
+      "enu_m": [
+        -7200.0,
+        -2250.0,
+        -40.940887966872396
+      ],
+      "layer": "base"
+    },
+    {
+      "lat_deg": 37.10528622929897,
+      "lon_deg": -6.7429398409752945,
+      "h_ellipsoid_m": 95.15858422893828,
+      "enu_m": [
+        -1024.0,
+        1024.0,
+        7.9442030788818885
+      ],
+      "layer": "detail"
+    },
+    {
+      "lat_deg": 37.10528621344299,
+      "lon_deg": -6.719900178741525,
+      "h_ellipsoid_m": 106.08727583373103,
+      "enu_m": [
+        1024.0,
+        1024.0,
+        18.872894964323628
+      ],
+      "layer": "detail"
+    },
+    {
+      "lat_deg": 37.08683257199995,
+      "lon_deg": -6.74293712905371,
+      "h_ellipsoid_m": 50.01256080523648,
+      "enu_m": [
+        -1024.0,
+        -1024.0,
+        -37.20182168180269
+      ],
+      "layer": "detail"
+    },
+    {
+      "lat_deg": 37.086832610512914,
+      "lon_deg": -6.719902918801914,
+      "h_ellipsoid_m": 76.5496737681735,
+      "enu_m": [
+        1024.0,
+        -1024.0,
+        -10.664708035526854
+      ],
+      "layer": "detail"
+    },
+    {
+      "lat_deg": 37.09606000000001,
+      "lon_deg": -6.731420000000001,
+      "h_ellipsoid_m": 87.04983036853292,
+      "enu_m": [
+        0.0,
+        0.0,
+        5.726142628389072e-10
+      ],
+      "layer": "detail"
+    },
+    {
+      "lat_deg": 37.102223062537185,
+      "lon_deg": -6.725660316807987,
+      "h_ellipsoid_m": 101.08080429926477,
+      "enu_m": [
+        512.0,
+        684.0,
+        13.9736607790908
+      ],
+      "layer": "detail"
+    }
+  ],
+  "check_note": "Geodetic points of grid nodes and their ENU coordinates computed with pyproj; the Rust georeference crate must reproduce them within 1 mm.",
+  "world": {
+    "features": {
+      "file": "features.json",
+      "bytes": 15157,
+      "sha256": "48159662e9d15874674ad3ff1c8dc42f35665179c5245ee5de3e981ac35ef1bd",
+      "buildings": 93,
+      "lidar_structures": 0,
+      "structures": 6,
+      "height_sources": {
+        "default": 47,
+        "osm-levels": 46
+      },
+      "osm_radius_m": 4500.0,
+      "osm_timestamp": "2026-11-05T00:26:40Z",
+      "osm_skipped": 0,
+      "licence": "ODbL 1.0 (derived database of OpenStreetMap data)",
+      "accuracy": "OSM footprints as mapped by contributors (typically 1 to 3 m). Lidar heights are the 90th percentile of first-surface heights above the lidar ground inside the footprint, from 1 m cells; the lidar date may differ from the image and OSM dates. Walls, roof shapes and materials are illustrative; roof colours are sampled from the pack image."
+    }
+  }
+}

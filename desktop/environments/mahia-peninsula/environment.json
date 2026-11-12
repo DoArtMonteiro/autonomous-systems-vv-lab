@@ -1,0 +1,668 @@
+{
+  "schema": "vv-geo-environment.v3",
+  "id": "mahia-peninsula",
+  "name": "Mahia Peninsula, New Zealand",
+  "summary": "Open pasture on the southern tip of the Mahia Peninsula, between sea cliffs on both sides. The simulation's pad centre is placed in a large grazed paddock, read from the 2023 aerial photograph and chosen on the lidar DEM as one of the flattest open spots near the tip (within 0.25 m over 10 m). The ground rolls gently beyond that, so the flat-ground assumption of the simulation is only approximate here; the relief figures give the departure.",
+  "site_note": "The pack covers an existing launch site about 1.5 km south of the pad origin. The simulated vehicle, pad and mission are generic: they are not that site, its facilities, its operations or its operator, and imply no affiliation.",
+  "built": {
+    "by": "scripts/geo/build_environment.py",
+    "date": "2026-11-05",
+    "pyproj": "3.8.0",
+    "proj": "9.8.1",
+    "rasterio": "1.5.2",
+    "gdal": "3.12.2",
+    "features_by": "scripts/geo/build_features.py",
+    "features_date": "2026-11-05"
+  },
+  "origin": {
+    "lat_deg": -39.248377,
+    "lon_deg": 177.867382,
+    "h_ellipsoid_m": 134.728,
+    "orthometric_height_m": 113.378,
+    "geoid_undulation_m": 21.351,
+    "geoid_undulation_spread_m": 0.89,
+    "note": "The simulation's pad centre (model origin, z = 0) is placed on the detail terrain at this point; the orthometric height is that ellipsoidal height minus the EGM2008 undulation. The geoid undulation is treated as constant over the extent (its spread across the corners is given)."
+  },
+  "frame": {
+    "kind": "enu-tangent-plane",
+    "ellipsoid": "WGS84",
+    "axes": {
+      "x": "east",
+      "y": "north",
+      "z": "up"
+    },
+    "heading_deg": 0.0,
+    "note": "Model x, y, z map to east, north, up of the tangent plane at the origin. Terrain heights are ENU up, so they include the curvature of the Earth."
+  },
+  "extent_m": 9000.0,
+  "height": {
+    "file": "height.u16",
+    "encoding": "uint16-le",
+    "scale_m": 0.01,
+    "offset_m": -128.0,
+    "columns": 601,
+    "rows": 601,
+    "spacing_m": 30.0,
+    "first_node_m": [
+      -9000.0,
+      9000.0
+    ],
+    "order": "row-major, row 0 at the north edge, column 0 at the west edge",
+    "bytes": 722402,
+    "sha256": "43e996b8467d5f23b1e008069fe7c0af21f833fbf260a39eafd42daefd9a10c6",
+    "min_up_m": -126.09,
+    "max_up_m": 279.78
+  },
+  "image": {
+    "file": "image.jpg",
+    "columns": 1800,
+    "rows": 1800,
+    "spacing_m": 10.0,
+    "first_texel_centre_m": [
+      -8995.0,
+      8995.0
+    ],
+    "nodata_fraction": 0.0,
+    "registration": {
+      "agreement_at_zero_shift": 0.9491,
+      "best_agreement": 0.9493,
+      "best_shift_east_m": 0.0,
+      "best_shift_north_m": -30.0,
+      "method": "Fraction of texels where the DEM says land (> 1 m) and the image is not dark water, at zero shift and at the best shift on a 30 m lattice within 300 m."
+    },
+    "bytes": 231748,
+    "sha256": "f442be980cbeffa72608066faec16e409728482b4935480d65004272ffef0a61",
+    "processing": "Bilinear resampling of the TCI asset onto the ENU grid, JPEG quality 88. No colour editing."
+  },
+  "layers": [
+    {
+      "role": "detail",
+      "extent_m": 1024.0,
+      "blend_m": 192.0,
+      "height": {
+        "file": "detail-height.u16",
+        "encoding": "uint16-le",
+        "scale_m": 0.01,
+        "offset_m": -116.0,
+        "columns": 513,
+        "rows": 513,
+        "spacing_m": 4.0,
+        "first_node_m": [
+          -1024.0,
+          1024.0
+        ],
+        "order": "row-major, row 0 at the north edge, column 0 at the west edge",
+        "bytes": 526338,
+        "sha256": "83e11c7379eae1eb834d5f31524c9844536c81955a3dde10f8e3ab71ad2dd479",
+        "min_up_m": -114.09,
+        "max_up_m": 67.71
+      },
+      "image": {
+        "file": "detail-image.jpg",
+        "columns": 4096,
+        "rows": 4096,
+        "spacing_m": 0.5,
+        "first_texel_centre_m": [
+          -1023.75,
+          1023.75
+        ],
+        "nodata_fraction": 0.0,
+        "base_fill_fraction": 0.0,
+        "colour_fit": [
+          [
+            [
+              43.34,
+              56.66,
+              61.77,
+              68.37,
+              75.57,
+              79.37,
+              82.73,
+              86.15,
+              90.19,
+              95.02,
+              101.15,
+              106.91,
+              111.66,
+              115.81,
+              119.53,
+              123.36,
+              127.03,
+              130.89,
+              134.84,
+              139.06,
+              143.13,
+              146.95,
+              150.78,
+              154.94,
+              158.97,
+              163.66,
+              168.81,
+              174.07,
+              180.09,
+              187.04,
+              198.35,
+              214.23,
+              247.6
+            ],
+            [
+              0.65,
+              1.0,
+              1.16,
+              1.59,
+              2.24,
+              3.19,
+              5.0,
+              9.04,
+              19.22,
+              22.49,
+              24.83,
+              27.58,
+              30.54,
+              33.41,
+              36.0,
+              38.56,
+              41.16,
+              43.76,
+              46.71,
+              49.83,
+              53.34,
+              57.63,
+              62.47,
+              68.26,
+              75.69,
+              83.51,
+              91.34,
+              98.52,
+              105.79,
+              115.92,
+              135.56,
+              176.45,
+              255.0
+            ]
+          ],
+          [
+            [
+              56.84,
+              84.5,
+              90.75,
+              95.23,
+              99.47,
+              103.47,
+              107.02,
+              110.42,
+              113.45,
+              115.86,
+              117.98,
+              119.94,
+              121.84,
+              123.88,
+              125.89,
+              127.75,
+              129.72,
+              131.8,
+              134.12,
+              136.56,
+              138.93,
+              141.32,
+              143.82,
+              146.4,
+              148.92,
+              151.96,
+              155.55,
+              160.05,
+              166.65,
+              177.68,
+              192.54,
+              208.44,
+              245.85
+            ],
+            [
+              5.49,
+              8.79,
+              9.65,
+              11.0,
+              13.24,
+              17.36,
+              23.24,
+              30.68,
+              46.2,
+              58.03,
+              61.8,
+              63.46,
+              64.91,
+              66.36,
+              67.73,
+              69.15,
+              70.5,
+              71.74,
+              73.05,
+              74.41,
+              75.87,
+              77.39,
+              79.12,
+              81.04,
+              83.45,
+              86.68,
+              91.13,
+              96.86,
+              103.76,
+              114.19,
+              135.75,
+              178.23,
+              255.0
+            ]
+          ],
+          [
+            [
+              72.44,
+              90.73,
+              94.54,
+              97.75,
+              100.11,
+              101.85,
+              103.4,
+              104.8,
+              106.25,
+              107.66,
+              109.14,
+              110.7,
+              112.23,
+              113.7,
+              115.11,
+              116.51,
+              117.91,
+              119.51,
+              121.35,
+              123.4,
+              125.48,
+              127.8,
+              130.26,
+              133.18,
+              136.92,
+              140.64,
+              144.74,
+              150.02,
+              157.95,
+              169.42,
+              184.88,
+              201.62,
+              245.71
+            ],
+            [
+              11.26,
+              17.23,
+              18.25,
+              19.17,
+              20.24,
+              22.19,
+              25.97,
+              27.74,
+              29.03,
+              30.25,
+              31.6,
+              33.0,
+              34.37,
+              35.61,
+              36.85,
+              38.11,
+              39.43,
+              40.98,
+              42.68,
+              44.78,
+              47.17,
+              50.27,
+              54.05,
+              58.47,
+              62.83,
+              66.84,
+              70.81,
+              75.56,
+              82.76,
+              93.01,
+              115.85,
+              157.57,
+              255.0
+            ]
+          ]
+        ],
+        "bytes": 3745092,
+        "sha256": "1e41dfc819e39603b80552df868ed51af83e4a72554e2e19eb979bae606d34ca",
+        "processing": "Area-averaged to the texel size from the source, bilinear resampling onto the ENU grid, per-channel tone curves (colour_fit: 33 percentiles of the detail and of the base image on 10 m blocks, linearly interpolated) matching the detail image to the base image, texels without source data filled from the base image, JPEG quality 86.",
+        "geodetic_lattice_residual_mm": 0.031
+      },
+      "note": "Within 192 m of the edge of this layer the drawn heights blend linearly into the base grid and the image fades into the base image, so the two surfaces meet. That margin is a display adjustment of the context data."
+    }
+  ],
+  "relief": [
+    {
+      "radius_m": 10.0,
+      "min_up_m": -0.25,
+      "max_up_m": 0.16
+    },
+    {
+      "radius_m": 50.0,
+      "min_up_m": -2.6,
+      "max_up_m": 0.72
+    },
+    {
+      "radius_m": 500.0,
+      "min_up_m": -113.89,
+      "max_up_m": 9.06
+    },
+    {
+      "radius_m": 3000.0,
+      "min_up_m": -114.11,
+      "max_up_m": 131.84
+    }
+  ],
+  "accuracy": [
+    "Copernicus GLO-30 is a surface model: heights include buildings and vegetation canopy. Its stated absolute vertical accuracy is better than 4 m (90 % linear error); it does not resolve pads, roads or ground conditions.",
+    "The 10 m image does not resolve structures; it is context only.",
+    "The simulation assumes flat ground at z = 0 and computes no interaction with this terrain. Where the terrain rises above z = 0 the drawn trajectory may pass through it; this is a property of the geographic placement, not of the simulated flight.",
+    "Horizontal registration of image and terrain follows the sources' georeferencing; Sentinel-2 L2A geolocation is of the order of 10 m.",
+    "Detail layer (2.048 km square around the origin): heights from Hawke's Bay LiDAR 1m DEM (2020-2021), bare earth, heights in NZVD2016 (EPSG:7839, as stated in the LINZ elevation TIFF specification; not recorded in the GeoTIFF), sampled every 4 m and converted from EPSG:2193+7839 to EPSG:4959 ellipsoidal heights with PROJ (Inverse of New Zealand Transverse Mercator 2000 + Inverse of NZGD2000 to NZVD2016 height (2) (with axis order normalized for visualization)); those are used as WGS84 heights. The origin is on this surface.",
+    "LINZ states a vertical accuracy of about 20 cm for the source lidar; the tiles are LERC-compressed with a 1 mm error.",
+    "Detail image: Hawke's Bay 0.25m Rural Aerial Photos (2023-2025), red, green and blue bands of the RGBNIR cloud-optimised tiles at 0.5 m per texel (source 0.25 m), resampled onto the ENU grid.",
+    "The LINZ imagery and DEM are on NZGD2000, a semi-dynamic datum fixed at epoch 2000; read here as WGS84, they are offset from the base layers by of the order of 1 to 2 m on the ground. The images were flown on 2023-02-20 and later; the lidar is of November 2020 to January 2021.",
+    "Within 192 m of the edge of the detail layer the drawn heights blend into the base grid and the detail image fades into the base image; this display adjustment is the only change made to the context data."
+  ],
+  "sources": [
+    {
+      "provider": "European Space Agency and European Union (Copernicus programme); WorldDEM-30 produced by DLR and Airbus",
+      "product": "Copernicus DEM GLO-30 (digital surface model, 1 arc-second; vertical datum EGM2008, EPSG 3855; horizontal WGS84-G1150, EPSG 4326)",
+      "licence": "Licence for the use of the Copernicus WorldDEM-30: free of charge; reproduction, distribution, communication to the public and adaptation are permitted (Art. 4, 5), with the notices of Art. 6; no endorsement may be implied and later users are bound by the same obligations. https://documentation.dataspace.copernicus.eu/APIs/SentinelHub/Data/DEM/resources/license/License-COPDEM-30.pdf",
+      "attribution": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved. The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+      "access": "AWS Open Data, s3://copernicus-dem-30m (no account)",
+      "credit": "Copernicus WorldDEM-30 © DLR e.V. 2010-2014, © Airbus 2014-2018",
+      "item": "Copernicus_DSM_COG_10_S40_00_E177_00_DEM + Copernicus_DSM_COG_10_S40_00_E178_00_DEM",
+      "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_S40_00_E177_00_DEM/Copernicus_DSM_COG_10_S40_00_E177_00_DEM.tif https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_S40_00_E178_00_DEM/Copernicus_DSM_COG_10_S40_00_E178_00_DEM.tif",
+      "raster_tags": {
+        "AREA_OR_POINT": "Point"
+      },
+      "absent_tiles": [],
+      "sea_fill_fraction": 0.0,
+      "sea_fill_note": "The product has no tile for a degree square of open sea; those squares are filled with 0 m above EGM2008."
+    },
+    {
+      "provider": "European Union, Copernicus Sentinel-2 (ESA), Level-2A processing; cloud-optimised copy by Element 84 on AWS Open Data",
+      "product": "Sentinel-2 Level-2A true-colour image (TCI, 10 m)",
+      "licence": "Legal notice on the use of Copernicus Sentinel data and service information (European Commission): free, full and open access, including reproduction, distribution, communication to the public, adaptation and combination; users waive claims for damages. https://sentinels.copernicus.eu/documents/247904/690755/Sentinel_Data_Legal_Notice",
+      "attribution": "Contains modified Copernicus Sentinel data 2026",
+      "access": "Earth Search STAC API https://earth-search.aws.element84.com/v1, collection sentinel-2-c1-l2a (no account)",
+      "credit": "Contains modified Copernicus Sentinel data 2026",
+      "items": [
+        {
+          "item": "S2B_T60HWB_20261013T220619_L2A",
+          "url": "https://e84-earth-search-sentinel-data.s3.us-west-2.amazonaws.com/sentinel-2-c1-l2a/60/H/WB/2026/10/S2B_T60HWB_20261013T220619_L2A/TCI.tif",
+          "acquired": "2026-10-13T22:06:57.025000Z",
+          "cloud_cover_percent": 0.000977,
+          "crs": "EPSG:32760",
+          "texel_fraction": 1.0
+        },
+        {
+          "item": "S2B_T60HWB_20261023T220620_L2A",
+          "url": "https://e84-earth-search-sentinel-data.s3.us-west-2.amazonaws.com/sentinel-2-c1-l2a/60/H/WB/2026/10/S2B_T60HWB_20261023T220620_L2A/TCI.tif",
+          "acquired": "2026-10-23T22:06:58.296000Z",
+          "cloud_cover_percent": 0.005434,
+          "crs": "EPSG:32760",
+          "texel_fraction": 0.0
+        }
+      ]
+    },
+    {
+      "provider": "U.S. National Geospatial-Intelligence Agency, EGM2008, through the PROJ data grid us_nga_egm08_25",
+      "product": "Geoid undulation at the origin (EGM2008 to the WGS84 ellipsoid)",
+      "licence": "Public domain (U.S. Government work); PROJ-data grid redistributed under its stated terms. https://cdn.proj.org",
+      "attribution": "EGM2008, NGA",
+      "access": "PROJ network grid (cdn.proj.org)",
+      "credit": "EGM2008, NGA"
+    },
+    {
+      "provider": "Toitū Te Whenua Land Information New Zealand (host and processor); Ocean Infinity (producer); Hawke's Bay Regional Council (licensor), as listed in the survey's STAC collection",
+      "product": "Hawke's Bay LiDAR 1m DEM (2020-2021), bare earth, heights in NZVD2016 (EPSG:7839, as stated in the LINZ elevation TIFF specification; not recorded in the GeoTIFF)",
+      "licence": "CC BY 4.0: \"Licensed for re-use under CC-BY-4.0\" (https://registry.opendata.aws/nz-elevation); the collection's STAC licence field is CC-BY-4.0 and names the licensor. https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "Hawke's Bay LiDAR 1m DEM (2020-2021), licensed by Hawke's Bay Regional Council for re-use under CC-BY-4.0; accessed on 2026-11-04 from https://registry.opendata.aws/nz-elevation; modified (resampled and converted to ellipsoidal heights)",
+      "credit": "Lidar DEM 2020-2021, Hawke's Bay Regional Council, CC BY 4.0 (LINZ)",
+      "access": "AWS Open Data s3://nz-elevation, hawkes-bay/hawkes-bay_2020-2021/dem_1m/2193 (no account)",
+      "layer": "detail",
+      "items": [
+        {
+          "item": "BJ42_10000_0205.tiff",
+          "url": "https://nz-elevation.s3-ap-southeast-2.amazonaws.com/hawkes-bay/hawkes-bay_2020-2021/dem_1m/2193/BJ42_10000_0205.tiff",
+          "res_m": 1.0,
+          "crs": "EPSG:2193"
+        },
+        {
+          "item": "BJ42_10000_0305.tiff",
+          "url": "https://nz-elevation.s3-ap-southeast-2.amazonaws.com/hawkes-bay/hawkes-bay_2020-2021/dem_1m/2193/BJ42_10000_0305.tiff",
+          "res_m": 1.0,
+          "crs": "EPSG:2193"
+        },
+        {
+          "item": "BJ43_10000_0201.tiff",
+          "url": "https://nz-elevation.s3-ap-southeast-2.amazonaws.com/hawkes-bay/hawkes-bay_2020-2021/dem_1m/2193/BJ43_10000_0201.tiff",
+          "res_m": 1.0,
+          "crs": "EPSG:2193"
+        },
+        {
+          "item": "BJ43_10000_0301.tiff",
+          "url": "https://nz-elevation.s3-ap-southeast-2.amazonaws.com/hawkes-bay/hawkes-bay_2020-2021/dem_1m/2193/BJ43_10000_0301.tiff",
+          "res_m": 1.0,
+          "crs": "EPSG:2193"
+        }
+      ],
+      "vertical_crs": "EPSG:2193+7839",
+      "ellipsoidal_crs": "EPSG:4959",
+      "vertical_transformation": "Inverse of New Zealand Transverse Mercator 2000 + Inverse of NZGD2000 to NZVD2016 height (2) (with axis order normalized for visualization)",
+      "fill_fraction": 0.0103,
+      "fill_note": "Detail nodes where the DEM has no value (sea, gaps) take the base DEM height there."
+    },
+    {
+      "provider": "Toitū Te Whenua Land Information New Zealand (host and processor); Aerial Surveys (producer); National Institute of Water and Atmospheric Research (licensor), as listed in the survey's STAC collection",
+      "product": "Hawke's Bay 0.25m Rural Aerial Photos (2023-2025), red, green and blue bands of the RGBNIR cloud-optimised tiles",
+      "licence": "CC BY 4.0: \"Licensed for re-use under CC-BY-4.0\" (https://registry.opendata.aws/nz-imagery); the collection's STAC licence field is CC-BY-4.0 and names the licensor. https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "Hawke's Bay 0.25m Rural Aerial Photos (2023-2025), licensed by National Institute of Water and Atmospheric Research for re-use under CC-BY-4.0; accessed on 2026-11-04 from https://registry.opendata.aws/nz-imagery; modified (resampled and colour-balanced)",
+      "credit": "Aerial photos 2023-2025, NIWA, CC BY 4.0 (LINZ)",
+      "access": "AWS Open Data s3://nz-imagery, hawkes-bay/hawkes-bay_2023-2024_0.25m/rgbnir/2193 (no account)",
+      "layer": "detail",
+      "items": [
+        {
+          "url": "https://nz-imagery.s3-ap-southeast-2.amazonaws.com/hawkes-bay/hawkes-bay_2023-2024_0.25m/rgbnir/2193/BJ42_10000_0205.tiff",
+          "gsd_m": 0.25,
+          "crs": "EPSG:2193"
+        },
+        {
+          "url": "https://nz-imagery.s3-ap-southeast-2.amazonaws.com/hawkes-bay/hawkes-bay_2023-2024_0.25m/rgbnir/2193/BJ42_10000_0305.tiff",
+          "gsd_m": 0.25,
+          "crs": "EPSG:2193"
+        },
+        {
+          "url": "https://nz-imagery.s3-ap-southeast-2.amazonaws.com/hawkes-bay/hawkes-bay_2023-2024_0.25m/rgbnir/2193/BJ43_10000_0201.tiff",
+          "gsd_m": 0.25,
+          "crs": "EPSG:2193"
+        },
+        {
+          "url": "https://nz-imagery.s3-ap-southeast-2.amazonaws.com/hawkes-bay/hawkes-bay_2023-2024_0.25m/rgbnir/2193/BJ43_10000_0301.tiff",
+          "gsd_m": 0.25,
+          "crs": "EPSG:2193"
+        }
+      ]
+    },
+    {
+      "provider": "OpenStreetMap contributors, through the Overpass API",
+      "product": "Building footprints and tall structures (OpenStreetMap data as of the recorded timestamp)",
+      "licence": "Open Data Commons Open Database License (ODbL) 1.0. features.json is a derived database of OpenStreetMap data and is made available under the ODbL. https://www.openstreetmap.org/copyright",
+      "attribution": "Buildings and structures: © OpenStreetMap contributors, ODbL 1.0",
+      "credit": "© OpenStreetMap contributors",
+      "access": "Overpass API https://overpass-api.de/api/interpreter (no account)",
+      "layer": "world:osm"
+    }
+  ],
+  "checks": [
+    {
+      "lat_deg": -39.16726375735577,
+      "lon_deg": 177.7632422359389,
+      "h_ellipsoid_m": 21.35051617256653,
+      "enu_m": [
+        -9000.0,
+        9000.0,
+        -126.08595479273569
+      ],
+      "layer": "base"
+    },
+    {
+      "lat_deg": -39.167263757355784,
+      "lon_deg": 177.97152176406107,
+      "h_ellipsoid_m": 21.35051617256653,
+      "enu_m": [
+        9000.0,
+        9000.0,
+        -126.08595479341514
+      ],
+      "layer": "base"
+    },
+    {
+      "lat_deg": -39.32939578123902,
+      "lon_deg": 177.7630021722473,
+      "h_ellipsoid_m": 21.35051617256653,
+      "enu_m": [
+        -9000.0,
+        -9000.0,
+        -126.08583652532741
+      ],
+      "layer": "base"
+    },
+    {
+      "lat_deg": -39.32939578123902,
+      "lon_deg": 177.9717618277527,
+      "h_ellipsoid_m": 21.35051617256653,
+      "enu_m": [
+        9000.0,
+        -9000.0,
+        -126.08583652486357
+      ],
+      "layer": "base"
+    },
+    {
+      "lat_deg": -39.248377000000005,
+      "lon_deg": 177.867382,
+      "h_ellipsoid_m": 134.00284447514824,
+      "enu_m": [
+        0.0,
+        0.0,
+        -0.7253610192901656
+      ],
+      "layer": "base"
+    },
+    {
+      "lat_deg": -39.20784046351712,
+      "lon_deg": 177.90211365995643,
+      "h_ellipsoid_m": 305.2524971590051,
+      "enu_m": [
+        3000.0,
+        4500.0,
+        168.22807344523372
+      ],
+      "layer": "base"
+    },
+    {
+      "lat_deg": -39.26861360065452,
+      "lon_deg": 177.78395033523006,
+      "h_ellipsoid_m": 21.35051617256653,
+      "enu_m": [
+        -7200.0,
+        -2250.0,
+        -117.83403810960455
+      ],
+      "layer": "base"
+    },
+    {
+      "lat_deg": -39.23915287424368,
+      "lon_deg": 177.8555211309473,
+      "h_ellipsoid_m": 20.859906895711607,
+      "enu_m": [
+        -1024.0,
+        1024.0,
+        -114.0328111312664
+      ],
+      "layer": "detail"
+    },
+    {
+      "lat_deg": -39.239153039332486,
+      "lon_deg": 177.87924265766904,
+      "h_ellipsoid_m": 134.70061908014029,
+      "enu_m": [
+        1024.0,
+        1024.0,
+        -0.1920960080012339
+      ],
+      "layer": "detail"
+    },
+    {
+      "lat_deg": -39.25759990220994,
+      "lon_deg": 177.855518024148,
+      "h_ellipsoid_m": 21.35051617256653,
+      "enu_m": [
+        -1024.0,
+        -1024.0,
+        -113.54220166838864
+      ],
+      "layer": "detail"
+    },
+    {
+      "lat_deg": -39.257599902209954,
+      "lon_deg": 177.87924597585194,
+      "h_ellipsoid_m": 21.35051617256653,
+      "enu_m": [
+        1024.0,
+        -1024.0,
+        -113.54220166829538
+      ],
+      "layer": "detail"
+    },
+    {
+      "lat_deg": -39.24837699999999,
+      "lon_deg": 177.867382,
+      "h_ellipsoid_m": 134.72820549440618,
+      "enu_m": [
+        0.0,
+        0.0,
+        -5.892323258569448e-10
+      ],
+      "layer": "detail"
+    },
+    {
+      "lat_deg": -39.24221595727771,
+      "lon_deg": 177.87331256688088,
+      "h_ellipsoid_m": 156.04300857202412,
+      "enu_m": [
+        512.0,
+        684.0,
+        21.25750640612077
+      ],
+      "layer": "detail"
+    }
+  ],
+  "check_note": "Geodetic points of grid nodes and their ENU coordinates computed with pyproj; the Rust georeference crate must reproduce them within 1 mm.",
+  "world": {
+    "features": {
+      "file": "features.json",
+      "bytes": 11723,
+      "sha256": "d625ab388996959ca9343d53bbe66194c79bbc3f40d65a58b1cefb0b37b7a053",
+      "buildings": 64,
+      "lidar_structures": 0,
+      "structures": 13,
+      "height_sources": {
+        "default": 43,
+        "osm-height": 2,
+        "osm-levels": 19
+      },
+      "osm_radius_m": 4500.0,
+      "osm_timestamp": "2026-11-05T00:24:38Z",
+      "osm_skipped": 0,
+      "licence": "ODbL 1.0 (derived database of OpenStreetMap data)",
+      "accuracy": "OSM footprints as mapped by contributors (typically 1 to 3 m). Lidar heights are the 90th percentile of first-surface heights above the lidar ground inside the footprint, from 1 m cells; the lidar date may differ from the image and OSM dates. Walls, roof shapes and materials are illustrative; roof colours are sampled from the pack image."
+    }
+  }
+}

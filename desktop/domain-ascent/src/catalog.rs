@@ -17,6 +17,8 @@ fn item(id: &str, label: &str, description: &str) -> Item {
         id: id.into(),
         label: label.into(),
         description: description.into(),
+        facts: Vec::new(),
+        evidence: String::new(),
     }
 }
 
@@ -67,6 +69,50 @@ pub const PARAMS: [Param; 11] = [
     Param { id: "medium_payload_kg", scenario: Some(MEDIUM), target: Target::PayloadKg, label: "Payload mass", description: PAYLOAD, unit: "kg", group: "Vehicle", min: 0.0, max: 10000.0, step: 100.0, default: 3000.0, integer: false },
     Param { id: "dispersions", scenario: None, target: Target::Dispersions, label: "Dispersions on", description: DISP, unit: "", group: "Dispersions", min: 0.0, max: 1.0, step: 1.0, default: 1.0, integer: true },
 ];
+
+/// The vehicle's measured attributes, read from the template it is simulated with.
+fn with_facts(mut v: Item, scenario: &str) -> Item {
+    let case = crate::case::template(scenario).expect("bundled template");
+    let veh = &case.vehicle;
+    let fact = |label: &str, value: f64, unit: &str| Fact {
+        label: label.into(),
+        value,
+        unit: unit.into(),
+    };
+    let liftoff: f64 = veh
+        .stages
+        .iter()
+        .map(|s| s.dry_mass_kg + s.propellant_kg)
+        .sum::<f64>()
+        + veh.payload_kg;
+    let mut facts = vec![
+        fact("Liftoff mass", liftoff / 1000.0, "t"),
+        fact("Payload", veh.payload_kg, "kg"),
+    ];
+    for (i, s) in veh.stages.iter().enumerate() {
+        let n = i + 1;
+        facts.push(fact(
+            &format!("Stage {n} thrust (vacuum)"),
+            s.thrust_vac_n / 1000.0,
+            "kN",
+        ));
+        facts.push(fact(&format!("Stage {n} Isp (vacuum)"), s.isp_vac_s, "s"));
+        facts.push(fact(
+            &format!("Stage {n} propellant"),
+            s.propellant_kg / 1000.0,
+            "t",
+        ));
+    }
+    facts.push(fact(
+        "Liftoff thrust over weight",
+        veh.stages[0].thrust_vac_n * veh.stages[0].isp_sl_s
+            / veh.stages[0].isp_vac_s
+            / (liftoff * 9.80665),
+        "",
+    ));
+    v.facts = facts;
+    v
+}
 
 pub fn param(id: &str) -> Option<&'static Param> {
     PARAMS.iter().find(|p| p.id == id)
@@ -214,8 +260,8 @@ pub fn catalog() -> DomainCatalog {
             label: "s of logical time (ticks of 20 ms from the start of the prelaunch hold)".into(),
         },
         vehicles: vec![
-            item("small", "Small launcher (exploratory)", "About 35 t at liftoff, two stages, 250 kg nominal payload; not a real vehicle."),
-            item("medium", "Medium launcher (exploratory)", "About 304 t at liftoff, two stages, 3 t nominal payload, a 6 % first-stage reserve kept for recovery; not a real vehicle."),
+            with_facts(item("small", "Small launcher (exploratory)", "About 35 t at liftoff, two stages, 250 kg nominal payload; not a real vehicle.").with_evidence("exploratory"), SMALL),
+            with_facts(item("medium", "Medium launcher (exploratory)", "About 304 t at liftoff, two stages, 3 t nominal payload, a 6 % first-stage reserve kept for recovery; not a real vehicle.").with_evidence("exploratory"), MEDIUM),
         ],
         scenarios: vec![
             ScenarioSpec {

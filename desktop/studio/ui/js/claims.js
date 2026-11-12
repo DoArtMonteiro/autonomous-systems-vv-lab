@@ -3,7 +3,7 @@
 // engine's recomputation report (the same rules as the Discovery Lab); nothing is decided here.
 
 import { invoke } from './api.js';
-import { WORDS, verdictOf } from './views/discover.js';
+import { WORDS, verdictOf, newestPackage } from './views/discover.js';
 
 let cache = null;
 
@@ -36,7 +36,7 @@ export async function claimStatus(claimId) {
     const broken = data.claims.find((c) => !c.claim && c.file.includes(claimId));
     return { available: false, reason: broken ? `The engine rejected the claim file: ${broken.error}` : 'This claim is not installed with this build.', claim: null, latest: null };
   }
-  const pkg = data.packages.find((p) => p.claim_id === claimId) || null;
+  const pkg = newestPackage(data.packages, claimId);
   let latest = null;
   if (pkg) {
     const v = verdictOf(pkg);

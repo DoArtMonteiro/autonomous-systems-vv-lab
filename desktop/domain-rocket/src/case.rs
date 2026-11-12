@@ -77,6 +77,41 @@ pub fn parameter_path(id: &str) -> Option<&'static [&'static str]> {
     })
 }
 
+/// M18 vehicle design parameters: factors applied to the vehicle of the scenario's template, so
+/// the same parameter means the same change on every vehicle and its default (1) leaves the
+/// template untouched. Each returns the vehicle fields it scales. Mass factors scale the matching
+/// inertia too (same geometry, denser or lighter structure or tanks). Any factor other than 1
+/// makes the case exploratory (schema v2); the simulator checks its bounded ranges again,
+/// including the thrust over full-load weight.
+pub fn vehicle_scale_fields(id: &str) -> Option<&'static [&'static str]> {
+    Some(match id {
+        "vehicle_dry_mass_scale" => &["dry_mass_kg", "dry_inertia_kgm2"],
+        "vehicle_propellant_scale" => &["propellant_mass_kg", "propellant_inertia_kgm2"],
+        "vehicle_thrust_scale" => &["max_thrust_n"],
+        "vehicle_isp_scale" => &["isp_s"],
+        _ => return None,
+    })
+}
+
+fn scale_value(node: &mut Value, factor: f64, name: &str) -> Result<(), String> {
+    match node {
+        Value::Array(items) => {
+            for item in items {
+                scale_value(item, factor, name)?;
+            }
+            Ok(())
+        }
+        Value::Number(n) => {
+            let v = n
+                .as_f64()
+                .ok_or_else(|| format!("vehicle.{name} is not a number"))?;
+            *node = number(v * factor);
+            Ok(())
+        }
+        _ => Err(format!("vehicle.{name} is not a number")),
+    }
+}
+
 /// A time that is a multiple of the 0.01 s step, as whole steps (the Python `_seconds`).
 pub fn whole_steps(value: f64, name: &str) -> Result<i64, String> {
     if !value.is_finite() || !(0.0..=DURATION_S).contains(&value) {
@@ -170,10 +205,23 @@ pub fn case_bytes(request: &RunRequest) -> Result<Vec<u8>, String> {
     // A parameter is written only when it differs from its default, so the default case stays the
     // pre-registered template byte for byte.
     for (id, value) in &request.parameters {
-        let path = parameter_path(id).ok_or_else(|| format!("unknown parameter {id}"))?;
         if crate::catalog::parameter_default(id) == Some(*value) {
             continue;
         }
+        if let Some(fields) = vehicle_scale_fields(id) {
+            for field in fields {
+                let node = case["vehicle"].get_mut(*field).ok_or_else(|| {
+                    format!(
+                        "vehicle.{field} does not exist in the case of {}",
+                        request.scenario
+                    )
+                })?;
+                scale_value(node, *value, field)?;
+            }
+            case["schema"] = json!(EXPLORATORY_SCHEMA);
+            continue;
+        }
+        let path = parameter_path(id).ok_or_else(|| format!("unknown parameter {id}"))?;
         let mut node = &mut case;
         for key in path {
             let next = match key.parse::<usize>() {

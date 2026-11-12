@@ -16,6 +16,8 @@ fn item(id: &str, label: &str, description: &str) -> Item {
         id: id.into(),
         label: label.into(),
         description: description.into(),
+        facts: Vec::new(),
+        evidence: String::new(),
     }
 }
 
@@ -67,7 +69,7 @@ struct Param {
 // Defaults equal the values of the two templates (a test checks it). The initial state, the vehicle
 // and the atmosphere are not parameters: the simulator pins them to the pre-registered case and the
 // seed disperses the initial state.
-const PARAMS: [Param; 15] = [
+const PARAMS: [Param; 19] = [
     Param {
         id: "ignition_fraction",
         label: "Ignition point",
@@ -267,6 +269,65 @@ const PARAMS: [Param; 15] = [
         advanced: false,
         influences: &["R1_vertical_speed"],
     },
+    // M18 vehicle design: factors on the scenario's own vehicle (case::vehicle_scale_fields), so
+    // they mean the same change on every vehicle. The controller is told the changed vehicle, as it
+    // is told each preset; its gains stay those of the template.
+    Param {
+        id: "vehicle_dry_mass_scale",
+        label: "Dry mass",
+        unit: "×",
+        description: "Factor on the stage's dry (empty) mass and its inertia, same geometry. Heavier needs more thrust and more propellant to brake; the simulator refuses a stage whose full-load thrust-to-weight falls outside 1.2 to 6. Not part of the pre-registered case when changed.",
+        min: 0.6,
+        max: 1.6,
+        step: 0.05,
+        default: 1.0,
+        group: "Vehicle design",
+        advanced: false,
+        influences: &["R6_propellant_margin", "R1_vertical_speed", "S3_axial_load"],
+    },
+    Param {
+        id: "vehicle_propellant_scale",
+        label: "Propellant load",
+        unit: "×",
+        description: "Factor on the propellant loaded for the landing and its inertia. Less propellant leaves less margin for the braking burn; more adds mass that has to be braked. Not part of the pre-registered case when changed.",
+        min: 0.3,
+        max: 2.0,
+        step: 0.05,
+        default: 1.0,
+        group: "Vehicle design",
+        advanced: false,
+        influences: &["R6_propellant_margin", "R1_vertical_speed"],
+    },
+    Param {
+        id: "vehicle_thrust_scale",
+        label: "Engine thrust",
+        unit: "×",
+        description: "Factor on the engine's maximum thrust (the throttle floor stays the same fraction, so the lowest thrust scales too). Less thrust brakes later and harder; more makes the lowest throttle stronger and hovering harder. Not part of the pre-registered case when changed.",
+        min: 0.5,
+        max: 1.6,
+        step: 0.05,
+        default: 1.0,
+        group: "Vehicle design",
+        advanced: false,
+        influences: &[
+            "R1_vertical_speed",
+            "R6_propellant_margin",
+            "S5_no_powered_ascent",
+        ],
+    },
+    Param {
+        id: "vehicle_isp_scale",
+        label: "Engine efficiency (Isp)",
+        unit: "×",
+        description: "Factor on the specific impulse: the same thrust for less propellant flow. The simulator accepts 150 to 450 s. Not part of the pre-registered case when changed.",
+        min: 0.7,
+        max: 1.3,
+        step: 0.05,
+        default: 1.0,
+        group: "Vehicle design",
+        advanced: false,
+        influences: &["R6_propellant_margin"],
+    },
 ];
 
 pub fn parameters() -> Vec<ParameterSpec> {
@@ -460,20 +521,32 @@ pub fn catalog() -> DomainCatalog {
             label: "Time since the start of the simulation".into(),
         },
         vehicles: vec![
-            item(
-                "landing-stage",
-                "22 t landing stage",
-                "A rocket stage of 22 t dry mass and 8 t of propellant that falls from about 3 km at 200 m/s and brakes with one gimballed engine to a 1.5 m/s descent over the pad. The initial state is dispersed by the seed.",
+            with_facts(
+                item(
+                    "landing-stage",
+                    "22 t landing stage",
+                    "A rocket stage of 22 t dry mass and 8 t of propellant that falls from about 3 km at 200 m/s and brakes with one gimballed engine to a 1.5 m/s descent over the pad. The initial state is dispersed by the seed.",
+                )
+                .with_evidence("reference"),
+                M9,
             ),
-            item(
-                "heavy-return-stage",
-                "41 t heavy return stage (exploratory)",
-                "A heavier stage, 30 t dry and 11 t of propellant, with a 760 kN engine (thrust over full-load weight 1.89, against 2.87 for the 22 t stage), Isp 300 s and a throttle floor of 55 %. Less braking margin and less throttle range. Illustrative values of the order of a reusable first stage near landing, not a real vehicle.",
+            with_facts(
+                item(
+                    "heavy-return-stage",
+                    "41 t heavy return stage (exploratory)",
+                    "A heavier stage, 30 t dry and 11 t of propellant, with a 760 kN engine (thrust over full-load weight 1.89, against 2.87 for the 22 t stage), Isp 300 s and a throttle floor of 55 %. Less braking margin and less throttle range. Illustrative values of the order of a reusable first stage near landing, not a real vehicle.",
+                )
+                .with_evidence("exploratory"),
+                HEAVY,
             ),
-            item(
-                "light-demonstrator",
-                "7.7 t light demonstrator stage (exploratory)",
-                "A small stage, 5.5 t dry and 2.2 t of propellant, with a 230 kN engine (thrust over full-load weight 3.05), Isp 265 s, a 30 % throttle floor and a faster throttle. Illustrative values of the order of a suborbital test vehicle, not a real vehicle.",
+            with_facts(
+                item(
+                    "light-demonstrator",
+                    "7.7 t light demonstrator stage (exploratory)",
+                    "A small stage, 5.5 t dry and 2.2 t of propellant, with a 230 kN engine (thrust over full-load weight 3.05), Isp 265 s, a 30 % throttle floor and a faster throttle. Illustrative values of the order of a suborbital test vehicle, not a real vehicle.",
+                )
+                .with_evidence("exploratory"),
+                LIGHT,
             ),
         ],
         scenarios: vec![
@@ -518,6 +591,34 @@ pub fn catalog() -> DomainCatalog {
         requirements: requirements(),
         demos: crate::demos::demos(),
     }
+}
+
+/// The vehicle's measured attributes, read from the template it is simulated with.
+fn with_facts(mut v: Item, scenario: &str) -> Item {
+    let case = crate::case::template(scenario).expect("bundled template");
+    let veh = &case["vehicle"];
+    let num = |k: &str| veh[k].as_f64().expect("vehicle number");
+    let dry = num("dry_mass_kg");
+    let prop = num("propellant_mass_kg");
+    let thrust = num("max_thrust_n");
+    let fact = |label: &str, value: f64, unit: &str| Fact {
+        label: label.into(),
+        value,
+        unit: unit.into(),
+    };
+    v.facts = vec![
+        fact("Dry mass", dry / 1000.0, "t"),
+        fact("Propellant", prop / 1000.0, "t"),
+        fact("Engine thrust", thrust / 1000.0, "kN"),
+        fact("Specific impulse", num("isp_s"), "s"),
+        fact(
+            "Thrust over full-load weight",
+            thrust / ((dry + prop) * 9.80665),
+            "",
+        ),
+        fact("Throttle floor", num("throttle_min") * 100.0, "%"),
+    ];
+    v
 }
 
 /// A request in the canonical shape, for demonstrations and tests.

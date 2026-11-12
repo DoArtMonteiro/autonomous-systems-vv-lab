@@ -1,4 +1,4 @@
-// Derived views of a replay shared by the mission player, the geospatial view and Mission Control
+// Derived views of a replay shared by the mission player, the geospatial view and the Flight console
 // (M16). Everything here reads the run records; nothing runs or changes a simulation. Phases and the
 // divergence instant are derived from recorded channels and are labelled as derived wherever shown.
 
@@ -124,7 +124,7 @@ export function hudNum(v) {
 }
 
 
-// ----------------------------------------------------------------------------- Mission Control
+// ----------------------------------------------------------------------------- Flight console
 
 /** Origin tag of a channel, read from the kind the record declares (never assumed). */
 export const KIND_TAG = { truth: 'T', observation: 'O', estimate: 'E', command: 'C', metric: 'D', limit: 'L', uncertainty: 'U' };
