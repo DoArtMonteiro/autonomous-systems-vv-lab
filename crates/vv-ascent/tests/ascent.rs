@@ -320,8 +320,10 @@ fn the_outcome_is_decided_in_a_fixed_order_and_each_code_means_one_thing() {
         elements_with(-2.9e7, 298e3),
         elements_with(-2.9e7, 298e3),
     );
+    // Exactly on the two boundaries: periapsis 0 km (clears the surface) and the 180 km minimum.
+    let (on_surface, on_minimum) = (elements_with(-2.9e7, 0.0), elements_with(-2.9e7, 180e3));
     let (hyperbolic, parabolic) = (elements_with(1.0e6, 300e3), elements_with(0.0, -200e3));
-    let cases: [(OutcomeInput, &str); 11] = [
+    let cases: [(OutcomeInput, &str); 14] = [
         (
             OutcomeInput {
                 lifted_off: false,
@@ -348,6 +350,14 @@ fn the_outcome_is_decided_in_a_fixed_order_and_each_code_means_one_thing() {
         (flying(None, true, false), "suborbital"),
         (flying(Some(&below_surface), false, false), "suborbital"),
         (flying(Some(&low), false, true), "low_periapsis_orbit"),
+        // A periapsis of exactly 0 km is not below the surface: bound, but under the minimum.
+        (
+            flying(Some(&on_surface), false, true),
+            "low_periapsis_orbit",
+        ),
+        // A periapsis of exactly the minimum meets it, on and off the apoapsis target.
+        (flying(Some(&on_minimum), false, true), "orbit"),
+        (flying(Some(&on_minimum), false, false), "off_target_orbit"),
         (flying(Some(&off), false, false), "off_target_orbit"),
         (flying(Some(&good), false, true), "orbit"),
         // Reaching the surface after SECO outranks a good orbit at SECO.

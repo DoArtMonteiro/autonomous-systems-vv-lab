@@ -684,6 +684,11 @@ pub struct OutcomeInput<'a> {
 /// out of time before SECO), `unbound` (specific energy not negative), `low_periapsis_orbit` (a bound
 /// orbit that clears the surface but not the minimum periapsis), `off_target_orbit` (the apoapsis is
 /// outside the tolerance) and `orbit`.
+///
+/// The order matters: a surface contact outranks every orbit, and `unbound` is tested before the
+/// periapsis because a hyperbolic state has a periapsis that says nothing about being in orbit.
+/// A periapsis of exactly 0 km clears the surface (it is not `suborbital`) and one of exactly
+/// `min_periapsis_km` meets the minimum.
 pub fn classify_outcome(i: &OutcomeInput) -> &'static str {
     if !i.lifted_off {
         return "scrubbed";
