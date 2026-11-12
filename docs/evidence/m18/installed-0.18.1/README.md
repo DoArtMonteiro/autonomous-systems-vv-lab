@@ -23,7 +23,7 @@ Os hashes de todos os instaladores de recuperação estão em `SHA256SUMS.txt` (
 - `VV Lab Studio_0.18.1_x64-setup.exe /S`: código de saída 0; a chave `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\VV Lab Studio` passou de `DisplayVersion` 0.17.0 para 0.18.1 e o executável instalado declara a versão 0.18.1.
 - Biblioteca do utilizador (`Documentos\VV Lab Library`): 11 corridas antes e 11 depois, mesma lista de identificadores, e o SHA-256 da lista ordenada dos 89 ficheiros da biblioteca é idêntico antes e depois.
 - Módulo Cinematic 0.2.0: instalado pelo teste opcional `real_module_zip_installs_when_given` de `desktop/studio/src/modules.rs` (`VV_CINEMATIC_ZIP`, `VV_CINEMATIC_INSTALL_TO` a apontar para a pasta real de módulos), porque o diálogo nativo não é automatizável. O estado lido pelo Studio instalado foi `installed: true, verified: true, version: 0.2.0`. A instalação substituiu a 0.1.0.
-- O percurso `m17_cinematic_journey.py` desinstala o módulo no fim; o módulo foi reinstalado da mesma forma antes do percurso de utilizador e das medições, e fica instalado e verificado.
+- O percurso `m17_cinematic_journey.py` desinstala o módulo no fim; o módulo foi reinstalado da mesma forma antes do percurso de utilizador e das medições, e fica instalado e verificado. No fim de todas as execuções (incluindo a repetição final desse percurso e a nova reinstalação), confirmou-se outra vez: `DisplayVersion` 0.18.1, módulo `installed: true, verified: true, version: 0.2.0` lido pelo Studio instalado, biblioteca com o mesmo SHA-256 e a mesma lista de 11 corridas, e nenhum processo do Studio ou do Godot ativo.
 
 ## Percursos contra o executável instalado
 
@@ -67,7 +67,7 @@ Vista geoespacial e leitor, `python desktop/studio/tests/perf_probe.py --exe "%L
 | Sessão de 180 s, p99 dos frames | 8,4 a 8,7 ms; working set de 905 para 939 MB |
 | Pedidos da WebView a fora da máquina | nenhum |
 
-Os frames de 8 ms correspondem ao ritmo de atualização do ecrã nesta máquina, não à capacidade máxima de desenho.
+Os frames de 8 ms (cerca de 125 Hz) ficam abaixo do ritmo de 165 Hz que o controlador indica para o ecrã; a causa do limite não foi determinada, por isso estes números não medem a capacidade máxima de desenho.
 
 Cinematic View, módulo instalado, `python scripts/cinematic/bench.py --godot <Godot_v4.7.2-stable_win64_console.exe do módulo> --project <project do módulo> --run tests/fixtures/cinematic/landing-run --env <environments/cape-canaveral instalado> --out <pasta> --profiles auto,balanced --seconds 12 --driver d3d12` (1440x900, sem sincronização vertical, câmara Auto; `perf/bench-*.json`, `perf/summary.json`):
 
