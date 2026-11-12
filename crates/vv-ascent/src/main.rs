@@ -19,6 +19,8 @@ fn summary(outputs: &vv_ascent::run::Outputs) -> serde_json::Value {
         "outcome": v.outcome,
         "requirements_pass": v.requirements_pass,
         "invariants_pass": v.invariants_pass,
+        "invariants_evaluated": v.invariants_evaluated,
+        "invariants_not_evaluated": v.invariants_not_evaluated,
         "verdicts": v.verdicts.iter().map(|x| serde_json::json!({
             "id": x.id, "status": x.status, "observed": x.observed, "cause": x.cause,
         })).collect::<Vec<_>>(),

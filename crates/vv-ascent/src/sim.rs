@@ -23,6 +23,9 @@ use crate::prng::{SplitMix64, source};
 pub const STACK: usize = 0;
 pub const BOOSTER: usize = 1;
 pub const UPPER: usize = 2;
+/// Index of the mission in the event order, after the entities: events about the mission as a whole
+/// (or before their entity existed) are attached to it. It is not an entity and has no samples.
+pub const MISSION: usize = 3;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -180,7 +183,17 @@ fn state_detail(b: &Body) -> Value {
     })
 }
 
-fn directive_event(ev: &mut Events, tick: u64, entity: usize, d: &Directive, body: &Body) {
+/// What a controller event records of the flight state: the navigation solution the flight software
+/// acted on, never the true state (events of the truth source carry that, in `state_detail`).
+fn observation_detail(o: &Observation) -> Value {
+    json!({
+        "observed_altitude_m": altitude(o.r),
+        "observed_downrange_m": downrange(o.r),
+        "observed_speed_m_s": o.v.norm(),
+    })
+}
+
+fn directive_event(ev: &mut Events, tick: u64, entity: usize, d: &Directive, obs: &Observation) {
     let (kind, label, extra) = match d {
         Directive::ChecksPassed => (
             "prelaunch_checks_passed",
@@ -230,7 +243,7 @@ fn directive_event(ev: &mut Events, tick: u64, entity: usize, d: &Directive, bod
             json!({ "reason": reason, "energy_obs_j_kg": energy_obs_j_kg }),
         ),
     };
-    let mut detail = state_detail(body);
+    let mut detail = observation_detail(obs);
     if let (Value::Object(m), Value::Object(x)) = (&mut detail, extra) {
         m.extend(x);
     }
@@ -329,7 +342,7 @@ pub fn simulate(prep: &Prepared) -> Simulation {
                 let (cmd, directives) = guidance.step(tick, &obs);
                 lives[i].cmd = cmd;
                 for d in &directives {
-                    directive_event(&mut ev, tick, i, d, &lives[i].body);
+                    directive_event(&mut ev, tick, i, d, &obs);
                     match d {
                         Directive::Separate => {
                             let s = lives[STACK].body;

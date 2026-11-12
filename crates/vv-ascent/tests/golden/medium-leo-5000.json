@@ -3,7 +3,7 @@
   "entities_sha256": "b19142ce7fb8081eba71a01cc56c8d5834c9abd665af9555f83590dd207913e1",
   "outcome": "orbit",
   "seed": 5000,
-  "trace_sha256": "7ed6415033c79ef29ed77d1cc74062761b658ccd334f778f865d26724a27d0e9",
+  "trace_sha256": "58d3841153adc8400750f5ac2f1f109bab880660e276891b05fe8c1f0f35f5ad",
   "verdicts": [
     {
       "id": "stack.S1_max_dynamic_pressure",
@@ -47,7 +47,7 @@
     },
     {
       "id": "upper.R6_propellant_margin",
-      "observed": "residual 1329.6 kg, margin 1329.6 kg, SECO reason: target energy reached",
+      "observed": "residual 1329.6 kg, margin 849.6 kg, SECO reason: target energy reached",
       "status": "pass"
     },
     {
@@ -61,5 +61,5 @@
       "status": "pass"
     }
   ],
-  "verification_sha256": "522eee309c1d516117e268ce377ec0564b0ed337bbc183595dd02efedb95b939"
+  "verification_sha256": "187a7310bba551bdf6e444485e11afddb356640a472715f6697924603f7659a8"
 }

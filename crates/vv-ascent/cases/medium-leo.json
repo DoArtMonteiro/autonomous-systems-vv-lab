@@ -76,7 +76,7 @@
     "separation_speed_m_s": [1800.0, 3500.0],
     "apoapsis_tolerance_km": 15.0,
     "min_periapsis_km": 250.0,
-    "min_residual_fraction": [0.04, 0.0]
+    "min_residual_fraction": [0.04, 0.01]
   },
   "dispersions": {
     "enabled": true,

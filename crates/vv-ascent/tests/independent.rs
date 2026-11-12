@@ -39,7 +39,7 @@ fn conic(r: [f64; 2], v: [f64; 2]) -> Conic {
         energy: -MU * inv_a / 2.0,
         e,
         periapsis_alt: a * (1.0 - e) - R,
-        apoapsis_alt: (a > 0.0).then(|| a * (1.0 + e) - R),
+        apoapsis_alt: (a > 0.0).then_some(a * (1.0 + e) - R),
         semi_major: a,
     }
 }
@@ -73,16 +73,8 @@ fn states() -> Vec<(&'static str, [f64; 2], [f64; 2])> {
             [0.0, R + 200e3],
             [1.0001 * escape, 0.0],
         ),
-        (
-            "hyperbola, climbing",
-            [0.0, R + 200e3],
-            [11_500.0, 1000.0],
-        ),
-        (
-            "hyperbola, descending",
-            [4.0e6, 5.5e6],
-            [-8000.0, -9000.0],
-        ),
+        ("hyperbola, climbing", [0.0, R + 200e3], [11_500.0, 1000.0]),
+        ("hyperbola, descending", [4.0e6, 5.5e6], [-8000.0, -9000.0]),
         (
             "slightly eccentric, 1.02 of circular speed",
             [0.0, R + 300e3],
@@ -103,21 +95,34 @@ fn elements_agree_with_vis_viva_and_the_eccentricity_vector_on_bound_and_unbound
         worst_e = worst_e.max(de);
         worst_alt = worst_alt.max(dp);
         worst_energy = worst_energy.max(den);
-        assert!(de < 1e-9, "{name}: eccentricity {} vs {}", got.eccentricity, want.e);
+        assert!(
+            de < 1e-9,
+            "{name}: eccentricity {} vs {}",
+            got.eccentricity,
+            want.e
+        );
         assert!(
             dp < 1e-3,
             "{name}: periapsis {} vs {}",
             got.periapsis_alt_m,
             want.periapsis_alt
         );
-        assert!(den < 1e-9, "{name}: energy {} vs {}", got.energy_j_kg, want.energy);
+        assert!(
+            den < 1e-9,
+            "{name}: energy {} vs {}",
+            got.energy_j_kg,
+            want.energy
+        );
         match (got.apoapsis_alt_m, want.apoapsis_alt) {
             (Some(g), Some(w)) => {
                 let da = (g - w).abs();
                 worst_alt = worst_alt.max(da);
                 assert!(da < 1e-3 + 1e-11 * w.abs(), "{name}: apoapsis {g} vs {w}");
                 let dsm = (got.semi_major_axis_m.unwrap() - want.semi_major).abs();
-                assert!(dsm < 1e-3 + 1e-11 * want.semi_major, "{name}: semi-major axis");
+                assert!(
+                    dsm < 1e-3 + 1e-11 * want.semi_major,
+                    "{name}: semi-major axis"
+                );
             }
             (None, None) => assert!(got.semi_major_axis_m.is_none(), "{name}"),
             (g, w) => panic!("{name}: apoapsis {g:?} vs {w:?}: bound and unbound disagree"),
@@ -168,10 +173,7 @@ fn a_body_in_constant_density_air_follows_the_tanh_fall_to_its_terminal_velocity
         gravity: Gravity::Uniform(Vec2::new(0.0, -g)),
         atmosphere: true,
     };
-    let aero = Aero {
-        area_m2: area,
-        cd,
-    };
+    let aero = Aero { area_m2: area, cd };
     let z0 = R - 1.0e5;
     let mut b = Body {
         r: Vec2::new(0.0, z0),
@@ -187,7 +189,10 @@ fn a_body_in_constant_density_air_follows_the_tanh_fall_to_its_terminal_velocity
         let drop = vt * vt / g * x.cosh().ln();
         worst_v = worst_v.max((-b.v.z - v).abs());
         worst_z = worst_z.max((b.r.z - (z0 - drop)).abs());
-        assert!(b.r.z < R, "the body must stay below the surface so the density is constant");
+        assert!(
+            b.r.z < R,
+            "the body must stay below the surface so the density is constant"
+        );
         assert_eq!(b.v.x, 0.0);
     }
     println!(
@@ -196,7 +201,10 @@ fn a_body_in_constant_density_air_follows_the_tanh_fall_to_its_terminal_velocity
     );
     assert!(worst_v < 1e-7, "velocity difference {worst_v}");
     assert!(worst_z < 1e-5, "position difference {worst_z}");
-    assert!((-b.v.z - vt).abs() < 1e-6 * vt, "terminal velocity not reached");
+    assert!(
+        (-b.v.z - vt).abs() < 1e-6 * vt,
+        "terminal velocity not reached"
+    );
 }
 
 /// The interpolated impact point of `impact_between` against the analytic Kepler arc of a vacuum
@@ -224,8 +232,9 @@ fn the_interpolated_impact_point_agrees_with_the_analytic_vacuum_arc() {
         let nu0 = nu_at(r0[1]);
         let nu1 = 2.0 * std::f64::consts::PI - nu_at(R);
         let mean = |nu: f64| {
-            let ecc = 2.0 * ((1.0 - c.e).sqrt() * (nu / 2.0).sin())
-                .atan2((1.0 + c.e).sqrt() * (nu / 2.0).cos());
+            let ecc = 2.0
+                * ((1.0 - c.e).sqrt() * (nu / 2.0).sin())
+                    .atan2((1.0 + c.e).sqrt() * (nu / 2.0).cos());
             ecc - c.e * ecc.sin()
         };
         let n = (MU / (a * a * a)).sqrt();

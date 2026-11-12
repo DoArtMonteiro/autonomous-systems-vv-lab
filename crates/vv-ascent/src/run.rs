@@ -99,7 +99,7 @@ pub struct RunInfo {
     pub outcome: String,
 }
 
-pub const EVENT_ORDER: &str = "tick, then entity (stack, booster, upper), then source (truth, controller, verifier), then emission order";
+pub const EVENT_ORDER: &str = "tick, then entity (stack, booster, upper, then the mission), then source (truth, controller, verifier), then emission order";
 
 fn trace_sample(s: &Sample, aero: &Aero) -> TraceSample {
     let d = drag(&Environment::MISSION, aero, s.r, s.v);
@@ -179,7 +179,7 @@ pub fn trace_of(prep: &Prepared, sim: &Simulation, verification: &Verification) 
             .map(|e| TraceEvent {
                 tick: e.tick,
                 t_s: e.tick as f64 * DT,
-                entity: names.get(e.entity).copied().unwrap_or("stack").into(),
+                entity: names.get(e.entity).copied().unwrap_or("mission").into(),
                 source: match e.source {
                     crate::sim::Source::Truth => "truth",
                     crate::sim::Source::Controller => "controller",

@@ -122,7 +122,9 @@ fn nominal_cases_reach_orbit_with_two_independent_entities_after_separation() {
             o.simulation.entities[2].end_reason,
             "end of coast after SECO"
         );
-        // Coast after SECO keeps the two-body energy (drag above 300 km is negligible).
+        // The coast keeps the two-body energy because the model has almost no drag at this altitude
+        // (the isothermal atmosphere is a model artefact there). This is an integrator check, not
+        // evidence of an orbital lifetime.
         let ins = v.insertion.as_ref().unwrap();
         let end = ins.end_of_coast.unwrap();
         let rel = ((end.energy_j_kg - ins.elements.energy_j_kg) / ins.elements.energy_j_kg).abs();
@@ -222,7 +224,9 @@ fn a_heavy_payload_fails_insertion_with_the_cause_named() {
     let mut c = case("small-leo");
     c.vehicle.payload_kg = 600.0;
     let o = run(&c, 5000);
-    assert_ne!(o.verification.outcome, "orbit");
+    // The heavy payload leaves the true orbit at SECO with a periapsis below the surface.
+    assert_eq!(o.verification.outcome, "suborbital");
+    assert!(!o.verification.requirements_pass);
     let v = o
         .verification
         .verdicts
@@ -265,6 +269,277 @@ fn a_vehicle_that_cannot_lift_off_is_scrubbed_by_the_prelaunch_checks() {
     assert!(o.verification.events.iter().any(|e| e.kind == "scrub"));
     assert_eq!(o.simulation.entities.len(), 1);
     assert_eq!(status(&o, "upper.R4_periapsis"), "not_evaluated");
+    // No invariant was judged: "no invariant failed" must not read as "safe" without the flag.
+    let v = &o.verification;
+    assert!(v.invariants_pass && !v.invariants_evaluated);
+    assert_eq!(
+        v.invariants_not_evaluated,
+        [
+            "stack.S1_max_dynamic_pressure",
+            "stack.S2_axial_acceleration",
+            "upper.S2_axial_acceleration"
+        ]
+    );
+}
+
+#[test]
+fn a_nominal_flight_judges_every_invariant() {
+    let o = run(&case("small-leo"), 5000);
+    assert!(o.verification.invariants_pass && o.verification.invariants_evaluated);
+    assert!(o.verification.invariants_not_evaluated.is_empty());
+}
+
+fn elements_with(energy: f64, periapsis_alt_m: f64) -> vv_ascent::dynamics::Elements {
+    vv_ascent::dynamics::Elements {
+        energy_j_kg: energy,
+        angular_momentum_m2_s: 5.0e10,
+        semi_major_axis_m: (energy < 0.0).then_some(7.0e6),
+        eccentricity: 0.1,
+        periapsis_alt_m,
+        apoapsis_alt_m: (energy < 0.0).then_some(400e3),
+    }
+}
+
+#[test]
+fn the_outcome_is_decided_in_a_fixed_order_and_each_code_means_one_thing() {
+    use vv_ascent::dynamics::Elements;
+    use vv_ascent::verify::{OUTCOMES, OutcomeInput, classify_outcome};
+    fn flying(seco: Option<&Elements>, surface: bool, on_target: bool) -> OutcomeInput<'_> {
+        OutcomeInput {
+            lifted_off: true,
+            separated: true,
+            upper_reached_surface: surface,
+            seco,
+            min_periapsis_km: 180.0,
+            apoapsis_on_target: on_target,
+        }
+    }
+    let (below_surface, low, off, good) = (
+        elements_with(-2.9e7, -859e3),
+        elements_with(-2.9e7, 100e3),
+        elements_with(-2.9e7, 298e3),
+        elements_with(-2.9e7, 298e3),
+    );
+    let (hyperbolic, parabolic) = (elements_with(1.0e6, 300e3), elements_with(0.0, -200e3));
+    let cases: [(OutcomeInput, &str); 11] = [
+        (
+            OutcomeInput {
+                lifted_off: false,
+                separated: false,
+                upper_reached_surface: false,
+                seco: None,
+                min_periapsis_km: 180.0,
+                apoapsis_on_target: false,
+            },
+            "scrubbed",
+        ),
+        (
+            OutcomeInput {
+                lifted_off: true,
+                separated: false,
+                upper_reached_surface: false,
+                seco: None,
+                min_periapsis_km: 180.0,
+                apoapsis_on_target: false,
+            },
+            "no_separation",
+        ),
+        (flying(None, false, false), "seco_not_reached"),
+        (flying(None, true, false), "suborbital"),
+        (flying(Some(&below_surface), false, false), "suborbital"),
+        (flying(Some(&low), false, true), "low_periapsis_orbit"),
+        (flying(Some(&off), false, false), "off_target_orbit"),
+        (flying(Some(&good), false, true), "orbit"),
+        // Reaching the surface after SECO outranks a good orbit at SECO.
+        (flying(Some(&good), true, true), "suborbital"),
+        // Unbound: hyperbolic, and exactly parabolic (energy zero), whatever the periapsis.
+        (flying(Some(&hyperbolic), false, false), "unbound"),
+        (flying(Some(&parabolic), false, false), "unbound"),
+    ];
+    let mut seen = Vec::new();
+    for (input, want) in &cases {
+        let got = classify_outcome(input);
+        assert_eq!(got, *want);
+        seen.push(got);
+    }
+    for code in OUTCOMES {
+        assert!(seen.contains(&code), "no case produces {code}");
+    }
+}
+
+#[test]
+fn a_bound_orbit_below_the_minimum_periapsis_is_not_called_suborbital() {
+    let mut c = case("small-leo");
+    // The nominal true periapsis is about 298 km: ask for more than the orbit has.
+    c.limits.min_periapsis_km = 350.0;
+    let o = run(&c, 5000);
+    assert_eq!(o.verification.outcome, "low_periapsis_orbit");
+    assert_eq!(status(&o, "upper.R4_periapsis"), "fail");
+    let p = o.verification.insertion.as_ref().unwrap().elements;
+    assert!(p.periapsis_alt_m > 0.0 && p.energy_j_kg < 0.0);
+}
+
+#[test]
+fn a_run_that_ends_before_seco_is_named_so_and_not_suborbital() {
+    let nominal = run(&case("small-leo"), 5000);
+    let tick_of = |k: &str| {
+        nominal
+            .verification
+            .events
+            .iter()
+            .find(|e| e.kind == k)
+            .unwrap()
+            .tick
+    };
+    // End the simulated time 5 s after the upper-stage ignition: separated, burning, no SECO.
+    let end_s = (tick_of("upper_ignition") as f64 * 0.02).ceil() + 5.0;
+    let mut c = case("small-leo");
+    c.mission.max_duration_s = end_s;
+    let o = run(&c, 5000);
+    assert_eq!(o.verification.outcome, "seco_not_reached");
+    assert!(o.verification.insertion.is_none());
+    assert_eq!(status(&o, "mission.R8_orbit_insertion"), "fail");
+    // The failing requirement is judged at the end of the simulated time, and its event is the
+    // mission's, never one at tick 0.
+    let r8 = o
+        .verification
+        .verdicts
+        .iter()
+        .find(|v| v.id == "mission.R8_orbit_insertion")
+        .unwrap();
+    assert_eq!(r8.tick, Some(o.simulation.last_tick));
+    let violation = o
+        .verification
+        .events
+        .iter()
+        .find(|e| e.kind == "violation" && e.detail["id"] == "mission.R8_orbit_insertion")
+        .unwrap();
+    assert_eq!(violation.tick, o.simulation.last_tick);
+    assert_eq!(violation.entity, vv_ascent::sim::MISSION);
+}
+
+#[test]
+fn an_orbit_with_another_requirement_failing_carries_requirements_pass_false() {
+    // Seed 42 reaches the orbit and misses only the booster recovery zone.
+    let o = run(&case("small-leo"), 42);
+    assert_eq!(o.verification.outcome, "orbit");
+    assert!(!o.verification.requirements_pass);
+    assert_eq!(status(&o, "booster.R3_recovery_zone"), "fail");
+    let nominal = run(&case("small-leo"), 5000);
+    assert_eq!(nominal.verification.outcome, "orbit");
+    assert!(nominal.verification.requirements_pass);
+}
+
+#[test]
+fn the_upper_stage_margin_requirement_has_a_real_minimum() {
+    let c = case("small-leo");
+    let min = c.limits.min_residual_fraction[1];
+    assert!(min > 0.0, "a zero minimum cannot fail");
+    // The nominal residual is above it, and raising the minimum above the residual fails R6 with
+    // the cause named.
+    let o = run(&c, 5000);
+    assert_eq!(status(&o, "upper.R6_propellant_margin"), "pass");
+    let mut strict = c.clone();
+    strict.limits.min_residual_fraction[1] = 0.05;
+    let o = run(&strict, 5000);
+    let v = o
+        .verification
+        .verdicts
+        .iter()
+        .find(|v| v.id == "upper.R6_propellant_margin")
+        .unwrap();
+    assert_eq!(v.status, "fail");
+    assert!(
+        v.cause.iter().any(|c| c.contains("below the minimum")),
+        "{:?}",
+        v.cause
+    );
+}
+
+/// An event never precedes the start of the entity it is attached to, nor follows its last sample.
+fn assert_events_inside_their_entity(o: &Outputs, what: &str) {
+    for e in &o.verification.events {
+        if let Some(run) = o.simulation.entities.get(e.entity) {
+            let (a, b) = (
+                run.samples.first().unwrap().tick,
+                run.samples.last().unwrap().tick,
+            );
+            assert!(
+                a <= e.tick && e.tick <= b,
+                "{what}: {} of the {} at tick {} outside {a}..{b}",
+                e.kind,
+                run.id,
+                e.tick
+            );
+        } else {
+            assert_eq!(e.entity, vv_ascent::sim::MISSION, "{what}: {}", e.kind);
+        }
+    }
+}
+
+#[test]
+fn verdict_events_are_attached_inside_the_span_of_their_entity() {
+    // Seed 7 fails the booster margin at MECO, which is before the booster exists; seed 42 fails
+    // the zone; the heavy payload fails the upper-stage margin and the insertion.
+    let mut heavy = case("small-leo");
+    heavy.vehicle.payload_kg = 600.0;
+    let runs = [
+        ("small-leo 7", run(&case("small-leo"), 7)),
+        ("small-leo 42", run(&case("small-leo"), 42)),
+        ("heavy payload", run(&heavy, 5000)),
+        ("medium-leo", run(&case("medium-leo"), 5000)),
+    ];
+    for (what, o) in &runs {
+        assert_events_inside_their_entity(o, what);
+    }
+    let margin = runs[0]
+        .1
+        .verification
+        .events
+        .iter()
+        .find(|e| e.kind == "violation" && e.detail["id"] == "booster.R2_propellant_margin");
+    let margin = margin.expect("seed 7 fails the booster margin");
+    assert_eq!(
+        margin.entity,
+        vv_ascent::sim::STACK,
+        "before the booster existed"
+    );
+}
+
+#[test]
+fn controller_events_carry_the_observation_never_the_true_state() {
+    let o = run(&case("small-leo"), 5000);
+    let truth = |tick: u64| {
+        let s = o.simulation.entities[0]
+            .samples
+            .iter()
+            .find(|s| s.tick == tick)
+            .unwrap();
+        vv_ascent::dynamics::altitude(s.r)
+    };
+    let mut checked = 0;
+    for e in o
+        .verification
+        .events
+        .iter()
+        .filter(|e| e.source == vv_ascent::sim::Source::Controller)
+    {
+        let d = e.detail.as_object().unwrap();
+        for key in ["altitude_m", "downrange_m", "speed_m_s", "mass_kg"] {
+            assert!(!d.contains_key(key), "{}: true-state field {key}", e.kind);
+        }
+        if let Some(obs) = d.get("observed_altitude_m") {
+            checked += 1;
+            if e.entity == vv_ascent::sim::STACK && e.tick > 0 {
+                // The navigation noise (10 m per axis) makes the observation differ from the truth.
+                assert_ne!(obs.as_f64().unwrap(), truth(e.tick), "{}", e.kind);
+            }
+        }
+    }
+    assert!(
+        checked > 5,
+        "controller events with an observation: {checked}"
+    );
 }
 
 #[test]
