@@ -1,13 +1,15 @@
 """The CC0 assets shipped with the Cinematic View are exactly the files recorded in assets/cc0/PROVENANCE.json.
 
 For every entry: the licence is CC0, the source page and author are given, each file exists with the recorded
-size and SHA-256, and no other file is in assets/cc0 besides PROVENANCE.json and NOTICE-cc0.md. When the staging
-directory of the asset agent is present (CINEMATIC_CC0_STAGING, default D:\\vvwt\\cc0\\out) the recorded hashes are
-also compared with the ones in its own PROVENANCE.json, so a changed copy is caught. The module's size limits
+size and SHA-256, and no other file is in assets/cc0 besides PROVENANCE.json and NOTICE-cc0.md. NOTICE-cc0.md must
+equal what scripts/cinematic/make_notice.py generates, so it lists only shipped assets. When the environment
+variable CINEMATIC_CC0_STAGING names a staging directory with its own PROVENANCE.json, the recorded hashes are
+also compared with it, so a changed copy is caught; without the variable that comparison is skipped. The module's size limits
 (desktop/studio/src/modules.rs: 512 files, 512 MiB per file, 1 GiB) are checked on the project directory.
 """
 
 import hashlib
+import importlib.util
 import json
 import os
 import unittest
@@ -57,11 +59,24 @@ class Cc0Assets(unittest.TestCase):
         self.assertEqual(on_disk, listed)
         self.assertTrue(os.path.isfile(os.path.join(CC0, "NOTICE-cc0.md")))
 
+    def test_notice_is_generated_from_the_provenance_and_lists_only_shipped_assets(self):
+        spec = importlib.util.spec_from_file_location("make_notice", os.path.join(REPO, "scripts", "cinematic", "make_notice.py"))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        with open(os.path.join(CC0, "NOTICE-cc0.md"), encoding="utf-8", newline="") as f:
+            notice = f.read()
+        self.assertEqual(notice, mod.render(self.prov))
+        for a in self.prov:
+            self.assertIn(f"`{a['id']}`", notice)
+        self.assertEqual(notice.count("| CC0 1.0 |"), len(self.prov))
+
     def test_hashes_agree_with_the_staging_provenance(self):
-        staging = os.environ.get("CINEMATIC_CC0_STAGING", r"D:\vvwt\cc0\out")
+        staging = os.environ.get("CINEMATIC_CC0_STAGING")
+        if not staging:
+            self.skipTest("CINEMATIC_CC0_STAGING is not set")
         p = os.path.join(staging, "PROVENANCE.json")
         if not os.path.isfile(p):
-            self.skipTest("the staging directory is not present")
+            self.skipTest("the staging directory has no PROVENANCE.json")
         with open(p, encoding="utf-8") as f:
             theirs = {a["id"]: {os.path.basename(e["path"]): e["sha256"] for e in a["files"]} for a in json.load(f)}
         for a in self.prov:
