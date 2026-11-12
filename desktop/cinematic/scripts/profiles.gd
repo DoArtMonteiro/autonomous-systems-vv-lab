@@ -6,8 +6,10 @@
 # RenderingDevice.get_device_total_memory() returned 0), so the capacity comes from --vram-bytes
 # (Studio reads the display adapter's HardwareInformation.qwMemorySize from the registry), else from
 # that registry value read here with reg.exe and fixed arguments, else it is unknown and Balanced is
-# used with a visible note. While running, if the video memory in use passes 85 % of the capacity,
-# the profile steps down one level instead of failing.
+# used with a visible note. The automatic choice never goes above High: capacity says nothing about
+# frame time, and Ultra measured above the 16.7 ms budget on the reference machine (docs/m17-cinematic.md),
+# so Ultra is only chosen by hand. While running, if the video memory in use passes 85 % of the
+# capacity, the profile steps down one level instead of failing.
 extends RefCounted
 
 const ORDER := ["performance", "balanced", "high", "ultra"]
@@ -57,9 +59,11 @@ static func auto_pick(vram: Dictionary) -> Dictionary:
 	var gb := b / 1.0e9
 	var pick := "performance"
 	for p in ORDER:
+		if p == "ultra":
+			break # Ultra is only ever chosen by hand
 		if gb >= TABLE[p]["min_vram_gb"]:
 			pick = p
-	return {"profile": pick, "reason": "%.1f GB of video memory (%s)" % [gb, vram["source"]]}
+	return {"profile": pick, "reason": "%.1f GB of video memory (%s); automatic choice stops at High" % [gb, vram["source"]]}
 
 
 # Settings of `name`; "custom" starts from Balanced and applies `custom` (key=value strings).
