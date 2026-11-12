@@ -111,7 +111,7 @@ Formatação, Clippy com avisos tratados como erros e os 44 testes Rust passaram
 
 A revisão técnica independente verificou fronteira de observações, conclusão física, estagnação, interação das falhas, integridade da reprodução e identidade da redução. A redução compara a primeira evidência de falha e conserva as categorias de perturbação; os testes incluem rejeição de uma condição diferente seguida por uma evidência coincidente. Os 39 testes Python passaram também numa cópia limpa do repositório, sem pastas de execuções anteriores.
 
-O workflow [verification](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/actions/workflows/ci.yml) aplica as verificações em Linux e Windows. A campanha de CI usa 58 casos e 216 invocações; a comparação entre plataformas cobre os oito pares M1 fixados, os 21 casos M2 da semente 42 e os quatro hashes do cenário reduzido: cenário, eventos, invariantes e missão. O resultado remoto pertence à PR e identifica o commit verificado.
+O workflow [verification](https://github.com/DoArtMonteiro/autonomous-systems-vv-lab/actions/workflows/ci.yml) aplica as verificações em Linux e Windows. A campanha de CI usa 58 casos e 216 invocações; a comparação entre plataformas cobre os oito pares M1 fixados, os 21 casos M2 da semente 42 e os quatro hashes do cenário reduzido: cenário, eventos, invariantes e missão. O resultado remoto pertence à PR e identifica o commit verificado.
 
 ## Compatibilidade e limites do modelo
 

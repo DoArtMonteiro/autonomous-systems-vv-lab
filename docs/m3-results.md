@@ -65,7 +65,7 @@ O hash canónico é o campo `artifact_sha256` do artefacto de eventos v1 e liga 
 
 ## Campanha M3
 
-Execução de CI em 11/10/2026, [workflow 38170117451](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/actions/runs/38170117451), em Ubuntu 24.04 e Windows, com as sementes 42, 1337 e 2026, dez cenários, limite de 30 casos, 90 invocações, 64 MiB de artefactos e 120 s. A execução verificou a revisão `29b7b1be363a9acd0fc334dfb9d773cf1034cd44`:
+Execução de CI em 11/10/2026, [workflow 38170117451](https://github.com/DoArtMonteiro/autonomous-systems-vv-lab/actions/runs/38170117451), em Ubuntu 24.04 e Windows, com as sementes 42, 1337 e 2026, dez cenários, limite de 30 casos, 90 invocações, 64 MiB de artefactos e 120 s. A execução verificou a revisão `29b7b1be363a9acd0fc334dfb9d773cf1034cd44`:
 
 ```powershell
 python scripts/run_campaign.py --binary target/release/vv-lab.exe --suite m3 --seeds 42,1337,2026 --max-runs 90 --max-cases 30 --max-artifact-bytes 67108864 --time-budget-seconds 120 --output-root runs/m3-campaign
@@ -123,7 +123,7 @@ target\release\vv-lab.exe benchmark scenarios/basic-mission.json --seed 42 --ite
 
 ## Verificação e limites
 
-O [workflow 38170785258](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/actions/runs/38170785258) validou o código no commit `c2a7e0ade838ba3f269c901014dc50d0167a3da6`, em Linux e Windows. Ambos passaram as verificações de formatação e Clippy, 88 testes Rust unitários e de integração e um teste de documentação. Também passaram 75 testes Python com Python 3.10, a compilação de lançamento, as campanhas, a minimização, a reprodução e a comparação canónica entre plataformas.
+O [workflow 38170785258](https://github.com/DoArtMonteiro/autonomous-systems-vv-lab/actions/runs/38170785258) validou o código no commit `c2a7e0ade838ba3f269c901014dc50d0167a3da6`, em Linux e Windows. Ambos passaram as verificações de formatação e Clippy, 88 testes Rust unitários e de integração e um teste de documentação. Também passaram 75 testes Python com Python 3.10, a compilação de lançamento, as campanhas, a minimização, a reprodução e a comparação canónica entre plataformas.
 
 Em Linux, a cobertura de linhas foi 87,28%, acima do limiar de 80%. `cargo audit` verificou 22 dependências e passou. As campanhas M1 e M2 passaram 58 casos e 216 invocações por plataforma. A campanha M3 passou 30 casos e 90 invocações por plataforma.
 

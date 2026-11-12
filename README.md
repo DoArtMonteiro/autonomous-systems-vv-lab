@@ -2,11 +2,11 @@
 
 A Rust and Python laboratory for repeatable autonomous-mission simulation, fault injection and verification.
 
-**Status:** M9 and M9.1 are integrated in `main`. The M10.0 resilient-navigation design was merged through [PR #13](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/13). The M10 implementation is in draft [PR #15](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/15) and has not been accepted. The M11 desktop application, the M12 experiment engine, the M14 research and the M13 Discovery Lab were integrated without M10 through PRs [#21](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/21), [#22](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/22) and [#23](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/23). M15 (mission experience and simulation library) is proposed on its own branch, and M16 (geospatial view and Mission Control) is proposed on a branch stacked on it. Every M13 and M14 finding remains exploratory.
+**Status:** M9 and M9.1 are integrated in `main`. The M10.0 resilient-navigation design was merged through [PR #13](https://github.com/DoArtMonteiro/autonomous-systems-vv-lab/pull/13). The M10 implementation is in draft [PR #15](https://github.com/DoArtMonteiro/autonomous-systems-vv-lab/pull/15) and has not been accepted. The M11 desktop application, the M12 experiment engine, the M14 research and the M13 Discovery Lab were integrated without M10 through PRs [#21](https://github.com/DoArtMonteiro/autonomous-systems-vv-lab/pull/21), [#22](https://github.com/DoArtMonteiro/autonomous-systems-vv-lab/pull/22) and [#23](https://github.com/DoArtMonteiro/autonomous-systems-vv-lab/pull/23). M15 (mission experience and simulation library) is proposed on its own branch, and M16 (geospatial view and Mission Control) is proposed on a branch stacked on it. Every M13 and M14 finding remains exploratory.
 
 The main simulator models a two-dimensional ground vehicle. A separate, idealised six-degree-of-freedom rocket model supports the M8 and M9 research campaigns. Neither model controls real hardware, and the rocket model has no flight-data validation.
 
-[Architecture](docs/architecture.md) · [M9 landing results](docs/m9-powered-landing.md) · [M8 model](docs/m8-rocket-dynamics.md) · [Reproduction](docs/reproducibility.md) · [M9 integration, PR #12](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/12)
+[Architecture](docs/architecture.md) · [M9 landing results](docs/m9-powered-landing.md) · [M8 model](docs/m8-rocket-dynamics.md) · [Reproduction](docs/reproducibility.md) · [M9 integration, PR #12](https://github.com/DoArtMonteiro/autonomous-systems-vv-lab/pull/12)
 
 ## The problem
 
@@ -59,7 +59,7 @@ The rocket package uses a separate adapter. Its M9 landing controller sees noisy
 
 The M9 and M9.1 result document reports **780 M9 runs comparing two policies** and **1,050 M9.1 runs**, with replay checks and predeclared campaign conditions. The campaign scripts are published, but the original raw outputs are not stored in public `main`. Treat the totals as project-reported results; the original outputs are unavailable for direct inspection.
 
-[PR #12](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/12) merged M9/M9.1 on 29/10/2026. [Its CI run](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/actions/runs/40852112731) passed Linux and Windows verification, including canonical output checks. The checks are automated CI; they do not establish independent human approval. The M9.1 report also records a failed predeclared hypothesis and a regression, rather than presenting only passing outcomes.
+[PR #12](https://github.com/DoArtMonteiro/autonomous-systems-vv-lab/pull/12) merged M9/M9.1 on 29/10/2026. [Its CI run](https://github.com/DoArtMonteiro/autonomous-systems-vv-lab/actions/runs/40852112731) passed Linux and Windows verification, including canonical output checks. The checks are automated CI; they do not establish independent human approval. The M9.1 report also records a failed predeclared hypothesis and a regression, rather than presenting only passing outcomes.
 
 For the M8 model, see the [reference cases and model assumptions](docs/m8-rocket-dynamics.md). For campaign commands and artefacts, see the [reproducibility guide](docs/reproducibility.md).
 
@@ -150,14 +150,14 @@ See [docs/m14-evidence-robustness.md](docs/m14-evidence-robustness.md) (case stu
 
 ## Development timeline
 
-- **08/10/2026:** deterministic mission simulation and replay introduced in [commit `cfadcdb`](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/commit/cfadcdb).
-- **12/10/2026:** temporal contracts and actuator fault injection added in [commit `a22db7d`](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/commit/a22db7d).
-- **23/10/2026:** adversarial campaigns and deterministic failure replay added in [commit `d491b4a`](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/commit/d491b4a).
-- **24/10/2026:** controller-repair findings and the evidence-based replay workbench integrated through [PR #6](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/6) and [PR #7](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/7).
-- **25/10/2026:** M7 Mission Control and the simulator-adapter contract integrated through [PR #9](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/9), merged as commit [`ec2a2ab`](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/commit/ec2a2ab8e237d51c65df96aa7ca99b1c465ec624).
-- **25/10/2026:** the six-degree-of-freedom rocket model and reference verification added in [commit `8b04960`](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/commit/8b04960).
-- **29/10/2026:** M9 and M9.1 integrated through [PR #12](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/12).
-- **03/11/2026:** M11, M12, M14 and M13 integrated without M10 through PRs [#21](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/21), [#22](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/22) and [#23](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/pull/23).
+- **08/10/2026:** deterministic mission simulation and replay introduced in [commit `cfadcdb`](https://github.com/DoArtMonteiro/autonomous-systems-vv-lab/commit/cfadcdb).
+- **12/10/2026:** temporal contracts and actuator fault injection added in [commit `a22db7d`](https://github.com/DoArtMonteiro/autonomous-systems-vv-lab/commit/a22db7d).
+- **23/10/2026:** adversarial campaigns and deterministic failure replay added in [commit `d491b4a`](https://github.com/DoArtMonteiro/autonomous-systems-vv-lab/commit/d491b4a).
+- **24/10/2026:** controller-repair findings and the evidence-based replay workbench integrated through [PR #6](https://github.com/DoArtMonteiro/autonomous-systems-vv-lab/pull/6) and [PR #7](https://github.com/DoArtMonteiro/autonomous-systems-vv-lab/pull/7).
+- **25/10/2026:** M7 Mission Control and the simulator-adapter contract integrated through [PR #9](https://github.com/DoArtMonteiro/autonomous-systems-vv-lab/pull/9), merged as commit [`ec2a2ab`](https://github.com/DoArtMonteiro/autonomous-systems-vv-lab/commit/ec2a2ab8e237d51c65df96aa7ca99b1c465ec624).
+- **25/10/2026:** the six-degree-of-freedom rocket model and reference verification added in [commit `8b04960`](https://github.com/DoArtMonteiro/autonomous-systems-vv-lab/commit/8b04960).
+- **29/10/2026:** M9 and M9.1 integrated through [PR #12](https://github.com/DoArtMonteiro/autonomous-systems-vv-lab/pull/12).
+- **03/11/2026:** M11, M12, M14 and M13 integrated without M10 through PRs [#21](https://github.com/DoArtMonteiro/autonomous-systems-vv-lab/pull/21), [#22](https://github.com/DoArtMonteiro/autonomous-systems-vv-lab/pull/22) and [#23](https://github.com/DoArtMonteiro/autonomous-systems-vv-lab/pull/23).
 
 Dates above are commit or merge dates, not operational acceptance dates.
 
