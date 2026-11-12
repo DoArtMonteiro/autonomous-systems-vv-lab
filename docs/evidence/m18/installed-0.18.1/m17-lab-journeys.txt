@@ -1,0 +1,36 @@
+PASS Off the pad: only R5 fails in the baseline  [R5_position]
+PASS Off the pad: the lateral gain is among the listed parameters  [lateral_position_gain, tilt_max_tan, initial_downrange_m, initial_crossrange_m, initial_horizontal_velocity_mps, gnss_position_sigma_m]
+PASS Off the pad: no requirement limit is suggested as a fix
+PASS Off the pad: the new run lands on the pad  [Landed, R5 2.911575 m]
+PASS Off the pad: the new run is a different, recomputed record
+PASS Off the pad: the fix is checked on 8 seeds and reported as counts  [{"n": 8, "base": 0, "exp": 7}]
+PASS Change the conditions opens the shown run as the Lab baseline  [e8c2b76d60e00cc8 vs e8c2b76d60e00cc8]
+PASS The baseline lists its failed requirements with margins  [Vertical speed at contact, Horizontal speed at contact]
+PASS Parameters the domain lists for the failure are highlighted  [vehicle_dry_mass_scale, vehicle_propellant_scale, vehicle_thrust_scale, ignition_fraction, throttle_gain, cutoff_altitude_m, altimeter_residual_threshold_m, initial_altitude_m, initial_vertical_velocity_mps, altimeter_sigma_m]
+PASS Run experiment is disabled until something changes
+PASS One change is counted
+PASS The experiment is a new run with its own record
+PASS The outcome changed through a new simulation  [Reached the ground, requirements not met -> Landed]
+PASS The Lab says which requirements changed  [The experiment now meets Vertical speed at contact, Horizontal speed at contact.]
+PASS The Lab lists what was changed  [What was changed  Controller: Baseline → Robust]
+PASS The experiment replays by recomputation  [{"schema": "vv-run-replay.v1", "status": "verified", "checks": [{"name": "request.json equals the request inside record.json", "pass": true, "detail": ""}, {"name": "the stored seed is allowed by the ]
+PASS The baseline record is unchanged
+PASS The seed check runs both conditions on 8 development seeds  [{"n": 8, "base": 0, "exp": 7}]
+PASS The robust controller meets everything on more seeds than the baseline  [{"n": 8, "base": 0, "exp": 7}]
+PASS The seed check states counts with an interval  [0/8  baseline conditions meet every requirement and safety rule (95 % interval 0 to 32 %)  7/8  your conditions meet every requirement and safety rule (95 % interval 53 to 98 %)]
+PASS The sweep runs one simulation per value  [5 values, 5 rows]
+PASS The sweep draws the margin against the parameter
+PASS A vehicle preset runs as an exploratory case
+PASS The Lab marks the experiment exploratory
+PASS The vehicle preset replays by recomputation  [{"schema": "vv-run-replay.v1", "status": "verified", "checks": [{"name": "request.json equals the request inside record.json", "pass": true, "detail": ""}, {"name": "the stored seed is allowed by the ]
+PASS A judging-only limit leaves every simulated channel identical
+PASS The Lab says only the judgement moved  [The same requirements pass and fail as in the baseline; the margins below show how far each moved. Only a requirement limit changed: the flight is identical and only the judgement moved.]
+PASS Lab at 1024x640 has no horizontal scroll
+PASS Every visible control has a name  [[]]
+PASS Two stages to orbit: the record is vv-run.v2 with separate entities  [stack, booster, upper]
+PASS Two stages to orbit: Flight console opens on the ascent
+PASS One payload too many: the baseline does not reach orbit  [Suborbital]
+PASS One payload too many: a lighter payload reaches orbit in a new simulation  [Orbit]
+PASS No page error or console error
+
+34/34 checks passed

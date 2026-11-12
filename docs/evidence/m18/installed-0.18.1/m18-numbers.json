@@ -1,0 +1,248 @@
+{
+ "ascent_payload_600": {
+  "base": {
+   "booster.R2_propellant_margin": [
+    "pass",
+    "residual 739.8 kg, margin 199.8 kg"
+   ],
+   "booster.R3_recovery_zone": [
+    "pass",
+    "impact at 1023.55 km downrange, 378.1 m/s, t = 617.15 s"
+   ],
+   "mission.R7_phase_sequence": [
+    "pass",
+    "all phases in order"
+   ],
+   "mission.R8_orbit_insertion": [
+    "pass",
+    "periapsis 298.10 km, apoapsis 301.90 km"
+   ],
+   "stack.R1_separation_window": [
+    "pass",
+    "altitude 95.45 km, speed 2765.3 m/s"
+   ],
+   "stack.S1_max_dynamic_pressure": [
+    "pass",
+    "worst 34508.8534 Pa at tick 3415"
+   ],
+   "stack.S2_axial_acceleration": [
+    "pass",
+    "worst 5.0564 g at tick 7534"
+   ],
+   "upper.R4_periapsis": [
+    "pass",
+    "periapsis 298.10 km, eccentricity 0.00029"
+   ],
+   "upper.R5_apoapsis": [
+    "pass",
+    "apoapsis 301.90 km, error +1.90 km"
+   ],
+   "upper.R6_propellant_margin": [
+    "pass",
+    "residual 145.6 kg, margin 97.6 kg, SECO reason: target energy reached"
+   ],
+   "upper.S2_axial_acceleration": [
+    "pass",
+    "worst 5.2509 g at tick 21784"
+   ]
+  },
+  "base_outcome": "Orbit",
+  "base_run": "e41f71c23324683f",
+  "exp": {
+   "booster.R2_propellant_margin": [
+    "pass",
+    "residual 737.7 kg, margin 197.7 kg"
+   ],
+   "booster.R3_recovery_zone": [
+    "pass",
+    "impact at 965.14 km downrange, 342.5 m/s, t = 569.63 s"
+   ],
+   "mission.R7_phase_sequence": [
+    "pass",
+    "all phases in order"
+   ],
+   "mission.R8_orbit_insertion": [
+    "fail",
+    "periapsis -858.96 km, apoapsis 300.77 km"
+   ],
+   "stack.R1_separation_window": [
+    "pass",
+    "altitude 86.63 km, speed 2719.5 m/s"
+   ],
+   "stack.S1_max_dynamic_pressure": [
+    "pass",
+    "worst 34838.0137 Pa at tick 3508"
+   ],
+   "stack.S2_axial_acceleration": [
+    "pass",
+    "worst 5.0528 g at tick 7515"
+   ],
+   "upper.R4_periapsis": [
+    "fail",
+    "periapsis -858.96 km, eccentricity 0.09519"
+   ],
+   "upper.R5_apoapsis": [
+    "pass",
+    "apoapsis 300.77 km, error +0.77 km"
+   ],
+   "upper.R6_propellant_margin": [
+    "fail",
+    "residual 3.6 kg, margin -44.4 kg, SECO reason: estimated propellant reserve reached before the target energy"
+   ],
+   "upper.S2_axial_acceleration": [
+    "pass",
+    "worst 4.5102 g at tick 22220"
+   ]
+  },
+  "exp_outcome": "Suborbital",
+  "exp_run": "29f1ca5e32273f37"
+ },
+ "cinematic_button": {
+  "described": true,
+  "disabled": false,
+  "focusable": true,
+  "title": "Open this run (landing or launch ascent) in the Cinematic View 0.2.0 (a separate window; read-only replay of the record)"
+ },
+ "cinematic_status": {
+  "installed": true,
+  "verified": true,
+  "version": "0.2.0"
+ },
+ "landing_thrust_0_7": {
+  "base": {
+   "R1_vertical_speed": [
+    "pass",
+    "1.658384 m/s"
+   ],
+   "R2_horizontal_speed": [
+    "fail",
+    "1.583657 m/s"
+   ],
+   "R3_tilt": [
+    "pass",
+    "0.999912 cos"
+   ],
+   "R4_angular_rate": [
+    "pass",
+    "0.022553 rad/s"
+   ],
+   "R5_position": [
+    "pass",
+    "1.368585 m"
+   ],
+   "R6_propellant_margin": [
+    "pass",
+    "5151.088793 kg"
+   ],
+   "S1_tilt_envelope": [
+    "pass",
+    "0.981914 cos"
+   ],
+   "S2_keep_out": [
+    "pass",
+    "1.368585 m"
+   ],
+   "S3_axial_load": [
+    "pass",
+    "1.763003 g0"
+   ],
+   "S4_no_relight": [
+    "pass",
+    "1.000000 ignitions"
+   ],
+   "S5_no_powered_ascent": [
+    "pass",
+    "0.000000 m"
+   ]
+  },
+  "base_outcome": "Reached the ground, requirements not met",
+  "base_run": "cad03fec2ff1582d",
+  "base_safety": "safe",
+  "exp": {
+   "R1_vertical_speed": [
+    "fail",
+    "60.077734 m/s"
+   ],
+   "R2_horizontal_speed": [
+    "fail",
+    "4.822859 m/s"
+   ],
+   "R3_tilt": [
+    "pass",
+    "0.999586 cos"
+   ],
+   "R4_angular_rate": [
+    "pass",
+    "0.062207 rad/s"
+   ],
+   "R5_position": [
+    "pass",
+    "3.739863 m"
+   ],
+   "R6_propellant_margin": [
+    "pass",
+    "6588.851294 kg"
+   ],
+   "S1_tilt_envelope": [
+    "pass",
+    "0.980019 cos"
+   ],
+   "S2_keep_out": [
+    "pass",
+    "3.739863 m"
+   ],
+   "S3_axial_load": [
+    "pass",
+    "1.720214 g0"
+   ],
+   "S4_no_relight": [
+    "pass",
+    "1.000000 ignitions"
+   ],
+   "S5_no_powered_ascent": [
+    "pass",
+    "0.000000 m"
+   ]
+  },
+  "exp_outcome": "Reached the ground, requirements not met",
+  "exp_run": "9e6edb2ebcf3bbba",
+  "exp_safety": "safe",
+  "seed": 5000
+ },
+ "player_header_1024x640": {
+  "actions": [
+   "Analyse",
+   "Compare in detail",
+   "Cinematic view",
+   "Change the conditions"
+  ],
+  "clash": [],
+  "count": 12,
+  "headHeight": 113,
+  "outside": []
+ },
+ "player_header_1440x900": {
+  "actions": [
+   "Analyse",
+   "Compare in detail",
+   "Cinematic view",
+   "Change the conditions"
+  ],
+  "clash": [],
+  "count": 12,
+  "headHeight": 89,
+  "outside": []
+ },
+ "player_header_1920x1080": {
+  "actions": [
+   "Analyse",
+   "Compare in detail",
+   "Cinematic view",
+   "Change the conditions"
+  ],
+  "clash": [],
+  "count": 12,
+  "headHeight": 89,
+  "outside": []
+ }
+}

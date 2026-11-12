@@ -1,0 +1,26 @@
+Verificação da árvore release/0.18.1 (commit "chore: Studio 0.18.1"), 2026-11-12, Windows 11 Pro 26300.
+Comandos do AGENTS.md na raiz e no espaço de trabalho desktop/ (VV_GODOT definido para os testes do módulo):
+
+cargo fmt --check                                              exit 0
+cargo clippy --all-targets -- -D warnings                      exit 0
+cargo test                                                     exit 0 (13 suites, 138 testes, 0 falhas)
+cargo build --release                                          exit 0
+cargo build --release --manifest-path crates/vv-rocket/Cargo.toml
+                                                               exit 0 (39 testes Python precisam deste binário)
+python -m unittest discover -s tests -p "test_*.py"            Ran 427 tests, OK (skipped=6: bibliotecas do construtor de
+                                                               pacotes geo, ligações simbólicas, CINEMATIC_CC0_STAGING,
+                                                               VV_WORKBENCH_RUN). Sem o binário vv-rocket, skipped=45.
+python scripts/run_campaign.py --seeds 42,1337,2026 --output-root runs/campaign
+                                                               exit 0, status passed, 87 casos, 324 invocações do simulador
+desktop/ cargo fmt --check                                     exit 0
+desktop/build.ps1 -StageOnly (prepara desktop/target/release/domains, que o build.rs do Studio exige)
+                                                               exit 0
+desktop/ cargo clippy --all-targets -- -D warnings             exit 0
+desktop/ cargo test                                            exit 0 (24 suites, 165 testes, 0 falhas)
+
+Cenários do README (`cargo run --bin vv-lab -- run scenarios/basic-mission.json --seed 42 --output runs/basic`, `replay`,
+`vv-rocket verify`, `vv-rocket land ... altimeter-bias.json --seed 0`, `vv-rocket replay`): exit 0.
+
+Defeito de documentação (não corrigido, não bloqueia a versão): os comandos `cargo run -- run ...` e
+`cargo run -- replay ...` do README falham com "cargo run could not determine which binary to run", porque o pacote da
+raiz tem três binários (vv-adversary, vv-lab, vv-repair) e não tem `default-run`. Com `--bin vv-lab` funcionam.

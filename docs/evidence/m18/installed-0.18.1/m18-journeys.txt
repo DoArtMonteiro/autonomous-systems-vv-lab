@@ -1,0 +1,74 @@
+PASS Mission Control: three paths (mission, vehicle, environments)  [mission, vehicle, environments]
+PASS Mission Control: eight environments counted  [["13", "6", "8", "3"]]
+PASS Mission Control: the environment path shows real pack images
+PASS Mission Control: no horizontal scroll at 1440 px
+PASS Hangar: every vehicle of the installed domains is listed  [small, medium, landing-stage, heavy-return-stage, light-demonstrator, ground-2d]
+PASS Hangar: the heavy stage shows its template's attributes (30 t dry, 760 kN)  [Dry mass30 t; Propellant11 t; Engine thrust760 kN; Specific impulse300 s; Thrust over full-load weight1.89; Throttle floor55%]
+PASS Hangar: exploratory and reference vehicles are labelled
+PASS Environments: all eight packs are visible  [adventdalen-svalbard, cape-canaveral, el-arenosillo, goms-alpine-valley, mahia-peninsula, santa-maria-azores, spaceport-america, wallops-island]
+PASS Environments: Wallops Island is the one chosen environment  [["wallops-island"]]
+PASS Environments: focus stays on the card that was chosen after the cards are redrawn  [{"env": "wallops-island", "tag": "H3", "inBody": false}]
+PASS Environments: the choice is announced in a polite status  [Wallops Island, Virginia is now the environment used by the missions.]
+PASS Lab: the vehicle design parameters are open
+PASS Lab: the baseline flies the heavy stage
+PASS Lab: the experiment is a new record with the thrust factor
+PASS Lab: a weaker engine changes the measured flight (requirement observations differ)  [{"R1_vertical_speed": ["1.658384 m/s", "60.077734 m/s"], "R2_horizontal_speed": ["1.583657 m/s", "4.822859 m/s"], "R3_tilt": ["0.999912 cos", "0.999586 cos"], "R4_angular_rate": ["0.022553 rad/s", "0.062207 rad/s"], "R5_position": ["1.368585 m", "3.739863 m"], "R6_propellant_margin": ["5151.088793 k]
+PASS Lab: the experiment is labelled exploratory
+PASS Compare: both runs are open  [Comparison of 2 runs Rocket powered landing Save comparison… Engine thrust 1 × (default) Open Reached the ground, requirements not met safe Robust · seed 5000 · no injected fault · cad03fec2ff1582d En]
+PASS Compare: the two runs have different labels  [["Engine thrust 1 \u00d7 (default)", "Engine thrust 0.7 \u00d7"]]
+PASS Compare: the labels name the changed parameter and its value, not the whole configuration  [["Engine thrust 1 \u00d7 (default)", "Engine thrust 0.7 \u00d7"]]
+PASS Compare: no label is truncated  [[{"text": "Engine thrust 1 \u00d7 (default)", "cut": false}, {"text": "Engine thrust 0.7 \u00d7", "cut": false}]]
+PASS Player: plays the baseline and the experiment from their records  [["cad03fec2ff1582d", "9e6edb2ebcf3bbba"]]
+PASS Player: the run holds findings later than the playback time  [2 findings, 1 drawn at t = 7.39]
+PASS Player: no finding marker later than the playback time is in the page  [[1.3]]
+PASS Player: the live region exists and holds no result before it is asked for
+PASS Player: the result fills the live region that was there, which is not replaced
+PASS Player: focus moves to the Result heading when its button goes away
+PASS Player: once the result is shown, every finding marker is drawn  [[2, 2]]
+PASS Player: the same two records play in the engineering scene
+PASS Player: the geospatial view uses the chosen environment  [wallops-island]
+PASS Flight console: the player's operations layout is called Flight console  [[["engineering", "Engineering"], ["geospatial", "Geospatial"], ["control", "Flight console"]]]
+PASS Flight console: the player does not use the name of the home page
+PASS Player header 1024x640: the window has the size asked for  [[1024, 640]]
+PASS Player header 1024x640: Analyse, Compare in detail, Cinematic view and Change the conditions are all there  [["Analyse", "Compare in detail", "Cinematic view", "Change the conditions"]]
+PASS Player header 1024x640: no two controls overlap
+PASS Player header 1024x640: every control is inside the window
+PASS Player header 1024x640: the header stays compact  [113 px]
+PASS Player header 1024x640: no horizontal scroll
+PASS Player header 1440x900: the window has the size asked for  [[1440, 900]]
+PASS Player header 1440x900: Analyse, Compare in detail, Cinematic view and Change the conditions are all there  [["Analyse", "Compare in detail", "Cinematic view", "Change the conditions"]]
+PASS Player header 1440x900: no two controls overlap
+PASS Player header 1440x900: every control is inside the window
+PASS Player header 1440x900: the header stays compact  [89 px]
+PASS Player header 1440x900: no horizontal scroll
+PASS Player header 1920x1080: the window has the size asked for  [[1920, 1080]]
+PASS Player header 1920x1080: Analyse, Compare in detail, Cinematic view and Change the conditions are all there  [["Analyse", "Compare in detail", "Cinematic view", "Change the conditions"]]
+PASS Player header 1920x1080: no two controls overlap
+PASS Player header 1920x1080: every control is inside the window
+PASS Player header 1920x1080: the header stays compact  [89 px]
+PASS Player header 1920x1080: no horizontal scroll
+PASS Cinematic: the button is enabled exactly when the module is installed and verified  [{"disabled": false, "title": "Open this run (landing or launch ascent) in the Cinematic View 0.2.0 (a separate window; read-only replay of the record)", "focusable": true, "described": true} status {"installed": true, "verified": true, "version": "0.2.0"}]
+PASS Cinematic: the button is focusable and names its reason or its action through aria-describedby  [{"disabled": false, "title": "Open this run (landing or launch ascent) in the Cinematic View 0.2.0 (a separate window; read-only replay of the record)", "focusable": true, "described": true}]
+PASS Cinematic: the enabled button says which module version opens this record  [Open this run (landing or launch ascent) in the Cinematic View 0.2.0 (a separate window; read-only replay of the record)]
+PASS Cinematic: the module process started for this run
+PASS Player: Land a rocket here opens the mission on the chosen environment  [{"environment": "cape-canaveral", "view": "geospatial"}]
+PASS Player: choosing another environment while the same mission is held changes what the player shows  [{"environment": "wallops-island", "experience": "first-landing"}]
+PASS Player: the environment selector shows the new environment  [wallops-island]
+PASS Lab: starting another vehicle asks before replacing an experiment in progress  [Replace the experiment in progress?]
+PASS Lab: keeping it leaves the heavy-stage baseline in place  [cad03fec2ff1582d cad03fec2ff1582d]
+PASS Lab: the baseline in progress is announced as a status
+PASS Lab: replacing it starts the new vehicle's baseline  [e41f71c23324683f]
+PASS Ascent: 600 kg payload changes which requirements pass  [upper.R4_periapsis, upper.R6_propellant_margin, mission.R8_orbit_insertion]
+PASS Ascent: the record publishes a numeric margin for the single-bound requirements  [requirement_margin.booster.R2_propellant_margin, requirement_margin.booster.R3_recovery_zone, requirement_margin.stack.S1_max_dynamic_pressure, requirement_margin.stack.S2_axial_acceleration, requirement_margin.upper.R4_periapsis, requirement_margin.upper.R5_apoapsis, requirement_margin.upper.R6_propellant_margin, requirement_margin.upper.S2_axial_acceleration]
+PASS Ascent: composite requirements publish none
+PASS Ascent: the Lab shows a numeric margin change for the requirements that have one  [[["Maximum dynamic pressure \u00b7 safety", "-329 Pa"], ["Maximum sensed acceleration \u00b7 safety", "+0.00352 g"], ["Maximum sensed acceleration \u00b7 safety", "+0.741 g"], ["Separation window", "\u2013"], ["Booster propellant margin", "-2.16 kg"], ["Booster impact in the recovery zone", "-11.3 km"], ["Periapsis altitude", "-1160 km"], ["Apoapsis on target", "+1.13 km"], ["Upper-stage propellan]
+PASS Ascent: no requirement that has numbers shows an empty margin
+PASS Layout 1024x700: home has no horizontal scroll
+PASS Layout 1024x700: vehicles has no horizontal scroll
+PASS Layout 1024x700: environments has no horizontal scroll
+PASS Layout 820x900: home has no horizontal scroll
+PASS Layout 820x900: vehicles has no horizontal scroll
+PASS Layout 820x900: environments has no horizontal scroll
+PASS No page error or console error
+
+72/72 checks passed
