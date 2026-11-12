@@ -159,6 +159,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width
 
 .kind-badge { display: inline-grid; place-items: center; width: 15px; height: 15px; font: 600 9.5px/1 var(--mono); border: 1px solid var(--rule-strong); border-radius: 2px; color: var(--fg-3); flex: none; }
 .class-badge { font: 600 11px/1.6 var(--mono); padding: 0 6px; border-radius: 2px; border: 1px solid currentColor; }
+.class-not_evaluated { color: var(--neutral); }
 .class-R { color: var(--pass); }
 .class-T { color: var(--fail); }
 .class-U { color: var(--unsafe); }

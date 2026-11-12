@@ -14,7 +14,9 @@ export function verdictGlyph(v) {
 /** The two headline verdicts: mission outcome and safety, never merged. */
 export function verdictBlocks(record) {
   const ov = verdictOfOutcome(record.outcome.status);
-  const sv = verdictOfSafety(record.safety.status);
+  // A run whose invariants were never judged (the vehicle never flew) is not shown as safe.
+  const unjudged = record.safety.class === 'not_evaluated';
+  const sv = unjudged ? 'neutral' : verdictOfSafety(record.safety.status);
   // A completed mission can still have failed requirements outside the safety invariants; say so
   // first, so the one-line clamp keeps it visible.
   const failedReqs = (record.requirements || []).filter((r) => r.category !== 'invariant' && r.status === 'fail');
@@ -29,8 +31,8 @@ export function verdictBlocks(record) {
   const cls = record.safety.class;
   const safety = h('div', { class: ['verdict', `v-${sv}`], role: 'group', 'aria-label': 'Safety', tabindex: '0' },
     h('div', { class: 'verdict-k' }, 'Safety, judged on the true state'),
-    h('div', { class: 'verdict-v' }, verdictGlyph(sv), h('span', null, record.safety.status === 'safe' ? 'Safe' : record.safety.status === 'unsafe' ? 'Unsafe' : record.safety.status),
-      cls ? h('span', { class: ['class-badge', `class-${cls}`], title: 'Classification of the run reported by the domain verifier' }, `class ${cls}`) : null),
+    h('div', { class: 'verdict-v' }, verdictGlyph(sv), h('span', null, unjudged ? 'Not evaluated' : record.safety.status === 'safe' ? 'Safe' : record.safety.status === 'unsafe' ? 'Unsafe' : record.safety.status),
+      cls && !unjudged ? h('span', { class: ['class-badge', `class-${cls}`], title: 'Classification of the run reported by the domain verifier' }, `class ${cls}`) : null),
     h('p', { class: 'verdict-x' }, prose(record.safety.explanation)));
   return [outcome, safety];
 }
