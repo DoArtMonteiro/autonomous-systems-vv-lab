@@ -232,6 +232,20 @@ class MalformedAscentRecords(unittest.TestCase):
                     c["values"].pop()
         self.refused(m, "values for the")
 
+    def test_channel_value_that_is_not_a_number(self):
+        def m(r):
+            for c in r["channels"]:
+                if c["id"] == "booster_speed_m_s":
+                    c["values"][3] = "fast"
+        self.refused(m, "neither a number nor null")
+
+    def test_position_channel_value_that_is_not_a_number(self):
+        def m(r):
+            for c in r["channels"]:
+                if c["id"] == "stack_altitude_km":
+                    c["values"][2] = True
+        self.refused(m, "neither a number nor null")
+
     def test_unknown_timebase(self):
         def m(r):
             r["scene"]["entities"][2]["timebase"] = "nowhere"

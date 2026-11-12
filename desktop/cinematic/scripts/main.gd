@@ -325,7 +325,7 @@ func _build() -> void:
 	if record.is_v2:
 		hud.set_entity(entity_sel)
 	hud.set_controls_visible(cli.controls)
-	hud.set_presentation(cli.presentation)
+	hud.set_presentation(cli.presentation, record)
 	_track_lines()
 	_set_time(t)
 	print("cinematic: scene built in %d ms (profile %s: %s)" % [(Time.get_ticks_usec() - t_build) / 1000, profile_name, profile_reason])

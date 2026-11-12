@@ -3,6 +3,7 @@
 extends RefCounted
 
 const CAMERAS := ["director", "follow", "pad", "closeup", "wide", "overhead", "lowwide"]
+const POSE_LIMIT_M := 1.0e8
 const PROFILES := ["auto", "performance", "balanced", "high", "ultra", "custom"]
 
 var run_dir := ""
@@ -29,7 +30,7 @@ var error := ""
 
 
 static func usage() -> String:
-	return "usage: -- --run <run dir> [--env <pack dir>] [--pose-dump t1,t2,...] [--profile auto|performance|balanced|high|ultra|custom] [--custom key=value,...] [--vram-bytes N] [--camera director|follow|pad|closeup|wide|overhead] [--t seconds] [--play] [--controls shown|hidden] [--presentation] [--entity auto|<entity id>] [--camera-pose ex,ey,ez,tx,ty,tz,fov] [--shot out.png] [--bench out.json --bench-seconds S --bench-from T --bench-to T]"
+	return "usage: -- --run <run dir> [--env <pack dir>] [--pose-dump t1,t2,...] [--profile auto|performance|balanced|high|ultra|custom] [--custom key=value,...] [--vram-bytes N] [--camera director|follow|pad|closeup|wide|overhead|lowwide] [--t seconds] [--play] [--controls shown|hidden] [--presentation] [--entity auto|<entity id>] [--camera-pose ex,ey,ez,tx,ty,tz,fov] [--shot out.png] [--bench out.json --bench-seconds S --bench-from T --bench-to T]"
 
 
 static func parse(args: PackedStringArray) -> RefCounted:
@@ -113,14 +114,21 @@ static func parse(args: PackedStringArray) -> RefCounted:
 				if parts.size() != 7:
 					c.error = "--camera-pose takes seven numbers: eye east,north,up; target east,north,up; vertical fov in degrees"
 					return c
+				# Built afresh for each occurrence, so a repeated option replaces the earlier one.
+				var pose := PackedFloat64Array()
 				for part in parts:
-					if not part.strip_edges().is_valid_float():
-						c.error = "--camera-pose takes seven numbers separated by commas"
+					var txt := part.strip_edges()
+					if not txt.is_valid_float() or not is_finite(txt.to_float()) or absf(txt.to_float()) >= POSE_LIMIT_M:
+						c.error = "--camera-pose takes seven finite numbers separated by commas, each below 1e8 in magnitude"
 						return c
-					c.camera_pose.append(part.strip_edges().to_float())
-				if c.camera_pose[6] < 1.0 or c.camera_pose[6] > 120.0:
+					pose.append(txt.to_float())
+				if pose[6] < 1.0 or pose[6] > 120.0:
 					c.error = "--camera-pose fov must be between 1 and 120 degrees"
 					return c
+				if Vector3(pose[0], pose[1], pose[2]).distance_to(Vector3(pose[3], pose[4], pose[5])) < 1.0e-3:
+					c.error = "--camera-pose eye and target must differ"
+					return c
+				c.camera_pose = pose
 				c.has_camera_pose = true
 			"--controls":
 				if not (v in ["shown", "hidden"]):

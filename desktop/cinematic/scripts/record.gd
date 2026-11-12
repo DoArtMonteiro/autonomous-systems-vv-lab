@@ -104,7 +104,7 @@ func _init_from(d: Dictionary) -> void:
 		if typeof(c) != TYPE_DICTIONARY or str(c.get("timebase", "")) != tb:
 			continue
 		var vals = c.get("values", [])
-		if not (vals is Array) or vals.size() != times.size():
+		if not (vals is Array) or vals.size() != times.size() or not _numbers_or_null(vals):
 			continue
 		channels[str(c.get("id", ""))] = vals
 	for id in nozzle_ids:
@@ -207,11 +207,17 @@ func _init_v2(d: Dictionary) -> void:
 			if not by_id.has(cid2) or by_id[cid2]["timebase"] != tb:
 				error = "entity %s needs channel %s on its own timebase" % [id, cid2]
 				return
+			if not _numbers_or_null(by_id[cid2]["values"]):
+				error = "channel %s of entity %s has a value that is neither a number nor null" % [cid2, id]
+				return
 		var m: Dictionary = meta[id]
 		var ch := {}
 		for cid3 in m.get("channels", []):
 			if not by_id.has(str(cid3)) or by_id[str(cid3)]["timebase"] != tb:
 				error = "entity %s lists channel %s that is not on its timebase" % [id, str(cid3)]
+				return
+			if not _numbers_or_null(by_id[str(cid3)]["values"]):
+				error = "channel %s of entity %s has a value that is neither a number nor null" % [str(cid3), id]
 				return
 			var short := str(cid3)
 			if short.begins_with(id + "_"):
@@ -243,6 +249,14 @@ func _init_v2(d: Dictionary) -> void:
 		})
 	if typeof(scene.get("visual", {})) != TYPE_DICTIONARY:
 		scene_data["visual"] = {}
+
+
+# True when every value is a number or null (the only kinds a channel sample may be).
+static func _numbers_or_null(vals: Array) -> bool:
+	for v in vals:
+		if v != null and typeof(v) != TYPE_INT and typeof(v) != TYPE_FLOAT:
+			return false
+	return true
 
 
 # Value of array `values` (one per sample of `tms`) at t: linear between the two samples around t,

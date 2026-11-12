@@ -187,7 +187,7 @@ func build(main_node: Node3D, rec, pk, root: Node3D, sun_world: Vector3, avg_col
 		marker.visible = false
 		main.add_child(marker)
 		ents.append({"rec": e, "node": vehicle, "body": body, "plume": plume, "k": k, "length": dims["length"], "base": dims["base"], "diameter": d,
-			"abs": [0.0, 0.0, 0.0], "axis": [0.0, 1.0], "thr": 0.0, "active": false, "marker": marker})
+			"abs": [0.0, 0.0, 0.0], "axis": [0.0, 1.0], "dax": [0.0, 1.0], "thr": 0.0, "active": false, "marker": marker})
 	fx = Effects.build(main, sun_world)
 	# The Earth beyond the pack: a plain sphere (no geography); the limb glow is the sky shader's.
 	var R: float = record.earth_radius_km * 1000.0
@@ -251,6 +251,15 @@ func update_entities(t: float) -> void:
 		en["axis"] = record.entity_axis(e, t)
 		var thr = record.entity_value(e, "throttle", t)
 		en["thr"] = clampf(float(thr), 0.0, 1.0) if thr != null else 0.0
+		# Drawn axis. The body is drawn along the recorded velocity, nose forward, with the plume at the
+		# tail. While an entity descends (recorded radial velocity below zero) with its engine burning,
+		# that would put the nozzle on top, burning upwards; the body is then drawn tail first (axis
+		# reversed, nose up, plume down), the pose of a braking burn. Illustrative: no attitude is
+		# recorded or simulated.
+		var vr = record.entity_value(e, "radial_velocity_m_s", t)
+		var ax: Array = en["axis"]
+		var rev: bool = en["thr"] > 0.005 and vr != null and float(vr) < 0.0
+		en["dax"] = [-ax[0], -ax[1]] if rev else ax
 
 
 func find(id: String) -> Dictionary:
@@ -267,7 +276,7 @@ func entity_pos(en: Dictionary) -> Array:
 # Centre of the vehicle (half way along its body) in absolute coordinates.
 func centre_of(en: Dictionary) -> Array:
 	var a: Array = en["abs"]
-	var ax: Array = en["axis"]
+	var ax: Array = en["dax"]
 	var h: float = (en["base"] + en["length"]) * 0.5
 	return [a[0] + ax[0] * h, 0.0, a[2] + ax[1] * h]
 
@@ -287,7 +296,7 @@ func apply_shift(se: float, sn: float, t: float) -> void:
 		if not en["active"]:
 			continue
 		var a: Array = en["abs"]
-		var ax: Array = en["axis"]
+		var ax: Array = en["dax"]
 		node.position = g(Vector3(a[0] - se, a[1] - sn, a[2]))
 		node.basis = Basis(Vector3.BACK, atan2(ax[1], ax[0]))
 		# Plume: the recorded throttle drives it; the length follows the technical view's rule, scaled to

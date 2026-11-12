@@ -114,6 +114,9 @@ func _verified_bytes(e: Dictionary, name: String) -> PackedByteArray:
 		_fail("%s is missing" % name)
 		return PackedByteArray()
 	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		_fail("%s cannot be opened" % name)
+		return PackedByteArray()
 	var n := f.get_length()
 	if n > MAX_FILE_BYTES or float(n) != _num(e.get("bytes", -1), -1.0):
 		_fail("%s has %d bytes, the manifest declares %s" % [name, n, str(e.get("bytes", "?"))])

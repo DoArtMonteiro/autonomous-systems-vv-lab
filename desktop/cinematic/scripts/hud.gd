@@ -8,7 +8,7 @@
 extends RefCounted
 
 const ILLUSTRATIVE := "Illustrative, not data: stage geometry (42 m), landing pad, lights and masts, ground texture and boulders near the pad, scanned plants (their positions and sizes are the pack's), HDRI sky, plume and exhaust, glow and dust, crown shapes, scrub colour and foliage cards, building walls and roofs, sky, haze, water finish, ground beyond the pack."
-const ILLUSTRATIVE_ASCENT := "Illustrative, not data: vehicle shapes (from the record's visual block), body axis drawn along the recorded velocity (no attitude is simulated), plume and exhaust, glow and dust, landing pad and lights, the Earth beyond the pack as a plain sphere with no geography, atmosphere, sky and haze."
+const ILLUSTRATIVE_ASCENT := "Illustrative, not data: vehicle shapes (from the record's visual block), body axis drawn along the recorded velocity, reversed (tail first) while an engine burns in descent (no attitude is recorded or simulated), the direction east (the record has no heading), the upper stage drawn offset from the first stage's recorded point, plume and exhaust, glow and dust, landing pad and lights, the Earth beyond the pack as a plain sphere with no geography, atmosphere, sky and haze."
 const DATA_ASCENT := "Data: each entity's position, altitude, speed and throttle from the record (interpolated between its samples for display); an entity exists from its first to its last sample; terrain and imagery of the pad's surroundings from the validated pack. Nothing here is simulated."
 const DATA := "Data: stage pose from the record (interpolated for display), throttle, verdicts; terrain, imagery, footprints, heights, plant positions from the validated pack. Nothing here is simulated."
 const MARGIN := 18
@@ -208,8 +208,9 @@ func build(root: Node, record, pack, t0: float, t1: float, profiles: Array, came
 
 
 # Presentation: hides the engineering panels (readout, verdicts, legend, playback bar) and keeps
-# the attribution line and one small permanent line saying that the picture is an illustration.
-func set_presentation(on: bool) -> void:
+# the attribution line and one small permanent line saying that the picture is an illustration and
+# what the record says the outcome was, so a clip never shows a run without its result.
+func set_presentation(on: bool, record = null) -> void:
 	if not on:
 		return
 	for c in layer.get_children():
@@ -217,9 +218,12 @@ func set_presentation(on: bool) -> void:
 			c.visible = false
 	var l := _label(10, Color(0.9, 0.92, 0.95))
 	l.text = "Illustrative replay of a recorded run"
+	if record != null:
+		var o: Dictionary = record.outcome()
+		l.text += ". Recorded outcome: %s (from the record, not re-verified here)" % str(o.get("label", o.get("code", "n/a")))
 	_anchor(l, 0, 1, 0, 1)
 	l.offset_left = MARGIN
-	l.offset_right = MARGIN + 400
+	l.offset_right = MARGIN + 760
 	l.offset_top = -MARGIN - 16
 	l.offset_bottom = -MARGIN
 	layer.add_child(l)
