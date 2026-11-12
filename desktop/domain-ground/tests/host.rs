@@ -856,6 +856,11 @@ fn demo_corridor_gps_noise_enters_the_zone_only_without_an_arrival_radius() {
         ("completed", "safe")
     );
     assert!(failed(&runs[0]).is_empty());
+    // The completion ticks stated in the demonstration text are checked here.
+    assert_eq!(
+        status(&runs[0], "mission_completion"),
+        ("pass".into(), Some(17.0))
+    );
     assert_eq!(
         (
             runs[1].outcome.code.as_str(),
@@ -875,6 +880,10 @@ fn demo_corridor_gps_noise_enters_the_zone_only_without_an_arrival_radius() {
         ("completed", "safe")
     );
     assert!(failed(&runs[2]).is_empty());
+    assert_eq!(
+        status(&runs[2], "mission_completion"),
+        ("pass".into(), Some(16.0))
+    );
 }
 
 #[test]

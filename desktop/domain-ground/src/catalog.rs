@@ -197,6 +197,7 @@ fn item(id: &str, label: &str, description: &str) -> Item {
         label: label.into(),
         description: description.into(),
         facts: Vec::new(),
+        evidence: String::new(),
     }
 }
 
@@ -287,7 +288,8 @@ fn parameters() -> Vec<ParameterSpec> {
         parameter(
             PARAM_GPS_NOISE,
             "GPS noise",
-            "Largest error of each GPS sample per axis, drawn uniformly by the seed. The corridor mission is              registered with ideal sensors (0 mm).",
+            "Largest error of each GPS sample per axis, drawn uniformly by the seed. The corridor mission is \
+             registered with ideal sensors (0 mm).",
             "mm",
             "Sensors",
             20.0,
@@ -297,7 +299,8 @@ fn parameters() -> Vec<ParameterSpec> {
         parameter(
             PARAM_ARRIVAL_RADIUS,
             "Arrival radius",
-            "Distance from the waypoint at which the mission counts it as reached. The corridor mission is              registered with 0 mm, so the vehicle must hit the waypoint exactly.",
+            "Distance from the waypoint at which the mission counts it as reached. The corridor mission is \
+             registered with 0 mm, so the vehicle must hit the waypoint exactly.",
             "mm",
             "Mission policy",
             1000.0,
@@ -428,30 +431,43 @@ fn demos() -> Vec<Demo> {
         Demo {
             id: "nominal-drive".into(),
             title: "Nominal drive".into(),
-            narrative: "The vehicle drives 1500 mm east to its waypoint and stops, with no faults. Every contract and                         invariant holds. This is the reference to compare any faulted run against."
+            narrative: "The vehicle drives 1500 mm east to its waypoint and stops, with no faults. Every contract and \
+              invariant holds. This is the reference to compare any faulted run against."
                 .into(),
             requests: vec![request("nominal_stop", "dominant_axis", 42, vec![])],
             look_at: vec!["requirements".into(), "scene".into(), "goal_distance_mm".into()],
-            expectation: "Mission completed (success) at tick 7, safety safe, all 7 temporal contracts and all 4                           safety invariants pass."
+            expectation: "Mission completed (success) at tick 7, safety safe, all 7 temporal contracts and all 4 \
+              safety invariants pass."
                 .into(),
         },
         Demo {
             id: "axis-policy-comparison".into(),
             title: "Same mission, two controllers".into(),
-            narrative: "The waypoint is 250 mm east and 2000 mm north of the start, and each move is 500 mm.                         dominant_axis drives north and arrives. x_first settles x before y: every 500 mm step jumps                         over the 250 mm x error, so it shuttles between two x positions and never turns north. The                         mission stalls although no safety invariant is violated: a stalled mission and an unsafe run                         are different results."
+            narrative: "The waypoint is 250 mm east and 2000 mm north of the start, and each move is 500 mm. \
+              dominant_axis drives north and arrives. x_first settles x before y: every 500 mm step jumps \
+              over the 250 mm x error, so it shuttles between two x positions and never turns north. The \
+              mission stalls although no safety invariant is violated: a stalled mission and an unsafe run \
+              are different results."
                 .into(),
             requests: vec![
                 request("x_first_overshoot", "dominant_axis", 42, vec![]),
                 request("x_first_overshoot", "x_first", 42, vec![]),
             ],
             look_at: vec!["truth_x_mm".into(), "goal_distance_mm".into(), "scene".into()],
-            expectation: "dominant_axis: completed at tick 5, safe, all contracts pass. x_first: stalled (detected at                           tick 8), it moves 500 mm every tick but ends 2250 mm from the goal, safety stays safe,                           mission_lifecycle is not evaluated and mission_completion fails."
+            expectation: "dominant_axis: completed at tick 5, safe, all contracts pass. x_first: stalled (detected at \
+              tick 8), it moves 500 mm every tick but ends 2250 mm from the goal, safety stays safe, \
+              mission_lifecycle is not evaluated and mission_completion fails."
                 .into(),
         },
         Demo {
             id: "delayed-command-after-fallback".into(),
             title: "A delayed command moves the vehicle in fallback".into(),
-            narrative: "First request: the mission as built, with a GPS dropout from tick 4 and a movement command                         issued at tick 4 that the actuator holds back for 3 ticks. The vehicle stops at tick 5 and                         enters fallback at tick 6, then the old command runs at tick 7 and moves it 250 mm while it                         should be holding. Second request: the same mission with both built-in faults removed. It                         is safe but cannot reach the waypoint in 14 ticks, so the unsafe motion comes from the faults,                         not from the mission."
+            narrative: "First request: the mission as built, with a GPS dropout from tick 4 and a movement command \
+              issued at tick 4 that the actuator holds back for 3 ticks. The vehicle stops at tick 5 and \
+              enters fallback at tick 6, then the old command runs at tick 7 and moves it 250 mm while it \
+              should be holding. Second request: the same mission with both built-in faults removed. It \
+              is safe but cannot reach the waypoint in 14 ticks, so the unsafe motion comes from the faults, \
+              not from the mission."
                 .into(),
             requests: vec![
                 request("delayed_after_fallback", "dominant_axis", 42, vec![]),
@@ -461,13 +477,23 @@ fn demos() -> Vec<Demo> {
                 },
             ],
             look_at: vec!["fallback".into(), "command_mm".into(), "moved_mm".into(), "events".into()],
-            expectation: "With the built-in faults: mission incomplete, safety unsafe. The invariant safe_fallback                           fails at tick 7, the contracts command_resolution and command_applied fail at tick 6 and                           no_motion_in_fallback fails at tick 7; fallback_response and stop_response pass. Without                           them: mission incomplete (1500 mm from the goal), safety safe, no fallback, only                           mission_completion fails and mission_lifecycle is not evaluated."
+            expectation: "With the built-in faults: mission incomplete, safety unsafe. The invariant safe_fallback \
+              fails at tick 7, the contracts command_resolution and command_applied fail at tick 6 and \
+              no_motion_in_fallback fails at tick 7; fallback_response and stop_response pass. Without \
+              them: mission incomplete (1500 mm from the goal), safety safe, no fallback, only \
+              mission_completion fails and mission_lifecycle is not evaluated."
                 .into(),
         },
         Demo {
             id: "corridor-gps-noise".into(),
             title: "One millimetre of GPS noise and a restricted zone".into(),
-            narrative: "The vehicle drives east along a corridor to a waypoint 250 mm above the corner of a restricted                         zone, in steps of 250 mm. With exact GPS it stops on the waypoint. With 1 mm of noise it                         never reads the waypoint exactly; the arrival radius of 0 mm makes it keep correcting by                         whole steps, it oscillates around the waypoint and at tick 21 steps south onto the edge of                         the zone. An arrival radius of one step, 250 mm, lets it stop. Same seed in all three runs.                         The scenario variant is a candidate fix studied in the M13 investigation, not a validated                         design change."
+            narrative: "The vehicle drives east along a corridor to a waypoint 250 mm above the corner of a restricted \
+              zone, in steps of 250 mm. With exact GPS it stops on the waypoint. With 1 mm of noise it \
+              never reads the waypoint exactly; the arrival radius of 0 mm makes it keep correcting by \
+              whole steps, it oscillates around the waypoint and at tick 21 steps south onto the edge of \
+              the zone. An arrival radius of one step, 250 mm, lets it stop. Same seed in all three runs. \
+              The scenario variant is a candidate fix studied in the M13 investigation, not a validated \
+              design change."
                 .into(),
             requests: vec![
                 request("zone_corridor", "dominant_axis", 5002, vec![]),
@@ -484,7 +510,9 @@ fn demos() -> Vec<Demo> {
                 },
             ],
             look_at: vec!["scene".into(), "truth_y_mm".into(), "requirements".into(), "events".into()],
-            expectation: "Exact GPS: mission completed at tick 17, safe. 1 mm of noise: mission incomplete, unsafe,                           the invariant restricted_zone fails at tick 21. 1 mm of noise with a 250 mm arrival                           radius: completed at tick 16, safe."
+            expectation: "Exact GPS: mission completed at tick 17, safe. 1 mm of noise: mission incomplete, unsafe, \
+              the invariant restricted_zone fails at tick 21. 1 mm of noise with a 250 mm arrival \
+              radius: completed at tick 16, safe."
                 .into(),
         },
     ]
@@ -498,12 +526,15 @@ pub fn catalog() -> DomainCatalog {
             unit: "tick".into(),
             label: "Logical tick (100 ms of simulated time)".into(),
         },
-        vehicles: vec![item(
-            "ground-2d",
-            "Ground vehicle, 2D kinematic",
-            "A generic unarmed ground vehicle that moves a fixed step along one axis per movement command. \
-             Integer millimetre positions, no dynamics.",
-        )],
+        vehicles: vec![
+            item(
+                "ground-2d",
+                "Ground vehicle, 2D kinematic",
+                "A generic unarmed ground vehicle that moves a fixed step along one axis per movement command. \
+                 Integer millimetre positions, no dynamics.",
+            )
+            .with_evidence("reference"),
+        ],
         scenarios: MISSIONS.iter().map(scenario).collect(),
         controllers: CONTROLLERS.iter().map(|c| item(c.0, c.1, c.2)).collect(),
         parameters: parameters(),

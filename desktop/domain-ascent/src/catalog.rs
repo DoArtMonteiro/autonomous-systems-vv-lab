@@ -18,6 +18,7 @@ fn item(id: &str, label: &str, description: &str) -> Item {
         label: label.into(),
         description: description.into(),
         facts: Vec::new(),
+        evidence: String::new(),
     }
 }
 
@@ -259,8 +260,8 @@ pub fn catalog() -> DomainCatalog {
             label: "s of logical time (ticks of 20 ms from the start of the prelaunch hold)".into(),
         },
         vehicles: vec![
-            with_facts(item("small", "Small launcher (exploratory)", "About 35 t at liftoff, two stages, 250 kg nominal payload; not a real vehicle."), SMALL),
-            with_facts(item("medium", "Medium launcher (exploratory)", "About 304 t at liftoff, two stages, 3 t nominal payload, a 6 % first-stage reserve kept for recovery; not a real vehicle."), MEDIUM),
+            with_facts(item("small", "Small launcher (exploratory)", "About 35 t at liftoff, two stages, 250 kg nominal payload; not a real vehicle.").with_evidence("exploratory"), SMALL),
+            with_facts(item("medium", "Medium launcher (exploratory)", "About 304 t at liftoff, two stages, 3 t nominal payload, a 6 % first-stage reserve kept for recovery; not a real vehicle.").with_evidence("exploratory"), MEDIUM),
         ],
         scenarios: vec![
             ScenarioSpec {

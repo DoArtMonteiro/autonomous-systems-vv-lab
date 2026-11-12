@@ -78,11 +78,11 @@ export const EXPERIENCES = [
   },
   {
     id: 'late-gnss', domain: 'rocket-landing', demo: 'late-gnss-bias',
-    title: 'Smaller, later, worse?', kicker: 'Surprising counterexample',
+    title: 'Smaller, later, worse?', kicker: 'Outside the registered conditions',
     summary: 'A smaller GNSS error that starts 0.02 s later slips past the safety logic that catches a larger one.',
     objective: 'The guarded controller was registered as landing softly (R1) with a GNSS bias of 5 to 30 m present from the start. Does that still hold when the bias starts a moment later?',
     watch: ['The registered run rejects the altimeter at 0.1 s; the later run never does.', 'The registered run touches down at about 2 m/s but off the pad; the later run hits the pad at about 17 m/s.'],
-    learn: ['Why the timing of a fault can matter more than its size', 'Why a counterexample is reported per requirement, not as a single score'],
+    learn: ['Why when a fault starts can change which requirement fails', 'Why a counterexample is reported per requirement, not as a single score'],
     categories: ['start', 'faults', 'claims'], level: 'Analyst', minutes: 3,
     runs: ['Registered: 15 m from 0 s', 'Later: 9.72 m from 0.02 s'],
     grade: 'exploratory', claim: 'g3-onset', next: 'threshold-trade-off',

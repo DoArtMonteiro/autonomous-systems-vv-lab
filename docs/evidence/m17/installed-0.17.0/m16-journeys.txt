@@ -70,7 +70,7 @@ PASS Layout 1024x640: every control has a name
 PASS No environment: Geospatial is disabled and says why  [{"off": "true", "title": "No validated geographic environment is installed. See Settings, Environments."}]
 PASS No environment: the engineering scene plays offline
 PASS No environment: Mission Control works on the engineering scene
-PASS Tampered pack: it is rejected with the reason  [ed packs are kept in %USERPROFILE%\AppData\Local\Temp\vv-m16-lib-3lmnp17d\environments.  Install a package… Import a pack folder… Open the imported packs folder]
+PASS Tampered pack: it is rejected with the reason  [ed packs are kept in <temporary folder>\vv-m16-lib-3lmnp17d\environments.  Install a package… Import a pack folder… Open the imported packs folder]
 PASS Tampered pack: Geospatial is disabled and says why  [{"off": "true", "title": "No validated geographic environment is installed. See Settings, Environments."}]
 PASS Tampered pack: the engineering scene plays offline
 PASS Tampered pack: Mission Control works on the engineering scene

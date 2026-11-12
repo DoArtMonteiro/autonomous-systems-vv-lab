@@ -7,8 +7,8 @@
 import { h, clear, prose } from '../dom.js';
 import { api } from '../api.js';
 import { domainById, visibleDomains, emit, loadRecord } from '../store.js';
-import { toast, errorText } from '../ui.js';
-import { verdictOfOutcome, verdictOfSafety, faultText } from '../model.js';
+import { toast, errorText, askConfirm } from '../ui.js';
+import { verdictOfOutcome, verdictOfSafety, faultText, distinguishingLabels } from '../model.js';
 import { verdictGlyph } from '../verification.js';
 
 const REQUEST_SCHEMA = 'vv-run-request.v1';
@@ -17,6 +17,7 @@ const DEV_SEED = 5000;
 
 let root;
 let navigate = () => {};
+let requestToken = 0; // the newest request to start a baseline; an older one finishing late is dropped
 let lab = null; // {domain, base:{id, record}, form, exp:{id, record}, gen, sweep, busy, focus:Set}
 
 export function initLab(el, nav) {
@@ -29,21 +30,45 @@ export async function showLab(opts) {
   if (opts && opts.scenario && opts.domain) {
     const d = domainById(opts.domain);
     if (d && d.catalog) {
-      clear(root).append(h('div', { class: 'lab lab-empty' }, h('p', { class: 'eyebrow' }, 'Experiment Lab'), h('h1', null, 'Simulating the baseline…'),
+      // An experiment in progress is replaced only when the person says so.
+      if (isDirty() && !(await askConfirm({
+        title: 'Replace the experiment in progress?',
+        message: 'The Lab holds a baseline with changes, runs or checks you have made. Starting this vehicle replaces them with a new baseline. Nothing already stored in the library is deleted.',
+        confirm: 'Replace it',
+      }))) { render(); return; }
+      // The page says what is happening, as a status, while the baseline runs.
+      clear(root).append(h('div', { class: 'lab lab-empty', role: 'status', 'aria-live': 'polite' }, h('p', { class: 'eyebrow' }, 'Experiment Lab'), h('h1', null, 'Simulating the baseline…'),
         h('p', { class: 'lab-lede' }, 'The platform runs the vehicle as it is defined, on a development seed. That run becomes the baseline every change is compared with.')));
       await startDefault(d, null, opts.scenario, opts.open);
       return;
     }
   }
   if (opts && opts.runId && (!lab || lab.base.id !== opts.runId)) {
+    // Starting from another stored run also replaces an experiment in progress: ask first.
+    if (isDirty() && !(await askConfirm({
+      title: 'Replace the experiment in progress?',
+      message: 'The Lab holds a baseline with changes, runs or checks you have made. Starting from this run replaces them with a new baseline. Nothing already stored in the library is deleted.',
+      confirm: 'Replace it',
+    }))) { render(); return; }
+    const mine = ++requestToken;
     try {
-      const record = await loadRecord(opts.runId);
+      const record = await loadIndexed(opts.runId);
+      if (mine !== requestToken) return; // a newer request replaced this one
       startFrom(opts.runId, record);
     } catch (e) {
+      if (mine !== requestToken) return; // an older request failing must not speak for the newer one
       toast(errorText(e), 'error');
     }
   }
   render();
+}
+
+/** Whether the Lab holds work a new baseline would discard: changes, an experiment or a check. */
+function isDirty() {
+  if (!lab) return false;
+  let changed = false;
+  try { changed = changes().length > 0; } catch { changed = true; }
+  return changed || !!lab.exp || !!lab.gen || !!(lab.sweep && lab.sweep.records);
 }
 
 /** For tests and the palette: the Lab's state without its records. */
@@ -73,8 +98,30 @@ function failedOf(record) {
   return (record.requirements || []).filter((r) => r.status === 'fail');
 }
 
+// Numbers the domain publishes with a record: the metrics requirement_observed.<id>,
+// requirement_limit.<id> and requirement_margin.<id> (margin positive when met, in the unit of the
+// metric). They are read once per record into this table; a record without them (older records,
+// requirements that are not one quantity against one bound) falls back to the text of the requirement.
+const NUMBERS = new WeakMap();
+
+function indexNumbers(record) {
+  const byId = new Map((record.metrics || []).map((m) => [m.id, m]));
+  for (const r of record.requirements || []) {
+    const margin = byId.get(`requirement_margin.${r.id}`);
+    const limit = byId.get(`requirement_limit.${r.id}`);
+    if (margin && limit && Number.isFinite(margin.value) && Number.isFinite(limit.value)) NUMBERS.set(r, { margin: margin.value, limit: limit.value, unit: margin.unit || '' });
+  }
+  return record;
+}
+
+async function loadIndexed(runId) {
+  return indexNumbers(await loadRecord(runId));
+}
+
 /** The number and comparison of a requirement's expected text ("<= 3 m/s", ">= 0.9962 cos"). */
 function limitOf(r) {
+  const n = NUMBERS.get(r);
+  if (n) return { op: '', value: n.limit };
   const m = /^\s*(<=|>=|<|>)\s*(-?[\d.]+(?:e[-+]?\d+)?)/i.exec(r.expected || '');
   return m ? { op: m[1], value: Number(m[2]) } : null;
 }
@@ -85,10 +132,13 @@ function observedOf(r) {
 }
 
 /**
- * Margin to the limit in the requirement's unit, positive when met: parsed from the record's
- * expected and observed text, so it is only as precise as that text.
+ * Margin to the limit in the requirement's unit, positive when met. It is the number the domain
+ * published when there is one; otherwise it is parsed from the requirement's expected and observed
+ * text, so it is only as precise as that text, and a composite observation gives none.
  */
 function marginOf(r) {
+  const n = NUMBERS.get(r);
+  if (n) return n.margin;
   const lim = limitOf(r);
   const obs = observedOf(r);
   if (!lim || obs === null || !Number.isFinite(obs)) return null;
@@ -96,6 +146,8 @@ function marginOf(r) {
 }
 
 function unitOf(r) {
+  const n = NUMBERS.get(r);
+  if (n) return n.unit;
   const m = /-?[\d.]+(?:e[-+]?\d+)?\s*(.*)$/i.exec(r.expected || '');
   return m ? m[1].trim() : '';
 }
@@ -201,7 +253,7 @@ async function runExperiment() {
     const out = await api.run(req);
     await tag(out.run_id, out.reused, `Derived from run ${lab.base.id}. Changes: ${changes().join('; ') || 'none'}.`);
     emit('runs-changed');
-    lab.exp = { id: out.run_id, record: await loadRecord(out.run_id), reused: out.reused };
+    lab.exp = { id: out.run_id, record: await loadIndexed(out.run_id), reused: out.reused };
     lab.gen = null;
   } catch (e) {
     toast(errorText(e), 'error');
@@ -221,7 +273,7 @@ async function checkSeeds(n) {
   render();
   try {
     const res = await runMany([...a, ...b], (k, total) => { lab.gen.progress = k; lab.gen.total = total; renderResult(); });
-    const records = await Promise.all(res.map((r) => (r.id ? loadRecord(r.id) : null)));
+    const records = await Promise.all(res.map((r) => (r.id ? loadIndexed(r.id) : null)));
     lab.gen = { seeds, base: records.slice(0, seeds.length), exp: records.slice(seeds.length), errors: res.filter((r) => r.error).map((r) => r.error) };
   } catch (e) {
     toast(errorText(e), 'error');
@@ -249,7 +301,7 @@ async function runSweep(paramId, from, to, k) {
   render();
   try {
     const res = await runMany(reqs, (n, total) => { lab.sweep.progress = n; lab.sweep.total = total; renderResult(); });
-    const records = await Promise.all(res.map((r) => (r.id ? loadRecord(r.id) : null)));
+    const records = await Promise.all(res.map((r) => (r.id ? loadIndexed(r.id) : null)));
     lab.sweep = { paramId, values, records, ids: res.map((r) => r.id || null), errors: res.filter((r) => r.error).map((r) => r.error) };
   } catch (e) {
     toast(errorText(e), 'error');
@@ -304,13 +356,19 @@ async function startDefault(d, btn, scenarioId, openGroup) {
   const sc = cat.scenarios.find((s) => s.id === scenarioId) || cat.scenarios[0];
   const req = { schema: REQUEST_SCHEMA, domain: d.manifest.id, scenario: sc.id, controller: sc.default_controller, seed: DEV_SEED, faults: [], parameters: {} };
   if (btn) { btn.classList.add('is-busy'); btn.disabled = true; }
+  // Only the newest request may set the Lab: an ascent baseline takes minutes, and a slower, older
+  // one finishing late must not replace the vehicle the person has since chosen.
+  const mine = ++requestToken;
   try {
     const out = await api.run(req);
     emit('runs-changed');
-    startFrom(out.run_id, await loadRecord(out.run_id));
+    const record = await loadIndexed(out.run_id);
+    if (mine !== requestToken) return;
+    startFrom(out.run_id, record);
     if (openGroup) lab.openGroup = openGroup;
     render();
   } catch (e) {
+    if (mine !== requestToken) return;
     toast(errorText(e), 'error');
     if (btn) { btn.classList.remove('is-busy'); btn.disabled = false; }
     if (!btn) render();
@@ -363,7 +421,7 @@ function renderBase(rec) {
             marginBar(r),
             m === null ? null : h('span', { class: 'lab-req-m small' }, `${fmt(Math.abs(m))} ${unitOf(r)} ${m >= 0 ? 'inside' : 'beyond'} the limit`)));
         })),
-        h('p', { class: 'small dim' }, 'Margins are read from the expected and observed values in the record. Select a requirement to highlight the parameters the domain lists for it.'))
+        h('p', { class: 'small dim' }, 'Margins are the numbers the domain publishes with the record; where it publishes none they are read from the expected and observed text, and a requirement made of several quantities shows no margin. Select a requirement to highlight the parameters the domain lists for it.'))
       : h('p', { class: 'lab-allmet' }, 'Every requirement met. Try a harder condition to find where this configuration stops meeting them.'),
     h('div', { class: 'row lab-base-actions' },
       h('button', { type: 'button', class: 'btn btn-quiet', onclick: () => navigate('run', { runId: lab.base.id }) }, 'Analyse the baseline')),
@@ -539,7 +597,7 @@ function renderComparison(el) {
   eventDeltas(a, b),
   h('p', { class: 'small dim' }, `One run on seed ${b.request.seed}. A change that helps one seed may not help another: check it across seeds below.`),
   h('div', { class: 'row' },
-    h('button', { type: 'button', class: 'btn btn-primary', id: 'lab-watch', title: 'Play both runs from their records in the mission player: engineering scene, geospatial view, Mission Control and, when installed, the Cinematic View', onclick: () => watchRuns() }, 'Watch both runs'),
+    h('button', { type: 'button', class: 'btn btn-primary', id: 'lab-watch', title: 'Play both runs from their records in the mission player: engineering scene, geospatial view, Flight console and, when installed, the Cinematic View', onclick: () => watchRuns() }, 'Watch both runs'),
     h('button', { type: 'button', class: 'btn', onclick: () => navigate('compare', { runIds: [lab.base.id, lab.exp.id] }) }, 'Compare signals in detail'),
     h('button', { type: 'button', class: 'btn btn-quiet', onclick: () => navigate('run', { runId: lab.exp.id }) }, 'Analyse the experiment'),
     h('button', { type: 'button', class: 'btn btn-quiet', title: 'Make this run the new baseline and keep experimenting from it', onclick: () => { const e = lab.exp; startFrom(e.id, e.record); render(); } }, 'Use as new baseline')));
@@ -548,9 +606,11 @@ function renderComparison(el) {
 /** Plays the baseline and the experiment in the mission player, from their stored records. */
 function watchRuns() {
   const sc = scenarioSpec();
+  // The experiment is named by what it changes (for example the thrust factor), never by a generic word.
+  const expLabel = distinguishingLabels([lab.base.record.request, lab.exp.record.request], catalog())[1];
   navigate('mission', { runs: [
     { runId: lab.base.id, record: lab.base.record, label: 'Baseline' },
-    { runId: lab.exp.id, record: lab.exp.record, label: 'Your change' },
+    { runId: lab.exp.id, record: lab.exp.record, label: expLabel },
   ], title: sc ? `${sc.label}: baseline and your change` : 'Baseline and your change', summary: changes().join('; ') || 'The baseline and your experiment.' });
 }
 

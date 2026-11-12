@@ -17,14 +17,18 @@ export function initVehicles(el, nav) {
 
 const ROLE = {
   'launch-ascent': { order: 0, title: 'Launch vehicles', text: 'Two-stage launchers flown from the pad to a low orbit. After separation the booster and the upper stage are simulated as two vehicles, each judged against its own requirements.', group: 'Vehicle' },
-  'rocket-landing': { order: 1, title: 'Landing stages', text: 'Reusable stages braking from about 3 km to a pad with one gimballed engine. Change the dry mass, the propellant, the thrust or the engine efficiency and fly it again.', group: 'Vehicle design' },
+  'rocket-landing': { order: 1, title: 'Landing stages', text: 'Reusable stages that brake to a pad with one gimballed engine. Change the dry mass, the propellant, the thrust or the engine efficiency and fly it again.', group: 'Vehicle design' },
   'ground-vehicle': { order: 2, title: 'Autonomous ground robots', text: 'A wheeled robot driving a corridor beside a restricted zone with noisy GPS. The same verification contract as the rockets.', group: null },
 };
 
-/** Evidence level of a vehicle, from its catalog label and the cases that fly it. */
+/**
+ * Evidence level of a vehicle, as its domain states it in the catalog (`evidence`). A vehicle is a
+ * reference case only when the domain says so; an unknown or missing level is shown as exploratory,
+ * the cautious reading.
+ */
 function evidence(v) {
-  if (/exploratory/i.test(v.label)) return { word: 'Exploratory', tone: 'explore', text: 'Illustrative values of the right order of magnitude. Runs are recomputable records of this model, not evidence for any pre-registered claim.' };
-  return { word: 'Reference case', tone: 'ref', text: 'The frozen, pre-registered case the platform’s verification results rest on. Verified model behaviour, not validated against flight data.' };
+  if (v.evidence === 'reference') return { word: 'Reference case', tone: 'ref', text: 'The frozen, pre-registered case the platform’s verification results rest on. Verified model behaviour, not validated against flight data.' };
+  return { word: 'Exploratory', tone: 'explore', text: 'Illustrative values of the right order of magnitude. Runs are recomputable records of this model, not evidence for any pre-registered claim.' };
 }
 
 const numText = (x) => {
@@ -130,7 +134,7 @@ export function showVehicles() {
     h('header', { class: 'hg-head' },
       h('p', { class: 'eyebrow' }, 'Vehicle hangar'),
       h('h1', null, 'Pick a vehicle. Change what it is made of. Fly it.'),
-      h('p', { class: 'hg-lede' }, `${all.length} vehicles across ${doms.length} simulation domains. Each one is a set of physical parameters the simulator integrates, not a skin: a heavier stage needs more thrust and propellant to stop, a weaker engine lights later and lands harder. Design changes run as new simulations in the Experiment Lab and can be watched, compared and replayed.`),
+      h('p', { class: 'hg-lede' }, `${all.length} vehicles across ${doms.length} simulation domains. Each one is a set of physical parameters the simulator integrates, not a skin. What a change does to a landing or an ascent is read from the new run, not assumed. Design changes run as new simulations in the Experiment Lab and can be watched, compared and replayed.`),
       h('ul', { class: 'hg-legend' },
         h('li', null, h('span', { class: 'hg-ev hg-ev-ref' }, 'Reference case'), ' frozen, pre-registered case; verified model behaviour, not flight data'),
         h('li', null, h('span', { class: 'hg-ev hg-ev-explore' }, 'Exploratory'), ' illustrative values; recomputable, not evidence for a claim'),

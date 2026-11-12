@@ -1,5 +1,7 @@
 # M18: plano de integração das PR #24 a #30
 
+> Atualização de 2026-11-11: plano substituído pela integração executada. #24 e #25 foram integradas nos SHA testados (com correções da revisão independente no #25); #26 a #30 foram substituídas pela #31 (integração do M17 com correções de CI e de segurança), integrada em `main` como `f5db000`; #26 a #30 foram fechadas. O texto abaixo é o plano original, mantido como registo.
+
 Estado: proposta para decisão do responsável. Nada foi integrado, enviado ou alterado nas PR. As verificações abaixo foram feitas em 2026-11-08 só com leitura (`git fetch`, `gh pr view`, `git merge-base`, uma árvore de trabalho descartável para as fusões de ensaio, já removida).
 
 ## Estado das PR
@@ -98,7 +100,7 @@ Resultados esperados de referência (do #30 instalado): Lab 34/34, ciclo do Cine
 
 ## Reversão
 
-- Instaladores anteriores em `C:\Users\Duarte\Documents\VV Lab Rollback`: Studio 0.16.0, 0.16.1, 0.16.2 e 0.17.0, com `SHA256SUMS.txt`. Verificar os hashes antes de reinstalar.
+- Instaladores anteriores em `%USERPROFILE%\Documents\VV Lab Rollback`: Studio 0.16.0, 0.16.1, 0.16.2 e 0.17.0, com `SHA256SUMS.txt`. Verificar os hashes antes de reinstalar.
 - Os ramos `feat/m15-...`, `feat/m16-geospatial`, `feat/m17-*` e `m17-integration` ficam preservados (nunca apagados nem reescritos) e as PR continuam abertas até decisão.
 - Cada fusão da Fase 1 é um commit de fusão isolado: reverter com `git revert -m 1 <fusão>`, por ordem inversa, em `main`. Sem reescrita de história nem envio forçado.
 - Antes de começar, registar o SHA de `origin/main` (`a23db64`) como ponto de regresso.

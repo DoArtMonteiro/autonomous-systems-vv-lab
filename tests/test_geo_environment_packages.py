@@ -13,6 +13,7 @@ import re
 import tempfile
 import unittest
 import zipfile
+import zlib
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GEO = os.path.join(ROOT, "scripts", "geo")
@@ -60,11 +61,27 @@ class EnvironmentIndex(unittest.TestCase):
                 if not e["bundled"]:
                     continue
                 got = pkg.package(e["id"], self.cat, dist=d)
-                self.assertEqual((got["bytes"], got["sha256"]), (e["bytes"], e["sha256"]), e["id"])
                 b = pkg.read(os.path.join(d, e["file"]))
-                self.assertEqual(hashlib.sha256(b).hexdigest(), e["sha256"])
+                self.assertEqual(hashlib.sha256(b).hexdigest(), got["sha256"])
                 side = pkg.read(os.path.join(d, e["file"] + ".sha256")).decode("ascii")
-                self.assertEqual(side, f"{e['sha256']}  {e['file']}\n")
+                self.assertEqual(side, f"{got['sha256']}  {e['file']}\n")
+                # Same entries, in the same order, with the same bytes as the pack files.
+                self.assertEqual(got["files"], e["files"], e["id"])
+                self.assertEqual(got["unpacked_bytes"], e["unpacked_bytes"], e["id"])
+                pack = pkg.pack_dir(e["id"], self.cat["environments"][e["id"]], None)
+                with zipfile.ZipFile(os.path.join(d, e["file"])) as z:
+                    self.assertEqual(z.namelist(), e["files"], e["id"])
+                    for n in e["files"][:-1]:
+                        self.assertEqual(z.read(n), pkg.read(os.path.join(pack, n)), f"{e['id']}/{n}")
+                    with open(os.path.join(pack, "environment.json"), encoding="utf-8") as f:
+                        m = json.load(f)
+                    want = pkg.notice(m, self.cat["environments"][e["id"]])
+                    want = want.encode("utf-8") if isinstance(want, str) else want
+                    self.assertEqual(z.read("NOTICE.md"), want, f"{e['id']}/NOTICE.md")
+                # Deflate output depends on the zlib build; the indexed zip bytes are those of the
+                # build named in the index, so they are compared only under that build.
+                if zlib.ZLIB_RUNTIME_VERSION == self.idx.get("zlib"):
+                    self.assertEqual((got["bytes"], got["sha256"]), (e["bytes"], e["sha256"]), e["id"])
 
     def test_built_zips_hold_only_the_manifest_its_files_and_the_notice(self):
         dist = os.path.join(ROOT, "dist", "environments")
@@ -73,7 +90,7 @@ class EnvironmentIndex(unittest.TestCase):
             if not os.path.exists(p):
                 continue
             b = pkg.read(p)
-            if hashlib.sha256(b).hexdigest() != e["sha256"]:
+            if zlib.ZLIB_RUNTIME_VERSION == self.idx.get("zlib") and hashlib.sha256(b).hexdigest() != e["sha256"]:
                 self.fail(f"{e['file']} in dist does not match the index (rebuild with package_environment.py)")
             with zipfile.ZipFile(p) as z:
                 names = z.namelist()

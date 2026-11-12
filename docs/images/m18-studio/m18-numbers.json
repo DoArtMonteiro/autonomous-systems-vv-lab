@@ -47,7 +47,7 @@
    ]
   },
   "base_outcome": "Orbit",
-  "base_run": "6cb9c6796327eaf8",
+  "base_run": "b31a929731ff94f8",
   "exp": {
    "booster.R2_propellant_margin": [
     "pass",
@@ -95,11 +95,18 @@
    ]
   },
   "exp_outcome": "Suborbital",
-  "exp_run": "ab83b79f1d624094"
+  "exp_run": "5b26cf889b9e1ef8"
  },
  "cinematic_button": {
+  "described": true,
   "disabled": false,
+  "focusable": true,
   "title": "Open this run in the Cinematic View 0.1.0 (a separate window; read-only replay of the record)"
+ },
+ "cinematic_status": {
+  "installed": true,
+  "verified": true,
+  "version": "0.1.0"
  },
  "landing_thrust_0_7": {
   "base": {
@@ -148,8 +155,8 @@
     "0.000000 m"
    ]
   },
-  "base_outcome": "Touched down, requirements not met",
-  "base_run": "04cb244b14ffbcbc",
+  "base_outcome": "Reached the ground, requirements not met",
+  "base_run": "23d948b4bddd6980",
   "base_safety": "safe",
   "exp": {
    "R1_vertical_speed": [
@@ -197,9 +204,45 @@
     "0.000000 m"
    ]
   },
-  "exp_outcome": "Touched down, requirements not met",
-  "exp_run": "9fc9fc96f8cdcacb",
+  "exp_outcome": "Reached the ground, requirements not met",
+  "exp_run": "1964202f51ae3d89",
   "exp_safety": "safe",
   "seed": 5000
+ },
+ "player_header_1024x640": {
+  "actions": [
+   "Analyse",
+   "Compare in detail",
+   "Cinematic view",
+   "Change the conditions"
+  ],
+  "clash": [],
+  "count": 12,
+  "headHeight": 113,
+  "outside": []
+ },
+ "player_header_1440x900": {
+  "actions": [
+   "Analyse",
+   "Compare in detail",
+   "Cinematic view",
+   "Change the conditions"
+  ],
+  "clash": [],
+  "count": 12,
+  "headHeight": 89,
+  "outside": []
+ },
+ "player_header_1920x1080": {
+  "actions": [
+   "Analyse",
+   "Compare in detail",
+   "Cinematic view",
+   "Change the conditions"
+  ],
+  "clash": [],
+  "count": 12,
+  "headHeight": 89,
+  "outside": []
  }
 }

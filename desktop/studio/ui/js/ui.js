@@ -81,6 +81,22 @@ export function askName({ title, label = 'Name', initial = '', confirm = 'Save' 
   });
 }
 
+/** Asks to confirm an action that discards something. Resolves true to go on, false to stay. */
+export function askConfirm({ title, message, confirm = 'Continue', cancel = 'Keep what I have' }) {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (v) => { if (!done) { done = true; m.close(); resolve(v); } };
+    const m = modal({
+      title,
+      body: [h('p', null, message)],
+      actions: [h('button', { type: 'button', class: 'btn btn-primary', dataset: { action: 'keep' }, onclick: () => finish(false) }, cancel),
+        h('button', { type: 'button', class: 'btn', dataset: { action: 'discard' }, onclick: () => finish(true) }, confirm)],
+    });
+    const obs = new MutationObserver(() => { if (!m.box.isConnected) { obs.disconnect(); if (!done) { done = true; resolve(false); } } });
+    obs.observe(document.getElementById('modal-root'), { childList: true });
+  });
+}
+
 export const SHORTCUTS = [
   ['Space', 'Play or pause the mission or the run'],
   ['Left / Right', 'Step one recorded sample'],

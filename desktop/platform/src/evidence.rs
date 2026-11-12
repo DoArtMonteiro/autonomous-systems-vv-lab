@@ -11,7 +11,9 @@ use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, DateTime, ZipWriter};
 
 use crate::canonical::{pretty_bytes, sha256_hex};
-use crate::contract::{FileHash, META_FILE, ReplayReport, RunRecord};
+use crate::contract::{
+    FileHash, META_FILE, REPLAY_VERIFIED_EARLIER_BUILD, ReplayReport, RunRecord,
+};
 use crate::host_sdk::read_bounded;
 
 pub const EVIDENCE_SCHEMA: &str = "vv-evidence.v1";
@@ -21,6 +23,33 @@ pub const EVIDENCE_SCHEMA: &str = "vv-evidence.v1";
 /// application is a scientifically accepted outcome.
 pub const EVIDENCE_CLASS: &str = "development_demonstration";
 const MAX_PACKAGE_BYTES: u64 = 96 * 1024 * 1024;
+
+/// File name of an evidence package: `<run id>-evidence.zip`, with `-REJECTED` when the replay
+/// rejected the run and `-EARLIER-BUILD` when it was verified only against its own record. The
+/// default export and the save dialog both use it.
+pub fn file_name(run_id: &str, replay_status: &str) -> String {
+    let suffix = match replay_status {
+        "rejected" => "-REJECTED",
+        REPLAY_VERIFIED_EARLIER_BUILD => "-EARLIER-BUILD",
+        _ => "",
+    };
+    format!("{run_id}-evidence{suffix}.zip")
+}
+
+#[cfg(test)]
+mod name_tests {
+    use super::*;
+
+    #[test]
+    fn the_name_carries_the_replay_status() {
+        assert_eq!(file_name("abc", "verified"), "abc-evidence.zip");
+        assert_eq!(file_name("abc", "rejected"), "abc-evidence-REJECTED.zip");
+        assert_eq!(
+            file_name("abc", REPLAY_VERIFIED_EARLIER_BUILD),
+            "abc-evidence-EARLIER-BUILD.zip"
+        );
+    }
+}
 
 #[derive(Serialize)]
 struct Manifest<'a> {
@@ -56,7 +85,12 @@ fn readme(run_id: &str, record: &RunRecord, replay: &ReplayReport) -> String {
         text.push_str(line);
         text.push('\n');
     }
-    text.push_str("\nThe desktop application replays a stored run by recomputing it from request.json and comparing every file byte for byte; replay.json lists each check.\n\n## Notes\n\n");
+    if replay.status == REPLAY_VERIFIED_EARLIER_BUILD {
+        text.push_str("\nThis run was recorded by an earlier build of the domain host, so it was not compared byte for byte. It was recomputed with the current defaults and agrees with the stored record on the outcome, the safety status, the status and instant of each requirement (in both directions), the stored timebases, channels, events and metrics, and the verdict flags of the native verification.json. Texts, the scene, anything only the current build writes and the native simulator replay were not compared. replay.json lists each check and what was not compared.\n");
+    } else {
+        text.push_str("\nThe desktop application replays a stored run by recomputing it from request.json and comparing every file byte for byte; replay.json lists each check.\n");
+    }
+    text.push_str("\n## Notes\n\n");
     for note in &record.notes {
         text.push_str("- ");
         text.push_str(note);

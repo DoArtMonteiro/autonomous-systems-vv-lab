@@ -54,11 +54,21 @@ def set_param(s, pid, value):
     time.sleep(0.2)
 
 
+def replace_if_asked(s):
+    """Starting from another run replaces an experiment in progress, and the Lab asks first: accept."""
+    try:
+        s.wait("document.querySelector('#modal-root [data-action=discard]')", 3, "replace dialog")
+    except TimeoutError:
+        return
+    s.page.click("#modal-root [data-action='discard']")
+
+
 def pad_fix(s):
     """The owner's case: a soft touchdown that misses the pad, fixed by a real new simulation."""
     open_mission(s, "off-the-pad")
     s.wait("document.querySelector('.pl-head [data-action=\"configure\"]')", 30, "change the conditions")
     s.page.click(".pl-head [data-action='configure']")
+    replace_if_asked(s)
     s.wait("window.__studio.view() === 'lab' && document.querySelector('.lab-base')", 30, "lab")
     base_id = lab(s)["base"]
     base = record(s, base_id)
@@ -88,6 +98,7 @@ def from_player(s):
     shown = s.js("window.__studio.player()")
     base_id = shown["runs"][shown["active"]]
     s.page.click(".pl-head [data-action='configure']")
+    replace_if_asked(s)
     s.wait("window.__studio.view() === 'lab' && window.__studio.lab() && document.querySelector('.lab-base')", 30, "lab")
     st = lab(s)
     check("Change the conditions opens the shown run as the Lab baseline", st["base"] == base_id, f"{st['base']} vs {base_id}")
@@ -181,15 +192,16 @@ def ascent(s):
     check("Two stages to orbit: the record is vv-run.v2 with separate entities", rec["schema"] == "vv-run.v2" and len(ents) >= 2, ", ".join(ents))
     s.shot("m17-ascent-player-dark")
     s.page.click(".pl-views [data-view='control']")
-    s.wait("document.querySelector('.mc')", 20, "mission control")
+    s.wait("document.querySelector('.mc')", 20, "flight console")
     time.sleep(1.0)
-    check("Two stages to orbit: Mission Control opens on the ascent", s.js("!!document.querySelector('.mc')") and not errors, "; ".join(errors)[:200])
+    check("Two stages to orbit: Flight console opens on the ascent", s.js("!!document.querySelector('.mc')") and not errors, "; ".join(errors)[:200])
     s.shot("m17-ascent-control-dark")
     s.page.click(".mc-back")
     s.wait("document.querySelector('.pl-head')", 10, "player")
     open_mission(s, "too-heavy")
     s.wait("document.querySelector('.pl-head [data-action=\"configure\"]')", 30, "change the conditions")
     s.page.click(".pl-head [data-action='configure']")
+    replace_if_asked(s)
     s.wait("window.__studio.view() === 'lab' && document.querySelector('.lab-base')", 30, "lab")
     base = record(s, lab(s)["base"])
     check("One payload too many: the baseline does not reach orbit", base["outcome"]["status"] != "success", base["outcome"]["label"])

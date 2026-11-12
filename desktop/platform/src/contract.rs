@@ -18,6 +18,10 @@ pub const RECORD_SCHEMA: &str = "vv-run.v1";
 /// record has neither field and serialises exactly as before.
 pub const RECORD_SCHEMA_V2: &str = "vv-run.v2";
 pub const REPLAY_SCHEMA: &str = "vv-run-replay.v1";
+/// Replay status of a run that an earlier host build stored: it still verifies against its own
+/// record (integrity, a request that only needs current defaults, a recomputed result that agrees
+/// on every verdict and every number), but not byte for byte, so it is not plain `verified`.
+pub const REPLAY_VERIFIED_EARLIER_BUILD: &str = "verified_earlier_build";
 
 /// File a domain host writes into its run directory, next to its native artifacts.
 pub const RECORD_FILE: &str = "record.json";
@@ -103,6 +107,19 @@ pub struct Item {
     /// hosts that predate it; omitted from the JSON when empty, so older catalogs are unchanged.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub facts: Vec<Fact>,
+    /// Evidence level of a vehicle, stated by the domain: `reference` (the frozen, pre-registered
+    /// case) or `exploratory` (illustrative values). Empty when the domain says nothing, which
+    /// readers treat as exploratory; omitted from the JSON when empty.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub evidence: String,
+}
+
+impl Item {
+    /// The same item with its evidence level set.
+    pub fn with_evidence(mut self, level: &str) -> Self {
+        self.evidence = level.into();
+        self
+    }
 }
 
 /// One attribute of an item: a label, a number and its unit.
@@ -529,7 +546,8 @@ pub struct ReplayCheck {
 #[serde(deny_unknown_fields)]
 pub struct ReplayReport {
     pub schema: String,
-    /// verified or rejected; a host must recompute from the stored inputs to say verified.
+    /// verified or rejected; a host must recompute from the stored inputs to say verified. The
+    /// platform alone adds `verified_earlier_build` (see [`REPLAY_VERIFIED_EARLIER_BUILD`]).
     pub status: String,
     pub checks: Vec<ReplayCheck>,
 }

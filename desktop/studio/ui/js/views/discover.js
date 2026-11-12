@@ -141,8 +141,18 @@ export function verdictOf(p) {
   return failedCheck(p) ? 'withdrawn' : p.verdict && p.verdict.claim;
 }
 
+/**
+ * The newest package of a claim by its creation stamp (the fixed-width UTC stamp the platform puts
+ * after the last dash of the package name), not by the order of the listing.
+ */
+export function newestPackage(packages, claimId) {
+  let best = null;
+  for (const p of packages) if (p.claim_id === claimId && (!best || String(p.created) > String(best.created))) best = p;
+  return best;
+}
+
 function latestFor(claimId) {
-  return st.packages.find((p) => p.claim_id === claimId);
+  return newestPackage(st.packages, claimId) || undefined;
 }
 
 function rail() {

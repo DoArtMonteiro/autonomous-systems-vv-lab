@@ -36,7 +36,7 @@ export async function showRun(opts) {
     // Charts measured while hidden need a resize once visible.
     requestAnimationFrame(() => { if (ws && ws.telemetry) ws.telemetry.resize(); });
   }
-  // M16: Mission Control opens a run at the instant of an event.
+  // M16: the Flight console opens a run at the instant of an event.
   if (ws && opts && Number.isFinite(opts.t)) { ws.cursor.pause(); ws.cursor.set(opts.t); }
 }
 

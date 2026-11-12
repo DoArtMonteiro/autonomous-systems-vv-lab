@@ -14,6 +14,7 @@ These are scripted checks of what the screen shows. They are not observations of
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -101,8 +102,29 @@ def environments(s):
     s.wait("document.querySelectorAll('.at-card .at-img[src]').length === 8", 30, "thumbnails")
     s.page.click(".at-card[data-env='wallops-island'] [data-action='use']")
     s.wait("document.querySelector(\".at-card[data-env='wallops-island']\").classList.contains('is-current')", 10, "chosen")
-    check("Environments: Wallops Island chosen for the missions", True)
+    chosen = s.js("[...document.querySelectorAll('.at-card.is-current')].map((e) => e.dataset.env)")
+    check("Environments: Wallops Island is the one chosen environment", chosen == ["wallops-island"], json.dumps(chosen))
+    focus = s.js("(() => { const a = document.activeElement; const c = a && a.closest('.at-card'); return { env: c && c.dataset.env, tag: a && a.tagName, inBody: a === document.body }; })()")
+    check("Environments: focus stays on the card that was chosen after the cards are redrawn", focus["env"] == "wallops-island" and not focus["inBody"], json.dumps(focus))
+    said = s.js("document.querySelector('.at [role=status]').textContent")
+    check("Environments: the choice is announced in a polite status", "Wallops Island" in said and s.js("document.querySelector('.at [role=status]').getAttribute('aria-live')") == "polite", said)
     s.shot("m18-environments-dark")
+
+
+def player_follows_environment(s):
+    """The player held for a mission shows the environment chosen later from Environments."""
+    def land_on(env):
+        s.nav("environments")
+        s.wait("document.querySelectorAll('.at-card').length === 8", 30, "environments")
+        s.page.click(f".at-card[data-env='{env}'] [data-action='fly']")
+        s.wait(f"(() => {{ const p = window.__studio.player(); return p && p.experience === 'first-landing' && p.environment === '{env}' && p.view === 'geospatial'; }})()", 120, f"player on {env}")
+        return s.player()
+    a = land_on("cape-canaveral")
+    check("Player: Land a rocket here opens the mission on the chosen environment", a["environment"] == "cape-canaveral" and a["view"] == "geospatial", json.dumps({k: a[k] for k in ("environment", "view")}))
+    b = land_on("wallops-island")
+    check("Player: choosing another environment while the same mission is held changes what the player shows", b["environment"] == "wallops-island" and b["experience"] == a["experience"], json.dumps({k: b[k] for k in ("environment", "experience")}))
+    named = s.js("document.querySelector('.pl-env') && document.querySelector('.pl-env').value")
+    check("Player: the environment selector shows the new environment", named == "wallops-island", str(named))
 
 
 def vehicle_experiment(s):
@@ -138,9 +160,34 @@ def compare(s, base_id, exp_id):
     time.sleep(2)
     text = s.js("document.querySelector('#view-compare').innerText")
     check("Compare: both runs are open", base_id[:8] in text and exp_id[:8] in text, " ".join(text[:200].split()))
+    labels = s.js("[...document.querySelectorAll('.run-legend .key-label')].map((e) => ({ text: e.textContent.trim(), cut: e.scrollWidth > e.clientWidth + 1 }))")
+    texts = [x["text"] for x in labels]
+    check("Compare: the two runs have different labels", len(texts) == 2 and texts[0] != texts[1], json.dumps(texts))
+    check("Compare: the labels name the changed parameter and its value, not the whole configuration", len(texts) == 2 and all("thrust" in t.lower() for t in texts) and "0.7" in texts[1] and "0.7" not in texts[0], json.dumps(texts))
+    check("Compare: no label is truncated", len(labels) == 2 and not any(x["cut"] for x in labels), json.dumps(labels))
     s.shot("m18-compare-dark")
     s.nav("lab")
     s.wait("document.querySelector('#lab-watch')", 20, "lab result")
+
+
+def reveal_in_place(s):
+    """D8: nothing the viewer has not reached is drawn; the result arrives in a live region that was
+    already there, and focus follows the button that asked for it."""
+    if s.player()["playing"]:
+        s.page.click(".pl-play")
+    s.page.evaluate("(() => { const r = document.querySelector('.pl-range'); r.value = String(Number(r.min) + 0.25 * (Number(r.max) - Number(r.min))); r.dispatchEvent(new Event('input', { bubbles: true })); })()")
+    time.sleep(0.4)
+    p = s.player()
+    drawn = s.js("[...document.querySelectorAll('.pl-mark[data-gated]')].map((b) => Number(b.dataset.t))")
+    check("Player: the run holds findings later than the playback time", p["findings"] > p["findingsDrawn"], f"{p['findings']} findings, {p['findingsDrawn']} drawn at t = {p['t']:.2f}")
+    check("Player: no finding marker later than the playback time is in the page", all(t <= p["t"] + 1e-6 for t in drawn), json.dumps(drawn))
+    check("Player: the live region exists and holds no result before it is asked for", s.js("(() => { const l = document.querySelector('.pl-live'); window.__live = l; return !!l && l.getAttribute('aria-live') === 'polite' && !l.querySelector('.pl-result') && !!l.querySelector(\"[data-action='reveal']\"); })()"))
+    s.page.focus("[data-action='reveal']")
+    s.page.keyboard.press("Enter")
+    s.wait("document.querySelector('.pl-result')", 10, "result card")
+    check("Player: the result fills the live region that was there, which is not replaced", s.js("document.querySelector('.pl-live') === window.__live && window.__live.contains(document.querySelector('.pl-result'))"))
+    check("Player: focus moves to the Result heading when its button goes away", s.js("!!document.activeElement && document.activeElement.id === 'pl-result-h' && document.activeElement.textContent === 'Result'"))
+    check("Player: once the result is shown, every finding marker is drawn", s.player()["findingsDrawn"] == s.player()["findings"], json.dumps([s.player()["findings"], s.player()["findingsDrawn"]]))
 
 
 def watch(s, base_id, exp_id):
@@ -148,6 +195,7 @@ def watch(s, base_id, exp_id):
     s.wait("(() => { const p = window.__studio.player(); return p && p.experience.startsWith('runs:') && document.querySelector('.pl-hud dl'); })()", 120, "player")
     p = s.player()
     check("Player: plays the baseline and the experiment from their records", p["runs"] == [base_id, exp_id], json.dumps(p["runs"]))
+    reveal_in_place(s)
     s.page.click(".pl-views [data-view='engineering']")
     s.wait("(() => { const p = window.__studio.player(); return p && p.view === 'engineering' && p.renderer === 'engineering'; })()", 60, "engineering scene")
     check("Player: the same two records play in the engineering scene", s.player()["runs"] == [base_id, exp_id])
@@ -157,13 +205,21 @@ def watch(s, base_id, exp_id):
     s.wait("(() => { const p = window.__studio.player(); return p && p.renderer === 'geospatial'; })()", 90, "geospatial")
     p = s.player()
     check("Player: the geospatial view uses the chosen environment", p["environment"] == "wallops-island", str(p["environment"]))
-    s.js("window.__studio.player() && document.querySelector('.pl-scrub input, input[type=range]') && 0")
     time.sleep(6)
     s.shot("m18-player-geospatial-wallops-dark")
-    b = s.js("(() => { const b = document.querySelector(\"[data-action='cinematic']\"); return b ? { disabled: b.disabled, title: b.title } : null; })()")
+    views = s.js("[...document.querySelectorAll('.pl-views [data-view]')].map((b) => [b.dataset.view, b.textContent.trim()])")
+    check("Flight console: the player's operations layout is called Flight console", views == [["engineering", "Engineering"], ["geospatial", "Geospatial"], ["control", "Flight console"]], json.dumps(views))
+    check("Flight console: the player does not use the name of the home page", "Mission Control" not in s.js("document.querySelector('#view-mission').innerText"))
+    player_header(s)
+    b = s.js("(() => { const b = document.querySelector(\"[data-action='cinematic']\"); return b ? { disabled: b.getAttribute('aria-disabled') === 'true', title: b.title, focusable: !b.disabled && b.tabIndex >= 0, described: !!document.getElementById(b.getAttribute('aria-describedby')) && document.getElementById(b.getAttribute('aria-describedby')).textContent.length > 0 } : null; })()")
     NUMBERS["cinematic_button"] = b
-    if b and not b["disabled"]:
-        check("Cinematic: the same record can open in the Cinematic View", True, b["title"])
+    status = s.page.evaluate("() => window.__TAURI__.core.invoke('cinematic_status')")
+    NUMBERS["cinematic_status"] = {k: status.get(k) for k in ("installed", "verified", "version")}
+    should_open = bool(status.get("installed") and status.get("verified"))
+    check("Cinematic: the button is enabled exactly when the module is installed and verified", bool(b) and (not b["disabled"]) == should_open, f"{json.dumps(b)} status {json.dumps(NUMBERS['cinematic_status'])}")
+    check("Cinematic: the button is focusable and names its reason or its action through aria-describedby", bool(b) and b["focusable"] and b["described"], json.dumps(b))
+    if should_open and b and not b["disabled"]:
+        check("Cinematic: the enabled button says which module version opens this record", str(status.get("version", "")) in b["title"], b["title"])
         s.page.click("[data-action='cinematic']")
         running = False
         for _ in range(60):
@@ -175,13 +231,72 @@ def watch(s, base_id, exp_id):
         time.sleep(6)
         kill_godot()
     else:
-        check("Cinematic: not available here, and the button says why", bool(b) and bool(b["title"]), json.dumps(b))
+        reason = status.get("reason") or ""
+        check("Cinematic: not available here, and the button gives the module's reason", bool(b) and b["disabled"] and bool(reason) and reason in b["title"], f"{json.dumps(b)} reason {reason!r}")
+
+
+def header_overlaps(s):
+    """Bounding boxes of the player header's controls, and the pairs that overlap or leave the window."""
+    return s.js("""() => {
+        const els = [...document.querySelectorAll('.pl-head button, .pl-head select, .pl-head h1, .pl-head .grade, .pl-head .pl-env-none')].filter((e) => e.offsetParent !== null);
+        const box = (e) => { const r = e.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom }; };
+        const label = (e) => (e.dataset.action || e.dataset.view || e.className || e.tagName).toString().slice(0, 30);
+        const boxes = els.map((e) => ({ name: label(e), ...box(e) }));
+        const clash = [];
+        for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+            const a = boxes[i], b = boxes[j];
+            const w = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+            const h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+            if (w > 1 && h > 1) clash.push(a.name + ' x ' + b.name);
+        }
+        const outside = boxes.filter((b) => b.left < -0.5 || b.right > innerWidth + 0.5).map((b) => b.name);
+        const head = document.querySelector('.pl-head').getBoundingClientRect();
+        return { count: boxes.length, clash, outside, headHeight: Math.round(head.height), actions: [...document.querySelectorAll('.pl-head-actions .btn')].map((b) => b.textContent.trim()) };
+    }""")
+
+
+def player_header(s):
+    """D2: with two runs, the header's controls never overlap and never leave the window."""
+    for w, hgt in ((1024, 640), (1440, 900), (1920, 1080)):
+        s.resize(w, hgt)
+        # The geospatial scene can keep the window busy for a while: give the resize time to land.
+        try:
+            s.wait(f"innerWidth === {w} && innerHeight === {hgt}", 25, f"window {w}x{hgt}")
+        except TimeoutError:
+            pass
+        time.sleep(0.8)
+        got = s.js("[innerWidth, innerHeight]")
+        r = header_overlaps(s)
+        NUMBERS[f"player_header_{w}x{hgt}"] = r
+        check(f"Player header {w}x{hgt}: the window has the size asked for", abs(got[0] - w) <= 1 and abs(got[1] - hgt) <= 1, json.dumps(got))
+        check(f"Player header {w}x{hgt}: Analyse, Compare in detail, Cinematic view and Change the conditions are all there", r["actions"] == ["Analyse", "Compare in detail", "Cinematic view", "Change the conditions"], json.dumps(r["actions"]))
+        check(f"Player header {w}x{hgt}: no two controls overlap", not r["clash"], "; ".join(r["clash"])[:300])
+        check(f"Player header {w}x{hgt}: every control is inside the window", not r["outside"], ", ".join(r["outside"]))
+        check(f"Player header {w}x{hgt}: the header stays compact", r["headHeight"] <= 150, f"{r['headHeight']} px")
+        check(f"Player header {w}x{hgt}: no horizontal scroll", s.no_hscroll())
+    s.resize(1440, 900)
 
 
 def ascent(s):
     s.nav("vehicles")
+    before = lab(s)["base"]
     s.page.click(".hg-card[data-vehicle='small'] [data-action='design']")
+    # The Lab holds the heavy-stage experiment: starting another vehicle must ask before replacing it.
+    s.wait("document.querySelector('#modal-root [role=dialog] [data-action=keep]')", 10, "replace dialog")
+    title = s.js("document.querySelector('#modal-root [role=dialog] h2').textContent")
+    check("Lab: starting another vehicle asks before replacing an experiment in progress", title == "Replace the experiment in progress?", title)
+    s.page.click("#modal-root [data-action='keep']")
+    s.wait("document.querySelector('#modal-root').hidden", 10, "dialog closed")
+    check("Lab: keeping it leaves the heavy-stage baseline in place", lab(s)["base"] == before and s.js("window.__studio.view()") == "lab", f"{before} {lab(s)['base']}")
+    s.nav("vehicles")
+    s.page.click(".hg-card[data-vehicle='small'] [data-action='design']")
+    s.wait("document.querySelector('#modal-root [role=dialog] [data-action=discard]')", 10, "replace dialog")
+    s.page.click("#modal-root [data-action='discard']")
+    s.wait("document.querySelector('#view-lab [role=status] h1') || (window.__studio.lab() && window.__studio.lab().base !== " + json.dumps(before) + ")", 30, "baseline simulating")
+    if s.js("!!document.querySelector('#view-lab [role=status] h1')"):
+        check("Lab: the baseline in progress is announced as a status", s.js("document.querySelector('#view-lab [role=status]').getAttribute('aria-live')") == "polite")
     s.wait("window.__studio.view() === 'lab' && window.__studio.lab() && document.querySelector('.lab-base')", 180, "ascent baseline")
+    check("Lab: replacing it starts the new vehicle's baseline", lab(s)["base"] != before and record(s, lab(s)["base"])["request"]["scenario"].startswith("small"), lab(s)["base"])
     base_id = lab(s)["base"]
     base = record(s, base_id)
     set_param(s, "small_payload_kg", 600)
@@ -190,6 +305,15 @@ def ascent(s):
     ra, rb = req_map(base), req_map(exp)
     flipped = [k for k in ra if k in rb and ra[k]["status"] != rb[k]["status"]]
     check("Ascent: 600 kg payload changes which requirements pass", len(flipped) >= 1, ", ".join(flipped))
+    published = sorted(m["id"] for m in exp["metrics"] if m["id"].startswith("requirement_margin."))
+    check("Ascent: the record publishes a numeric margin for the single-bound requirements", len(published) >= 6, ", ".join(published))
+    check("Ascent: composite requirements publish none", not any(k in " ".join(published) for k in ("R1_separation_window", "R7_phase_sequence", "R8_orbit_insertion")))
+    cells = s.js("[...document.querySelectorAll('.lab-table tbody tr')].map((tr) => [tr.cells[0].textContent.trim(), tr.cells[tr.cells.length - 1].textContent.trim()])")
+    numeric = [c for c in cells if re.fullmatch(r"[+-]?[\d.e+-]+ (km|kg|Pa|g)", c[1])]
+    check("Ascent: the Lab shows a numeric margin change for the requirements that have one", len(numeric) >= 4, json.dumps(cells)[:400])
+    with_numbers = {req_map(exp)[k]["label"] for k in req_map(exp) if f"requirement_margin.{k}" in published}
+    empty = [c[0] for c in cells if any(c[0].startswith(lbl) for lbl in with_numbers) and c[1] in ("–", "")]
+    check("Ascent: no requirement that has numbers shows an empty margin", not empty, ", ".join(empty))
     NUMBERS["ascent_payload_600"] = {"base_run": base_id, "exp_run": exp_id,
                                      "base": {k: [v["status"], v["observed"]] for k, v in ra.items()},
                                      "exp": {k: [v["status"], v["observed"]] for k, v in rb.items()},
@@ -249,7 +373,7 @@ def main():
             except Exception as e:  # noqa: BLE001
                 check("vehicle experiment journey completed", False, repr(e)[:300])
                 s.shot("m18-failure-vehicle")
-            for part in (ascent, layout):
+            for part in (player_follows_environment, ascent, layout):
                 try:
                     part(s)
                 except Exception as e:  # noqa: BLE001
