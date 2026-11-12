@@ -21,6 +21,12 @@ flown), the impact speed is the speed of the ballistic descent at the surface (a
 starts above it, loses speed to drag first and pays gravity loss), and Tsiolkovsky is taken at vacuum
 Isp (sea-level Isp gives less). They can show that a goal is far out of reach with a given reserve,
 not that it is reachable.
+
+The landing-burn figure is an understatement of about 25 to 30 %: vacuum instead of sea-level Isp
+costs about 10 % (285 against 315 s on small-leo) and the gravity loss of a real stop about 10 %
+more (380 kg against 346 kg in scripts/m18_booster_landing_1d.py), before the thrust level, the
+terminal descent and the trim. The 2D gate runs on branch recovery/booster burned 580 to 700 kg on
+small-leo with trim and landing together, against the 365 kg printed here for the landing alone.
 """
 
 import argparse
