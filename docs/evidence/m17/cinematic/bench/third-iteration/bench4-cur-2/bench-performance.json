@@ -1,0 +1,72 @@
+{
+ "adapter": "AMD Radeon RX 7700 XT",
+ "bench_seconds": 12.0,
+ "buffer_mem_used_bytes": 54362044,
+ "draw_calls_in_frame": 385,
+ "driver": "d3d12",
+ "frame_ms_max": 4.173,
+ "frame_ms_p50": 1.067,
+ "frame_ms_p95": 2.528,
+ "frame_ms_p99": 2.737,
+ "frames": 10715,
+ "primitives_in_frame": 19604705,
+ "profile": "performance",
+ "profile_reason": "Chosen on the command line",
+ "replay_from_t": 0.0,
+ "replay_to_t": 23.3361272857644,
+ "settings": {
+  "aa": "fxaa",
+  "cascades": 2,
+  "dof": false,
+  "foliage_cards": false,
+  "glow": true,
+  "lod_far_m": 1500.0,
+  "lod_near_m": 350.0,
+  "min_vram_gb": 2.0,
+  "msaa": 0,
+  "name": "performance",
+  "render_scale": 0.75,
+  "scan_veg": 0.0,
+  "shadow_size": 2048,
+  "soft_shadows": false,
+  "ssao": false,
+  "ssil": false,
+  "ssr": false,
+  "tex_max": 512,
+  "vegetation_density": 0.35,
+  "vegetation_shadows": false,
+  "volumetric_fog": false
+ },
+ "static_memory_bytes": 157513731,
+ "t": 23.3361272857644,
+ "texture_mem_used_bytes": 594309120,
+ "video_mem_used_bytes": 949645312,
+ "vram_capacity_bytes": 12868124672,
+ "vram_capacity_source": "registry qwMemorySize",
+ "vsync": "disabled",
+ "window": [
+  1440.0,
+  900.0
+ ],
+ "world": {
+  "buildings": 687,
+  "drawn_vegetation": 37188,
+  "lidar_structures": 8,
+  "shrubs": 34255,
+  "structures": 39,
+  "tiles": 206,
+  "trees": 2933
+ },
+ "harness": {
+  "command": "--rendering-driver d3d12 --path <repo>\\desktop\\cinematic --resolution 1440x900 -- --run <repo>\\tests\\fixtures\\cinematic\\landing-run --env <repo>\\desktop\\environments\\cape-canaveral --profile performance --camera director --bench <scratch>\\visual\\bench4-cur-2\\bench-performance.json --bench-seconds 12.0",
+  "wall_s_to_first_frame": 8.244,
+  "engine_ms_to_first_frame": 5932,
+  "peak_working_set_bytes": 659107840,
+  "peak_private_bytes": 1390534656,
+  "exit": 0,
+  "log_tail": [
+   "cinematic: pack cape-canaveral verified (6 files, SHA-256 against environment.json)",
+   "cinematic: scene built in 5572 ms (profile performance: Chosen on the command line)"
+  ]
+ }
+}

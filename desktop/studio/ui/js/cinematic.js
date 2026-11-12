@@ -26,19 +26,20 @@ const mbText = (b) => `${(b / 1048576).toFixed(0)} MB`;
 /**
  * "Cinematic view" button for the player: opens the stored run `runId()` on environment `envId()`
  * in the module. Unavailable, when the module is not installed or not verified, when there is no
- * environment, or when the scene is not a rocket landing: the button then stays focusable with
+ * environment, or when the scene is neither a rocket landing nor a launch ascent (vv-run.v1 or
+ * vv-run.v2; the module itself checks the record and refuses anything else): the button then stays focusable with
  * aria-disabled, does nothing, and its reason is both its title and a text that
  * aria-describedby points to, so a keyboard or screen-reader user can read why. Returns a wrapper
  * (the button and that text); the button carries data-action="cinematic".
  */
-export function cinematicButton(runId, envId, rocket) {
+export function cinematicButton(runId, envId, replayable) {
   const reasonId = `cin-why-${++cinSeq}`;
   const why = h('span', { class: 'sr-only', id: reasonId });
   const b = h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'cinematic' }, 'aria-disabled': 'true', 'aria-describedby': reasonId, title: 'Checking the Cinematic View module…' }, 'Cinematic view');
   const wrap = h('span', { class: 'cin-wrap' }, b, why);
   why.textContent = 'Checking the Cinematic View module…';
   const off = (text) => { b.setAttribute('aria-disabled', 'true'); b.title = text; why.textContent = text; };
-  if (!rocket) { off('The Cinematic View replays rocket landings only.'); return wrap; }
+  if (!replayable) { off('The Cinematic View replays rocket landings and launch ascents; this scene is neither.'); return wrap; }
   // Read afresh each time the player is built: the module folder can change outside this window
   // (another Studio window, an uninstall, a manual removal), and a stale "installed" would offer a
   // launch that cannot work.
@@ -46,7 +47,7 @@ export function cinematicButton(runId, envId, rocket) {
     if (!s.installed || !s.verified) return off(s.reason || 'The Cinematic View module is not installed.');
     if (!envId()) return off('The Cinematic View needs a geographic environment; none is installed.');
     b.removeAttribute('aria-disabled');
-    b.title = `Open this run in the Cinematic View ${s.version} (a separate window; read-only replay of the record)`;
+    b.title = `Open this run (landing or launch ascent) in the Cinematic View ${s.version} (a separate window; read-only replay of the record)`;
     why.textContent = b.title;
   }).catch((e) => off(`The module status could not be read: ${errorText(e)}`));
   b.addEventListener('click', () => {

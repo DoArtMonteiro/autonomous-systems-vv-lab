@@ -1,0 +1,1 @@
+Godot must not scan this folder: the assets are raw files read at run time (GLTFDocument, Image.load).

@@ -49,7 +49,7 @@ static func _mesh(v: PackedVector3Array, nv: PackedVector3Array, cv: PackedColor
 	return m
 
 
-static func build(pack, parent: Node3D, settings: Dictionary) -> Dictionary:
+static func build(pack, parent: Node3D, settings: Dictionary, pad := Vector2.ZERO, extra := []) -> Dictionary:
 	var stats := {"buildings": 0, "lidar_structures": 0, "structures": 0, "trees": 0, "shrubs": 0, "drawn_vegetation": 0, "tiles": 0}
 	var group := Node3D.new()
 	group.name = "WorldLayer"
@@ -57,7 +57,7 @@ static func build(pack, parent: Node3D, settings: Dictionary) -> Dictionary:
 	if pack.features != null:
 		_buildings(pack, group, stats)
 	if not pack.vegetation.is_empty():
-		_vegetation(pack, group, settings, stats)
+		_vegetation(pack, group, settings, stats, pad, extra)
 	return {"group": group, "stats": stats}
 
 
@@ -253,7 +253,9 @@ static func leaf_texture() -> ImageTexture:
 	return ImageTexture.create_from_image(img)
 
 
-static func _vegetation(pack, group: Node3D, st: Dictionary, stats: Dictionary) -> void:
+static func _vegetation(pack, group: Node3D, st: Dictionary, stats: Dictionary, pad := Vector2.ZERO, extra := []) -> void:
+	# Scanned plants and rocks in the near field (CC0); the plants they replace are skipped below.
+	var replaced: Dictionary = preload("res://scripts/scan_veg.gd").build(pack, group, st, stats, pad, extra)
 	var veg: Dictionary = pack.vegetation
 	var density: float = st.get("vegetation_density", 1.0)
 	var lod_near: float = st.get("lod_near_m", 700.0)
@@ -285,6 +287,8 @@ static func _vegetation(pack, group: Node3D, st: Dictionary, stats: Dictionary) 
 	card_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	var tiles := {}
 	for i in veg["n"]:
+		if replaced.has(i):
+			continue
 		var x: float = veg["x"][i]
 		var y: float = veg["y"][i]
 		var hx := int(round(x * 10.0))
@@ -336,6 +340,11 @@ static func _vegetation(pack, group: Node3D, st: Dictionary, stats: Dictionary) 
 				var col := Color(minf(1.0, r0 * k * (1.0 + 0.25 * hs)), minf(1.0, g0 * k * (1.0 + 0.08 * hs)), minf(1.0, b0 * k * (1.0 - 0.3 * hs)))
 				if kind == "tree1":
 					col = col.darkened(0.2)
+				if kind.begins_with("shrub"):
+					# Scrub reads as scrub, not as dark rocks, where the photograph under it is bare
+					# soil: pull the colour towards a dry olive green (illustrative; position, height
+					# and crown radius are the pack's).
+					col = col.lerp(Color(0.19, 0.22, 0.08) * (0.8 + 0.5 * hash2(hx + 3, hy + 5)), 0.65)
 				mm_near.set_instance_color(j, col)
 			stats["trees" if kind.begins_with("tree") else "shrubs"] += ids.size()
 			var parts := [["core", crown_mat, 0.0, lod_near, shadows_near], ["far", crown_mat, lod_near, lod_far, false]]

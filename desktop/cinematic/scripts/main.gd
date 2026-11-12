@@ -13,14 +13,19 @@ const Pack := preload("res://scripts/pack.gd")
 const Terrain := preload("res://scripts/terrain.gd")
 const World := preload("res://scripts/world.gd")
 const Stage := preload("res://scripts/stage.gd")
+const Effects := preload("res://scripts/effects.gd")
+const Pad := preload("res://scripts/pad.gd")
 const Profiles := preload("res://scripts/profiles.gd")
 const Hud := preload("res://scripts/hud.gd")
+const AscentView := preload("res://scripts/ascent.gd")
+const Skybox := preload("res://scripts/skybox.gd")
 
 # Illustrative sun (as the technical view: no date or time of day is part of the model).
 const SUN_AZIMUTH_DEG := 128.0
 const SUN_ELEVATION_DEG := 27.0
 const STAGE_LENGTH := 42.0
 const CAMERAS := ["director", "follow", "pad", "closeup", "wide", "overhead", "lowwide"]
+const CAMERAS_ASCENT := ["director", "follow", "pad", "wide"]
 
 var cli
 var record
@@ -45,11 +50,13 @@ var director_shot := ""
 var transition := {}
 var observer = null
 var top_z := 3000.0
-var dust: MeshInstance3D
-var splash: MeshInstance3D
-var splash_mat: ShaderMaterial
+var fx: Dictionary = {}
 var drop: MeshInstance3D
-var ground_light: OmniLight3D
+var ascent = null          # launch ascent view (vv-run.v2)
+var content_root: Node3D   # parent of the terrain, world layer and pad (moved by the floating origin in an ascent)
+var cameras: Array = CAMERAS
+var entity_sel := "auto"
+var sky_mat: ShaderMaterial
 var ready_ok := false
 var frames := 0
 var started_usec := 0
@@ -72,8 +79,14 @@ func _ready() -> void:
 	vehicle = Node3D.new()
 	vehicle.name = "Vehicle"
 	add_child(vehicle)
+	if cli.has_policy_dump:
+		_policy_dump()
+		return
 	if cli.has_pose_dump:
-		_pose_dump()
+		if record.is_v2:
+			_pose_dump_ascent()
+		else:
+			_pose_dump()
 		return
 	pack = Pack.load_dir(cli.env_dir)
 	if pack.error != "":
@@ -120,6 +133,54 @@ func _pose_dump() -> void:
 	get_tree().quit(0)
 
 
+# Headless check of two rules that are otherwise only visible on screen: the profile the automatic
+# choice makes for the given video memory (--vram-bytes), and the line presentation mode shows.
+func _policy_dump() -> void:
+	var vram: Dictionary = Profiles.detect_vram(cli.vram_bytes)
+	var out := {
+		"auto": Profiles.auto_pick(vram),
+		"vram_bytes": vram["bytes"],
+		"presentation_line": Hud.presentation_line(record),
+	}
+	print("POLICY " + JSON.stringify(out, "", true, true))
+	get_tree().quit(0)
+
+
+# Headless check of an ascent: for each t, every entity's activity, position (east, north, up in
+# metres, 64-bit, the pad's tangent plane) and axis from the record, and the same read back from a
+# node placed as the renderer places it (32-bit vectors; no floating origin and no ground offset).
+func _pose_dump_ascent() -> void:
+	var nodes := {}
+	for e in record.entities:
+		var n := Node3D.new()
+		add_child(n)
+		nodes[e["id"]] = n
+	for at in cli.pose_dump:
+		var list := []
+		for e in record.entities:
+			var act: bool = record.entity_active(e, at)
+			var pl = record.entity_plane(e, at) if act else null
+			var d := {"id": e["id"], "active": act and pl != null}
+			if d["active"]:
+				var ax: Array = record.entity_axis(e, at)
+				var n: Node3D = nodes[e["id"]]
+				n.position = g(Vector3(float(pl[0]) * 1000.0, 0.0, float(pl[1]) * 1000.0))
+				n.basis = Basis(Vector3.BACK, atan2(ax[1], ax[0]))
+				d["position_enu"] = [float(pl[0]) * 1000.0, 0.0, float(pl[1]) * 1000.0]
+				d["axis_enu"] = [ax[0], 0.0, ax[1]]
+				d["drawn_position_enu"] = Frame.to_enu(n.global_transform.origin)
+				d["drawn_axis_enu"] = Frame.to_enu(n.global_transform.basis.x.normalized())
+				var thr = record.entity_value(e, "throttle", at)
+				d["throttle"] = thr
+				# The axis the renderer draws the body along (ascent.gd's own rule).
+				var thr_f: float = clampf(float(thr), 0.0, 1.0) if thr != null else 0.0
+				var dax: Array = AscentView.drawn_axis(ax, thr_f, record.entity_value(e, "radial_velocity_m_s", at), record.entity_value(e, "speed_m_s", at))
+				d["burn_axis_enu"] = [dax[0], 0.0, dax[1]]
+			list.append(d)
+		print("POSE2 " + JSON.stringify({"t": at, "entities": list}, "", true, true))
+	get_tree().quit(0)
+
+
 # --- scene --------------------------------------------------------------------------------------
 
 func _sun_dir_enu() -> Vector3:
@@ -144,11 +205,16 @@ func _build() -> void:
 	var psky := ShaderMaterial.new()
 	psky.shader = load("res://shaders/sky.gdshader")
 	sky.sky_material = psky
+	sky_mat = psky
 	sky.process_mode = Sky.PROCESS_MODE_QUALITY
 	sky.radiance_size = Sky.RADIANCE_SIZE_256
 	env.background_mode = Environment.BG_SKY
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	# A less blue fill: shadows keep form without turning blue (the sky colour is only part of it).
+	env.ambient_light_sky_contribution = 0.55
+	env.ambient_light_color = Color(0.62, 0.58, 0.52)
+	env.ambient_light_energy = 0.9
 	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
 	env.tonemap_mode = Environment.TONE_MAPPER_AGX
 	env.tonemap_exposure = 0.92
@@ -175,7 +241,8 @@ func _build() -> void:
 	env.glow_bloom = 0.05
 	env.glow_hdr_threshold = 3.0
 	env.adjustment_enabled = true
-	env.adjustment_saturation = 1.05
+	env.adjustment_saturation = 1.08
+	env.adjustment_contrast = 1.07
 	we.environment = env
 	add_child(we)
 	sun = DirectionalLight3D.new()
@@ -192,8 +259,9 @@ func _build() -> void:
 	sun.look_at_from_position(Vector3.ZERO, -d, Vector3.UP if absf(d.normalized().y) < 0.99 else Vector3.FORWARD)
 	camera = Camera3D.new()
 	camera.near = 0.5
-	camera.far = 250000.0
+	camera.far = 3.0e6 if record.is_v2 else 250000.0
 	camera.fov = 30.0
+	camera.attributes = CameraAttributesPractical.new()
 	add_child(camera)
 	camera.make_current()
 	# Profile.
@@ -207,39 +275,77 @@ func _build() -> void:
 		profile_reason = "Chosen on the command line"
 	settings = Profiles.settings(profile_name, cli.custom)
 	Profiles.apply(settings, get_viewport(), env, sun)
+	# Image-based sky and lighting (CC0 HDRI turned to the scene sun's azimuth), if the file is there.
+	if Skybox.apply(sky_mat, "spiaggia_di_mondello", g(_sun_dir_enu()).normalized(), 4096 if int(settings["tex_max"]) >= 2048 else 2048):
+		env.sky.radiance_size = Sky.RADIANCE_SIZE_512
 	# Terrain, world layer and stage.
-	terrain = Terrain.build(pack, self)
-	world = World.build(pack, self, settings)
-	stage = Stage.build(vehicle)
-	for n in vehicle.find_children("*", "MeshInstance3D", true, false):
-		if not n.get_parent().name.begins_with("Plume"):
-			n.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
-	_pad_rings()
-	_ground_effect_nodes()
-	# Top of the trajectory box (centre of mass), as the technical view's wide preset uses.
-	var mz := 0.0
-	for v in record.channels.get(record.position_ids[2], []):
-		if v != null:
-			mz = maxf(mz, float(v))
-	top_z = mz if mz > 0.0 else 3000.0
+	content_root = self
+	if record.is_v2:
+		content_root = Node3D.new()
+		content_root.name = "WorldRoot"
+		add_child(content_root)
+		cameras = CAMERAS_ASCENT
+	terrain = Terrain.build(pack, content_root, not record.is_v2)
+	var pad_c: Dictionary = record.pad()
+	for m in terrain.get("materials", []):
+		m.set_shader_parameter("pad_xy", Vector2(pad_c["cx"], pad_c["cy"]))
+	Terrain.set_scans(terrain, int(settings["tex_max"]), 36.5)
+	var obs := _observer()
+	world = World.build(pack, content_root, settings, Vector2(pad_c["cx"], pad_c["cy"]), [Vector2(obs.x, obs.y)])
+	var pp: Dictionary = record.pad()
+	Pad.build(content_root, pack, pp["cx"], pp["cy"])
+	if record.is_v2:
+		var bm: ShaderMaterial = terrain["materials"][0]
+		var earth_colour: Color = Color(bm.get_shader_parameter("land_avg")).lerp(Color(bm.get_shader_parameter("water_avg")), float(bm.get_shader_parameter("beyond_sea")))
+		ascent = AscentView.new()
+		ascent.build(self, record, pack, content_root, g(_sun_dir_enu()).normalized(), earth_colour, cli.presentation)
+	else:
+		Stage.hull_tex_max = int(settings["tex_max"])
+		stage = Stage.build(vehicle)
+		for n in vehicle.find_children("*", "MeshInstance3D", true, false):
+			n.layers = 2   # not on the decals' layer (pad slab, contact shadow): they paint the ground only
+			if not n.get_parent().name.begins_with("Plume"):
+				n.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+		_pad_rings()
+		fx = Effects.build(self, g(_sun_dir_enu()).normalized())
+		# Top of the trajectory box (centre of mass), as the technical view's wide preset uses.
+		var mz := 0.0
+		for v in record.channels.get(record.position_ids[2], []):
+			if v != null:
+				mz = maxf(mz, float(v))
+		top_z = mz if mz > 0.0 else 3000.0
 	# Interface.
 	hud = Hud.new()
-	hud.build(self, record, pack, record.t0(), record.t1(), Profiles.ORDER + ["custom"], CAMERAS)
+	hud.build(self, record, pack, record.t0(), record.t1(), Profiles.ORDER + ["custom"], cameras)
 	hud.play_btn.pressed.connect(func(): _set_playing(not playing))
 	hud.slider.value_changed.connect(func(v): if not hud.slider_blocked(): _set_time(v))
 	hud.speed_menu.item_selected.connect(func(i): speed = [0.25, 0.5, 1.0, 2.0][i])
 	for c in hud.cam_buttons:
 		hud.cam_buttons[c].pressed.connect(func(): set_mode(c))
+	for ek in hud.entity_buttons:
+		hud.entity_buttons[ek].pressed.connect(func(): select_entity(ek))
 	var all_profiles: Array = Profiles.ORDER + ["custom"]
 	hud.profile_menu.select(all_profiles.find(profile_name))
 	hud.profile_menu.item_selected.connect(func(i): _switch_profile(all_profiles[i], "Chosen in the menu"))
 	notes.append(profile_reason)
 	_update_note()
-	mode = cli.camera
+	mode = "explicit" if cli.has_camera_pose else cli.camera
+	if record.is_v2:
+		entity_sel = cli.entity
+		if entity_sel != "auto" and ascent.find(entity_sel).is_empty():
+			_fail(2, "--entity %s is not an entity of the record" % entity_sel)
+			return
+		if not (mode in cameras) and mode != "explicit":
+			mode = "follow" if entity_sel != "auto" else "director"
+		elif cli.camera == "director" and entity_sel != "auto" and not cli.has_camera_pose:
+			mode = "follow"
 	t = cli.start_t if not is_nan(cli.start_t) else record.t0()
 	playing = cli.play
 	hud.set_camera(mode)
+	if record.is_v2:
+		hud.set_entity(entity_sel)
 	hud.set_controls_visible(cli.controls)
+	hud.set_presentation(cli.presentation, record)
 	_track_lines()
 	_set_time(t)
 	print("cinematic: scene built in %d ms (profile %s: %s)" % [(Time.get_ticks_usec() - t_build) / 1000, profile_name, profile_reason])
@@ -280,6 +386,8 @@ func _switch_profile(name: String, reason: String) -> void:
 
 # Rings of the record's pad (R5 landing radius, S2 keep-out), draped on the terrain: data overlays.
 func _pad_rings() -> void:
+	if cli.presentation:
+		return
 	var p: Dictionary = record.pad()
 	for spec in [[p["land"], Color(0.35, 0.85, 0.55), 0.35], [p["keep"], Color(0.95, 0.45, 0.35), 0.4]]:
 		var r: float = spec[0]
@@ -306,6 +414,8 @@ func _pad_rings() -> void:
 # Data overlays for reading height: the nozzle-plane track draped on the terrain (record) and a
 # drop line from the stage to the ground under it.
 func _track_lines() -> void:
+	if cli.presentation or record.is_v2:
+		return
 	var im := ImmediateMesh.new()
 	im.surface_begin(Mesh.PRIMITIVE_LINE_STRIP)
 	var ids: Array = record.nozzle_ids
@@ -342,65 +452,6 @@ func _update_drop(vp: Vector3) -> void:
 	drop.mesh = im
 
 
-func _ground_effect_nodes() -> void:
-	# Where the plume meets the ground: a warm light and a pale dust disc (illustration from the
-	# applied throttle and the nozzle's height above the drawn terrain only).
-	ground_light = OmniLight3D.new()
-	ground_light.light_color = Color(1.0, 0.66, 0.38)
-	ground_light.omni_range = 140.0
-	ground_light.omni_attenuation = 1.6
-	ground_light.light_volumetric_fog_energy = 0.0
-	add_child(ground_light)
-	var img := Image.create(128, 128, true, Image.FORMAT_RGBA8)
-	for y in 128:
-		for x in 128:
-			var r := Vector2(x - 63.5, y - 63.5).length() / 64.0
-			var a := 0.0
-			if r < 1.0:
-				a = smoothstep(0.06, 0.45, r) * (1.0 - smoothstep(0.45, 1.0, r)) * 0.75 / 0.25
-			img.set_pixel(x, y, Color(0.92, 0.88, 0.8, clampf(a, 0.0, 1.0)))
-	img.generate_mipmaps()
-	var mat := StandardMaterial3D.new()
-	mat.albedo_texture = ImageTexture.create_from_image(img)
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	var q := QuadMesh.new()
-	q.size = Vector2(2, 2)
-	q.orientation = PlaneMesh.FACE_Y
-	dust = MeshInstance3D.new()
-	dust.mesh = q
-	dust.material_override = mat
-	dust.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(dust)
-	# Exhaust spreading over the ground when the plume reaches it (illustration): a flat, warm,
-	# additive glow on the ground, brightest under the nozzle, so a burning engine stays visible
-	# down to contact.
-	var si := Image.create(128, 128, true, Image.FORMAT_RGBA8)
-	for yy in 128:
-		for xx in 128:
-			var rr := Vector2(xx - 63.5, yy - 63.5).length() / 64.0
-			var a := clampf(1.0 - rr, 0.0, 1.0)
-			si.set_pixel(xx, yy, Color(1.0, 0.6, 0.3, a * a * a))
-	si.generate_mipmaps()
-	var sm := StandardMaterial3D.new()
-	sm.albedo_texture = ImageTexture.create_from_image(si)
-	sm.albedo_color = Color(1.6, 1.2, 0.9)
-	sm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	sm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	sm.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	sm.cull_mode = BaseMaterial3D.CULL_DISABLED
-	var sq := QuadMesh.new()
-	sq.size = Vector2(2, 2)
-	sq.orientation = PlaneMesh.FACE_Y
-	splash_mat = null
-	splash = MeshInstance3D.new()
-	splash.mesh = sq
-	splash.material_override = sm
-	splash.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(splash)
-
-
 # --- playback -----------------------------------------------------------------------------------
 
 func _set_playing(on: bool) -> void:
@@ -410,43 +461,30 @@ func _set_playing(on: bool) -> void:
 
 func _set_time(at: float) -> void:
 	t = clampf(at, record.t0(), record.t1())
+	if record.is_v2:
+		ascent.update_entities(t)
+		for m in terrain.get("materials", []):
+			m.set_shader_parameter("logical_t", t)
+		hud.set_time(t, record)
+		_place_camera()
+		return
 	apply_pose(t)
 	var len: float = record.plume_length(t)
 	# The axial plume stops at the ground; below that it is drawn as the ground spread.
 	var vp := _enu(vehicle.position)
 	var clear_m: float = maxf(0.0, vp.z - pack.ground(vp.x, vp.y))
-	Stage.set_plume(stage, len, t, clear_m)
+	var thr = record.sample_value("act_throttle", t)
+	var thr_f := clampf(float(thr), 0.0, 1.0) if thr != null else 0.6
+	Stage.set_plume(stage, len, t, clear_m, thr_f)
+	# Exposure as a function of the recorded state: a lit plume pulls it down a little (no automatic
+	# exposure: that evolves with the wall clock and a frame at a given t would not repeat).
+	env.tonemap_exposure = 0.95 - 0.14 * thr_f * (1.0 if len > 0.0 else 0.0)
 	for m in terrain.get("materials", []):
 		m.set_shader_parameter("logical_t", t)
-	_ground_effect(len)
+	Effects.update(fx, vp, pack.ground(vp.x, vp.y), len, thr_f, t, g)
 	_update_drop(vp)
 	hud.set_time(t, record)
 	_place_camera()
-
-
-func _ground_effect(len: float) -> void:
-	var p := _enu(vehicle.position)
-	var gz: float = pack.ground(p.x, p.y)
-	var h := p.z - gz
-	var reach := 70.0
-	var on := len > 0.0 and h < reach
-	dust.visible = on
-	ground_light.visible = on
-	splash.visible = len > 0.0 and h < len
-	if splash.visible:
-		var ks: float = clampf(1.0 - maxf(0.0, h) / len, 0.0, 1.0)
-		var rs: float = 5.0 + 14.0 * ks
-		splash.position = g(Vector3(p.x, p.y, gz + 0.35))
-		splash.scale = Vector3(rs, 1.0, rs)
-	if not on:
-		return
-	var k := (1.0 - maxf(0.0, h) / reach) * minf(1.0, len / 28.0)
-	var r := 8.0 + 34.0 * k
-	dust.position = g(Vector3(p.x, p.y, gz + 0.25))
-	dust.scale = Vector3(r, 1, r)
-	dust.transparency = 1.0 - k
-	ground_light.position = g(Vector3(p.x, p.y, gz + maxf(2.0, minf(h, 30.0) * 0.4)))
-	ground_light.light_energy = 14.0 * k
 
 
 static func _enu(v: Vector3) -> Vector3:
@@ -517,26 +555,36 @@ func _observer() -> Vector3:
 
 # Pose {pos, target, fov} (ENU) of camera rule `m` at the current playback state.
 func pose(m: String) -> Dictionary:
+	if record.is_v2:
+		return _pose_ascent(m)
+	if m == "explicit":
+		# An exact eye, target and field of view given on the command line (ENU metres, degrees).
+		var cp: PackedFloat64Array = cli.camera_pose
+		var eye := Vector3(cp[0], cp[1], cp[2])
+		var tgt := Vector3(cp[3], cp[4], cp[5])
+		return {"pos": eye, "target": tgt, "fov": cp[6], "dof": eye.distance_to(tgt)}
 	if m == "director":
 		return pose(director_shot if director_shot != "" else director_pick())
 	var aim := _aim()
 	var pv := _pad_v()
 	match m:
 		"follow":
-			return {"pos": aim + bearing(152, 7) * 190.0, "target": aim, "fov": 30.0}
+			return {"pos": aim + bearing(152, 7) * 190.0, "target": aim, "fov": lens_fov(45.0), "sx": 0.34, "sy": 0.10, "shake": 0.05}
 		"pad":
 			var at := _observer()
 			var dd := at.distance_to(aim)
-			return {"pos": at, "target": aim, "fov": clampf(rad_to_deg(2.0 * atan(STAGE_LENGTH * 1.2 / dd)), 3.0, 40.0)}
+			return {"pos": at, "target": aim, "fov": clampf(rad_to_deg(2.0 * atan(STAGE_LENGTH * 1.2 / dd)), 3.0, 40.0), "sx": 0.28, "sy": 0.0, "shake": 0.06}
 		"closeup":
-			var at := pv + bearing(38, 0) * 150.0
-			at.z = pack.ground(at.x, at.y) + 20.0
+			# Low hero angle (cinematic only): 165 m out, 22 m above the ground, a 50 mm lens
+			# looking up at the stage, which stands on the left third of the frame.
+			var at := pv + bearing(38, 0) * 165.0
+			at.z = pack.ground(at.x, at.y) + 22.0
 			var g0: float = pack.ground(pv.x, pv.y)
 			var tg := aim
 			tg.z = clampf(tg.z, g0 + 17.0, g0 + 24.0)
 			tg.x = pv.x + (tg.x - pv.x) * 0.5
 			tg.y = pv.y + (tg.y - pv.y) * 0.5
-			return {"pos": at, "target": tg, "fov": minf(40.0, rad_to_deg(2.0 * atan(STAGE_LENGTH * 0.95 / at.distance_to(tg))))}
+			return {"pos": at, "target": tg, "fov": lens_fov(50.0), "sx": -0.30, "sy": -0.06, "shake": 0.10, "dof": at.distance_to(tg)}
 		"wide":
 			var dw := top_z * 1.35
 			return {"pos": Vector3(pv.x + 0.5 * dw, pv.y - 0.95 * dw, top_z * 0.62), "target": Vector3(pv.x, pv.y, top_z * 0.42), "fov": 40.0}
@@ -552,10 +600,46 @@ func pose(m: String) -> Dictionary:
 	return {"pos": Vector3(pv.x, pv.y - span * 0.02, span / (2.0 * tan(deg_to_rad(20.0)))), "target": pv, "fov": 40.0}
 
 
+# Vertical field of view of a lens of focal length `mm` on a 24 mm tall sensor.
+static func lens_fov(mm: float) -> float:
+	return rad_to_deg(2.0 * atan(12.0 / mm))
+
+
+# Camera shake as a function of the record time only (a handheld look: slow drift plus a faint
+# tremor), in degrees about the camera's right and up axes.
+static func shake_deg(at: float, amp: float) -> Vector2:
+	var x := sin(TAU * 0.37 * at + 1.1) * 0.55 + sin(TAU * 1.31 * at + 0.3) * 0.3 + sin(TAU * 3.7 * at + 2.0) * 0.15
+	var y := sin(TAU * 0.29 * at + 4.0) * 0.55 + sin(TAU * 1.07 * at + 5.1) * 0.3 + sin(TAU * 4.3 * at + 0.7) * 0.15
+	return Vector2(x, y) * amp
+
+
+# Camera of a launch ascent: a rule of the recorded state. `director` is Auto: pad view at lift-off, a
+# follow of the lead entity, a staging view while the children are new, then the burning entity.
+func _pose_ascent(m: String) -> Dictionary:
+	var aspect := get_viewport().get_visible_rect().size.x / get_viewport().get_visible_rect().size.y
+	if m == "explicit":
+		return ascent.explicit(cli.camera_pose)
+	if m == "director":
+		var shot: String = ascent.auto_pick(t)
+		director_shot = shot
+		return ascent.pose(shot, "auto", aspect, _observer())
+	return ascent.pose(m, entity_sel, aspect, _observer())
+
+
+func select_entity(id: String) -> void:
+	entity_sel = id
+	if hud != null:
+		hud.set_entity(id)
+	if id == "auto":
+		set_mode("director")
+	else:
+		set_mode("follow")
+
+
 func set_mode(m: String) -> void:
-	if not (m in CAMERAS):
+	if not (m in cameras):
 		return
-	transition = {"from": _current_cam(), "t0": Time.get_ticks_msec(), "dur": 700.0}
+	transition = {} if record.is_v2 else {"from": _current_cam(), "t0": Time.get_ticks_msec(), "dur": 700.0}
 	mode = m
 	director_shot = ""
 	hud.set_camera(mode)
@@ -570,7 +654,7 @@ func _current_cam() -> Dictionary:
 func _place_camera() -> void:
 	if mode == "director":
 		var shot := director_pick()
-		if director_shot != "" and shot != director_shot and transition.is_empty() and cli.shot_path == "":
+		if director_shot != "" and shot != director_shot and transition.is_empty() and cli.shot_path == "" and not record.is_v2:
 			transition = {"from": _current_cam(), "t0": Time.get_ticks_msec(), "dur": 1100.0}
 		director_shot = shot
 	var want := pose(mode)
@@ -588,17 +672,78 @@ func _place_camera() -> void:
 			transition = {}
 	else:
 		transition = {}
-	var gz: float = pack.ground(pos.x, pos.y)
-	if pos.z < gz + 3.0:
-		pos.z = gz + 3.0
+	if not record.is_v2:
+		var gz: float = pack.ground(pos.x, pos.y)
+		if pos.z < gz + 2.5:
+			pos.z = gz + 2.5
 	camera.fov = fov
 	var gp := g(pos)
 	var gt := g(target)
 	if gp.distance_to(gt) > 1e-3:
 		camera.look_at_from_position(gp, gt, Vector3.UP)
+		# Composition: the subject sits at screen (sx, sy) (in half-frame units, +x right, +y up)
+		# instead of the centre, by panning the aim point the other way; then the shake.
+		var vs := get_viewport().get_visible_rect().size
+		var dist := gp.distance_to(gt)
+		var half_h := dist * tan(deg_to_rad(fov) * 0.5)
+		var sx: float = want.get("sx", 0.0)
+		var sy: float = want.get("sy", 0.0)
+		if sx != 0.0 or sy != 0.0:
+			var b := camera.global_transform.basis
+			gt = gt - b.x * sx * half_h * (vs.x / vs.y) - b.y * sy * half_h
+			camera.look_at_from_position(gp, gt, Vector3.UP)
+		var amp: float = want.get("shake", 0.0)
+		if amp > 0.0 and transition.is_empty():
+			var sh := shake_deg(t, amp)
+			camera.rotate_object_local(Vector3.UP, deg_to_rad(sh.x))
+			camera.rotate_object_local(Vector3.RIGHT, deg_to_rad(sh.y))
+		_set_dof(want.get("dof", 0.0))
 	# Shadows cover what the shot shows: the stage and its shadow, or the whole descent.
 	var wide := mode == "wide" or mode == "overhead" or (mode == "director" and director_shot == "wide")
 	sun.directional_shadow_max_distance = 6000.0 if wide else 1500.0
+	if record.is_v2:
+		# The depth range follows the shot: a view from space needs a far plane beyond the Earth.
+		camera.far = maxf(3.0e6, 4.0 * gp.distance_to(gt))
+		camera.near = maxf(0.5, camera.far / 2.0e6)
+		_ascent_frame(want, gp)
+
+
+# After the camera is placed in an ascent: the floating origin (the camera's target), the entities and
+# the world moved to it, wide-view markers, and the sky, fog and exposure as functions of the camera's
+# altitude above the pad (recorded state only).
+func _ascent_frame(want: Dictionary, eye_g: Vector3) -> void:
+	ascent.apply_shift(want["shift_e"], want["shift_n"], t)
+	var is_wide := mode == "wide" or (mode == "director" and director_shot == "wide")
+	ascent.place_markers(is_wide, {"eye_g": eye_g})
+	var cam_alt: float = eye_g.y
+	var sky_mat: ShaderMaterial = env.sky.sky_material
+	var space := smoothstep(25000.0, 110000.0, cam_alt)
+	sky_mat.set_shader_parameter("space", space)
+	# The limb of the Earth sits below the horizon by the dip angle of the camera's height (illustrative glow).
+	sky_mat.set_shader_parameter("dip", acos(6371000.0 / (6371000.0 + maxf(cam_alt, 0.0))))
+	var fall := exp(-maxf(cam_alt, 0.0) / 7000.0)
+	env.fog_density = 0.000045 * fall
+	env.volumetric_fog_density = 0.00012 * fall
+	env.fog_height_density = 0.00006 * fall
+	env.tonemap_exposure = 0.95
+
+
+# Depth of field on close shots only: the subject at `focus` metres stays sharp, the far landscape and
+# the near ground soften. Off (0) elsewhere and in the Performance profile.
+func _set_dof(focus: float) -> void:
+	var ca: CameraAttributesPractical = camera.attributes
+	if ca == null:
+		return
+	var on := focus > 0.0 and bool(settings.get("dof", false))
+	ca.dof_blur_far_enabled = on
+	ca.dof_blur_near_enabled = on
+	if on:
+		# Gentle: a strong blur on a close, low shot reads as a miniature.
+		ca.dof_blur_far_distance = focus * 2.2
+		ca.dof_blur_far_transition = focus * 3.5
+		ca.dof_blur_near_distance = focus * 0.3
+		ca.dof_blur_near_transition = focus * 0.25
+		ca.dof_blur_amount = 0.018
 
 
 # --- frame loop ---------------------------------------------------------------------------------
@@ -618,7 +763,13 @@ func _unhandled_input(ev: InputEvent) -> void:
 		KEY_END:
 			_set_time(record.t1())
 		KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7:
-			set_mode(CAMERAS[ev.keycode - KEY_1])
+			if ev.keycode - KEY_1 < cameras.size():
+				set_mode(cameras[ev.keycode - KEY_1])
+		KEY_A, KEY_S, KEY_B, KEY_U:
+			if record.is_v2:
+				var want_id: String = {KEY_A: "auto", KEY_S: "stack", KEY_B: "booster", KEY_U: "upper"}[ev.keycode]
+				if want_id == "auto" or not ascent.find(want_id).is_empty():
+					select_entity(want_id)
 		KEY_H:
 			# Hides the playback bar; the readout, verdicts, illustrative label and credit line stay.
 			hud.set_controls_visible(not hud.bar.visible)
@@ -674,6 +825,10 @@ func _save_shot() -> void:
 	meta["file"] = cli.shot_path.get_file()
 	meta["camera"] = mode
 	meta["shot"] = director_shot
+	var fwd := -camera.global_transform.basis.z
+	meta["camera_eye_enu"] = [_enu(camera.position).x, _enu(camera.position).y, _enu(camera.position).z]
+	meta["camera_dir_enu"] = [_enu(fwd).x, _enu(fwd).y, _enu(fwd).z]
+	meta["camera_fov"] = camera.fov
 	print("SHOT " + JSON.stringify(meta))
 	get_tree().quit(0 if err == OK else 1)
 
