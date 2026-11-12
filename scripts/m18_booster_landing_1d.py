@@ -8,10 +8,11 @@ deceleration, then commands the deceleration that brings the speed estimate to z
 (`a = v^2 / (2 h) + g`) within the throttle limits, and cuts when the speed estimate is no longer
 downward. It answers two things:
 
-1. the ideal bound: with exact knowledge, what touchdown speed does the throttle floor and the 20 ms
-   quantisation leave (the stage cannot hover: its lowest thrust is a multiple of its weight);
-2. how the touchdown speed grows with the altitude noise of the navigation solution (the ascent
-   cases use 10 m per axis), which decides whether a landing needs its own altimeter.
+1. what touchdown speed this controller reaches with exact knowledge (the throttle floor, the 20 ms
+   quantisation and the cut rule leave it a floor; the stage cannot hover, its lowest thrust is a
+   multiple of its weight). It is one controller's result, not a bound for every controller;
+2. how much the touchdown speed of that same controller grows with the altitude noise of the
+   navigation solution (the ascent cases use 10 m per axis).
 
 Noise is drawn from `random.Random(seed)` with an explicit seed, so the output is reproducible. The
 numbers are for the small bundled booster at a landing mass of its dry mass plus 600 kg (of the 810 kg the case keeps at MECO).
@@ -107,7 +108,7 @@ def main():
         t_min / mass - G, t_max / mass - G, (t_min / mass - G) * DT, (t_max / mass - G) * DT))
     v0 = 300.0
     print(f"  from {v0:.0f} m/s downward:")
-    summarise(s, "exact altitude and speed", landing_prop_kg=landing_prop, v0=v0, h_alt_sigma=0.0, v_sigma=0.0)
+    summarise(s, "this controller, exact altitude and speed", landing_prop_kg=landing_prop, v0=v0, h_alt_sigma=0.0, v_sigma=0.0)
     for sigma in (0.1, 0.5, 2.0, 10.0):
         summarise(s, f"altitude noise {sigma:>4} m, speed noise 0.1 m/s", landing_prop_kg=landing_prop, v0=v0, h_alt_sigma=sigma, v_sigma=0.1)
     ideal = land(s, landing_prop_kg=landing_prop, v0=v0, h_alt_sigma=0.0, v_sigma=0.0, seed=1)

@@ -600,3 +600,44 @@ fn golden_fixtures() {
         );
     }
 }
+
+/// Not run by default (about a minute in debug): the 200-seed scan behind the residual and
+/// non-orbit rates in docs/m17-ascent.md. Run with
+/// `cargo test --release --test ascent seed_scan -- --ignored --nocapture`.
+#[test]
+#[ignore = "documentation scan over 200 seeds per vehicle"]
+fn seed_scan_of_the_upper_stage_residual_and_the_outcomes() {
+    for (id, text) in vv_ascent::CASES {
+        let load = case(id).vehicle.stages[1].propellant_kg;
+        let mut residual = Vec::new();
+        let mut not_orbit: Vec<(u64, &str)> = Vec::new();
+        for seed in 5000..5200u64 {
+            let o = compute(text.as_bytes(), seed).unwrap();
+            let v = o
+                .verification
+                .verdicts
+                .iter()
+                .find(|v| v.id == "upper.R6_propellant_margin")
+                .unwrap();
+            if let Some(s) = &v.state {
+                residual.push(s.propellant_kg / load);
+            }
+            if o.verification.outcome != "orbit" {
+                not_orbit.push((seed, o.verification.outcome));
+            }
+        }
+        residual.sort_by(|a, b| a.total_cmp(b));
+        let count = |code: &str| not_orbit.iter().filter(|(_, c)| *c == code).count();
+        println!(
+            "{id}: residual fraction at SECO over {} seeds: min {:.4}, p5 {:.4}, median {:.4}, max {:.4}; not orbit {} (suborbital {}, low_periapsis_orbit {})",
+            residual.len(),
+            residual[0],
+            residual[residual.len() / 20],
+            residual[residual.len() / 2],
+            residual[residual.len() - 1],
+            not_orbit.len(),
+            count("suborbital"),
+            count("low_periapsis_orbit"),
+        );
+    }
+}
