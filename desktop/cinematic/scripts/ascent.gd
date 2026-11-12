@@ -252,13 +252,15 @@ func update_entities(t: float) -> void:
 		var thr = record.entity_value(e, "throttle", t)
 		en["thr"] = clampf(float(thr), 0.0, 1.0) if thr != null else 0.0
 		# Drawn axis. The body is drawn along the recorded velocity, nose forward, with the plume at the
-		# tail. While an entity descends (recorded radial velocity below zero) with its engine burning,
-		# that would put the nozzle on top, burning upwards; the body is then drawn tail first (axis
-		# reversed, nose up, plume down), the pose of a braking burn. Illustrative: no attitude is
-		# recorded or simulated.
+		# tail. While an entity descends steeply (recorded radial velocity below minus half its speed, more
+		# than 30 degrees below the horizon) with its engine burning, that would put the nozzle on top,
+		# burning upwards; the body is then drawn tail first (axis reversed, nose up, plume down), the
+		# pose of a braking burn. A burn while moving near the horizon keeps the nose forward.
+		# Illustrative: no attitude is recorded or simulated.
 		var vr = record.entity_value(e, "radial_velocity_m_s", t)
+		var sp = record.entity_value(e, "speed_m_s", t)
 		var ax: Array = en["axis"]
-		var rev: bool = en["thr"] > 0.005 and vr != null and float(vr) < 0.0
+		var rev: bool = en["thr"] > 0.005 and vr != null and sp != null and float(sp) >= 1.0 and float(vr) < -0.5 * float(sp)
 		en["dax"] = [-ax[0], -ax[1]] if rev else ax
 
 

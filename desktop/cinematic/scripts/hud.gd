@@ -8,7 +8,7 @@
 extends RefCounted
 
 const ILLUSTRATIVE := "Illustrative, not data: stage geometry (42 m), landing pad, lights and masts, ground texture and boulders near the pad, scanned plants (their positions and sizes are the pack's), HDRI sky, plume and exhaust, glow and dust, crown shapes, scrub colour and foliage cards, building walls and roofs, sky, haze, water finish, ground beyond the pack."
-const ILLUSTRATIVE_ASCENT := "Illustrative, not data: vehicle shapes (from the record's visual block), body axis drawn along the recorded velocity, reversed (tail first) while an engine burns in descent (no attitude is recorded or simulated), the direction east (the record has no heading), the upper stage drawn offset from the first stage's recorded point, plume and exhaust, glow and dust, landing pad and lights, the Earth beyond the pack as a plain sphere with no geography, atmosphere, sky and haze."
+const ILLUSTRATIVE_ASCENT := "Illustrative, not data: vehicle shapes (from the record's visual block), body axis drawn along the recorded velocity, reversed (tail first) while an engine burns in a steep descent (no attitude is recorded or simulated), the direction east (the record has no heading), the upper stage drawn offset from the first stage's recorded point, plume and exhaust, glow and dust, landing pad and lights, the Earth beyond the pack as a plain sphere with no geography, atmosphere, sky and haze."
 const DATA_ASCENT := "Data: each entity's position, altitude, speed and throttle from the record (interpolated between its samples for display); an entity exists from its first to its last sample; terrain and imagery of the pad's surroundings from the validated pack. Nothing here is simulated."
 const DATA := "Data: stage pose from the record (interpolated for display), throttle, verdicts; terrain, imagery, footprints, heights, plant positions from the validated pack. Nothing here is simulated."
 const MARGIN := 18
@@ -108,7 +108,9 @@ func build(root: Node, record, pack, t0: float, t1: float, profiles: Array, came
 	_anchor(sp, 0, 1, 0, 1)
 	sp.offset_left = MARGIN
 	sp.offset_right = MARGIN + 560
-	sp.offset_top = -MARGIN - 86
+	# Grows upwards from the bottom margin: the label is as tall as its text needs, whatever its length.
+	sp.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	sp.offset_top = -MARGIN - 20
 	sp.offset_bottom = -MARGIN - 8
 	status.custom_minimum_size = Vector2(540, 0)
 	sp.add_child(status)
