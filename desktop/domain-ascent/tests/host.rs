@@ -160,6 +160,34 @@ fn the_record_is_v2_with_three_entities_and_consistent_ownership() {
     let _ = fs::remove_dir_all(&dir);
 }
 
+fn requirements_pass_metric(r: &RunRecord) -> f64 {
+    r.metrics
+        .iter()
+        .find(|m| m.id == "requirements_pass")
+        .and_then(|m| m.value)
+        .unwrap()
+}
+
+#[test]
+fn an_orbit_with_another_requirement_failing_is_partial_and_carries_requirements_pass() {
+    // Seed 42 reaches the orbit and misses only the booster recovery zone.
+    let (r, dir) = run(&request(SMALL, 42, &[]), "partial");
+    assert_eq!(r.outcome.code, "orbit");
+    assert_eq!(r.outcome.status, "partial");
+    assert!(
+        r.outcome.label.contains("other requirements"),
+        "{}",
+        r.outcome.label
+    );
+    assert_eq!(status(&r, "booster.R3_recovery_zone"), "fail");
+    assert_eq!(requirements_pass_metric(&r), 0.0);
+    let _ = fs::remove_dir_all(&dir);
+    let (r, dir) = run(&request(SMALL, 5000, &[]), "full");
+    assert_eq!(r.outcome.status, "success");
+    assert_eq!(requirements_pass_metric(&r), 1.0);
+    let _ = fs::remove_dir_all(&dir);
+}
+
 #[test]
 fn runs_are_deterministic_and_seeds_matter() {
     let (a, da) = run(&request(MEDIUM, 5000, &[]), "det-a");
@@ -212,7 +240,9 @@ fn demonstrations_show_what_they_claim() {
                 );
             }
             "payload-too-heavy" => {
-                assert_ne!(r.outcome.code, "orbit");
+                // The true orbit at SECO has its periapsis below the surface.
+                assert_eq!(r.outcome.code, "suborbital");
+                assert_eq!(r.outcome.status, "failure");
                 assert_eq!(status(&r, "upper.R6_propellant_margin"), "fail");
                 assert_eq!(status(&r, "mission.R8_orbit_insertion"), "fail");
                 let q = r

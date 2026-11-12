@@ -125,7 +125,10 @@ pub struct Limits {
     pub apoapsis_tolerance_km: f64,
     pub min_periapsis_km: f64,
     /// Per stage, the smallest true residual propellant at cutoff, as a fraction of the nominal
-    /// load (stage 1: the recovery reserve the mission must keep).
+    /// load (stage 1: the recovery reserve the mission must keep; stage 2: at least the reserve the
+    /// flight software itself holds, so a zero here would make the requirement unfailable).
+    /// Zero is accepted by the range check but is not a requirement: the bundled cases set a real
+    /// minimum.
     pub min_residual_fraction: [f64; 2],
 }
 

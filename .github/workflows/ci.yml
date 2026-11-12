@@ -82,6 +82,15 @@ jobs:
           cargo test --locked --manifest-path crates/vv-rocket/Cargo.toml
           cargo build --locked --release --manifest-path crates/vv-rocket/Cargo.toml
 
+      # vv-ascent (M17) is its own workspace too: its reference, independent and mission tests
+      # (golden hashes included) run on both platforms, which is the cross-platform determinism check.
+      - name: Check, lint, test and build vv-ascent
+        run: |
+          cargo fmt --manifest-path crates/vv-ascent/Cargo.toml -- --check
+          cargo clippy --locked --manifest-path crates/vv-ascent/Cargo.toml --all-targets -- -D warnings
+          cargo test --locked --manifest-path crates/vv-ascent/Cargo.toml
+          cargo build --locked --release --manifest-path crates/vv-ascent/Cargo.toml
+
       # vv-exec (M12) is its own workspace and links vv-rocket as a library. Its tests include the
       # comparison of the engine statistics with the independent reference fixture.
       - name: Check, lint and test vv-exec

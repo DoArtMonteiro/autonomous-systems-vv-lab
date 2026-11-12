@@ -1849,6 +1849,22 @@ fn a_v2_case_accepts_bounded_changes_and_rejects_the_rest() {
             .unwrap_err()
             .contains("full-load weight")
     );
+    // A stage whose engine at the lowest throttle is far above its weight cannot land: a thrust to
+    // full-load weight of 5.5 with a minimum throttle of 0.8 is accepted by the two ranges alone
+    // (4.4 times the weight at the lowest throttle).
+    let mut cannot_land = case.clone();
+    cannot_land["vehicle"]["max_thrust_n"] = json!(30000.0 * 9.80665 * 5.5);
+    cannot_land["vehicle"]["throttle_min"] = json!(0.8);
+    assert!(
+        run_value(&cannot_land, 5000)
+            .unwrap_err()
+            .contains("minimum-throttle thrust")
+    );
+    // The same engine with a minimum throttle of 0.4 (2.2 times) is inside the bound.
+    let mut can_land = case.clone();
+    can_land["vehicle"]["max_thrust_n"] = json!(30000.0 * 9.80665 * 5.5);
+    can_land["vehicle"]["throttle_min"] = json!(0.4);
+    run_value(&can_land, 5000).unwrap();
     // The dispersions, the safety limits and the attitude stay pinned.
     let mut moved = case.clone();
     moved["requirements"]["s2_keep_out_m"] = json!(80.0);

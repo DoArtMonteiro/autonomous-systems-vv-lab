@@ -377,10 +377,11 @@ async function startDefault(d, btn, scenarioId, openGroup) {
 
 function verdictPill(record) {
   const ov = verdictOfOutcome(record.outcome.status);
-  const sv = verdictOfSafety(record.safety.status);
+  const unjudged = record.safety.status === 'safe' && record.safety.class === 'not_evaluated';
+  const sv = unjudged ? 'neutral' : verdictOfSafety(record.safety.status);
   return h('div', { class: 'lab-verdicts' },
     h('span', { class: ['mini', `v-${ov}`], title: prose(record.outcome.explanation) }, verdictGlyph(ov), record.outcome.label),
-    h('span', { class: ['mini', `v-${sv}`], title: prose(record.safety.explanation) }, verdictGlyph(sv), record.safety.status === 'safe' ? 'Safety rules held' : record.safety.status));
+    h('span', { class: ['mini', `v-${sv}`], title: prose(record.safety.explanation) }, verdictGlyph(sv), unjudged ? 'Safety not evaluated' : record.safety.status === 'safe' ? 'Safety rules held' : record.safety.status));
 }
 
 function runLine(req) {

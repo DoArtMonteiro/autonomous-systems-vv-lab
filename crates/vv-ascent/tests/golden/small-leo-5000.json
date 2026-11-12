@@ -1,8 +1,9 @@
 {
   "case": "small-leo",
+  "entities_sha256": "6a5729a7165009ec3937277b89880a81f2e47be851ca266919fd31d52286431b",
   "outcome": "orbit",
   "seed": 5000,
-  "trace_sha256": "cab3df1d34e92156910f1ac676170b19b66bb9da84a587ce36e10bf2bdfe94cd",
+  "trace_sha256": "451d0b80f08103b33a222a61e5e8b57372e97bee07abe3a6f8596a246b3a1dc0",
   "verdicts": [
     {
       "id": "stack.S1_max_dynamic_pressure",
@@ -46,7 +47,7 @@
     },
     {
       "id": "upper.R6_propellant_margin",
-      "observed": "residual 145.6 kg, margin 145.6 kg, SECO reason: target energy reached",
+      "observed": "residual 145.6 kg, margin 97.6 kg, SECO reason: target energy reached",
       "status": "pass"
     },
     {
@@ -60,5 +61,5 @@
       "status": "pass"
     }
   ],
-  "verification_sha256": "af995fc2bba5d207d5a8f5bbdd6c4adc68e9498451fd9a39298d167b87e3b742"
+  "verification_sha256": "148ce7c5f7799bdd4b1ffbc7421213ff490c8364d72b63dcbc4a112492b80203"
 }

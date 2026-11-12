@@ -132,39 +132,99 @@ fn severity(kind: &str, source: &str) -> &'static str {
     }
 }
 
-fn outcome(code: &str) -> Outcome {
-    let (label, status, explanation) = match code {
-        "orbit" => (
+/// The mission outcome as the platform vocabulary has it (`success`, `partial`, `failure`). The
+/// native code names what the true orbit at SECO is; `requirements_pass` is carried next to it: an
+/// orbit that reached its target with another requirement not met (the booster zone, a margin, the
+/// separation window) is `partial`, not a full success.
+fn outcome(code: &str, requirements_pass: bool) -> Outcome {
+    let (label, status, explanation): (&str, &str, String) = match code {
+        "orbit" if requirements_pass => (
             "Orbit",
             "success",
-            "The upper stage reached an orbit with periapsis and apoapsis inside the requirements, judged on the true state at SECO.",
+            "The upper stage reached an orbit with periapsis and apoapsis inside the requirements, judged on the true state at SECO, and every other requirement was met.".into(),
+        ),
+        "orbit" => (
+            "Orbit, other requirements not met",
+            "partial",
+            "The upper stage reached an orbit with periapsis and apoapsis inside the requirements, judged on the true state at SECO, but at least one other requirement was not met (see the requirements).".into(),
         ),
         "off_target_orbit" => (
             "Orbit off target",
             "partial",
-            "The upper stage is in orbit but its apoapsis is outside the tolerance of the target.",
+            "The upper stage is in a bound orbit that clears the minimum periapsis, but its apoapsis is outside the tolerance of the target.".into(),
+        ),
+        "low_periapsis_orbit" => (
+            "Orbit below the minimum periapsis",
+            "failure",
+            "The true orbit at SECO is bound and clears the surface, but its periapsis is below the minimum periapsis of the requirements.".into(),
+        ),
+        "unbound" => (
+            "Unbound trajectory",
+            "failure",
+            "The specific orbital energy of the true state at SECO is not negative: the upper stage is on a parabolic or hyperbolic trajectory, not in orbit.".into(),
         ),
         "suborbital" => (
             "Suborbital",
             "failure",
-            "The periapsis of the true orbit at SECO is below the minimum, or the upper stage reached the surface.",
+            "The periapsis of the true orbit at SECO is below the surface, or the upper stage reached the surface.".into(),
+        ),
+        "seco_not_reached" => (
+            "SECO not reached",
+            "failure",
+            "The upper stage separated but the second engine cutoff did not happen before the end of the simulated time, so no orbit was judged.".into(),
         ),
         "no_separation" => (
             "No separation",
             "failure",
-            "The stack never separated: the upper stage never flew.",
+            "The stack never separated: the upper stage never flew.".into(),
         ),
-        _ => (
+        "scrubbed" => (
             "Scrubbed",
             "failure",
-            "The flight software scrubbed the mission before or at liftoff.",
+            "The flight software scrubbed the mission before or at liftoff.".into(),
+        ),
+        // A code this record does not know is shown as such, never as another outcome.
+        other => (
+            "Unclassified outcome",
+            "failure",
+            format!("The verifier returned the outcome code {other}, which this record has no description for."),
         ),
     };
     Outcome {
         code: code.into(),
         label: label.into(),
         status: status.into(),
-        explanation: explanation.into(),
+        explanation,
+    }
+}
+
+/// The safety verdict in the closed platform vocabulary (`safe`, `unsafe`). `safe` means no
+/// invariant failed; an invariant that was never judged (an entity that never flew) is named in the
+/// explanation, and when none was judged at all the class is `not_evaluated`.
+fn safety(v: &vv_ascent::verify::Verification) -> Safety {
+    let judged = v
+        .verdicts
+        .iter()
+        .filter(|x| x.category == "invariant" && x.status != "not_evaluated")
+        .count();
+    let skipped = v.invariants_not_evaluated.join(", ");
+    let explanation = if !v.invariants_pass {
+        "At least one invariant (dynamic pressure or sensed acceleration) was exceeded on the true state; see the requirements.".to_string()
+    } else if judged == 0 {
+        format!(
+            "Safe (not evaluated: {skipped}): no invariant could be judged because the vehicle never flew, so \"safe\" means that no violation was observed, not that safety was shown."
+        )
+    } else if !v.invariants_evaluated {
+        format!(
+            "Dynamic pressure and sensed acceleration stayed within their limits on the true state of every flown tick. Safe (not evaluated: {skipped}): the entity never flew, so \"safe\" does not cover it."
+        )
+    } else {
+        "Dynamic pressure and sensed acceleration stayed within their limits on the true state of every flown tick.".to_string()
+    };
+    Safety {
+        status: if v.invariants_pass { "safe" } else { "unsafe" }.into(),
+        class: (judged == 0).then(|| "not_evaluated".to_string()),
+        explanation,
     }
 }
 
@@ -572,6 +632,13 @@ pub fn build(request: &RunRequest, case: &Case, out: &Outputs) -> RunRecord {
             "upper",
         ),
     ];
+    metrics.push(metric(
+        "requirements_pass",
+        "Every requirement passed (1 yes, 0 no), next to the outcome",
+        Some(if v.requirements_pass { 1.0 } else { 0.0 }),
+        "",
+        "mission",
+    ));
     metrics.extend(requirement_metrics(case, out));
     let scene = json!({
         "kind": "ascent",
@@ -615,16 +682,8 @@ pub fn build(request: &RunRequest, case: &Case, out: &Outputs) -> RunRecord {
             )],
         },
         model_validity: crate::manifest().model_validity,
-        outcome: outcome(v.outcome),
-        safety: Safety {
-            status: if v.invariants_pass { "safe" } else { "unsafe" }.into(),
-            class: None,
-            explanation: if v.invariants_pass {
-                "Dynamic pressure and sensed acceleration stayed within their limits on the true state of every flown tick.".into()
-            } else {
-                "At least one invariant (dynamic pressure or sensed acceleration) was exceeded on the true state; see the requirements.".into()
-            },
-        },
+        outcome: outcome(v.outcome, v.requirements_pass),
+        safety: safety(v),
         timebases,
         channels,
         events,
@@ -643,7 +702,78 @@ pub fn build(request: &RunRequest, case: &Case, out: &Outputs) -> RunRecord {
         mission: Some(MissionResult {
             requirements: mission_reqs,
             event_order: trace.event_order.clone(),
-            explanation: outcome(v.outcome).explanation,
+            explanation: outcome(v.outcome, v.requirements_pass).explanation,
         }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::case::template;
+
+    fn verification(payload_kg: f64) -> vv_ascent::verify::Verification {
+        let mut case = template(crate::catalog::SMALL).unwrap();
+        case.vehicle.payload_kg = payload_kg;
+        let bytes = serde_json::to_vec(&case).unwrap();
+        vv_ascent::run::compute(&bytes, 5000).unwrap().verification
+    }
+
+    #[test]
+    fn a_scrubbed_run_is_not_called_safe_without_saying_nothing_was_evaluated() {
+        // A payload far beyond the catalogue range: the prelaunch checks scrub the mission.
+        let v = verification(20_000.0);
+        assert_eq!(v.outcome, "scrubbed");
+        let s = safety(&v);
+        assert_eq!(
+            s.status, "safe",
+            "the platform vocabulary is safe or unsafe"
+        );
+        assert_eq!(s.class.as_deref(), Some("not_evaluated"));
+        assert!(
+            s.explanation.starts_with("Safe (not evaluated: "),
+            "{}",
+            s.explanation
+        );
+        assert!(s.explanation.contains("stack.S1_max_dynamic_pressure"));
+        assert!(s.explanation.contains("never flew"));
+    }
+
+    #[test]
+    fn a_flown_run_judges_every_invariant_and_has_no_class() {
+        let v = verification(250.0);
+        let s = safety(&v);
+        assert_eq!((s.status.as_str(), s.class), ("safe", None));
+        assert!(
+            !s.explanation.contains("not evaluated"),
+            "{}",
+            s.explanation
+        );
+    }
+
+    #[test]
+    fn every_native_outcome_has_its_own_description_and_an_unknown_one_is_not_disguised() {
+        let mut labels = Vec::new();
+        for code in vv_ascent::verify::OUTCOMES {
+            let o = outcome(code, true);
+            assert_ne!(o.label, "Unclassified outcome", "{code}");
+            assert!(!o.explanation.is_empty(), "{code}");
+            labels.push(o.label);
+        }
+        labels.sort();
+        labels.dedup();
+        assert_eq!(
+            labels.len(),
+            vv_ascent::verify::OUTCOMES.len(),
+            "labels are distinct"
+        );
+        let unknown = outcome("something_new", true);
+        assert_eq!(unknown.label, "Unclassified outcome");
+        assert!(unknown.explanation.contains("something_new"));
+        assert_eq!(outcome("orbit", true).status, "success");
+        assert_eq!(outcome("orbit", false).status, "partial");
+        // Reaching the surface or an unbound trajectory never reads as an orbit.
+        assert_eq!(outcome("unbound", true).status, "failure");
+        assert_eq!(outcome("low_periapsis_orbit", true).status, "failure");
     }
 }

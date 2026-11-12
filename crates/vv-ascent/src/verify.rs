@@ -8,7 +8,7 @@ use serde::Serialize;
 use crate::dynamics::{Aero, Elements, Environment, altitude, density, drag, elements};
 use crate::math::Vec2;
 use crate::model::{DT, G0, Prepared};
-use crate::sim::{BOOSTER, STACK, Sample, SimEvent, Simulation, Source, UPPER, downrange};
+use crate::sim::{BOOSTER, MISSION, STACK, Sample, SimEvent, Simulation, Source, UPPER, downrange};
 
 pub const VERIFICATION_SCHEMA: &str = "vv-ascent-verification.v1";
 pub const DISCLAIMER: &str =
@@ -58,10 +58,22 @@ pub struct Insertion {
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct Verification {
     pub schema: &'static str,
-    /// `orbit`, `off_target_orbit`, `suborbital`, `no_separation` or `scrubbed`.
+    /// One of `OUTCOMES`: `orbit`, `off_target_orbit`, `low_periapsis_orbit`, `unbound`,
+    /// `suborbital`, `seco_not_reached`, `no_separation` or `scrubbed`. It judges the mission only;
+    /// a run can be `orbit` with `requirements_pass` false (a requirement of another entity or of
+    /// the margins failed) and `invariants_pass` says nothing of the mission.
     pub outcome: &'static str,
+    /// Every requirement passed. False for an `orbit` outcome means the orbit was reached but at
+    /// least one other requirement (booster zone, margins, separation window) was not met.
     pub requirements_pass: bool,
+    /// No invariant failed. It is also true when no invariant could be judged: read it together
+    /// with `invariants_evaluated`.
     pub invariants_pass: bool,
+    /// Every invariant was judged on at least one flown tick. False when an entity never flew (a
+    /// scrubbed mission judges none, a mission without separation does not judge the upper stage).
+    pub invariants_evaluated: bool,
+    /// Identifiers of the invariants that were not judged.
+    pub invariants_not_evaluated: Vec<String>,
     pub verdicts: Vec<Verdict>,
     pub max_q: Option<StateExcerpt>,
     pub booster_max_q: Option<StateExcerpt>,
@@ -633,11 +645,101 @@ fn verdicts(ctx: &Ctx, insertion: &Option<Insertion>) -> Vec<Verdict> {
             ),
             None => "no SECO".into(),
         },
-        tick: insertion.as_ref().map(|i| i.tick),
+        // Without a SECO the requirement is judged at the end of the simulated time.
+        tick: Some(insertion.as_ref().map_or(sim.last_tick, |i| i.tick)),
         state: None,
         cause,
     });
     out
+}
+
+/// Every mission outcome the verifier can name, in the order of `classify_outcome`.
+pub const OUTCOMES: [&str; 8] = [
+    "scrubbed",
+    "no_separation",
+    "suborbital",
+    "seco_not_reached",
+    "unbound",
+    "low_periapsis_orbit",
+    "off_target_orbit",
+    "orbit",
+];
+
+/// What the outcome is decided on: facts the verifier established on the true state.
+pub struct OutcomeInput<'a> {
+    pub lifted_off: bool,
+    /// The stack separated, so the upper stage flew.
+    pub separated: bool,
+    /// The upper stage reached the surface at any time (before or after SECO).
+    pub upper_reached_surface: bool,
+    /// Osculating elements of the true state at SECO; `None` when SECO was never reached.
+    pub seco: Option<&'a Elements>,
+    pub min_periapsis_km: f64,
+    pub apoapsis_on_target: bool,
+}
+
+/// The mission outcome, decided in a fixed order so each code means one thing:
+/// `scrubbed` (never lifted off), `no_separation`, `suborbital` (the upper stage reached the surface,
+/// or the true orbit at SECO has a periapsis below the surface), `seco_not_reached` (still flying or
+/// out of time before SECO), `unbound` (specific energy not negative), `low_periapsis_orbit` (a bound
+/// orbit that clears the surface but not the minimum periapsis), `off_target_orbit` (the apoapsis is
+/// outside the tolerance) and `orbit`.
+///
+/// The order matters: a surface contact outranks every orbit, and `unbound` is tested before the
+/// periapsis because a hyperbolic state has a periapsis that says nothing about being in orbit.
+/// A periapsis of exactly 0 km clears the surface (it is not `suborbital`) and one of exactly
+/// `min_periapsis_km` meets the minimum.
+pub fn classify_outcome(i: &OutcomeInput) -> &'static str {
+    if !i.lifted_off {
+        return "scrubbed";
+    }
+    if !i.separated {
+        return "no_separation";
+    }
+    if i.upper_reached_surface {
+        return "suborbital";
+    }
+    let Some(el) = i.seco else {
+        return "seco_not_reached";
+    };
+    if el.energy_j_kg >= 0.0 {
+        "unbound"
+    } else if el.periapsis_alt_m < 0.0 {
+        "suborbital"
+    } else if el.periapsis_alt_m / 1000.0 < i.min_periapsis_km {
+        "low_periapsis_orbit"
+    } else if !i.apoapsis_on_target {
+        "off_target_orbit"
+    } else {
+        "orbit"
+    }
+}
+
+/// The entity an event of a verdict is attached to: the entity the verdict is about when the tick
+/// lies inside that entity's span, else the stack when it does, else the mission. A verdict of the
+/// mission is always attached to it. An event never precedes the start of its entity.
+fn event_entity(sim: &Simulation, verdict_entity: &str, tick: u64) -> usize {
+    let within = |e: usize| {
+        sim.entities
+            .get(e)
+            .is_some_and(|run| match (run.samples.first(), run.samples.last()) {
+                (Some(a), Some(b)) => a.tick <= tick && tick <= b.tick,
+                _ => false,
+            })
+    };
+    let intended = match verdict_entity {
+        "stack" => STACK,
+        "booster" => BOOSTER,
+        "upper" => UPPER,
+        _ => return MISSION,
+    };
+    if within(intended) {
+        intended
+    } else if within(STACK) {
+        STACK
+    } else {
+        MISSION
+    }
 }
 
 fn argmax_q(samples: &[Sample], aero: &Aero) -> Option<StateExcerpt> {
@@ -720,14 +822,10 @@ pub fn verify(prep: &Prepared, sim: &Simulation) -> Verification {
         );
     }
     for v in verdicts.iter().filter(|v| v.status == "fail") {
-        let entity = match v.entity {
-            "booster" if sim.entities.len() > BOOSTER => BOOSTER,
-            "upper" if sim.entities.len() > UPPER => UPPER,
-            _ => STACK,
-        };
+        let tick = v.tick.unwrap_or(sim.last_tick);
         add(
-            v.tick.unwrap_or(0),
-            entity,
+            tick,
+            event_entity(sim, v.entity, tick),
             "violation",
             &format!("{} not met", v.label),
             serde_json::json!({ "id": v.id, "category": v.category }),
@@ -744,29 +842,29 @@ pub fn verify(prep: &Prepared, sim: &Simulation) -> Verification {
         .iter()
         .filter(|v| v.category == "invariant")
         .all(|v| v.status != "fail");
-    let status = |id: &str| {
-        verdicts
-            .iter()
-            .find(|v| v.id == id)
-            .map(|v| v.status)
-            .unwrap_or("not_evaluated")
-    };
-    let outcome = if event_tick(&sim.events, STACK, "liftoff").is_none() {
-        "scrubbed"
-    } else if sim.entities.len() <= UPPER {
-        "no_separation"
-    } else if status("upper.R4_periapsis") != "pass" || sim.upper_impact.is_some() {
-        "suborbital"
-    } else if status("upper.R5_apoapsis") != "pass" {
-        "off_target_orbit"
-    } else {
-        "orbit"
-    };
+    let invariants_not_evaluated: Vec<String> = verdicts
+        .iter()
+        .filter(|v| v.category == "invariant" && v.status == "not_evaluated")
+        .map(|v| v.id.clone())
+        .collect();
+    let apoapsis_on_target = verdicts
+        .iter()
+        .any(|v| v.id == "upper.R5_apoapsis" && v.status == "pass");
+    let outcome = classify_outcome(&OutcomeInput {
+        lifted_off: event_tick(&sim.events, STACK, "liftoff").is_some(),
+        separated: sim.entities.len() > UPPER,
+        upper_reached_surface: sim.upper_impact.is_some(),
+        seco: insertion.as_ref().map(|i| &i.elements),
+        min_periapsis_km: prep.limits.min_periapsis_km,
+        apoapsis_on_target,
+    });
     Verification {
         schema: VERIFICATION_SCHEMA,
         outcome,
         requirements_pass: req_pass,
         invariants_pass: inv_pass,
+        invariants_evaluated: invariants_not_evaluated.is_empty(),
+        invariants_not_evaluated,
         verdicts,
         max_q,
         booster_max_q,

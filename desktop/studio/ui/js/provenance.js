@@ -5,6 +5,14 @@ import { h, clear, icon, shortHash, num, prose } from './dom.js';
 import { api } from './api.js';
 import { toast, errorText } from './ui.js';
 
+/** Puts the current verdicts next to the stored outcome on the run page (null removes the note). */
+function markStoredVerdicts(detail) {
+  for (const old of document.querySelectorAll('.verdict-reeval')) old.remove();
+  if (!detail) return;
+  const x = document.querySelector('.verdict[aria-label="Mission outcome"] .verdict-x');
+  if (x) x.append(h('span', { class: 'verdict-reeval', role: 'note' }, h('b', null, ' Under the current rules: '), detail));
+}
+
 export function provenancePanel(runId, record, meta) {
   const p = record.provenance || {};
   const replayOut = h('div', { class: 'replay-out', 'aria-live': 'polite' });
@@ -20,13 +28,19 @@ export function provenancePanel(runId, record, meta) {
       // An earlier build's run is checked against its own record, not byte for byte: say so, and never call it rejected.
       const earlier = rep.status === 'verified_earlier_build';
       const ok = rep.status === 'verified' || earlier;
+      // Verdicts the current rules judge differently from the stored record: said first, never behind a green check.
+      const reeval = earlier ? rep.checks.find((c) => c.name === 'verdicts re-evaluated under current rules') : null;
+      markStoredVerdicts(reeval ? reeval.detail : null);
       clear(replayOut).append(
-        h('div', { class: ['replay-verdict', ok ? 'v-pass' : 'v-unsafe'] },
-          h('span', { class: 'glyph' }, icon(ok ? 'check' : 'warn')),
-          h('strong', null, earlier ? 'Verified against its own record' : ok ? 'Verified' : 'Rejected'),
-          h('span', { class: 'dim' }, earlier
+        h('div', { class: ['replay-verdict', reeval ? 'v-partial' : ok ? 'v-pass' : 'v-unsafe'] },
+          h('span', { class: 'glyph' }, icon(ok && !reeval ? 'check' : 'warn')),
+          h('strong', null, reeval ? 'Verified, but the stored verdicts are not the current ones' : earlier ? 'Verified against its own record' : ok ? 'Verified' : 'Rejected'),
+          h('span', { class: 'dim' }, reeval
+            ? 'Recorded by an earlier build. The timebases, channels, other metrics and events agree with the recomputation, but the verdicts listed below differ from the ones the current rules give; the outcome, requirements and metrics shown for this run are the stored ones.'
+            : earlier
             ? 'Recorded by an earlier build. It was recomputed with the current defaults and agrees with the stored record on the outcome, the safety status, each requirement, the timebases, channels, events and metrics. Texts, the scene and the native files are not compared.'
             : ok ? 'The run was recomputed from its inputs and every check passed.' : 'At least one check failed; the stored run does not reproduce.')),
+        reeval ? h('p', { class: 'replay-reeval', role: 'status' }, h('b', null, 'Stored verdicts differ from current ones: '), reeval.detail) : null,
         h('ol', { class: 'checks' }, rep.checks.map((c) => h('li', { class: c.pass ? 'v-pass' : 'v-fail' },
           h('span', { class: 'glyph' }, icon(c.pass ? 'check' : 'cross')),
           h('span', null, c.name),

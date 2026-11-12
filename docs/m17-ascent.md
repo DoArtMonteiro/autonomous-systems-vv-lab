@@ -23,6 +23,7 @@ O M17 acrescenta uma missão de lançamento com várias fases e várias entidade
 ### Forças
 
 - Atmosfera exponencial isotérmica: `ρ = 1,225·exp(−h / 8500 m)`; a razão de pressões `p/p0` é igual à razão de densidades.
+  - **Limite do modelo.** Uma única altura de escala de 8,5 km só descreve a baixa atmosfera. Comparada com os valores arredondados de uma tabela publicada de densidade da alta atmosfera (os valores citados são os de uma tabela de um capítulo de livro sobre a alta atmosfera; não se identificou qual a atmosfera padrão de que provêm, e acima de 150 km dependem da atividade solar), a densidade do modelo é cerca de 9 vezes maior a 90 km (3,09e-5 contra 3,4e-6 kg/m³) e cerca de 13 vezes maior a 150 km (2,66e-8 contra 2,08e-9 kg/m³), e cerca de 33 000 vezes menor a 300 km (5,8e-16 contra 1,9e-11 kg/m³). Acima de cerca de 300 km a densidade do modelo é um artefacto da forma exponencial, não um valor físico: o arrasto resultante é praticamente nulo. O arrasto da subida e da queda do booster entre 90 e 150 km é, por isso, sobrestimado, e o voo livre do andar superior depois do SECO quase não tem arrasto, ao contrário de uma órbita real.
 - Arrasto `−½ ρ |v| Cd A v`, com `Cd` constante e área de referência por andar. Como a Terra não roda, a velocidade relativa ao ar é a velocidade inercial.
 - Impulso com caudal mássico fixo para cada acelerador: `ṁ = acelerador · T_vac / (Isp_vac g0)`, impulso `ṁ g0 Isp(p)` com `Isp(p) = Isp_vac − (Isp_vac − Isp_sl) p/p0`. O impulso ao nível do mar resulta da mesma descarga com o Isp do nível do mar.
 - Esgotamento: num passo em que o propelente restante não chega para `ṁ dt`, o caudal desse passo é reduzido para queimar exatamente o que resta.
@@ -43,7 +44,7 @@ O M17 acrescenta uma missão de lançamento com várias fases e várias entidade
 - `upper`: o andar superior e a carga útil, até ao corte do motor (SECO) e a um voo livre de 600 s.
 - As duas entidades filhas partem exatamente do estado do `stack` no tick da separação (teste: posição, velocidade e soma das massas iguais) e depois são integradas de forma independente.
 - Em cada tick as entidades são processadas pela ordem de índice. Para a entidade guiada (o `stack`, depois o `upper`) gera-se a observação e o software de voo produz o comando de `[k, k+1]`; depois cada entidade regista a sua amostra real em `k` e dá um passo. Os eventos reais detetados num passo ficam com o tick `k+1`.
-- Ordem total dos eventos: tick, depois entidade (`stack`, `booster`, `upper`), depois fonte (real, controlador, verificador), depois a ordem de emissão. Um teste verifica a ordem estrita e a sequência das fases.
+- Ordem total dos eventos: tick, depois entidade (`stack`, `booster`, `upper` e, no fim, a `mission` para os eventos que não pertencem a nenhuma entidade), depois fonte (real, controlador, verificador), depois a ordem de emissão. Um teste verifica a ordem estrita e a sequência das fases.
 
 ### Fases
 
@@ -79,7 +80,24 @@ Proveniência: ordens de grandeza públicas de lançadores de querosene e oxigé
 
 ## Requisitos e invariantes
 
-Todos são calculados sobre o estado real. Cada falha indica o identificador, o tick, o estado real nesse tick (altitude, distância, velocidade, velocidade radial, massa, propelente, acelerador, pressão dinâmica, aceleração sentida), a causa e as condições esperada e observada. O resultado da missão (`orbit`, `off_target_orbit`, `suborbital`, `no_separation`, `scrubbed`) fica separado da segurança (invariantes).
+Todos são calculados sobre o estado real. Cada falha indica o identificador, o tick, o estado real nesse tick (altitude, distância, velocidade, velocidade radial, massa, propelente, acelerador, pressão dinâmica, aceleração sentida), a causa e as condições esperada e observada. O resultado da missão fica separado da segurança (invariantes). O resultado é decidido por esta ordem, e cada código tem um só significado:
+
+| Código | Significado |
+|---|---|
+| `scrubbed` | o lançador nunca descolou |
+| `no_separation` | descolou mas o `stack` nunca se separou: o andar superior nunca voou |
+| `suborbital` | o andar superior atingiu a superfície em algum momento, ou a órbita real no SECO tem periapse abaixo da superfície (menos de 0 km) |
+| `seco_not_reached` | separou-se mas o SECO não ocorreu antes do fim do tempo simulado: nenhuma órbita foi avaliada |
+| `unbound` | energia específica real no SECO maior ou igual a zero: trajetória parabólica ou hiperbólica, não órbita |
+| `low_periapsis_orbit` | órbita ligada que não toca a superfície mas com periapse abaixo do mínimo declarado (`min_periapsis_km`) |
+| `off_target_orbit` | órbita ligada com a periapse no mínimo mas apoapse fora da tolerância do alvo |
+| `orbit` | periapse e apoapse dentro dos requisitos e sem contacto com a superfície |
+
+`orbit` descreve a órbita, não o conjunto dos requisitos: com `requirements_pass` falso (por exemplo a zona de recuperação do booster ou uma margem) o resultado continua `orbit`, e o registo `vv-run.v2` mostra-o com o estado `partial`, a etiqueta "Orbit, other requirements not met" e a métrica `requirements_pass`.
+
+`invariants_pass` quer dizer que nenhum invariante falhou, não que todos foram avaliados. `invariants_evaluated` e `invariants_not_evaluated` (identificadores) dizem quais não puderam ser julgados porque a entidade nunca voou: um lançamento cancelado não avalia nenhum. No registo a segurança continua no vocabulário fechado da plataforma (`safe` ou `unsafe`), mas a explicação diz "safe (not evaluated: ...)" e, se nenhum invariante foi julgado, a classe é `not_evaluated`.
+
+Eventos de veredictos: um evento nunca precede o início da entidade a que está ligado nem segue a sua última amostra. Um veredicto do booster ou do andar superior cujo instante é anterior à existência da entidade (a margem do booster é medida no MECO, antes da separação) fica ligado ao `stack`; o que não cabe em nenhuma entidade, e os veredictos da missão, ficam ligados à `mission`, que na ordem total vem depois das entidades. Os eventos do controlador registam a observação (`observed_altitude_m`, `observed_downrange_m`, `observed_speed_m_s`) e nunca o estado real.
 
 | Identificador | Categoria | Condição |
 |---|---|---|
@@ -91,7 +109,7 @@ Todos são calculados sobre o estado real. Cada falha indica o identificador, o 
 | `booster.R3_recovery_zone` | requisito | ponto de impacto interpolado dentro da zona declarada |
 | `upper.R4_periapsis` | requisito | periapse da órbita osculadora real no SECO pelo menos o mínimo |
 | `upper.R5_apoapsis` | requisito | apoapse dentro da tolerância do alvo |
-| `upper.R6_propellant_margin` | requisito | SECO pelo critério de energia, sem esgotamento, resíduo real pelo menos o mínimo |
+| `upper.R6_propellant_margin` | requisito | SECO pelo critério de energia, sem esgotamento, resíduo real pelo menos o mínimo (1 % da carga do andar superior nos dois casos, a reserva que o próprio software de voo mantém; ver abaixo) |
 | `mission.R7_phase_sequence` | requisito | ignição, descolagem, inclinação, viragem, MECO, separação, ignição superior e SECO, por esta ordem |
 | `mission.R8_orbit_insertion` | requisito | R4 e R5 cumpridos e o andar superior nunca atinge a superfície |
 
@@ -113,7 +131,20 @@ Testes em `crates/vv-ascent/tests/reference.rs`, com o RK4 de produção e o pas
 | | `medium-leo` andar 1 (4309,350 m/s) | 3,0e-13 | 1e-11 |
 | | `medium-leo` andar 2 (6974,401 m/s) | 5,8e-13 | 1e-11 |
 
-Na missão completa, a variação relativa da energia orbital do andar superior nos 600 s de voo livre depois do SECO foi 2,4e-12 (`small-leo`, semente 5000) e 1,5e-14 (`medium-leo`, semente 5000); o teste exige menos de 1e-6 (o arrasto acima de 300 km é desprezável mas não nulo).
+Na missão completa, a variação relativa da energia orbital do andar superior nos 600 s de voo livre depois do SECO foi 2,4e-12 (`small-leo`, semente 5000) e 1,5e-14 (`medium-leo`, semente 5000); o teste exige menos de 1e-6. Esta deriva só mostra que o integrador conserva a energia e que o modelo quase não tem arrasto a estas altitudes (ver o limite da atmosfera acima): **não é evidência do tempo de vida orbital**, que depende do arrasto real a 300 e 400 km (muito maior do que o do modelo), da atividade solar e da massa balística, nada disto modelado. O requisito de periapse mínima é um valor declarado, não uma avaliação de decaimento.
+
+Referências independentes (`crates/vv-ascent/tests/independent.rs`). O lado da referência só usa a biblioteca padrão e constantes literais e nunca chama a função do simulador que verifica; as diferenças medidas saem com `cargo test --test independent -- --nocapture`.
+
+| Referência | Grandeza | Diferença medida | Tolerância |
+|---|---|---|---|
+| (d) `elements` contra vis-viva e vetor de excentricidade, oito estados: elípticos excêntricos (subida e descida, um retrógrado), periapse abaixo da superfície, ligado por pouco (0,9999 da velocidade de escape), não ligado por pouco (1,0001) e hiperbólicos | excentricidade | 7,2e-16 | 1e-9 |
+| | altitudes de periapse e de apoapse (a apoapse do quase parabólico é 3,3e10 m) | 6,4e-3 m, só no quase parabólico (relativo 2e-13) | 1e-3 m mais 1e-11 do valor |
+| | energia específica (relativo) | 2,6e-13 | 1e-9 |
+| (e) queda em ar de densidade constante (corpo abaixo da superfície com gravidade uniforme, onde a densidade do simulador é exatamente a do nível do mar), 120 s; `v = v_t tanh(g t / v_t)`, queda `(v_t²/g) ln cosh(g t / v_t)`, `v_t = 126,534 m/s` | velocidade | 1,1e-11 m/s | 1e-7 m/s |
+| | posição | 2,4e-8 m | 1e-5 m |
+| (f) ponto de impacto interpolado contra o arco kepleriano analítico no vácuo (anomalia verdadeira, equação de Kepler, vis-viva), dois arcos de 379 s e 437 s | instante do impacto | 3,3e-8 s (pior) | 1e-6 s |
+| | distância ao longo da superfície (1855 km e 1260 km) | 8,5e-5 m (pior) | 1e-3 m |
+| | velocidade no impacto | 3,5e-8 m/s (pior) | 1e-6 m/s |
 
 ## Resultados de exemplo
 
@@ -124,11 +155,13 @@ Execuções reais do domínio `launch-ascent` com sementes de desenvolvimento; t
 | `small-leo`, semente 5000 | `orbit`, seguro | periapse 298,10 km, apoapse 301,90 km; max-Q 34,5 kPa a 12,2 km; separação a 95,4 km e 2765 m/s; booster cai a 1023,5 km (zona 850 a 1150 km); resíduo superior 145,6 kg |
 | `medium-leo`, semente 5000 | `orbit`, seguro | periapse 399,10 km, apoapse 400,06 km; max-Q 32,7 kPa; separação a 93,1 km e 2448 m/s; booster cai a 811,8 km (zona 650 a 900 km) a 1037 m/s; resíduo superior 1330 kg |
 | `small-leo`, carga útil 600 kg | `suborbital`, seguro | `upper.R6_propellant_margin` falha: o SECO veio da reserva estimada antes da energia alvo; periapse −859 km; `mission.R8_orbit_insertion` falha |
-| `small-leo`, semente 42 | `orbit`, seguro, um requisito falha | `booster.R3_recovery_zone` falha: impacto balístico 29,5 km antes da zona, porque as dispersões dessa semente deram uma separação a 72,1 km; sem manobra de regresso modelada |
+| `small-leo`, semente 42 | `orbit` com `requirements_pass` falso (no registo, estado `partial`), seguro, um requisito falha | `booster.R3_recovery_zone` falha: impacto balístico 29,5 km antes da zona, porque as dispersões dessa semente deram uma separação a 72,1 km; sem manobra de regresso modelada |
 | `small-leo`, inclinação de 6° | `no_separation`, inseguro | `stack.S1_max_dynamic_pressure` falha no tick 4396 (45,0 kPa a 14,6 km com o acelerador já no mínimo de 0,6); o `stack` fica em ar denso e cai antes do MECO |
 | `small-leo`, carga útil 20 t | `scrubbed` | as verificações pré-lançamento recusam uma relação impulso-peso nominal abaixo de 1,1 |
 
-Nas sementes 5000 a 5009, os dois veículos cumprem todos os requisitos. Com dispersões ligadas, as sementes 42 (zona de recuperação) e 7 (margem do booster, −10,6 kg) falham requisitos do booster em `small-leo`: são resultados do modelo, não erros.
+Nas sementes 5000 a 5009, `small-leo` cumpre todos os requisitos; `medium-leo` cumpre-os todos exceto na semente 5005, em que o resíduo real do andar superior no SECO é 0,69 % da carga (mínimo 1 %) e `upper.R6_propellant_margin` falha. Com dispersões ligadas, as sementes 42 (zona de recuperação) e 7 (margem do booster, −10,6 kg) falham requisitos do booster em `small-leo`: são resultados do modelo, não erros.
+
+**Margem do andar superior (R6).** O mínimo de resíduo era 0 nos dois casos, o que tornava a margem impossível de falhar. Passou a 1 % da carga do andar superior (48 kg em `small-leo`, 480 kg em `medium-leo`), igual à reserva que o software de voo mantém e abaixo da mediana medida. Medido em 200 sementes (5000 a 5199, dispersões ligadas; `cargo test --release --test ascent seed_scan -- --ignored --nocapture` em `crates/vv-ascent`): o resíduo real no SECO foi entre 0,2 % e 3,9 % da carga em `small-leo` (mediana 3,0 %) e entre 0 % e 3,9 % em `medium-leo` (mediana 2,6 %, esgotamento em algumas sementes). Nas mesmas 200 sementes o andar superior não chegou a órbita em 8 casos de `small-leo` (4 `suborbital`, 4 `low_periapsis_orbit`) e em 20 de `medium-leo` (14 `suborbital`, 6 `low_periapsis_orbit`): com dispersões de 1 % no empuxo e estimativas de massa e propelente do veículo nominal, o guiamento simples falha com frequência não desprezável. É um resultado do modelo exploratório, não foi investigado a fundo.
 
 ## Registo `vv-run.v2`
 
@@ -150,6 +183,29 @@ Não está modelado: rotação da Terra (e o ganho de velocidade para leste que 
 
 O guiamento é simples e explicável, não ótimo: não procura a trajetória de menor consumo e o seu desempenho depende da inclinação inicial escolhida.
 
+### Regresso propulsionado do booster: estudo de orçamento, não implementado
+
+O booster continua balístico. Foi feito um estudo independente (não é uma validação nem um limite, só uma ordem de grandeza) para saber o que uma recuperação exigiria, com dois guiões Python que não usam o código do simulador:
+
+- `scripts/m18_booster_budget.py`: orçamento de Tsiolkovsky com o propelente que o booster leva na separação e um integrador de ponto material à parte (arrasto e gravidade do inverso do quadrado, em Python) a partir do estado de separação lido do `trace.json` de uma execução. O integrador reproduz o impacto balístico do simulador (`small-leo`, semente 5000: 1023,55 km a 378,1 m/s nos dois, diferença abaixo de 0,1 m e de 0,01 m/s; `medium-leo`: 811,83 km a 1037,3 m/s nos dois), o que é uma verificação independente do booster balístico e não depende da escolha de nenhum ângulo. Resultados (semente 5000, dispersões ligadas):
+  - `small-leo`: separação a 95,4 km, 87,9 km à frente do local de lançamento, 2765 m/s (horizontal 2186 m/s, vertical 1693 m/s); o booster leva 737 kg de propelente (2,7 % da carga), que dão no máximo 722 m/s. Travar o impacto balístico (378 m/s) custa cerca de 365 kg; só anular a velocidade horizontal (o regresso ao local de lançamento exige mais) custa cerca de 2186 m/s, 2882 kg; os dois juntos cerca de 13,4 % da carga do primeiro andar, contra 3 % de reserva.
+  - `medium-leo`: separação a 93,1 km, 72,6 km à frente, 2448 m/s (horizontal 1801 m/s, vertical 1657 m/s); 13 177 kg de propelente (5,7 %) dão no máximo 1607 m/s. A travagem do impacto balístico (1037 m/s) custa cerca de 7,7 t; anular a velocidade horizontal, cerca de 1801 m/s e 15,3 t; os dois juntos cerca de 12,7 % da carga, contra 6 % de reserva.
+  - **Com as reservas atuais, o regresso ao local de lançamento está fora de alcance nos dois casos** (em `small-leo` só a velocidade horizontal pede cerca de quatro vezes o propelente que o booster leva; em `medium-leo`, cerca de 1,2 vezes, e a travagem final ainda por cima). Um caso novo podia declarar uma reserva maior, mas isso retira velocidade à separação e à inserção em órbita, o que não foi calculado. Uma travagem final sem manobra de regresso cabe no propelente que o booster leva. Os valores são estimativas: a velocidade horizontal a anular é só uma parte do regresso, e uma travagem real começa acima do solo, perde velocidade para o arrasto antes e paga perdas de gravidade.
+- `scripts/m18_booster_landing_1d.py`: travagem vertical a partir de 300 m/s, gravidade uniforme, controlo a 50 Hz, massa de aterragem de 3400 kg em `small-leo`, com um controlador simples (acende quando a altitude estimada atinge a altura de paragem, comanda `a = v²/(2h) + g` dentro dos limites do acelerador e corta quando a velocidade estimada deixa de ser descendente); o ruído sai de `random.Random` com sementes explícitas. É o resultado desse controlador, não um limite para qualquer controlador. O primeiro andar não paira: o empuxo ao nível do mar vai de 9,1 a 15,2 vezes o peso e um passo de 20 ms muda a velocidade entre 1,6 e 2,8 m/s. Com altitude e velocidade exatas a velocidade de toque é 4,0 m/s; com ruído de altitude de 0,1 m, mediana 3,4 m/s (pior em 200 amostras 5,6 m/s); com 2 m, mediana 3,2 m/s (pior 9,4); com os 10 m da navegação do voo (e 0,1 m/s), mediana 7,0 m/s (percentil 90 9,4 e pior 10,9), e em 197 das 200 amostras o motor corta acima do chão. O ruído de altitude acrescenta cerca de 3 m/s à mediana; o piso de cerca de 4 m/s vem do acelerador mínimo, do passo de 20 ms e da regra de corte deste controlador, não da navegação. Não ficou demonstrado que um requisito de poucos m/s precise de um altímetro próprio.
+
+Estado: **não implementado**. O estudo acima é a única parte feita; o booster continua balístico e todos os casos existentes ficam iguais. Para implementar faltaria um motor reacendível no `booster` (hoje sem motor), o guiamento do booster como segunda instância de software de voo com a sua navegação e fluxos pseudoaleatórios próprios, um bloco de recuperação opcional no caso (zona de aterragem declarada, sensores, fração de empuxo), requisitos novos (velocidade de toque, erro de posição, margem de propelente), a entidade no registo `vv-run.v2` e a validação contra uma referência independente. Existe um trabalho em curso, nunca compilado e sobre outra base, no ramo local `feat/m18-booster-recovery` (commit bfe78a4); não foi integrado.
+
+### Recuperação do booster: resultado
+
+**Requisito não cumprido.** O booster continua balístico e não há recuperação propulsionada.
+
+- **Regresso ao local de lançamento: inviável com as reservas atuais.** `scripts/m18_booster_budget.py`, com o estado de separação real da semente 5000: `small-leo` leva 737 kg de propelente (no máximo 722 m/s) e só anular a velocidade horizontal pede cerca de 2186 m/s (2882 kg); `medium-leo` leva 13,2 t (1607 m/s) e pede cerca de 1801 m/s (15,3 t) só para isso. Os dois casos precisariam de cerca de 13 % da carga do primeiro andar para travar e regressar, contra 3 % e 6 % de reserva. Uma reserva maior retira velocidade à inserção em órbita, não calculado. A travagem final, sem regresso, de 365 kg (`small-leo`) é uma subestimação de 25 a 30 % (Isp no vácuo, sem perda de gravidade).
+- **Aterragem propulsionada numa zona a jusante: porta fechada antes de escrever Rust.** Referência 2D em Python (ponto material, arrasto e atmosfera do modelo, navegação com 10 m e 0,1 m/s, guiamento só com observações, altímetro de 0,5 m opcional, 13 motores, ajuste do ponto de aterragem com um motor, lei polinomial de aterragem e descida terminal), partindo dos estados de separação reais gravados das sementes 5000 a 5019. Limiares congelados e confirmados antes de afinar: velocidade vertical de toque até 3,0 m/s, horizontal até 1,0 m/s, aterragem a menos de 50 m do centro da zona (ponto médio da zona de recuperação do caso: 1000 km em `small-leo`, 775 km em `medium-leo`) e propelente nunca esgotado; 10 em 10 sementes retidas obrigatório. Afinado só nas sementes 5000 a 5009 (9 em 10 nos dois casos) e corrido uma vez nas sementes retidas 5010 a 5019: **`small-leo` 8 em 10, `medium-leo` 9 em 10: porta falhada.** A causa não é a velocidade de toque (todas as sementes que convergem aterram a 0,8 a 2 m/s na vertical e a 0,5 m/s na horizontal, a menos de 40 m): é o propelente que sobra no MECO, porque o MECO é decidido pela estimativa nominal do software de voo. Em `small-leo` sobram entre 369 e 1310 kg contra cerca de 600 a 700 kg gastos; em `medium-leo`, entre 10,1 e 18,0 t contra cerca de 12,5 a 13 t. As sementes 5017 e 5019 de `small-leo` (separação 87 km abaixo da zona; 369 kg a bordo) e 5019 de `medium-leo` (10,1 t) esgotam o propelente. O que não está provado: que outro guiamento não poupe mais propelente. Pressão dinâmica máxima na descida: cerca de 370 a 430 kPa (pequeno) e 750 a 840 kPa (médio).
+- Evidência no ramo local `recovery/booster`: commits `ab110d1` (limiares, zona, ruído e sementes congelados antes de afinar), `ea3bbae` (referência Python e configurações escolhidas nas sementes de afinação) e `3deb85d` (resultado nas sementes retidas, corrido uma vez). Não foi escrito Rust nem integrado nada.
+
+### Regras de veredicto da versão 0.15.1 do domínio
+
+O domínio `launch-ascent` passou a 0.15.1 porque as regras de veredicto mudaram (códigos de resultado, mínimo de propelente do andar superior de 1 %, instante do requisito de inserção sem SECO). Uma execução guardada por uma versão anterior reproduz-se como `verified_earlier_build`: o domínio declara numa tabela (`VERDICT_RULES` em `desktop/domain-ascent/src/lib.rs`) as alterações de resultado (`orbit` com `success` passa a `partial`; `suborbital` passa a `low_periapsis_orbit`, `seco_not_reached` ou `unbound`; `off_target_orbit` passa a `unbound`), a passagem de `pass` a `fail` de `upper.R6_propellant_margin` e o novo instante de `mission.R8_orbit_insertion`, e a plataforma aceita só essas diferenças, cada uma só onde a mesma comparação mostra o facto em que assenta (um `orbit` passa a `partial` só se o registo recalculado falha um requisito; as linhas de `suborbital` só com a periapse e a apoapse recalculadas que a regra descreve; o limite de R6 só com o limite antigo guardado e uma margem coerente; o requisito R8 e o seu evento só do instante 0 guardado para o fim da execução; os eventos de violação só para a alteração aceite nessa comparação; o sinalizador nativo `requirements_pass` só se uma alteração de requisito foi aceite), lista-as no relatório (`verdicts re-evaluated under current rules`) e continua a exigir que escalas de tempo, canais, as restantes métricas e os eventos que não são violações coincidam. Tudo o que a tabela não cobre rejeita. A mudança de `pass` para `fail` de R6 só é aceite se o registo guardado tiver o limite antigo e um valor observado que o cumpre (passou mesmo pela regra antiga). Limite desta verificação: a versão do domínio, os hashes e as métricas estão no registo editável, por isso a recomputação não prova que o veredicto guardado foi alguma vez o de uma build antiga, só que a telemetria é a recomputada e que os veredictos guardados são coerentes com as regras antigas; apagar a métrica `requirements_pass`, que só a build atual escreve, não é detetado. A proteção é o aviso que diz que os veredictos guardados diferem dos atuais. Teste de regressão com duas execuções reais gravadas pela build de b69cc8e (`desktop/domain-ascent/tests/earlier_build.rs`).
 ## Reprodução
 
 ```sh

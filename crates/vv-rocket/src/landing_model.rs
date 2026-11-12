@@ -36,6 +36,9 @@ pub const TARGET_VERTICAL_SPEED_MPS: f64 = -1.5;
 /// Pre-registered fixed step.
 pub const DT_S: f64 = 0.01;
 const GRAVITY_MPS2: f64 = 9.80665;
+/// Upper bound of the exploratory (v2) minimum-throttle thrust over the full-load weight. The
+/// registered vehicle is at 1.15 and the bundled exploratory vehicles at 0.9 to 1.1.
+const MAX_MIN_THROTTLE_THRUST_TO_WEIGHT: f64 = 2.5;
 const SEA_LEVEL_DENSITY_KGPM3: f64 = 1.225;
 const SCALE_HEIGHT_M: f64 = 8500.0;
 const NOMINAL_POSITION_M: [f64; 3] = [80.0, 0.0, 3000.0];
@@ -614,6 +617,15 @@ fn check_exploratory(case: &LandingCase) -> Result<(), String> {
         "vehicle.max_thrust_n over the full-load weight",
         1.2,
         6.0,
+    )?;
+    // Thrust at the lowest throttle over the same weight: above this the engine cannot be throttled
+    // down far enough to slow the descent to the touchdown limits (a thrust-to-weight of 6 with a
+    // minimum throttle of 0.9 is a stage that only ever climbs once lit).
+    within(
+        v.max_thrust_n * v.throttle_min / weight,
+        "vehicle minimum-throttle thrust over the full-load weight",
+        0.0,
+        MAX_MIN_THROTTLE_THRUST_TO_WEIGHT,
     )?;
     let env = &case.environment;
     require_equal(&env.gravity_mps2, &GRAVITY_MPS2, "environment.gravity_mps2")?;

@@ -159,6 +159,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width
 
 .kind-badge { display: inline-grid; place-items: center; width: 15px; height: 15px; font: 600 9.5px/1 var(--mono); border: 1px solid var(--rule-strong); border-radius: 2px; color: var(--fg-3); flex: none; }
 .class-badge { font: 600 11px/1.6 var(--mono); padding: 0 6px; border-radius: 2px; border: 1px solid currentColor; }
+.class-not_evaluated { color: var(--neutral); }
 .class-R { color: var(--pass); }
 .class-T { color: var(--fail); }
 .class-U { color: var(--unsafe); }
@@ -391,6 +392,9 @@ span.req-t { border-color: transparent; color: var(--fg-3); cursor: default; }
 .replay-verdict { display: flex; gap: 8px; align-items: center; padding: 8px 10px; border-radius: var(--r); border: 1px solid var(--rule); }
 .replay-verdict.v-pass { border-color: var(--pass); background: var(--pass-wash); }
 .replay-verdict.v-unsafe { border-color: var(--unsafe); background: var(--unsafe-wash); }
+.replay-verdict.v-partial { border-color: var(--fail); background: var(--fail-wash); }
+.replay-reeval { margin: 6px 0 0; padding: 6px 10px; border-left: 3px solid var(--fail); background: var(--fail-wash); font-size: 13px; }
+.verdict-reeval { color: var(--fail); }
 .replay-verdict .glyph { background: transparent; }
 .checks { display: grid; gap: 2px; margin-top: 6px; }
 .checks li { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 2px 8px; align-items: start; font-size: 12px; padding: 2px 0; }
