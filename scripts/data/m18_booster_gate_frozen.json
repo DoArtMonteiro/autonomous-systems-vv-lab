@@ -1,0 +1,37 @@
+{
+  "schema": "vv-booster-gate-frozen.v1",
+  "status": "exploratory; frozen before any tuning; never loosened afterwards",
+  "purpose": "Gate for a downrange powered landing of the vv-ascent booster, judged by a Python 2D point-mass reference before any Rust is written.",
+  "thresholds": {
+    "touchdown_vertical_speed_m_s_max": 3.0,
+    "touchdown_horizontal_speed_m_s_max": 1.0,
+    "landing_zone_radius_m": 50.0,
+    "propellant_never_depleted": true,
+    "reported_without_threshold": ["peak descent dynamic pressure", "propellant used", "landing error", "boost-back/trim delta-v"],
+    "source_of_speeds": "docs/m9-powered-landing.md (R1 vertical speed, R2 horizontal speed <= 1.0 m/s); the radius is stated here because the downrange zone is new (M9 uses 10 m on a pad with a 0.05 m altimeter-class sensor)"
+  },
+  "landing_zone": {
+    "centre_downrange_km": {"small-leo": 1000.0, "medium-leo": 775.0},
+    "rule": "midpoint of the recovery_zone already declared in each case (small 850 to 1150 km, medium 650 to 900 km), surface distance from the launch site at sea level"
+  },
+  "pass_rule": "a vehicle passes if all 10 held-out seeds 5010 to 5019 meet every threshold, with the configuration chosen on seeds 5000 to 5009 only; the held-out seeds are run once",
+  "inputs": {
+    "states": "scripts/data/m18_booster_gate_states.json: the true separation state, true mass, propellant and first-stage dispersion factors recorded from real vv-ascent runs (nominal cases as bundled in recovery/science fc24942, dispersions on, seeds 5000 to 5019)",
+    "tuning_seeds": [5000, 5001, 5002, 5003, 5004, 5005, 5006, 5007, 5008, 5009],
+    "held_out_seeds": [5010, 5011, 5012, 5013, 5014, 5015, 5016, 5017, 5018, 5019]
+  },
+  "assumptions": {
+    "dynamics": "planar point mass over the spherical non-rotating Earth of vv-ascent: inverse-square gravity, isothermal exponential atmosphere (1.225 kg/m3, 8500 m), drag with the stage Cd and area, thrust at fixed mass flow with Isp(p) between sea-level and vacuum, instantaneous thrust direction, no attitude dynamics",
+    "true_vehicle": "first stage with the recorded dispersion factors (thrust, Isp, dry mass); the booster mass and propellant at separation are the recorded true values",
+    "guidance_knowledge": "nominal vehicle of the case and a propellant estimate equal to the nominal reserve (reserve_fraction times the first-stage load): never the true state, true vehicle or true propellant",
+    "navigation": {"position_sigma_m_per_axis": 10.0, "velocity_sigma_m_s_per_axis": 0.1, "noise": "white, Gaussian, from random.Random with an explicit seed per run, at every control tick", "rate_hz": 50},
+    "optional_landing_altimeter": {"allowed_sigma_m": [0.5], "active_below_altitude_m": 5000.0, "note": "a declared exploratory case parameter; with none the radial position of the navigation solution is used"},
+    "engines": {"count_allowed": [5, 9, 13], "model": "the stage thrust and mass flow split equally over n engines; the guidance lights k of them at a throttle between the stage throttle_min and throttle_max; the throttle floor is not lowered", "declared_as": "new exploratory case parameters"},
+    "integration": "RK4 at 0.02 s while an engine is lit or below 60 km altitude, 0.5 s otherwise; the guidance runs at 50 Hz; contact is the interpolated crossing of zero altitude",
+    "recorded_not_judged": ["peak descent dynamic pressure"]
+  },
+  "tuning_rules": {
+    "may_change": ["guidance gains and rules", "flip delay", "plan throttle", "tilt limit", "touchdown target speed", "engine count among the allowed values", "altimeter on or off"],
+    "may_not_change": ["thresholds", "zone centre and radius", "noise sigmas", "seeds of the two sets", "the recorded states"]
+  }
+}
