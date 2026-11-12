@@ -391,6 +391,11 @@ fn violation_id(e: &Event) -> Option<&str> {
         .flatten()
 }
 
+/// How far before the last instant of the mission clock a requirement judged at the end of the run
+/// may lie: the clock's last instant is the last sample of the longest entity, which can come one
+/// 20 ms logical tick after the tick the requirement is judged at; 0.1 s is five ticks.
+const RETIME_WINDOW_S: f64 = 0.1;
+
 /// The end of the run in the recomputed record: the last instant of its mission clock, else of any
 /// timebase.
 fn run_end(r: &RunRecord) -> f64 {
@@ -471,18 +476,23 @@ fn compare(stored: &RunRecord, fresh: &RunRecord, rules: &VerdictRules) -> Compa
             let Some(x) = fresh.requirements.iter().find(|x| x.id == q.id) else {
                 continue;
             };
+            // A status change is accepted only for a requirement that genuinely had the status under the
+            // old rule: the stored record carries the old limit and an observed value that meets it.
             if x.status != q.status
-                && let Some(c) = rules
-                    .requirements
-                    .iter()
-                    .find(|c| c.id == q.id && c.from == q.status && c.to == x.status)
+                && let Some(c) = rules.requirements.iter().find(|c| {
+                    c.id == q.id
+                        && c.from == q.status
+                        && c.to == x.status
+                        && has_old_limit(stored, c)
+                        && metric_value(stored, c.observed_metric).is_some_and(|o| o >= c.old_limit)
+                })
             {
                 applied.push(*c);
             }
             if x.t != q.t
                 && q.t.is_none()
                 && rules.retimed.contains(&q.id.as_str())
-                && x.t.is_some_and(|t| t <= end && t >= end - 1.0)
+                && x.t.is_some_and(|t| t <= end && t >= end - RETIME_WINDOW_S)
             {
                 retimed_ids.push(q.id.as_str());
             }
@@ -610,7 +620,7 @@ fn compare(stored: &RunRecord, fresh: &RunRecord, rules: &VerdictRules) -> Compa
     // retimed one at 0 in the stored record and at the end of the run in the recomputation, and a new
     // violation of a requirement whose status changed to fail. No other violation is skipped, so a
     // deleted or forged one is a disagreement.
-    let near_end = |e: &Event| e.t <= end && e.t >= end - 1.0;
+    let near_end = |e: &Event| e.t <= end && e.t >= end - RETIME_WINDOW_S;
     let moved_from_start = |id: &str| {
         stored
             .events
@@ -712,7 +722,7 @@ fn compare(stored: &RunRecord, fresh: &RunRecord, rules: &VerdictRules) -> Compa
 }
 /// What the earlier-build replay does not compare, listed in the report so a reader of
 /// `replay.json` can see the limits of the check.
-pub const EARLIER_BUILD_NOT_COMPARED: &str = "texts (labels, explanations, notes, the expected and observed text of a requirement), the scene, the entity and mission blocks, channels, events and metrics that only the current build writes (so deleting a stored channel, metric or informational event is not detected), and the native simulator replay, which needs the same simulator sources";
+pub const EARLIER_BUILD_NOT_COMPARED: &str = "texts (labels, explanations, notes, the expected and observed text of a requirement), the scene, the entity and mission blocks, channels, events and metrics that only the current build writes (so deleting a stored channel, metric or informational event is not detected), and the native simulator replay, which needs the same simulator sources. The domain version, the hashes and the metrics are read from the editable record, so the recomputation cannot prove that a stored verdict was ever the one an older build wrote: it shows that the telemetry is the recomputed one and that the stored verdicts are consistent with the old rules. Deleting the requirements_pass metric, which only the current build writes, is not detected. The banner that says the stored verdicts differ from the current ones is the protection";
 
 /// Verdict flags of a native `verification.json`: the top-level `requirements_pass` and
 /// `invariants_pass`, and the pass flag or status of every entry of `requirements`, `invariants`
@@ -1446,6 +1456,24 @@ mod verdict_rule_tests {
         let mut s = stored.clone();
         s.metrics[3].value = Some(2.5);
         assert!(rejects(&s, &fresh));
+    }
+
+    #[test]
+    fn a_pass_the_old_rule_could_not_have_given_is_not_re_evaluated() {
+        // The stored record says R1 passed, but its own numbers (observed -1 against the old limit 0)
+        // show it could not have under the old rule: a forged pass.
+        let mut stored = record();
+        stored.metrics[1].value = Some(-1.0);
+        stored.metrics[3].value = Some(-1.0);
+        assert!(rejects(&stored, &judged_again(&stored)));
+        // Without the metrics of the old rule the flip is not accepted either.
+        let mut stored = record();
+        let fresh = judged_again(&stored);
+        stored.metrics.retain(|m| m.id != "limit.R1");
+        assert!(rejects(&stored, &fresh));
+        // The genuine one is.
+        let stored = record();
+        assert!(!rejects(&stored, &judged_again(&stored)));
     }
 
     #[test]
