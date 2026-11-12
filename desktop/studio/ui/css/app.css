@@ -392,6 +392,9 @@ span.req-t { border-color: transparent; color: var(--fg-3); cursor: default; }
 .replay-verdict { display: flex; gap: 8px; align-items: center; padding: 8px 10px; border-radius: var(--r); border: 1px solid var(--rule); }
 .replay-verdict.v-pass { border-color: var(--pass); background: var(--pass-wash); }
 .replay-verdict.v-unsafe { border-color: var(--unsafe); background: var(--unsafe-wash); }
+.replay-verdict.v-partial { border-color: var(--fail); background: var(--fail-wash); }
+.replay-reeval { margin: 6px 0 0; padding: 6px 10px; border-left: 3px solid var(--fail); background: var(--fail-wash); font-size: 13px; }
+.verdict-reeval { color: var(--fail); }
 .replay-verdict .glyph { background: transparent; }
 .checks { display: grid; gap: 2px; margin-top: 6px; }
 .checks li { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 2px 8px; align-items: start; font-size: 12px; padding: 2px 0; }

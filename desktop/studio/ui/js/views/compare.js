@@ -89,14 +89,15 @@ function build() {
       const rec = r.record;
       const rt = requestText(rec.request, cat);
       const ov = verdictOfOutcome(rec.outcome.status);
-      const sv = verdictOfSafety(rec.safety.status);
+      const unjudged = rec.safety.status === 'safe' && rec.safety.class === 'not_evaluated';
+      const sv = unjudged ? 'neutral' : verdictOfSafety(rec.safety.status);
       return h('div', { class: 'run-key', role: 'listitem', dataset: { run: r.id } },
         h('span', { class: 'key-swatch', style: { background: runSwatch(colours[i], runDash(i)) }, 'aria-hidden': 'true' }),
         h('span', { class: 'key-label', title: labels[i] }, labels[i]),
         h('button', { type: 'button', class: 'link small', 'aria-label': `Open run ${i + 1}`, onclick: () => navigate('run', { runId: r.id }) }, 'Open'),
         h('span', { class: 'key-verdicts' },
           h('span', { class: ['mini', `v-${ov}`], title: prose(rec.outcome.explanation) }, verdictGlyph(ov), rec.outcome.label),
-          h('span', { class: ['mini', `v-${sv}`], title: prose(rec.safety.explanation) }, verdictGlyph(sv), rec.safety.status, rec.safety.class ? ` · class ${rec.safety.class}` : '')),
+          h('span', { class: ['mini', `v-${sv}`], title: prose(rec.safety.explanation) }, verdictGlyph(sv), unjudged ? 'not evaluated' : rec.safety.status, rec.safety.class && !unjudged ? ` · class ${rec.safety.class}` : '')),
         h('span', { class: 'key-sub', title: `${rt.controller} · seed ${rt.seed} · ${rt.faults} · ${r.id}` }, `${rt.controller} · seed ${rt.seed} · ${rt.faults} · ${r.id}`));
     })),
     cmp.errors.length ? h('div', { class: 'cmp-errors', role: 'alert' }, h('strong', null, `${cmp.errors.length} run${cmp.errors.length > 1 ? 's' : ''} could not be included`),
@@ -140,7 +141,10 @@ function matrix() {
     const tb = h('tbody');
     const rows = [];
     rows.push(['Mission outcome', records.map((r) => ({ v: verdictOfOutcome(r.record.outcome.status), text: r.record.outcome.label, key: r.record.outcome.code, title: prose(r.record.outcome.explanation) }))]);
-    rows.push(['Safety', records.map((r) => ({ v: verdictOfSafety(r.record.safety.status), text: `${r.record.safety.status}${r.record.safety.class ? ` · class ${r.record.safety.class}` : ''}`, key: `${r.record.safety.status}${r.record.safety.class}`, title: prose(r.record.safety.explanation) }))]);
+    rows.push(['Safety', records.map((r) => {
+      const unjudged = r.record.safety.status === 'safe' && r.record.safety.class === 'not_evaluated';
+      return { v: unjudged ? 'neutral' : verdictOfSafety(r.record.safety.status), text: unjudged ? 'not evaluated' : `${r.record.safety.status}${r.record.safety.class ? ` · class ${r.record.safety.class}` : ''}`, key: `${r.record.safety.status}${r.record.safety.class}`, title: prose(r.record.safety.explanation) };
+    })]);
     const ids = [];
     const cats = new Map();
     for (const r of records) for (const q of r.record.requirements || []) if (!ids.includes(q.id)) { ids.push(q.id); cats.set(q.id, q.category); }

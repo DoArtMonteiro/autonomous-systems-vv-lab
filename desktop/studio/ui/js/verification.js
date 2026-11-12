@@ -15,7 +15,7 @@ export function verdictGlyph(v) {
 export function verdictBlocks(record) {
   const ov = verdictOfOutcome(record.outcome.status);
   // A run whose invariants were never judged (the vehicle never flew) is not shown as safe.
-  const unjudged = record.safety.class === 'not_evaluated';
+  const unjudged = record.safety.status === 'safe' && record.safety.class === 'not_evaluated';
   const sv = unjudged ? 'neutral' : verdictOfSafety(record.safety.status);
   // A completed mission can still have failed requirements outside the safety invariants; say so
   // first, so the one-line clamp keeps it visible.

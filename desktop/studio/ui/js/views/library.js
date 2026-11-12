@@ -133,7 +133,9 @@ function drawRows() {
   for (const m of list) {
     const s = m.summary;
     const ov = verdictOfOutcome(s.outcome_status);
-    const sv = verdictOfSafety(s.safety_status);
+    // Invariants never judged (the vehicle never flew): neutral, not a pass.
+    const unjudged = s.safety_status === 'safe' && s.safety_class === 'not_evaluated';
+    const sv = unjudged ? 'neutral' : verdictOfSafety(s.safety_status);
     const cbId = nextId('pick');
     const cb = h('input', { type: 'checkbox', id: cbId, 'aria-label': `Select run ${m.run_id} for comparison`, checked: picked.has(m.run_id), onclick: (e) => e.stopPropagation(), onchange: (e) => {
       if (e.target.checked) {
@@ -154,7 +156,7 @@ function drawRows() {
     h('td', { class: 'mono' }, String(s.seed)),
     h('td', { class: 'small' }, s.faults.length ? s.faults.map(words).join(', ') : h('span', { class: 'dim' }, 'none')),
     h('td', null, h('span', { class: ['cell', `v-${ov}`] }, verdictGlyph(ov), s.outcome_label)),
-    h('td', null, h('span', { class: ['cell', `v-${sv}`] }, verdictGlyph(sv), s.safety_status, s.safety_class ? h('span', { class: ['class-badge', `class-${s.safety_class}`] }, s.safety_class) : null)),
+    h('td', null, h('span', { class: ['cell', `v-${sv}`] }, verdictGlyph(sv), unjudged ? 'not evaluated' : s.safety_status, s.safety_class && !unjudged ? h('span', { class: ['class-badge', `class-${s.safety_class}`] }, s.safety_class) : null)),
     h('td', { class: 'failed' }, s.failed.join(' ')),
     h('td', { class: 'mono dim small' }, m.created_utc.replace('T', ' ').replace('Z', '')));
     tbody.append(tr);

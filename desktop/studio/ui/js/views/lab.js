@@ -377,7 +377,7 @@ async function startDefault(d, btn, scenarioId, openGroup) {
 
 function verdictPill(record) {
   const ov = verdictOfOutcome(record.outcome.status);
-  const unjudged = record.safety.class === 'not_evaluated';
+  const unjudged = record.safety.status === 'safe' && record.safety.class === 'not_evaluated';
   const sv = unjudged ? 'neutral' : verdictOfSafety(record.safety.status);
   return h('div', { class: 'lab-verdicts' },
     h('span', { class: ['mini', `v-${ov}`], title: prose(record.outcome.explanation) }, verdictGlyph(ov), record.outcome.label),
