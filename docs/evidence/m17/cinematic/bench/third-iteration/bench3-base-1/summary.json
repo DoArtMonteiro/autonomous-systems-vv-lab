@@ -1,0 +1,29 @@
+{
+ "machine": {
+  "platform": "Windows-11-10.0.26300-SP0",
+  "processor": "AMD64 Family 25 Model 97 Stepping 2, AuthenticAMD",
+  "python": "3.14.6"
+ },
+ "rows": [
+  {
+   "profile": "balanced",
+   "first_frame_s": 4.41,
+   "p50_ms": 1.47,
+   "p99_ms": 2.67,
+   "frames": 7177,
+   "vram_used_mb": 642,
+   "working_set_mb": 640,
+   "private_mb": 1059
+  },
+  {
+   "profile": "ultra",
+   "first_frame_s": 4.006,
+   "p50_ms": 3.24,
+   "p99_ms": 7.58,
+   "frames": 2815,
+   "vram_used_mb": 1054,
+   "working_set_mb": 676,
+   "private_mb": 1493
+  }
+ ]
+}

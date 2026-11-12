@@ -1,0 +1,70 @@
+{
+ "adapter": "AMD Radeon RX 7700 XT",
+ "bench_seconds": 12.0,
+ "buffer_mem_used_bytes": 95846008,
+ "draw_calls_in_frame": 611,
+ "driver": "d3d12",
+ "frame_ms_max": 12.729,
+ "frame_ms_p50": 3.736,
+ "frame_ms_p95": 8.675,
+ "frame_ms_p99": 9.017,
+ "frames": 2528,
+ "primitives_in_frame": 24988241,
+ "profile": "ultra",
+ "profile_reason": "Chosen on the command line",
+ "replay_from_t": 0.0,
+ "replay_to_t": 23.3361272857644,
+ "settings": {
+  "aa": "fsr2",
+  "cascades": 4,
+  "dof": true,
+  "foliage_cards": true,
+  "glow": true,
+  "lod_far_m": 4500.0,
+  "lod_near_m": 1000.0,
+  "min_vram_gb": 11.0,
+  "msaa": 4,
+  "name": "ultra",
+  "render_scale": 1.0,
+  "shadow_size": 8192,
+  "soft_shadows": true,
+  "ssao": true,
+  "ssil": true,
+  "ssr": true,
+  "vegetation_density": 1.0,
+  "vegetation_shadows": true,
+  "volumetric_fog": true
+ },
+ "static_memory_bytes": 252293204,
+ "t": 23.3361272857644,
+ "texture_mem_used_bytes": 1035030528,
+ "video_mem_used_bytes": 1446072320,
+ "vram_capacity_bytes": 12868124672,
+ "vram_capacity_source": "registry qwMemorySize",
+ "vsync": "disabled",
+ "window": [
+  1440.0,
+  900.0
+ ],
+ "world": {
+  "buildings": 687,
+  "drawn_vegetation": 105727,
+  "lidar_structures": 8,
+  "shrubs": 97479,
+  "structures": 39,
+  "tiles": 207,
+  "trees": 8248
+ },
+ "harness": {
+  "command": "--rendering-driver d3d12 --path <repo>\\desktop\\cinematic --resolution 1440x900 -- --run <repo>\\tests\\fixtures\\cinematic\\landing-run --env <repo>\\desktop\\environments\\cape-canaveral --profile ultra --camera director --bench <scratch>\\visual\\bench-cur-1\\bench-ultra.json --bench-seconds 12.0",
+  "wall_s_to_first_frame": 5.493,
+  "engine_ms_to_first_frame": 3991,
+  "peak_working_set_bytes": 759910400,
+  "peak_private_bytes": 2175295488,
+  "exit": 0,
+  "log_tail": [
+   "cinematic: pack cape-canaveral verified (6 files, SHA-256 against environment.json)",
+   "cinematic: scene built in 3403 ms (profile ultra: Chosen on the command line)"
+  ]
+ }
+}

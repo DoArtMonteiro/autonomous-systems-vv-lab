@@ -1,0 +1,49 @@
+{
+ "machine": {
+  "platform": "Windows-11-10.0.26300-SP0",
+  "processor": "AMD64 Family 25 Model 97 Stepping 2, AuthenticAMD",
+  "python": "3.14.6"
+ },
+ "rows": [
+  {
+   "profile": "performance",
+   "first_frame_s": 8.244,
+   "p50_ms": 1.07,
+   "p99_ms": 2.74,
+   "frames": 10715,
+   "vram_used_mb": 906,
+   "working_set_mb": 629,
+   "private_mb": 1326
+  },
+  {
+   "profile": "balanced",
+   "first_frame_s": 12.87,
+   "p50_ms": 1.95,
+   "p99_ms": 5.37,
+   "frames": 5106,
+   "vram_used_mb": 1356,
+   "working_set_mb": 707,
+   "private_mb": 1870
+  },
+  {
+   "profile": "high",
+   "first_frame_s": 16.569,
+   "p50_ms": 3.24,
+   "p99_ms": 13.49,
+   "frames": 2579,
+   "vram_used_mb": 2406,
+   "working_set_mb": 724,
+   "private_mb": 3032
+  },
+  {
+   "profile": "ultra",
+   "first_frame_s": 16.284,
+   "p50_ms": 4.21,
+   "p99_ms": 17.27,
+   "frames": 1942,
+   "vram_used_mb": 2672,
+   "working_set_mb": 730,
+   "private_mb": 3301
+  }
+ ]
+}
