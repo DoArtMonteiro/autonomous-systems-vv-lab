@@ -129,12 +129,21 @@ def main():
                     launched = godot_pids(proc.pid)
                     time.sleep(0.5)
                 check("Cinematic: the player opens the module window on the shown run", bool(launched))
-                time.sleep(12)
                 # The module's own log says whether it verified the pack, drew a first frame and
                 # rendered without errors. (No desktop screenshot: it would capture other windows.)
+                # The first frame takes 8 to 13 s on the reference PC (the module decodes its CC0
+                # assets at start), so wait for it instead of sleeping a fixed time.
                 logs = os.path.join(os.environ.get("APPDATA", ""), "VV Lab Cinematic", "logs")
-                newest = max((os.path.join(logs, f) for f in os.listdir(logs)), key=os.path.getmtime) if os.path.isdir(logs) else None
-                text = open(newest, encoding="utf-8", errors="replace").read() if newest else ""
+                text = ""
+                t0 = time.time()
+                while time.time() - t0 < 90:
+                    newest = max((os.path.join(logs, f) for f in os.listdir(logs)), key=os.path.getmtime) if os.path.isdir(logs) else None
+                    text = open(newest, encoding="utf-8", errors="replace").read() if newest else ""
+                    if "FIRST_FRAME" in text:
+                        break
+                    time.sleep(1)
+                time.sleep(2)
+                text = open(newest, encoding="utf-8", errors="replace").read() if newest else text
                 check("Cinematic: the module verified the pack and drew its first frame", "verified" in text and "FIRST_FRAME" in text, text[:300].replace("\n", " "))
                 check("Cinematic: the module renders without errors", "ERROR" not in text, f"{text.count('ERROR')} errors; " + text.splitlines()[1][:120] if text else "no log")
                 # Only the Godot process this Studio started; any other Godot instance is left alone.
