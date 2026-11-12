@@ -1383,6 +1383,49 @@ mod tests {
         let _ = fs::remove_dir_all(&d);
     }
 
+    /// Module 0.2.0 (launch ascents, CC0 assets) carries a `third_party_assets` list and a notice in
+    /// its manifest; the installer ignores fields it does not know, verifies every file listed, replaces
+    /// 0.1.0 and still launches with only the fixed arguments (a run folder and an environment folder).
+    #[test]
+    fn a_module_with_third_party_assets_replaces_the_old_one_and_launches() {
+        let d = tmp("v020");
+        let root = d.join("modules").join("cinematic");
+        install(&root, &build_version(&d, "0.1.0", b"MZ one")).unwrap();
+        let sub = d.join("0.2.0");
+        fs::create_dir_all(&sub).unwrap();
+        let notice: &[u8] = b"CC0 notice";
+        let zp = build_zip(
+            &sub,
+            &[FILES[0], FILES[1], ("LICENSES/NOTICE-cc0.md", notice)],
+            None,
+            |m| {
+                m["version"] = "0.2.0".into();
+                m["third_party_assets"] = serde_json::json!([{
+                    "id": "x", "licence": "CC0 1.0",
+                    "files": [{"path": "LICENSES/NOTICE-cc0.md", "bytes": notice.len(), "sha256": hex(notice)}],
+                }]);
+            },
+        );
+        let s = install(&root, &zp).unwrap();
+        assert_eq!(s.version.as_deref(), Some("0.2.0"));
+        assert!(s.verified, "{s:?}");
+        let mut names: Vec<_> = fs::read_dir(&root)
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().to_string())
+            .collect();
+        names.sort();
+        assert_eq!(names, ["0.2.0"]);
+        let Launch { args, .. } =
+            launch_command(&root, Path::new("RUN"), Path::new("ENV")).unwrap();
+        let at = args.iter().position(|a| a == "--path").unwrap();
+        assert_eq!(
+            args[at + 2..],
+            ["--", "--run", "RUN", "--env", "ENV", "--profile", "auto"]
+        );
+        let _ = fs::remove_dir_all(&d);
+    }
+
     #[test]
     fn a_failed_swap_keeps_the_installed_module() {
         let d = tmp("swap");
