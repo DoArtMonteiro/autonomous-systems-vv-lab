@@ -304,6 +304,9 @@ fn golden_fixtures() {
             "verdicts": o.verification.verdicts.iter().map(|v| serde_json::json!({
                 "id": v.id, "status": v.status, "observed": v.observed,
             })).collect::<Vec<_>>(),
+            // The states and observations of every entity, apart from the events: a verifier or
+            // labelling change must leave this hash alone, so it separates a physics change from one.
+            "entities_sha256": sha256_hex(&serde_json::to_vec(&o.trace.entities).unwrap()),
             "trace_sha256": sha256_hex(&o.trace_bytes),
             "verification_sha256": sha256_hex(&o.verification_bytes),
         });

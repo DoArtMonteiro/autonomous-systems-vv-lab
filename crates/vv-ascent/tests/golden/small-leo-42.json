@@ -1,5 +1,6 @@
 {
   "case": "small-leo",
+  "entities_sha256": "e6d2793174555fe75132de30b2f815c21f2c186882d55289dd0d87002a71ea9d",
   "outcome": "orbit",
   "seed": 42,
   "trace_sha256": "c5ee2c6d129c6a915c8c5de5a720151022e66c507c794f732fdd35f14abbb641",
