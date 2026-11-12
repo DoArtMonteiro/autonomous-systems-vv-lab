@@ -238,6 +238,15 @@ func _trails() -> void:
 
 # --- the record at t ---------------------------------------------------------------------------------
 
+# The axis the body is drawn along, from the recorded axis (along the velocity), throttle, radial
+# velocity and speed (the last two may be null). Reversed, so the nose is up and the plume down, only
+# when the engine burns (throttle above 0.005, the threshold below which no plume is drawn) in a
+# steep descent: radial velocity below minus half the speed, more than 30 degrees below the horizon.
+static func drawn_axis(axis: Array, thr: float, vr, sp) -> Array:
+	var rev: bool = thr > 0.005 and vr != null and sp != null and float(sp) >= 1.0 and float(vr) < -0.5 * float(sp)
+	return [-axis[0], -axis[1]] if rev else axis
+
+
 # Positions (east, north, up in metres, 64-bit), axes and throttle of every entity at t.
 func update_entities(t: float) -> void:
 	for en in ents:
@@ -257,11 +266,7 @@ func update_entities(t: float) -> void:
 		# burning upwards; the body is then drawn tail first (axis reversed, nose up, plume down), the
 		# pose of a braking burn. A burn while moving near the horizon keeps the nose forward.
 		# Illustrative: no attitude is recorded or simulated.
-		var vr = record.entity_value(e, "radial_velocity_m_s", t)
-		var sp = record.entity_value(e, "speed_m_s", t)
-		var ax: Array = en["axis"]
-		var rev: bool = en["thr"] > 0.005 and vr != null and sp != null and float(sp) >= 1.0 and float(vr) < -0.5 * float(sp)
-		en["dax"] = [-ax[0], -ax[1]] if rev else ax
+		en["dax"] = drawn_axis(en["axis"], en["thr"], record.entity_value(e, "radial_velocity_m_s", t), record.entity_value(e, "speed_m_s", t))
 
 
 func find(id: String) -> Dictionary:

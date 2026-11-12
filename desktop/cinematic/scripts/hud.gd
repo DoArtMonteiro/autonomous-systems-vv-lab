@@ -212,6 +212,14 @@ func build(root: Node, record, pack, t0: float, t1: float, profiles: Array, came
 # Presentation: hides the engineering panels (readout, verdicts, legend, playback bar) and keeps
 # the attribution line and one small permanent line saying that the picture is an illustration and
 # what the record says the outcome was, so a clip never shows a run without its result.
+static func presentation_line(record) -> String:
+	var line := "Illustrative replay of a recorded run"
+	if record != null:
+		var o: Dictionary = record.outcome()
+		line += ". Recorded outcome: %s (from the record, not re-verified here)" % str(o.get("label", o.get("code", "n/a")))
+	return line
+
+
 func set_presentation(on: bool, record = null) -> void:
 	if not on:
 		return
@@ -219,13 +227,14 @@ func set_presentation(on: bool, record = null) -> void:
 		if c != credit_line:
 			c.visible = false
 	var l := _label(10, Color(0.9, 0.92, 0.95))
-	l.text = "Illustrative replay of a recorded run"
-	if record != null:
-		var o: Dictionary = record.outcome()
-		l.text += ". Recorded outcome: %s (from the record, not re-verified here)" % str(o.get("label", o.get("code", "n/a")))
-	_anchor(l, 0, 1, 0, 1)
+	l.text = presentation_line(record)
+	# One line from the left margin to the credit line (420 px wide at the right); a label that does
+	# not fit in a narrow window is cut with an ellipsis instead of running under the credit line.
+	l.clip_text = true
+	l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_anchor(l, 0, 1, 1, 1)
 	l.offset_left = MARGIN
-	l.offset_right = MARGIN + 760
+	l.offset_right = -420 - 2 * MARGIN
 	l.offset_top = -MARGIN - 16
 	l.offset_bottom = -MARGIN
 	layer.add_child(l)

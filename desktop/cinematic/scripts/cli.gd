@@ -10,6 +10,7 @@ var run_dir := ""
 var env_dir := ""
 var pose_dump: PackedFloat64Array = PackedFloat64Array()
 var has_pose_dump := false
+var has_policy_dump := false  # headless: print the automatic profile choice and the presentation line, then exit
 var profile := "auto"
 var custom := {}
 var vram_bytes := -1
@@ -30,7 +31,7 @@ var error := ""
 
 
 static func usage() -> String:
-	return "usage: -- --run <run dir> [--env <pack dir>] [--pose-dump t1,t2,...] [--profile auto|performance|balanced|high|ultra|custom] [--custom key=value,...] [--vram-bytes N] [--camera director|follow|pad|closeup|wide|overhead|lowwide] [--t seconds] [--play] [--controls shown|hidden] [--presentation] [--entity auto|<entity id>] [--camera-pose ex,ey,ez,tx,ty,tz,fov] [--shot out.png] [--bench out.json --bench-seconds S --bench-from T --bench-to T]"
+	return "usage: -- --run <run dir> [--env <pack dir>] [--pose-dump t1,t2,...] [--profile auto|performance|balanced|high|ultra|custom] [--custom key=value,...] [--vram-bytes N] [--camera director|follow|pad|closeup|wide|overhead|lowwide] [--t seconds] [--play] [--controls shown|hidden] [--presentation] [--policy-dump] [--entity auto|<entity id>] [--camera-pose ex,ey,ez,tx,ty,tz,fov] [--shot out.png] [--bench out.json --bench-seconds S --bench-from T --bench-to T]"
 
 
 static func parse(args: PackedStringArray) -> RefCounted:
@@ -101,6 +102,8 @@ static func parse(args: PackedStringArray) -> RefCounted:
 				c.play = true
 			"--presentation":
 				c.presentation = true
+			"--policy-dump":
+				c.has_policy_dump = true
 			"--entity":
 				var ok := v.length() >= 1 and v.length() <= 32
 				for ch in v:
@@ -140,6 +143,6 @@ static func parse(args: PackedStringArray) -> RefCounted:
 				return c
 	if c.run_dir == "":
 		c.error = "--run is required"
-	elif c.env_dir == "" and not c.has_pose_dump:
-		c.error = "--env is required (except with --pose-dump)"
+	elif c.env_dir == "" and not c.has_pose_dump and not c.has_policy_dump:
+		c.error = "--env is required (except with --pose-dump or --policy-dump)"
 	return c

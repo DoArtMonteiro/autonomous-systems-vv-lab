@@ -79,6 +79,9 @@ func _ready() -> void:
 	vehicle = Node3D.new()
 	vehicle.name = "Vehicle"
 	add_child(vehicle)
+	if cli.has_policy_dump:
+		_policy_dump()
+		return
 	if cli.has_pose_dump:
 		if record.is_v2:
 			_pose_dump_ascent()
@@ -130,6 +133,19 @@ func _pose_dump() -> void:
 	get_tree().quit(0)
 
 
+# Headless check of two rules that are otherwise only visible on screen: the profile the automatic
+# choice makes for the given video memory (--vram-bytes), and the line presentation mode shows.
+func _policy_dump() -> void:
+	var vram: Dictionary = Profiles.detect_vram(cli.vram_bytes)
+	var out := {
+		"auto": Profiles.auto_pick(vram),
+		"vram_bytes": vram["bytes"],
+		"presentation_line": Hud.presentation_line(record),
+	}
+	print("POLICY " + JSON.stringify(out, "", true, true))
+	get_tree().quit(0)
+
+
 # Headless check of an ascent: for each t, every entity's activity, position (east, north, up in
 # metres, 64-bit, the pad's tangent plane) and axis from the record, and the same read back from a
 # node placed as the renderer places it (32-bit vectors; no floating origin and no ground offset).
@@ -156,6 +172,10 @@ func _pose_dump_ascent() -> void:
 				d["drawn_axis_enu"] = Frame.to_enu(n.global_transform.basis.x.normalized())
 				var thr = record.entity_value(e, "throttle", at)
 				d["throttle"] = thr
+				# The axis the renderer draws the body along (ascent.gd's own rule).
+				var thr_f: float = clampf(float(thr), 0.0, 1.0) if thr != null else 0.0
+				var dax: Array = AscentView.drawn_axis(ax, thr_f, record.entity_value(e, "radial_velocity_m_s", at), record.entity_value(e, "speed_m_s", at))
+				d["burn_axis_enu"] = [dax[0], 0.0, dax[1]]
 			list.append(d)
 		print("POSE2 " + JSON.stringify({"t": at, "entities": list}, "", true, true))
 	get_tree().quit(0)

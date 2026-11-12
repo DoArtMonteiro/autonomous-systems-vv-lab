@@ -201,6 +201,48 @@ class AscentRecord(unittest.TestCase):
                         self.assertAlmostEqual(got["position_enu"][k], ref[0][k], delta=1e-6, msg=f"t={t}")
 
 
+    def test_body_is_drawn_tail_first_only_in_a_steep_descent_burn(self):
+        # The reduced record has no descending burn, so a copy gets throttle 0.6 wherever the booster
+        # descends. The renderer's own rule (ascent.gd drawn_axis, read through --pose-dump) must reverse
+        # the axis where the engine burns more than 30 degrees below the horizon and nowhere else.
+        rec = copy.deepcopy(self.rec)
+        ch = {c["id"]: c for c in rec["channels"]}
+        vrs = ch["booster_radial_velocity_m_s"]["values"]
+        thr = ch["booster_throttle"]["values"]
+        for i, vr in enumerate(vrs):
+            thr[i] = 0.6 if vr is not None and vr < 0 else 0.0
+        with tempfile.TemporaryDirectory() as tmp:
+            os.makedirs(os.path.join(tmp, "run"))
+            with open(os.path.join(tmp, "run", "record.json"), "w", encoding="utf-8") as f:
+                json.dump(rec, f)
+            times = list(rec["timebases"]["booster"])
+            rows = dump(self.godot, os.path.join(tmp, "run"), times)
+        tms = rec["timebases"]["booster"]
+        reversed_n = 0
+        self.assertEqual(len(rows), len(times))
+        for t, row in zip(times, rows):
+            got = {e["id"]: e for e in row["entities"]}["booster"]
+            self.assertTrue(got["active"], t)
+            sp = sample_at(tms, ch["booster_speed_m_s"]["values"], t)
+            vr = sample_at(tms, vrs, t)
+            th = sample_at(tms, thr, t)
+            steep = th > 0.005 and sp >= 1.0 and vr < -0.5 * sp
+            sign = -1.0 if steep else 1.0
+            ref = reference(rec, t)["booster"][1]
+            for k in range(3):
+                self.assertAlmostEqual(got["burn_axis_enu"][k], sign * ref[k], delta=1e-8, msg=f"axis {k} at t={t}")
+            reversed_n += steep
+        self.assertGreater(reversed_n, 20)
+
+    def test_the_axis_of_a_record_without_a_burn_is_never_reversed(self):
+        times = [10.0, 100.0, 300.0, 500.0]
+        for row in dump(self.godot, RUN, times):
+            for e in row["entities"]:
+                if e["active"]:
+                    for k in range(3):
+                        self.assertAlmostEqual(e["burn_axis_enu"][k], e["axis_enu"][k], delta=1e-12)
+
+
 class MalformedAscentRecords(unittest.TestCase):
     def setUp(self):
         self.godot = os.environ.get("VV_GODOT", "")
