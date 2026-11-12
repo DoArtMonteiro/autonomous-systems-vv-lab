@@ -93,6 +93,20 @@ pub fn downrange(r: Vec2) -> f64 {
     R_EARTH * atan2(r.x, r.z)
 }
 
+/// The surface contact inside the step from `prev` (tick `tick`, at or above the surface) to `next`
+/// (tick `tick + 1`, below it): the crossing of zero altitude, by linear interpolation of the
+/// altitude, the downrange distance and the speed over the step.
+pub fn impact_between(tick: u64, prev: &Body, next: &Body) -> Impact {
+    let a0 = altitude(prev.r);
+    let f = a0 / (a0 - altitude(next.r));
+    Impact {
+        tick: tick + 1,
+        t_s: (tick as f64 + f) * DT,
+        downrange_m: downrange(prev.r) + f * (downrange(next.r) - downrange(prev.r)),
+        speed_m_s: prev.v.norm() + f * (next.v.norm() - prev.v.norm()),
+    }
+}
+
 struct Live {
     body: Body,
     fixed_mass: f64,
@@ -495,14 +509,7 @@ pub fn simulate(prep: &Prepared) -> Simulation {
             live.prev_vr = vr;
             let alt = altitude(next.r);
             if alt < 0.0 {
-                let a0 = altitude(prev.r);
-                let f = a0 / (a0 - alt);
-                let impact = Impact {
-                    tick: tick + 1,
-                    t_s: (tick as f64 + f) * DT,
-                    downrange_m: downrange(prev.r) + f * (downrange(next.r) - downrange(prev.r)),
-                    speed_m_s: prev.v.norm() + f * (next.v.norm() - prev.v.norm()),
-                };
+                let impact = impact_between(tick, &prev, &next);
                 ev.push(tick + 1, i, Source::Truth, "impact", "Surface impact", json!({ "t_s": impact.t_s, "downrange_m": impact.downrange_m, "speed_m_s": impact.speed_m_s }));
                 if i == BOOSTER {
                     booster_impact = Some(impact);
