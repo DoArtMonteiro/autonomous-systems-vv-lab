@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use vv_platform::contract::*;
 use vv_platform::host_sdk::{
-    DomainHost, HostError, OutcomeChange, RequirementChange, VerdictRules,
+    DomainHost, HostError, MetricFact, OutcomeBasis, OutcomeChange, RequirementChange, VerdictRules,
 };
 use vv_platform::seeds::check_seed;
 
@@ -43,25 +43,55 @@ pub struct Host;
 pub const VERDICT_RULES: VerdictRules = VerdictRules {
     since: "0.15.1",
     outcomes: &[
+        // Every orbit was a success before; it is partial now when a requirement fails.
         OutcomeChange {
             from: ("orbit", "success"),
             to: ("orbit", "partial"),
+            basis: OutcomeBasis::RequirementFailed,
         },
         OutcomeChange {
             from: ("suborbital", "failure"),
             to: ("low_periapsis_orbit", "failure"),
+            basis: OutcomeBasis::Facts {
+                stored: &[("upper.R4_periapsis", "fail")],
+                fresh: &[
+                    ("periapsis_km", MetricFact::AtLeast(0.0)),
+                    ("apoapsis_km", MetricFact::Present),
+                ],
+            },
         },
         OutcomeChange {
             from: ("suborbital", "failure"),
             to: ("seco_not_reached", "failure"),
+            basis: OutcomeBasis::Facts {
+                stored: &[("upper.R4_periapsis", "not_evaluated")],
+                fresh: &[("periapsis_km", MetricFact::Absent)],
+            },
         },
         OutcomeChange {
             from: ("suborbital", "failure"),
             to: ("unbound", "failure"),
+            basis: OutcomeBasis::Facts {
+                stored: &[("upper.R4_periapsis", "fail")],
+                fresh: &[
+                    ("periapsis_km", MetricFact::Present),
+                    ("apoapsis_km", MetricFact::Absent),
+                ],
+            },
         },
         OutcomeChange {
             from: ("off_target_orbit", "partial"),
             to: ("unbound", "failure"),
+            basis: OutcomeBasis::Facts {
+                stored: &[
+                    ("upper.R4_periapsis", "pass"),
+                    ("upper.R5_apoapsis", "fail"),
+                ],
+                fresh: &[
+                    ("periapsis_km", MetricFact::Present),
+                    ("apoapsis_km", MetricFact::Absent),
+                ],
+            },
         },
     ],
     requirements: &[RequirementChange {
@@ -69,12 +99,12 @@ pub const VERDICT_RULES: VerdictRules = VerdictRules {
         from: "pass",
         to: "fail",
         reason: "the minimum residual propellant is 1 % of the upper-stage load, it was 0",
+        observed_metric: "requirement_observed.upper.R6_propellant_margin",
+        limit_metric: "requirement_limit.upper.R6_propellant_margin",
+        margin_metric: "requirement_margin.upper.R6_propellant_margin",
+        old_limit: 0.0,
     }],
     retimed: &["mission.R8_orbit_insertion"],
-    derived_metrics: &[
-        "requirement_limit.upper.R6_propellant_margin",
-        "requirement_margin.upper.R6_propellant_margin",
-    ],
     summary: "Outcome codes, the upper-stage propellant minimum and the instant of the orbit-insertion requirement changed in 0.15.1; timebases, channels, other metrics and the other events still agree.",
 };
 static SCRATCH: AtomicU64 = AtomicU64::new(0);

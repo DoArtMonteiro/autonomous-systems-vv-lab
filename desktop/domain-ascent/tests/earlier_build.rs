@@ -181,3 +181,109 @@ fn a_suborbital_run_of_the_older_build_verifies_as_the_orbit_below_the_minimum_p
         let _ = fs::remove_dir_all(d);
     }
 }
+
+fn replace_in_file(path: &Path, from: &str, to: &str) {
+    let text = fs::read_to_string(path).unwrap();
+    assert!(text.contains(from), "{from} in {}", path.display());
+    fs::write(path, text.replacen(from, to, 1)).unwrap();
+}
+
+/// Replaces the first rom after the first nchor.
+fn replace_after(path: &Path, anchor: &str, from: &str, to: &str) {
+    let text = fs::read_to_string(path).unwrap();
+    let at = text.find(anchor).unwrap_or_else(|| panic!("{anchor}"));
+    let rel = text[at..].find(from).unwrap_or_else(|| panic!("{from}"));
+    let mut out = text.clone();
+    out.replace_range(at + rel..at + rel + from.len(), to);
+    fs::write(path, out).unwrap();
+}
+
+/// The stored native `verification.json` edited, with its hash and size in `record.json` rewritten
+/// so the integrity check passes and only the comparison with the recomputation can reject.
+fn edit_native_verification(dir: &Path, from: &str, to: &str) {
+    use vv_platform::canonical::sha256_hex;
+    let path = dir.join("verification.json");
+    let old = fs::read(&path).unwrap();
+    replace_in_file(&path, from, to);
+    let new = fs::read(&path).unwrap();
+    let record = dir.join("record.json");
+    replace_in_file(&record, &sha256_hex(&old), &sha256_hex(&new));
+    if old.len() != new.len() {
+        replace_in_file(
+            &record,
+            &format!("\"bytes\": {},", old.len()),
+            &format!("\"bytes\": {},", new.len()),
+        );
+    }
+}
+
+#[test]
+fn forged_verdicts_flags_and_events_of_an_older_run_are_still_rejected() {
+    // A forged overall flag: the stored low-periapsis run says every requirement passed. The change
+    // table has no requirement change for this run, so the flag is not accepted.
+    let flag = copy_fixture(SMALL);
+    edit_native_verification(
+        &flag,
+        "\"requirements_pass\": false",
+        "\"requirements_pass\": true",
+    );
+    let r = replay_earlier_build(&Host, &flag);
+    assert_eq!(r.status, "rejected");
+    assert!(
+        r.checks
+            .iter()
+            .any(|c| c.pass && c.name == "stored artifacts match the hashes in record.json"),
+        "the forgery must reach the comparison, not the hash check"
+    );
+    assert!(
+        failed(&r).iter().any(|f| f.contains("requirements_pass")),
+        "{:?}",
+        failed(&r)
+    );
+
+    // A forged verdict of a requirement the table does change (R6 on the medium run) is accepted
+    // only in the declared direction: pass stored, fail recomputed. Another stored status is not.
+    let status = copy_fixture(MEDIUM);
+    replace_after(
+        &status.join("record.json"),
+        "\"id\": \"upper.R6_propellant_margin\"",
+        "\"status\": \"pass\"",
+        "\"status\": \"not_evaluated\"",
+    );
+    let r = replay_earlier_build(&Host, &status);
+    assert_eq!(r.status, "rejected");
+    assert!(
+        failed(&r)
+            .iter()
+            .any(|f| f.contains("upper.R6_propellant_margin")),
+        "{:?}",
+        failed(&r)
+    );
+
+    // A forged violation event of R6 (the stored run passed it) is not reproduced; a forged R8
+    // violation at tick 0 has no recomputed one to move to. The events are inserted as text so
+    // nothing else of the record changes.
+    for id in ["upper.R6_propellant_margin", "mission.R8_orbit_insertion"] {
+        let forged = copy_fixture(MEDIUM);
+        replace_in_file(
+            &forged.join("record.json"),
+            "\n  \"events\": [",
+            &format!(
+                "\n  \"events\": [ {{ \"t\": 0.0, \"kind\": \"violation\", \"label\": \"forged\", \"severity\": \"violation\", \"source\": \"verifier\", \"detail\": {{ \"id\": \"{id}\", \"category\": \"requirement\" }} }},"
+            ),
+        );
+        let r = replay_earlier_build(&Host, &forged);
+        assert_eq!(r.status, "rejected", "{id}");
+        assert!(
+            failed(&r)
+                .iter()
+                .any(|f| f.contains("event violation at 0")),
+            "{id}: {:?}",
+            failed(&r)
+        );
+        let _ = fs::remove_dir_all(forged);
+    }
+    for d in [flag, status] {
+        let _ = fs::remove_dir_all(d);
+    }
+}
