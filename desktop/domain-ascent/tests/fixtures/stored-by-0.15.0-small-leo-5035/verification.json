@@ -1,0 +1,598 @@
+{
+  "schema": "vv-ascent-verification.v1",
+  "outcome": "suborbital",
+  "requirements_pass": false,
+  "invariants_pass": true,
+  "verdicts": [
+    {
+      "id": "stack.S1_max_dynamic_pressure",
+      "entity": "stack",
+      "label": "Maximum dynamic pressure",
+      "category": "invariant",
+      "status": "pass",
+      "expected": "at most 45000 Pa at every tick of the stack",
+      "observed": "worst 34575.5804 Pa at tick 3358",
+      "tick": 3358,
+      "state": {
+        "tick": 3358,
+        "t_s": 67.16,
+        "altitude_m": 12040.71295395121,
+        "downrange_m": 3276.493183858493,
+        "speed_m_s": 482.42808927204123,
+        "radial_velocity_m_s": 438.7413251619691,
+        "mass_kg": 24021.15585647423,
+        "propellant_kg": 15509.88305898524,
+        "throttle": 1.0,
+        "dynamic_pressure_pa": 34575.58036423745,
+        "sensed_acceleration_g": 2.176945774541451
+      },
+      "cause": []
+    },
+    {
+      "id": "stack.S2_axial_acceleration",
+      "entity": "stack",
+      "label": "Maximum sensed acceleration",
+      "category": "invariant",
+      "status": "pass",
+      "expected": "at most 6 g at every tick of the stack",
+      "observed": "worst 5.3248 g at tick 7534",
+      "tick": 7534,
+      "state": {
+        "tick": 7534,
+        "t_s": 150.68,
+        "altitude_m": 98170.1138348952,
+        "downrange_m": 81139.92150600892,
+        "speed_m_s": 2854.691206546579,
+        "radial_velocity_m_s": 1887.6651271818976,
+        "mass_kg": 8827.843646224443,
+        "propellant_kg": 316.5708487354529,
+        "throttle": 0.8154170860302816,
+        "dynamic_pressure_pa": 48.12522275226173,
+        "sensed_acceleration_g": 5.324832326983166
+      },
+      "cause": []
+    },
+    {
+      "id": "upper.S2_axial_acceleration",
+      "entity": "upper",
+      "label": "Maximum sensed acceleration",
+      "category": "invariant",
+      "status": "pass",
+      "expected": "at most 6 g at every tick of the upper",
+      "observed": "worst 4.4714 g at tick 21713",
+      "tick": 21713,
+      "state": {
+        "tick": 21713,
+        "t_s": 434.26,
+        "altitude_m": 299944.7585771391,
+        "downrange_m": 1158441.5930775919,
+        "speed_m_s": 7152.439680247541,
+        "radial_velocity_m_s": 11.198047257829558,
+        "mass_kg": 1223.478588841493,
+        "propellant_kg": 324.0653127707445,
+        "throttle": 0.9998630213909475,
+        "dynamic_pressure_pa": 1.481823367090783e-8,
+        "sensed_acceleration_g": 4.471361160269791
+      },
+      "cause": []
+    },
+    {
+      "id": "stack.R1_separation_window",
+      "entity": "stack",
+      "label": "Separation window",
+      "category": "requirement",
+      "status": "pass",
+      "expected": "altitude in 40 to 120 km and speed in 1500 to 3500 m/s at separation",
+      "observed": "altitude 101.97 km, speed 2843.0 m/s",
+      "tick": 7635,
+      "state": {
+        "tick": 7635,
+        "t_s": 152.70000000000002,
+        "altitude_m": 101966.600894548,
+        "downrange_m": 85399.12784467047,
+        "speed_m_s": 2843.0429191341896,
+        "radial_velocity_m_s": 1870.5528643287862,
+        "mass_kg": 8824.832809784037,
+        "propellant_kg": 313.56001229504756,
+        "throttle": 0.0,
+        "dynamic_pressure_pa": 30.53835351365435,
+        "sensed_acceleration_g": 0.00040333386379878545
+      },
+      "cause": []
+    },
+    {
+      "id": "booster.R2_propellant_margin",
+      "entity": "booster",
+      "label": "Booster propellant margin",
+      "category": "requirement",
+      "status": "fail",
+      "expected": "true residual at MECO at least 540.0 kg (recovery minimum), no depletion before MECO",
+      "observed": "residual 313.6 kg, margin -226.4 kg",
+      "tick": 7535,
+      "state": {
+        "tick": 7535,
+        "t_s": 150.70000000000002,
+        "altitude_m": 98207.87228095718,
+        "downrange_m": 81182.10884421233,
+        "speed_m_s": 2855.609803000943,
+        "radial_velocity_m_s": 1888.179521249918,
+        "mass_kg": 8824.832809784037,
+        "propellant_kg": 313.56001229504756,
+        "throttle": 0.0,
+        "dynamic_pressure_pa": 47.94275606890201,
+        "sensed_acceleration_g": 0.0006332016897304879
+      },
+      "cause": [
+        "true propellant 313.6 kg below the minimum: dispersions of thrust, Isp or loaded propellant against the nominal flow estimate of the flight software"
+      ]
+    },
+    {
+      "id": "booster.R3_recovery_zone",
+      "entity": "booster",
+      "label": "Booster impact in the recovery zone",
+      "category": "requirement",
+      "status": "pass",
+      "expected": "impact downrange in 850 to 1150 km",
+      "observed": "impact at 1082.23 km downrange, 336.2 m/s, t = 661.56 s",
+      "tick": 33078,
+      "state": {
+        "tick": 33078,
+        "t_s": 661.5600000000001,
+        "altitude_m": -0.5012055179104209,
+        "downrange_m": 1082226.3799240864,
+        "speed_m_s": 336.19423394640364,
+        "radial_velocity_m_s": -285.1309367742051,
+        "mass_kg": 3122.0458726799548,
+        "propellant_kg": 313.56001229504756,
+        "throttle": 0.0,
+        "dynamic_pressure_pa": 69228.76980002063,
+        "sensed_acceleration_g": 2.5844782944520746
+      },
+      "cause": []
+    },
+    {
+      "id": "upper.R4_periapsis",
+      "entity": "upper",
+      "label": "Periapsis altitude",
+      "category": "requirement",
+      "status": "fail",
+      "expected": "periapsis at least 180 km at SECO",
+      "observed": "periapsis 28.91 km, eccentricity 0.02074",
+      "tick": 22285,
+      "state": {
+        "tick": 22285,
+        "t_s": 445.7,
+        "altitude_m": 300000.02353557944,
+        "downrange_m": 1239309.0031316464,
+        "speed_m_s": 7649.312136214608,
+        "radial_velocity_m_s": 0.30979248644939616,
+        "mass_kg": 1053.552729368391,
+        "propellant_kg": 154.13945329764246,
+        "throttle": 0.0,
+        "dynamic_pressure_pa": 1.683872168210008e-8,
+        "sensed_acceleration_g": 1.6558686147204049e-12
+      },
+      "cause": [
+        "true speed 7649.3 m/s and radial velocity 0.3 m/s at SECO give a periapsis 151.1 km below the minimum"
+      ]
+    },
+    {
+      "id": "upper.R5_apoapsis",
+      "entity": "upper",
+      "label": "Apoapsis on target",
+      "category": "requirement",
+      "status": "pass",
+      "expected": "apoapsis within 15 km of 300 km at SECO",
+      "observed": "apoapsis 300.00 km, error +0.00 km",
+      "tick": 22285,
+      "state": {
+        "tick": 22285,
+        "t_s": 445.7,
+        "altitude_m": 300000.02353557944,
+        "downrange_m": 1239309.0031316464,
+        "speed_m_s": 7649.312136214608,
+        "radial_velocity_m_s": 0.30979248644939616,
+        "mass_kg": 1053.552729368391,
+        "propellant_kg": 154.13945329764246,
+        "throttle": 0.0,
+        "dynamic_pressure_pa": 1.683872168210008e-8,
+        "sensed_acceleration_g": 1.6558686147204049e-12
+      },
+      "cause": []
+    },
+    {
+      "id": "upper.R6_propellant_margin",
+      "entity": "upper",
+      "label": "Upper-stage propellant margin",
+      "category": "requirement",
+      "status": "fail",
+      "expected": "SECO on the energy criterion with true residual at least 0.0 kg",
+      "observed": "residual 154.1 kg, margin 154.1 kg, SECO reason: estimated propellant reserve reached before the target energy",
+      "tick": 22285,
+      "state": {
+        "tick": 22285,
+        "t_s": 445.7,
+        "altitude_m": 300000.02353557944,
+        "downrange_m": 1239309.0031316464,
+        "speed_m_s": 7649.312136214608,
+        "radial_velocity_m_s": 0.30979248644939616,
+        "mass_kg": 1053.552729368391,
+        "propellant_kg": 154.13945329764246,
+        "throttle": 0.0,
+        "dynamic_pressure_pa": 1.683872168210008e-8,
+        "sensed_acceleration_g": 1.6558686147204049e-12
+      },
+      "cause": [
+        "SECO reason: estimated propellant reserve reached before the target energy"
+      ]
+    },
+    {
+      "id": "mission.R7_phase_sequence",
+      "entity": "mission",
+      "label": "Phase sequence",
+      "category": "requirement",
+      "status": "pass",
+      "expected": "ignition, liftoff, pitch kick, gravity turn, MECO, separation, upper ignition, SECO, in this order",
+      "observed": "all phases in order",
+      "tick": 22285,
+      "state": null,
+      "cause": []
+    },
+    {
+      "id": "mission.R8_orbit_insertion",
+      "entity": "mission",
+      "label": "Orbit insertion",
+      "category": "requirement",
+      "status": "fail",
+      "expected": "upper stage in orbit: periapsis and apoapsis requirements met, no surface contact; target 300 km",
+      "observed": "periapsis 28.91 km, apoapsis 300.00 km",
+      "tick": 22285,
+      "state": null,
+      "cause": [
+        "upper.R4_periapsis not met"
+      ]
+    }
+  ],
+  "max_q": {
+    "tick": 3358,
+    "t_s": 67.16,
+    "altitude_m": 12040.71295395121,
+    "downrange_m": 3276.493183858493,
+    "speed_m_s": 482.42808927204123,
+    "radial_velocity_m_s": 438.7413251619691,
+    "mass_kg": 24021.15585647423,
+    "propellant_kg": 15509.88305898524,
+    "throttle": 1.0,
+    "dynamic_pressure_pa": 34575.58036423745,
+    "sensed_acceleration_g": 2.176945774541451
+  },
+  "booster_max_q": {
+    "tick": 31999,
+    "t_s": 639.98,
+    "altitude_m": 13661.754045030102,
+    "downrange_m": 1070569.428196248,
+    "speed_m_s": 1860.8432469754705,
+    "radial_velocity_m_s": -1354.7727243542777,
+    "mass_kg": 3122.0458726799548,
+    "propellant_kg": 313.56001229504756,
+    "throttle": 0.0,
+    "dynamic_pressure_pa": 425107.9972443708,
+    "sensed_acceleration_g": 15.870315113930296
+  },
+  "insertion": {
+    "tick": 22285,
+    "elements": {
+      "energy_j_kg": -30495239.68239333,
+      "angular_momentum_m2_s": 51028561398.8701,
+      "semi_major_axis_m": 6535453.499487252,
+      "eccentricity": 0.02074022596441076,
+      "periapsis_alt_m": 28906.717127987184,
+      "apoapsis_alt_m": 300000.28184651677
+    },
+    "end_of_coast": {
+      "energy_j_kg": -30495239.682928883,
+      "angular_momentum_m2_s": 51028561398.406204,
+      "semi_major_axis_m": 6535453.499372478,
+      "eccentricity": 0.020740225979353644,
+      "periapsis_alt_m": 28906.716917933896,
+      "apoapsis_alt_m": 300000.28182702046
+    }
+  },
+  "events": [
+    {
+      "tick": 0,
+      "entity": 0,
+      "source": "controller",
+      "seq": 0,
+      "kind": "prelaunch_hold",
+      "label": "Prelaunch hold and checks",
+      "detail": {
+        "hold_s": 5.0
+      }
+    },
+    {
+      "tick": 0,
+      "entity": 0,
+      "source": "controller",
+      "seq": 1,
+      "kind": "prelaunch_checks_passed",
+      "label": "Prelaunch checks passed; hold continues",
+      "detail": {
+        "altitude_m": 0.0,
+        "downrange_m": 0.0,
+        "mass_kg": 35497.09843493682,
+        "speed_m_s": 0.0
+      }
+    },
+    {
+      "tick": 250,
+      "entity": 0,
+      "source": "controller",
+      "seq": 2,
+      "kind": "ignition",
+      "label": "First-stage ignition commanded",
+      "detail": {
+        "altitude_m": 0.0,
+        "downrange_m": 0.0,
+        "mass_kg": 35497.09843493682,
+        "speed_m_s": 0.0
+      }
+    },
+    {
+      "tick": 251,
+      "entity": 0,
+      "source": "truth",
+      "seq": 3,
+      "kind": "liftoff",
+      "label": "Liftoff: thrust exceeds weight",
+      "detail": {
+        "thrust_n": 511549.8511017855,
+        "weight_n": 348590.39819504454
+      }
+    },
+    {
+      "tick": 650,
+      "entity": 0,
+      "source": "controller",
+      "seq": 4,
+      "kind": "pitch_kick_start",
+      "label": "Pitch kick starts",
+      "detail": {
+        "altitude_m": 153.430253890343,
+        "downrange_m": -0.000022495772749311612,
+        "mass_kg": 34020.1431481334,
+        "speed_m_s": 39.18890185196274
+      }
+    },
+    {
+      "tick": 850,
+      "entity": 0,
+      "source": "controller",
+      "seq": 5,
+      "kind": "pitch_kick_end",
+      "label": "Pitch kick complete; tilt held",
+      "detail": {
+        "altitude_m": 352.7486691568047,
+        "downrange_m": 1.758741948966932,
+        "mass_kg": 33281.66550473169,
+        "speed_m_s": 60.694052479284295
+      }
+    },
+    {
+      "tick": 950,
+      "entity": 0,
+      "source": "controller",
+      "seq": 6,
+      "kind": "gravity_turn_start",
+      "label": "Gravity turn: thrust along the observed velocity",
+      "detail": {
+        "altitude_m": 485.27517191134393,
+        "downrange_m": 5.760467552715398,
+        "mass_kg": 32912.42668303083,
+        "speed_m_s": 71.95279466615226
+      }
+    },
+    {
+      "tick": 3358,
+      "entity": 0,
+      "source": "verifier",
+      "seq": 16,
+      "kind": "max_q",
+      "label": "Maximum dynamic pressure (max-Q) of the ascent",
+      "detail": {
+        "altitude_m": 12040.71295395121,
+        "q_pa": 34575.58036423745
+      }
+    },
+    {
+      "tick": 7535,
+      "entity": 0,
+      "source": "controller",
+      "seq": 7,
+      "kind": "meco",
+      "label": "Main engine cutoff (MECO) commanded",
+      "detail": {
+        "altitude_m": 98207.87228095718,
+        "downrange_m": 81182.10884421233,
+        "mass_kg": 8824.832809784037,
+        "propellant_est_kg": 809.7680632889168,
+        "speed_m_s": 2855.609803000943
+      }
+    },
+    {
+      "tick": 7535,
+      "entity": 1,
+      "source": "verifier",
+      "seq": 18,
+      "kind": "violation",
+      "label": "Booster propellant margin not met",
+      "detail": {
+        "category": "requirement",
+        "id": "booster.R2_propellant_margin"
+      }
+    },
+    {
+      "tick": 7635,
+      "entity": 0,
+      "source": "controller",
+      "seq": 8,
+      "kind": "separation",
+      "label": "Stage separation commanded",
+      "detail": {
+        "altitude_m": 101966.600894548,
+        "downrange_m": 85399.12784467047,
+        "mass_kg": 8824.832809784037,
+        "speed_m_s": 2843.0429191341896
+      }
+    },
+    {
+      "tick": 7635,
+      "entity": 1,
+      "source": "truth",
+      "seq": 9,
+      "kind": "entity_start",
+      "label": "Booster flies on its own",
+      "detail": {
+        "altitude_m": 101966.600894548,
+        "downrange_m": 85399.12784467047,
+        "mass_kg": 3122.0458726799548,
+        "speed_m_s": 2843.0429191341896
+      }
+    },
+    {
+      "tick": 7635,
+      "entity": 2,
+      "source": "truth",
+      "seq": 10,
+      "kind": "entity_start",
+      "label": "Upper stage flies on its own",
+      "detail": {
+        "altitude_m": 101966.600894548,
+        "downrange_m": 85399.12784467047,
+        "mass_kg": 5702.786937104084,
+        "speed_m_s": 2843.0429191341896
+      }
+    },
+    {
+      "tick": 7835,
+      "entity": 2,
+      "source": "controller",
+      "seq": 11,
+      "kind": "upper_ignition",
+      "label": "Upper-stage ignition commanded",
+      "detail": {
+        "altitude_m": 109378.40143104829,
+        "downrange_m": 93818.56669272279,
+        "mass_kg": 5702.786937104084,
+        "speed_m_s": 2818.1468159933856
+      }
+    },
+    {
+      "tick": 18690,
+      "entity": 1,
+      "source": "truth",
+      "seq": 12,
+      "kind": "apogee",
+      "label": "Apogee of the trajectory",
+      "detail": {
+        "altitude_m": 306679.4045841098,
+        "downrange_m": 532346.7602993137,
+        "mass_kg": 3122.0458726799548,
+        "speed_m_s": 2075.3373331365424
+      }
+    },
+    {
+      "tick": 22285,
+      "entity": 0,
+      "source": "verifier",
+      "seq": 21,
+      "kind": "violation",
+      "label": "Orbit insertion not met",
+      "detail": {
+        "category": "requirement",
+        "id": "mission.R8_orbit_insertion"
+      }
+    },
+    {
+      "tick": 22285,
+      "entity": 2,
+      "source": "controller",
+      "seq": 13,
+      "kind": "seco",
+      "label": "Second engine cutoff (SECO) commanded",
+      "detail": {
+        "altitude_m": 300000.02353557944,
+        "downrange_m": 1239309.0031316464,
+        "energy_obs_j_kg": -30495801.537134077,
+        "mass_kg": 1053.552729368391,
+        "reason": "estimated propellant reserve reached before the target energy",
+        "speed_m_s": 7649.312136214608
+      }
+    },
+    {
+      "tick": 22285,
+      "entity": 2,
+      "source": "verifier",
+      "seq": 17,
+      "kind": "orbit_insertion_evaluation",
+      "label": "Orbit insertion evaluated on the true state at SECO",
+      "detail": {
+        "apoapsis_alt_m": 300000.28184651677,
+        "eccentricity": 0.02074022596441076,
+        "periapsis_alt_m": 28906.717127987184
+      }
+    },
+    {
+      "tick": 22285,
+      "entity": 2,
+      "source": "verifier",
+      "seq": 19,
+      "kind": "violation",
+      "label": "Periapsis altitude not met",
+      "detail": {
+        "category": "requirement",
+        "id": "upper.R4_periapsis"
+      }
+    },
+    {
+      "tick": 22285,
+      "entity": 2,
+      "source": "verifier",
+      "seq": 20,
+      "kind": "violation",
+      "label": "Upper-stage propellant margin not met",
+      "detail": {
+        "category": "requirement",
+        "id": "upper.R6_propellant_margin"
+      }
+    },
+    {
+      "tick": 22369,
+      "entity": 2,
+      "source": "truth",
+      "seq": 14,
+      "kind": "apogee",
+      "label": "Apogee of the trajectory",
+      "detail": {
+        "altitude_m": 300000.2818323318,
+        "downrange_m": 1251581.934476689,
+        "mass_kg": 1053.552729368391,
+        "speed_m_s": 7649.311833765384
+      }
+    },
+    {
+      "tick": 33078,
+      "entity": 1,
+      "source": "truth",
+      "seq": 15,
+      "kind": "impact",
+      "label": "Surface impact",
+      "detail": {
+        "downrange_m": 1082226.066714867,
+        "speed_m_s": 336.22416701525975,
+        "t_s": 661.5582429120795
+      }
+    }
+  ],
+  "disclaimer": "exploratory planar point-mass model; not a real vehicle; not validated against flight data"
+}

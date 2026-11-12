@@ -1,0 +1,977 @@
+{
+  "schema": "vv-ascent-verification.v1",
+  "outcome": "orbit",
+  "requirements_pass": true,
+  "invariants_pass": true,
+  "verdicts": [
+    {
+      "id": "stack.S1_max_dynamic_pressure",
+      "entity": "stack",
+      "label": "Maximum dynamic pressure",
+      "category": "invariant",
+      "status": "pass",
+      "expected": "at most 40000 Pa at every tick of the stack",
+      "observed": "worst 32818.2775 Pa at tick 3322",
+      "tick": 3322,
+      "state": {
+        "tick": 3322,
+        "t_s": 66.44,
+        "altitude_m": 10431.622005250305,
+        "downrange_m": 3019.9314370292195,
+        "speed_m_s": 427.56162610261816,
+        "radial_velocity_m_s": 381.2073204822437,
+        "mass_kg": 212083.6224114063,
+        "propellant_kg": 138103.8100367675,
+        "throttle": 0.8985955242648234,
+        "dynamic_pressure_pa": 32818.27753158632,
+        "sensed_acceleration_g": 1.8664118872039963
+      },
+      "cause": []
+    },
+    {
+      "id": "stack.S2_axial_acceleration",
+      "entity": "stack",
+      "label": "Maximum sensed acceleration",
+      "category": "invariant",
+      "status": "pass",
+      "expected": "at most 5.5 g at every tick of the stack",
+      "observed": "worst 4.2613 g at tick 6713",
+      "tick": 6713,
+      "state": {
+        "tick": 6713,
+        "t_s": 134.26,
+        "altitude_m": 57888.20963142812,
+        "downrange_m": 52278.37815524494,
+        "speed_m_s": 1895.1362338760475,
+        "radial_velocity_m_s": 1097.9127331258328,
+        "mass_kg": 110301.23653865929,
+        "propellant_kg": 36321.424164020485,
+        "throttle": 0.9997273390391114,
+        "dynamic_pressure_pa": 2424.809084083106,
+        "sensed_acceleration_g": 4.261338687726653
+      },
+      "cause": []
+    },
+    {
+      "id": "upper.S2_axial_acceleration",
+      "entity": "upper",
+      "label": "Maximum sensed acceleration",
+      "category": "invariant",
+      "status": "pass",
+      "expected": "at most 5.5 g at every tick of the upper",
+      "observed": "worst 4.8196 g at tick 21538",
+      "tick": 21538,
+      "state": {
+        "tick": 21538,
+        "t_s": 430.76,
+        "altitude_m": 400002.0039706379,
+        "downrange_m": 1062894.1880593796,
+        "speed_m_s": 7642.163472253581,
+        "radial_velocity_m_s": -0.24222741486687482,
+        "mass_kg": 7419.844529076221,
+        "propellant_kg": 397.57448110761675,
+        "throttle": 0.5803451934695483,
+        "dynamic_pressure_pa": 1.3063181659597212e-13,
+        "sensed_acceleration_g": 4.81955724566673
+      },
+      "cause": []
+    },
+    {
+      "id": "stack.R1_separation_window",
+      "entity": "stack",
+      "label": "Separation window",
+      "category": "requirement",
+      "status": "pass",
+      "expected": "altitude in 50 to 130 km and speed in 1800 to 3500 m/s at separation",
+      "observed": "altitude 77.61 km, speed 2362.3 m/s",
+      "tick": 7529,
+      "state": {
+        "tick": 7529,
+        "t_s": 150.58,
+        "altitude_m": 77610.10508947726,
+        "downrange_m": 81560.20232238206,
+        "speed_m_s": 2362.329621863087,
+        "radial_velocity_m_s": 1259.595561721587,
+        "mass_kg": 91932.7448587069,
+        "propellant_kg": 17952.932484068097,
+        "throttle": 0.0,
+        "dynamic_pressure_pa": 370.1839864606041,
+        "sensed_acceleration_g": 0.001986313083682411
+      },
+      "cause": []
+    },
+    {
+      "id": "booster.R2_propellant_margin",
+      "entity": "booster",
+      "label": "Booster propellant margin",
+      "category": "requirement",
+      "status": "pass",
+      "expected": "true residual at MECO at least 9200.0 kg (recovery minimum), no depletion before MECO",
+      "observed": "residual 17952.9 kg, margin 8752.9 kg",
+      "tick": 7379,
+      "state": {
+        "tick": 7379,
+        "t_s": 147.58,
+        "altitude_m": 73790.90133953281,
+        "downrange_m": 75633.2622142547,
+        "speed_m_s": 2377.858912767759,
+        "radial_velocity_m_s": 1286.5485444237656,
+        "mass_kg": 91932.7448587069,
+        "propellant_kg": 17952.932484068097,
+        "throttle": 0.0,
+        "dynamic_pressure_pa": 587.8210962183771,
+        "sensed_acceleration_g": 0.0031540984402018643
+      },
+      "cause": []
+    },
+    {
+      "id": "booster.R3_recovery_zone",
+      "entity": "booster",
+      "label": "Booster impact in the recovery zone",
+      "category": "requirement",
+      "status": "pass",
+      "expected": "impact downrange in 650 to 900 km",
+      "observed": "impact at 738.72 km downrange, 986.1 m/s, t = 494.95 s",
+      "tick": 24748,
+      "state": {
+        "tick": 24748,
+        "t_s": 494.96000000000004,
+        "altitude_m": -4.764904331415892,
+        "downrange_m": 738726.0348622092,
+        "speed_m_s": 985.5508765858087,
+        "radial_velocity_m_s": -677.8863142975804,
+        "mass_kg": 36959.13854345484,
+        "propellant_kg": 17952.932484068097,
+        "throttle": 0.0,
+        "dynamic_pressure_pa": 594927.6998326719,
+        "sensed_acceleration_g": 7.9404049717527885
+      },
+      "cause": []
+    },
+    {
+      "id": "upper.R4_periapsis",
+      "entity": "upper",
+      "label": "Periapsis altitude",
+      "category": "requirement",
+      "status": "pass",
+      "expected": "periapsis at least 250 km at SECO",
+      "observed": "periapsis 399.60 km, eccentricity 0.00004",
+      "tick": 21575,
+      "state": {
+        "tick": 21575,
+        "t_s": 431.5,
+        "altitude_m": 400001.7326633716,
+        "downrange_m": 1068225.9098726143,
+        "speed_m_s": 7672.540618960073,
+        "radial_velocity_m_s": -0.3232238538166712,
+        "mass_kg": 7353.321559968293,
+        "propellant_kg": 331.0515119996883,
+        "throttle": 0.0,
+        "dynamic_pressure_pa": 1.316765909030873e-13,
+        "sensed_acceleration_g": 7.851864495923283e-18
+      },
+      "cause": []
+    },
+    {
+      "id": "upper.R5_apoapsis",
+      "entity": "upper",
+      "label": "Apoapsis on target",
+      "category": "requirement",
+      "status": "pass",
+      "expected": "apoapsis within 15 km of 400 km at SECO",
+      "observed": "apoapsis 400.20 km, error +0.20 km",
+      "tick": 21575,
+      "state": {
+        "tick": 21575,
+        "t_s": 431.5,
+        "altitude_m": 400001.7326633716,
+        "downrange_m": 1068225.9098726143,
+        "speed_m_s": 7672.540618960073,
+        "radial_velocity_m_s": -0.3232238538166712,
+        "mass_kg": 7353.321559968293,
+        "propellant_kg": 331.0515119996883,
+        "throttle": 0.0,
+        "dynamic_pressure_pa": 1.316765909030873e-13,
+        "sensed_acceleration_g": 7.851864495923283e-18
+      },
+      "cause": []
+    },
+    {
+      "id": "upper.R6_propellant_margin",
+      "entity": "upper",
+      "label": "Upper-stage propellant margin",
+      "category": "requirement",
+      "status": "pass",
+      "expected": "SECO on the energy criterion with true residual at least 0.0 kg",
+      "observed": "residual 331.1 kg, margin 331.1 kg, SECO reason: target energy reached",
+      "tick": 21575,
+      "state": {
+        "tick": 21575,
+        "t_s": 431.5,
+        "altitude_m": 400001.7326633716,
+        "downrange_m": 1068225.9098726143,
+        "speed_m_s": 7672.540618960073,
+        "radial_velocity_m_s": -0.3232238538166712,
+        "mass_kg": 7353.321559968293,
+        "propellant_kg": 331.0515119996883,
+        "throttle": 0.0,
+        "dynamic_pressure_pa": 1.316765909030873e-13,
+        "sensed_acceleration_g": 7.851864495923283e-18
+      },
+      "cause": []
+    },
+    {
+      "id": "mission.R7_phase_sequence",
+      "entity": "mission",
+      "label": "Phase sequence",
+      "category": "requirement",
+      "status": "pass",
+      "expected": "ignition, liftoff, pitch kick, gravity turn, MECO, separation, upper ignition, SECO, in this order",
+      "observed": "all phases in order",
+      "tick": 21575,
+      "state": null,
+      "cause": []
+    },
+    {
+      "id": "mission.R8_orbit_insertion",
+      "entity": "mission",
+      "label": "Orbit insertion",
+      "category": "requirement",
+      "status": "pass",
+      "expected": "upper stage in orbit: periapsis and apoapsis requirements met, no surface contact; target 400 km",
+      "observed": "periapsis 399.60 km, apoapsis 400.20 km",
+      "tick": 21575,
+      "state": null,
+      "cause": []
+    }
+  ],
+  "max_q": {
+    "tick": 3322,
+    "t_s": 66.44,
+    "altitude_m": 10431.622005250305,
+    "downrange_m": 3019.9314370292195,
+    "speed_m_s": 427.56162610261816,
+    "radial_velocity_m_s": 381.2073204822437,
+    "mass_kg": 212083.6224114063,
+    "propellant_kg": 138103.8100367675,
+    "throttle": 0.8985955242648234,
+    "dynamic_pressure_pa": 32818.27753158632,
+    "sensed_acceleration_g": 1.8664118872039963
+  },
+  "booster_max_q": {
+    "tick": 24416,
+    "t_s": 488.32,
+    "altitude_m": 5593.266604533419,
+    "downrange_m": 732556.1407003582,
+    "speed_m_s": 1550.2220083528682,
+    "radial_velocity_m_s": -1022.698425320996,
+    "mass_kg": 36959.13854345484,
+    "propellant_kg": 17952.932484068097,
+    "throttle": 0.0,
+    "dynamic_pressure_pa": 762279.9532412678,
+    "sensed_acceleration_g": 10.174028763977285
+  },
+  "insertion": {
+    "tick": 21575,
+    "elements": {
+      "energy_j_kg": -29434815.18019792,
+      "angular_momentum_m2_s": 51950785778.809845,
+      "semi_major_axis_m": 6770901.046257559,
+      "eccentricity": 0.000044674877859059364,
+      "periapsis_alt_m": 399598.5570803201,
+      "apoapsis_alt_m": 400203.5354347965
+    },
+    "end_of_coast": {
+      "energy_j_kg": -29434815.180197388,
+      "angular_momentum_m2_s": 51950785778.81032,
+      "semi_major_axis_m": 6770901.046257682,
+      "eccentricity": 0.000044674877859059364,
+      "periapsis_alt_m": 399598.55708044395,
+      "apoapsis_alt_m": 400203.5354349194
+    }
+  },
+  "events": [
+    {
+      "tick": 0,
+      "entity": 0,
+      "source": "controller",
+      "seq": 0,
+      "kind": "prelaunch_hold",
+      "label": "Prelaunch hold and checks",
+      "detail": {
+        "hold_s": 5.0
+      }
+    },
+    {
+      "tick": 0,
+      "entity": 0,
+      "source": "controller",
+      "seq": 1,
+      "kind": "prelaunch_checks_passed",
+      "label": "Prelaunch checks passed; hold continues",
+      "detail": {
+        "altitude_m": 0.0,
+        "downrange_m": 0.0,
+        "mass_kg": 304687.78670391376,
+        "speed_m_s": 0.0
+      }
+    },
+    {
+      "tick": 250,
+      "entity": 0,
+      "source": "controller",
+      "seq": 2,
+      "kind": "ignition",
+      "label": "First-stage ignition commanded",
+      "detail": {
+        "altitude_m": 0.0,
+        "downrange_m": 0.0,
+        "mass_kg": 304687.78670391376,
+        "speed_m_s": 0.0
+      }
+    },
+    {
+      "tick": 251,
+      "entity": 0,
+      "source": "truth",
+      "seq": 3,
+      "kind": "liftoff",
+      "label": "Liftoff: thrust exceeds weight",
+      "detail": {
+        "thrust_n": 4191820.5692251693,
+        "weight_n": 2992110.3857815396
+      }
+    },
+    {
+      "tick": 750,
+      "entity": 0,
+      "source": "controller",
+      "seq": 4,
+      "kind": "pitch_kick_start",
+      "label": "Pitch kick starts",
+      "detail": {
+        "altitude_m": 208.73337518703192,
+        "downrange_m": -0.00004265887699147503,
+        "mass_kg": 289523.0071125979,
+        "speed_m_s": 42.97793016539347
+      }
+    },
+    {
+      "tick": 1000,
+      "entity": 0,
+      "source": "controller",
+      "seq": 5,
+      "kind": "pitch_kick_end",
+      "label": "Pitch kick complete; tilt held",
+      "detail": {
+        "altitude_m": 483.72288387827575,
+        "downrange_m": 3.1911983133380177,
+        "mass_kg": 281940.6173169399,
+        "speed_m_s": 67.37188269929797
+      }
+    },
+    {
+      "tick": 1150,
+      "entity": 0,
+      "source": "controller",
+      "seq": 6,
+      "kind": "gravity_turn_start",
+      "label": "Gravity turn: thrust along the observed velocity",
+      "detail": {
+        "altitude_m": 708.9497356275097,
+        "downrange_m": 12.507362205128477,
+        "mass_kg": 277391.18343954516,
+        "speed_m_s": 83.04845434903291
+      }
+    },
+    {
+      "tick": 3069,
+      "entity": 0,
+      "source": "controller",
+      "seq": 7,
+      "kind": "throttle_down",
+      "label": "Throttle down for dynamic pressure",
+      "detail": {
+        "altitude_m": 8588.233814430423,
+        "downrange_m": 2143.7994651314557,
+        "mass_kg": 219188.75936807477,
+        "q_est_pa": 32028.214414810856,
+        "speed_m_s": 378.62390135432537
+      }
+    },
+    {
+      "tick": 3070,
+      "entity": 0,
+      "source": "controller",
+      "seq": 8,
+      "kind": "throttle_up",
+      "label": "Throttle back up",
+      "detail": {
+        "altitude_m": 8595.15774977766,
+        "downrange_m": 2146.8667767522684,
+        "mass_kg": 219158.53677523762,
+        "speed_m_s": 378.83683174326677
+      }
+    },
+    {
+      "tick": 3073,
+      "entity": 0,
+      "source": "controller",
+      "seq": 9,
+      "kind": "throttle_down",
+      "label": "Throttle down for dynamic pressure",
+      "detail": {
+        "altitude_m": 8615.949184895493,
+        "downrange_m": 2156.087770467932,
+        "mass_kg": 219067.54809768972,
+        "q_est_pa": 32010.37742745671,
+        "speed_m_s": 379.4804063624308
+      }
+    },
+    {
+      "tick": 3074,
+      "entity": 0,
+      "source": "controller",
+      "seq": 10,
+      "kind": "throttle_up",
+      "label": "Throttle back up",
+      "detail": {
+        "altitude_m": 8622.88621398434,
+        "downrange_m": 2159.167803201652,
+        "mass_kg": 219037.25788135713,
+        "speed_m_s": 379.6945596556273
+      }
+    },
+    {
+      "tick": 3075,
+      "entity": 0,
+      "source": "controller",
+      "seq": 11,
+      "kind": "throttle_down",
+      "label": "Throttle down for dynamic pressure",
+      "detail": {
+        "altitude_m": 8629.826517292298,
+        "downrange_m": 2162.251021150587,
+        "mass_kg": 219006.9283221745,
+        "q_est_pa": 32029.28554880408,
+        "speed_m_s": 379.90932060464337
+      }
+    },
+    {
+      "tick": 3322,
+      "entity": 0,
+      "source": "verifier",
+      "seq": 46,
+      "kind": "max_q",
+      "label": "Maximum dynamic pressure (max-Q) of the ascent",
+      "detail": {
+        "altitude_m": 10431.622005250305,
+        "q_pa": 32818.27753158632
+      }
+    },
+    {
+      "tick": 3861,
+      "entity": 0,
+      "source": "controller",
+      "seq": 12,
+      "kind": "throttle_up",
+      "label": "Throttle back up",
+      "detail": {
+        "altitude_m": 14951.376179623418,
+        "downrange_m": 5645.412700486791,
+        "mass_kg": 196798.97758189216,
+        "speed_m_s": 551.2427294077152
+      }
+    },
+    {
+      "tick": 3862,
+      "entity": 0,
+      "source": "controller",
+      "seq": 13,
+      "kind": "throttle_down",
+      "label": "Throttle down for dynamic pressure",
+      "detail": {
+        "altitude_m": 14960.609157793224,
+        "downrange_m": 5651.428661661278,
+        "mass_kg": 196768.64802270953,
+        "q_est_pa": 32083.966078043468,
+        "speed_m_s": 551.5256027725214
+      }
+    },
+    {
+      "tick": 3865,
+      "entity": 0,
+      "source": "controller",
+      "seq": 14,
+      "kind": "throttle_up",
+      "label": "Throttle back up",
+      "detail": {
+        "altitude_m": 14988.329272304662,
+        "downrange_m": 5669.505508004977,
+        "mass_kg": 196678.30240530026,
+        "speed_m_s": 552.3650107959652
+      }
+    },
+    {
+      "tick": 3866,
+      "entity": 0,
+      "source": "controller",
+      "seq": 15,
+      "kind": "throttle_down",
+      "label": "Throttle down for dynamic pressure",
+      "detail": {
+        "altitude_m": 14997.576385928318,
+        "downrange_m": 5675.5407945588595,
+        "mass_kg": 196647.97284611763,
+        "q_est_pa": 32007.38967199888,
+        "speed_m_s": 552.6482796879973
+      }
+    },
+    {
+      "tick": 3868,
+      "entity": 0,
+      "source": "controller",
+      "seq": 16,
+      "kind": "throttle_up",
+      "label": "Throttle back up",
+      "detail": {
+        "altitude_m": 15016.081308874302,
+        "downrange_m": 5687.625948345712,
+        "mass_kg": 196587.48078575375,
+        "speed_m_s": 553.2125659312175
+      }
+    },
+    {
+      "tick": 3869,
+      "entity": 0,
+      "source": "controller",
+      "seq": 17,
+      "kind": "throttle_down",
+      "label": "Throttle down for dynamic pressure",
+      "detail": {
+        "altitude_m": 15025.33910594508,
+        "downrange_m": 5693.675809083204,
+        "mass_kg": 196557.15122657112,
+        "q_est_pa": 32073.594573738294,
+        "speed_m_s": 553.4961322426266
+      }
+    },
+    {
+      "tick": 3870,
+      "entity": 0,
+      "source": "controller",
+      "seq": 18,
+      "kind": "throttle_up",
+      "label": "Throttle back up",
+      "detail": {
+        "altitude_m": 15034.600442770869,
+        "downrange_m": 5699.730519560009,
+        "mass_kg": 196527.10067876097,
+        "speed_m_s": 553.7755389405979
+      }
+    },
+    {
+      "tick": 3872,
+      "entity": 0,
+      "source": "controller",
+      "seq": 19,
+      "kind": "throttle_down",
+      "label": "Throttle down for dynamic pressure",
+      "detail": {
+        "altitude_m": 15053.133776196279,
+        "downrange_m": 5711.854516932074,
+        "mass_kg": 196466.44156039573,
+        "q_est_pa": 32034.015345106676,
+        "speed_m_s": 554.343167305206
+      }
+    },
+    {
+      "tick": 3873,
+      "entity": 0,
+      "source": "controller",
+      "seq": 20,
+      "kind": "throttle_up",
+      "label": "Throttle back up",
+      "detail": {
+        "altitude_m": 15062.405792810023,
+        "downrange_m": 5717.923820726434,
+        "mass_kg": 196436.24096001592,
+        "speed_m_s": 554.6251610345984
+      }
+    },
+    {
+      "tick": 3874,
+      "entity": 0,
+      "source": "controller",
+      "seq": 21,
+      "kind": "throttle_down",
+      "label": "Throttle down for dynamic pressure",
+      "detail": {
+        "altitude_m": 15071.681370465085,
+        "downrange_m": 5723.997994904609,
+        "mass_kg": 196405.9114008333,
+        "q_est_pa": 32041.34493855876,
+        "speed_m_s": 554.9092234597889
+      }
+    },
+    {
+      "tick": 3875,
+      "entity": 0,
+      "source": "controller",
+      "seq": 22,
+      "kind": "throttle_up",
+      "label": "Throttle back up",
+      "detail": {
+        "altitude_m": 15080.960506050847,
+        "downrange_m": 5730.077039310489,
+        "mass_kg": 196375.7385883708,
+        "speed_m_s": 555.1909906281298
+      }
+    },
+    {
+      "tick": 3879,
+      "entity": 0,
+      "source": "controller",
+      "seq": 23,
+      "kind": "throttle_down",
+      "label": "Throttle down for dynamic pressure",
+      "detail": {
+        "altitude_m": 15118.112759150565,
+        "downrange_m": 5754.44203759699,
+        "mass_kg": 196254.42035164032,
+        "q_est_pa": 32039.985745832004,
+        "speed_m_s": 556.3286319089901
+      }
+    },
+    {
+      "tick": 3880,
+      "entity": 0,
+      "source": "controller",
+      "seq": 24,
+      "kind": "throttle_up",
+      "label": "Throttle back up",
+      "detail": {
+        "altitude_m": 15127.40975368116,
+        "downrange_m": 5760.545502566746,
+        "mass_kg": 196224.2423862133,
+        "speed_m_s": 556.6109730766451
+      }
+    },
+    {
+      "tick": 3882,
+      "entity": 0,
+      "source": "controller",
+      "seq": 25,
+      "kind": "throttle_down",
+      "label": "Throttle down for dynamic pressure",
+      "detail": {
+        "altitude_m": 15146.014449288137,
+        "downrange_m": 5772.767093886337,
+        "mass_kg": 196163.58326784807,
+        "q_est_pa": 32021.182499841103,
+        "speed_m_s": 557.1805896750749
+      }
+    },
+    {
+      "tick": 3884,
+      "entity": 0,
+      "source": "controller",
+      "seq": 26,
+      "kind": "throttle_up",
+      "label": "Throttle back up",
+      "detail": {
+        "altitude_m": 15164.633411671966,
+        "downrange_m": 5785.008249066251,
+        "mass_kg": 196103.2277572964,
+        "speed_m_s": 557.7459594511164
+      }
+    },
+    {
+      "tick": 3888,
+      "entity": 0,
+      "source": "controller",
+      "seq": 27,
+      "kind": "throttle_down",
+      "label": "Throttle down for dynamic pressure",
+      "detail": {
+        "altitude_m": 15201.914143308066,
+        "downrange_m": 5809.549302309301,
+        "mass_kg": 195981.90952056594,
+        "q_est_pa": 32041.37856989509,
+        "speed_m_s": 558.8871846586321
+      }
+    },
+    {
+      "tick": 3889,
+      "entity": 0,
+      "source": "controller",
+      "seq": 28,
+      "kind": "throttle_up",
+      "label": "Throttle back up",
+      "detail": {
+        "altitude_m": 15211.243265246972,
+        "downrange_m": 5815.696831825233,
+        "mass_kg": 195951.73683560637,
+        "speed_m_s": 559.1703380358156
+      }
+    },
+    {
+      "tick": 3890,
+      "entity": 0,
+      "source": "controller",
+      "seq": 29,
+      "kind": "throttle_down",
+      "label": "Throttle down for dynamic pressure",
+      "detail": {
+        "altitude_m": 15220.575952063315,
+        "downrange_m": 5821.849263641611,
+        "mass_kg": 195921.40727642376,
+        "q_est_pa": 32022.318590126022,
+        "speed_m_s": 559.4559934375538
+      }
+    },
+    {
+      "tick": 3891,
+      "entity": 0,
+      "source": "controller",
+      "seq": 30,
+      "kind": "throttle_up",
+      "label": "Throttle back up",
+      "detail": {
+        "altitude_m": 15229.912212757394,
+        "downrange_m": 5828.006607039373,
+        "mass_kg": 195891.16233136615,
+        "speed_m_s": 559.7404524815954
+      }
+    },
+    {
+      "tick": 3901,
+      "entity": 0,
+      "source": "controller",
+      "seq": 31,
+      "kind": "throttle_down",
+      "label": "Throttle down for dynamic pressure",
+      "detail": {
+        "altitude_m": 15323.47196227964,
+        "downrange_m": 5889.85098671398,
+        "mass_kg": 195587.86673953995,
+        "q_est_pa": 32009.351142359516,
+        "speed_m_s": 562.6035036815715
+      }
+    },
+    {
+      "tick": 3902,
+      "entity": 0,
+      "source": "controller",
+      "seq": 32,
+      "kind": "throttle_up",
+      "label": "Throttle back up",
+      "detail": {
+        "altitude_m": 15332.847669268958,
+        "downrange_m": 5896.062568852879,
+        "mass_kg": 195557.57263236056,
+        "speed_m_s": 562.8898152079157
+      }
+    },
+    {
+      "tick": 3903,
+      "entity": 0,
+      "source": "controller",
+      "seq": 33,
+      "kind": "throttle_down",
+      "label": "Throttle down for dynamic pressure",
+      "detail": {
+        "altitude_m": 15342.226961000822,
+        "downrange_m": 5902.279094041854,
+        "mass_kg": 195527.24307317793,
+        "q_est_pa": 32010.31935928869,
+        "speed_m_s": 563.1767710616157
+      }
+    },
+    {
+      "tick": 3904,
+      "entity": 0,
+      "source": "controller",
+      "seq": 34,
+      "kind": "throttle_up",
+      "label": "Throttle back up",
+      "detail": {
+        "altitude_m": 15351.609836699441,
+        "downrange_m": 5908.500565279389,
+        "mass_kg": 195496.9526366976,
+        "speed_m_s": 563.4632265129078
+      }
+    },
+    {
+      "tick": 3912,
+      "entity": 0,
+      "source": "controller",
+      "seq": 35,
+      "kind": "throttle_down",
+      "label": "Throttle down for dynamic pressure",
+      "detail": {
+        "altitude_m": 15426.802086146548,
+        "downrange_m": 5958.450706902187,
+        "mass_kg": 195254.31616323665,
+        "q_est_pa": 32004.126915378027,
+        "speed_m_s": 565.7632877202358
+      }
+    },
+    {
+      "tick": 3913,
+      "entity": 0,
+      "source": "controller",
+      "seq": 36,
+      "kind": "throttle_up",
+      "label": "Throttle back up",
+      "detail": {
+        "altitude_m": 15436.217282654718,
+        "downrange_m": 5964.716805644508,
+        "mass_kg": 195224.00224999455,
+        "speed_m_s": 566.0510067843811
+      }
+    },
+    {
+      "tick": 7379,
+      "entity": 0,
+      "source": "controller",
+      "seq": 37,
+      "kind": "meco",
+      "label": "Main engine cutoff (MECO) commanded",
+      "detail": {
+        "altitude_m": 73790.90133953281,
+        "downrange_m": 75633.2622142547,
+        "mass_kg": 91932.7448587069,
+        "propellant_est_kg": 13797.57963743217,
+        "speed_m_s": 2377.858912767759
+      }
+    },
+    {
+      "tick": 7529,
+      "entity": 0,
+      "source": "controller",
+      "seq": 38,
+      "kind": "separation",
+      "label": "Stage separation commanded",
+      "detail": {
+        "altitude_m": 77610.10508947726,
+        "downrange_m": 81560.20232238206,
+        "mass_kg": 91932.7448587069,
+        "speed_m_s": 2362.329621863087
+      }
+    },
+    {
+      "tick": 7529,
+      "entity": 1,
+      "source": "truth",
+      "seq": 39,
+      "kind": "entity_start",
+      "label": "Booster flies on its own",
+      "detail": {
+        "altitude_m": 77610.10508947726,
+        "downrange_m": 81560.20232238206,
+        "mass_kg": 36959.13854345484,
+        "speed_m_s": 2362.329621863087
+      }
+    },
+    {
+      "tick": 7529,
+      "entity": 2,
+      "source": "truth",
+      "seq": 40,
+      "kind": "entity_start",
+      "label": "Upper stage flies on its own",
+      "detail": {
+        "altitude_m": 77610.10508947726,
+        "downrange_m": 81560.20232238206,
+        "mass_kg": 54973.60631525204,
+        "speed_m_s": 2362.329621863087
+      }
+    },
+    {
+      "tick": 7779,
+      "entity": 2,
+      "source": "controller",
+      "seq": 41,
+      "kind": "upper_ignition",
+      "label": "Upper-stage ignition commanded",
+      "detail": {
+        "altitude_m": 83795.92704561818,
+        "downrange_m": 91422.7059824074,
+        "mass_kg": 54973.60631525204,
+        "speed_m_s": 2337.017538881421
+      }
+    },
+    {
+      "tick": 14679,
+      "entity": 1,
+      "source": "truth",
+      "seq": 42,
+      "kind": "apogee",
+      "label": "Apogee of the trajectory",
+      "detail": {
+        "altitude_m": 167251.01988707762,
+        "downrange_m": 358717.04186702776,
+        "mass_kg": 36959.13854345484,
+        "speed_m_s": 1970.8206237294644
+      }
+    },
+    {
+      "tick": 21505,
+      "entity": 2,
+      "source": "truth",
+      "seq": 43,
+      "kind": "apogee",
+      "label": "Apogee of the trajectory",
+      "detail": {
+        "altitude_m": 400002.06879007537,
+        "downrange_m": 1058158.0064225744,
+        "mass_kg": 7488.717016965754,
+        "speed_m_s": 7611.000482413679
+      }
+    },
+    {
+      "tick": 21575,
+      "entity": 2,
+      "source": "controller",
+      "seq": 44,
+      "kind": "seco",
+      "label": "Second engine cutoff (SECO) commanded",
+      "detail": {
+        "altitude_m": 400001.7326633716,
+        "downrange_m": 1068225.9098726143,
+        "energy_obs_j_kg": -29432963.21365684,
+        "mass_kg": 7353.321559968293,
+        "reason": "target energy reached",
+        "speed_m_s": 7672.540618960073
+      }
+    },
+    {
+      "tick": 21575,
+      "entity": 2,
+      "source": "verifier",
+      "seq": 47,
+      "kind": "orbit_insertion_evaluation",
+      "label": "Orbit insertion evaluated on the true state at SECO",
+      "detail": {
+        "apoapsis_alt_m": 400203.5354347965,
+        "eccentricity": 0.000044674877859059364,
+        "periapsis_alt_m": 399598.5570803201
+      }
+    },
+    {
+      "tick": 24748,
+      "entity": 1,
+      "source": "truth",
+      "seq": 45,
+      "kind": "impact",
+      "label": "Surface impact",
+      "detail": {
+        "downrange_m": 738721.0056374149,
+        "speed_m_s": 986.0510319749039,
+        "t_s": 494.9529754838941
+      }
+    }
+  ],
+  "disclaimer": "exploratory planar point-mass model; not a real vehicle; not validated against flight data"
+}

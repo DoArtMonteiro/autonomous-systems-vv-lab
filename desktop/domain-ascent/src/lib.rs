@@ -9,7 +9,9 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use vv_platform::contract::*;
-use vv_platform::host_sdk::{DomainHost, HostError};
+use vv_platform::host_sdk::{
+    DomainHost, HostError, OutcomeChange, RequirementChange, VerdictRules,
+};
 use vv_platform::seeds::check_seed;
 
 pub mod case;
@@ -25,6 +27,56 @@ pub fn manifest() -> DomainManifest {
 
 pub struct Host;
 
+/// The changes of the verdict rules in 0.15.1, for a run stored by an older version of this domain
+/// (see `VerdictRules`). Each entry is something the same run is now judged differently on; the
+/// physics (timebases, channels, other metrics, events that are not violations) is unchanged and is
+/// still compared. In words:
+///
+/// * the outcome names what the orbit is: a periapsis below the minimum but above the surface is
+///   `low_periapsis_orbit`, no SECO is `seco_not_reached`, a specific energy not negative is
+///   `unbound` (all three were `suborbital` or `off_target_orbit` before), and an orbit with another
+///   requirement failing is `partial`, not `success`;
+/// * the upper-stage propellant minimum is 1 % of the load in both cases (it was 0), so R6 can now
+///   fail on a run that passed, with its limit and margin metrics;
+/// * the orbit-insertion requirement without SECO is judged at the last tick of the run, not at
+///   tick 0, and its violation event moves with it.
+pub const VERDICT_RULES: VerdictRules = VerdictRules {
+    since: "0.15.1",
+    outcomes: &[
+        OutcomeChange {
+            from: ("orbit", "success"),
+            to: ("orbit", "partial"),
+        },
+        OutcomeChange {
+            from: ("suborbital", "failure"),
+            to: ("low_periapsis_orbit", "failure"),
+        },
+        OutcomeChange {
+            from: ("suborbital", "failure"),
+            to: ("seco_not_reached", "failure"),
+        },
+        OutcomeChange {
+            from: ("suborbital", "failure"),
+            to: ("unbound", "failure"),
+        },
+        OutcomeChange {
+            from: ("off_target_orbit", "partial"),
+            to: ("unbound", "failure"),
+        },
+    ],
+    requirements: &[RequirementChange {
+        id: "upper.R6_propellant_margin",
+        from: "pass",
+        to: "fail",
+        reason: "the minimum residual propellant is 1 % of the upper-stage load, it was 0",
+    }],
+    retimed: &["mission.R8_orbit_insertion"],
+    derived_metrics: &[
+        "requirement_limit.upper.R6_propellant_margin",
+        "requirement_margin.upper.R6_propellant_margin",
+    ],
+    summary: "Outcome codes, the upper-stage propellant minimum and the instant of the orbit-insertion requirement changed in 0.15.1; timebases, channels, other metrics and the other events still agree.",
+};
 static SCRATCH: AtomicU64 = AtomicU64::new(0);
 
 fn scratch_dir() -> PathBuf {
@@ -69,6 +121,10 @@ impl DomainHost for Host {
 
     fn native_seed_file(&self) -> Option<&'static str> {
         Some("run.json")
+    }
+
+    fn verdict_rules(&self) -> VerdictRules {
+        VERDICT_RULES
     }
 
     fn native_replay(&self, dir: &Path) -> Vec<ReplayCheck> {

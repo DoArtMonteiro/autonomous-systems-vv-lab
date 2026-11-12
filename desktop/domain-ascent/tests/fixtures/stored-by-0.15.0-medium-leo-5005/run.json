@@ -1,0 +1,10 @@
+{
+  "schema": "vv-ascent-run.v1",
+  "seed": 5005,
+  "simulator": "vv-ascent 0.1.0",
+  "source_sha256": "2998c92ea8f36540957ae8f9a314b78bd5d360ea71dfa84a2f8d6af8991c0166",
+  "case_sha256": "28b5ffb47e2490fbfcfa844f621e0cebfcd5f22ad74aeb5bef6d4886bf3a254f",
+  "trace_sha256": "02883a73e88f9441385452824e850fc671fc1ba135c051dc613199310afab77d",
+  "verification_sha256": "f13a7f102fd6bc46f90695e321e78bb091b6efe83df0cffbc14fc912d3c1cf8e",
+  "outcome": "orbit"
+}
