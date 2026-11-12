@@ -1,0 +1,197 @@
+{
+  "flow": "m16",
+  "exe": "vv-studio.exe",
+  "machine": {
+    "cpu": "AMD64 Family 25 Model 97 Stepping 2, AuthenticAMD",
+    "os": "Windows-11-10.0.26300-SP0",
+    "python": "3.14.6"
+  },
+  "cold_start_to_ready_s": 1.04,
+  "idle_memory": {
+    "processes": 7,
+    "working_set_mb": 428.8,
+    "private_mb": 276.0,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "idle_frames": {
+    "frames": 254,
+    "mean_ms": 7.9,
+    "p50_ms": 8,
+    "p95_ms": 8.1,
+    "p99_ms": 8.5,
+    "max_ms": 12.1,
+    "over_33ms": 0
+  },
+  "clicks_to_landing": 1,
+  "click_to_landing_on_screen_s": 0.25,
+  "machine_time_to_landing_s": 1.29,
+  "playback_detected": true,
+  "playback_frames": {
+    "frames": 634,
+    "mean_ms": 7.89,
+    "p50_ms": 8,
+    "p95_ms": 8.1,
+    "p99_ms": 8.5,
+    "max_ms": 15.5,
+    "over_33ms": 0
+  },
+  "playback_memory": {
+    "processes": 7,
+    "working_set_mb": 498.1,
+    "private_mb": 383.0,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "webgl": "ANGLE (AMD, AMD Radeon RX 7700 XT (0x0000747E) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "window_inner": [
+    1440,
+    900,
+    1
+  ],
+  "engineering_playback_cpu_percent_of_one_core": 37.0,
+  "engineering_gpu": {
+    "gpu_dedicated_mb": 139.3,
+    "gpu_3d_utilisation_percent": 3.5
+  },
+  "geo_switch_to_terrain_on_gpu_s": 0.455,
+  "geo_playback_frames": {
+    "frames": 636,
+    "mean_ms": 7.86,
+    "p50_ms": 8,
+    "p95_ms": 8.1,
+    "p99_ms": 8.5,
+    "max_ms": 8.6,
+    "over_33ms": 0
+  },
+  "geo_playback_cpu_percent_of_one_core": 52.3,
+  "geo_playback_memory": {
+    "processes": 7,
+    "working_set_mb": 878.7,
+    "private_mb": 1078.2,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "geo_gpu": {
+    "gpu_dedicated_mb": 467.3,
+    "gpu_3d_utilisation_percent": 42.7
+  },
+  "geo_scene": {
+    "renders": 1116,
+    "triangles": 4489118,
+    "geometries": 50,
+    "textures": 10,
+    "camera": {
+      "mode": "follow",
+      "position": [
+        88,
+        -163.4,
+        42.1
+      ],
+      "target": [
+        -0.5,
+        3.1,
+        18.9
+      ],
+      "fov": 30,
+      "distance": 190,
+      "stageFraction": 0.411,
+      "observer": null,
+      "shot": null
+    },
+    "world": {
+      "buildings": 687,
+      "lidar_structures": 8,
+      "structures": 39,
+      "trees": 8248,
+      "shrubs": 97479,
+      "tiles": 47,
+      "vegetation_in_range": 105727,
+      "vegetation_tiers": [
+        64104,
+        41623,
+        0
+      ]
+    }
+  },
+  "switch_to_control_s": 0.439,
+  "control_playback_frames": {
+    "frames": 635,
+    "mean_ms": 7.88,
+    "p50_ms": 8,
+    "p95_ms": 8.1,
+    "p99_ms": 8.5,
+    "max_ms": 8.7,
+    "over_33ms": 0
+  },
+  "control_playback_cpu_percent_of_one_core": 61.0,
+  "control_memory": {
+    "processes": 7,
+    "working_set_mb": 966.1,
+    "private_mb": 1176.0,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "after_leaving_memory": {
+    "processes": 7,
+    "working_set_mb": 800.6,
+    "private_mb": 839.5,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "after_leaving_gpu": {
+    "gpu_dedicated_mb": 259.6,
+    "gpu_3d_utilisation_percent": 0
+  },
+  "long_session_start_memory": {
+    "processes": 7,
+    "working_set_mb": 904.9,
+    "private_mb": 1174.0,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "long_session_s": 180,
+  "long_session_p99_ms_samples": [
+    8.7,
+    8.6,
+    8.4,
+    8.5,
+    8.5,
+    8.5,
+    8.5,
+    8.5,
+    8.6,
+    8.5,
+    8.5,
+    8.5,
+    8.5,
+    8.6,
+    8.1,
+    8.6,
+    8.5,
+    8.7
+  ],
+  "long_session_end_memory": {
+    "processes": 7,
+    "working_set_mb": 938.5,
+    "private_mb": 1133.8,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "webview_requests": 26,
+  "webview_requests_leaving_the_machine": []
+}

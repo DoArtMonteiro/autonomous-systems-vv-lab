@@ -122,6 +122,7 @@ def main():
                 s.shot("m17-settings-cinematic-installed-dark")
                 open_mission(s, "lying-altimeter")
                 s.wait("document.querySelector('.pl-head [data-action=\"cinematic\"]:not([aria-disabled=\"true\"])')", 30, "cinematic button enabled")
+                t_click = time.time()
                 s.page.click(".pl-head [data-action='cinematic']")
                 t0 = time.time()
                 launched = []
@@ -129,12 +130,25 @@ def main():
                     launched = godot_pids(proc.pid)
                     time.sleep(0.5)
                 check("Cinematic: the player opens the module window on the shown run", bool(launched))
-                time.sleep(12)
                 # The module's own log says whether it verified the pack, drew a first frame and
                 # rendered without errors. (No desktop screenshot: it would capture other windows.)
+                # The first frame takes about 12 to 15 s after the click on the reference PC (the module
+                # decodes its CC0 assets at start), so wait for it instead of sleeping a fixed time.
+                # Only a log written after the click counts: an older one may hold an earlier FIRST_FRAME.
                 logs = os.path.join(os.environ.get("APPDATA", ""), "VV Lab Cinematic", "logs")
-                newest = max((os.path.join(logs, f) for f in os.listdir(logs)), key=os.path.getmtime) if os.path.isdir(logs) else None
-                text = open(newest, encoding="utf-8", errors="replace").read() if newest else ""
+                text = ""
+                newest = None
+                t0 = time.time()
+                while time.time() - t0 < 90:
+                    fresh = [os.path.join(logs, f) for f in os.listdir(logs)] if os.path.isdir(logs) else []
+                    fresh = [f for f in fresh if os.path.getmtime(f) >= t_click - 1]
+                    newest = max(fresh, key=os.path.getmtime) if fresh else None
+                    text = open(newest, encoding="utf-8", errors="replace").read() if newest else ""
+                    if "FIRST_FRAME" in text:
+                        break
+                    time.sleep(1)
+                time.sleep(2)
+                text = open(newest, encoding="utf-8", errors="replace").read() if newest else text
                 check("Cinematic: the module verified the pack and drew its first frame", "verified" in text and "FIRST_FRAME" in text, text[:300].replace("\n", " "))
                 check("Cinematic: the module renders without errors", "ERROR" not in text, f"{text.count('ERROR')} errors; " + text.splitlines()[1][:120] if text else "no log")
                 # Only the Godot process this Studio started; any other Godot instance is left alone.

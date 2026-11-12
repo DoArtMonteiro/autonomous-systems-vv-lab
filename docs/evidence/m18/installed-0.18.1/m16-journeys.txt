@@ -1,0 +1,80 @@
+PASS Settings: the installed environments are listed with sources and size  [adventdalen-svalbard,cape-canaveral,el-arenosillo,goms-alpine-valley,mahia-peninsula,santa-maria-azores,spaceport-america,wallops-island]
+PASS Settings: Studio says it makes no network request
+PASS Geo: the player offers Engineering, Geospatial and Flight console
+PASS Geo: the geospatial view loads from the local pack  [0.40 s]
+PASS Geo: an environment is selected  [cape-canaveral]
+PASS Geo: switching view keeps the same runs
+PASS Sources: the short credit of every source that asks for one stays on the map (Copernicus, Sentinel, OpenStreetMap); public-domain sources that ask for none (NGA) are in the panel only  [i Sources Terrain is context only  Copernicus WorldDEM-30 © DLR e.V. 2010-2014, © Airbus 2014-2018 · Contains modified Copernicus Sentinel data 2025 · USDA NAIP 2023 · © OpenStreetMap contributors]
+PASS Sources: the credit is at least 11 px  [11 px]
+PASS Sources: the panel holds every notice
+PASS Sources: the closed control takes little room (under 80 px tall)  [50 px]
+PASS Sources: the panel is closed by default
+PASS Sources: Enter opens the panel
+PASS Sources: the panel says what is simulated, context and illustrative
+PASS Sources: the panel carries the full Copernicus DEM notice and the Sentinel notice
+PASS Sources: the panel states the flat-ground limitation
+PASS Sources: the panel states where buildings, heights and vegetation come from
+PASS Sources: Escape closes the panel and keeps the focus on the button
+PASS Sources: Space on the button opens the panel
+PASS Sources: Space again closes it
+PASS Sources: hovering opens the panel
+PASS Sources: leaving closes an unpinned panel
+PASS Sources: a click pins the panel open
+PASS Sources: a press outside closes it
+PASS Sources: a tap opens the panel
+PASS Sources: a second tap closes it
+PASS World: the Cape pack draws OSM buildings and lidar vegetation  [{"buildings": 687, "lidar_structures": 8, "structures": 39, "trees": 8248, "shrubs": 97479, "tiles": 47, "vegetation_in_range": 0, "vegetation_tiers": [0, 0, 105727]}]
+PASS World: vegetation near the pad camera is drawn in full detail  [[55069, 50658, 0]]
+PASS Auto camera: the camera picks a shot from the playback state  [follow]
+PASS Geo to Flight console keeps the playback time  [10.426499999999916 -> 10.426499999999916]
+PASS Flight console keeps the landscape
+PASS Flight console to Engineering keeps the playback time
+PASS Geo: placing the run on a landscape changes no record
+PASS Catalogue: one card per installed environment  [adventdalen-svalbard,cape-canaveral,el-arenosillo,goms-alpine-valley,mahia-peninsula,santa-maria-azores,spaceport-america,wallops-island]
+PASS Catalogue: cards state resolution, relief, size and credits
+PASS Catalogue: the thumbnails load from the packs
+PASS Catalogue: choosing a card switches the scene
+PASS Gating: the run has findings later than the playback time  [3]
+PASS Gating: no later finding is shown on the player timeline
+PASS Gating: the result is not shown yet
+PASS Gating: analysis mode shows the later findings and the result
+PASS Gating: the analysis switch says it is on
+PASS Gating MC: findings exist in the run  [1]
+PASS Gating MC: none is drawn at the start of the playback
+PASS Gating MC: the event list does not list them either
+PASS Gating MC: analysis mode draws them
+PASS MC rocket: telemetry is grouped for a rocket landing  [motion,propulsion,navigation,sensors,geo]
+PASS MC rocket: propellant comes from a recorded true-state channel
+PASS MC rocket: estimated and true heights are both shown with their origin
+PASS MC rocket: geographic values are tagged G
+PASS MC rocket: requirements are pending before contact
+PASS MC rocket: two runs on the timeline
+PASS MC rocket: the timeline marks where the runs part
+PASS MC rocket: a controller detection is on the timeline  [Fault injected, 0.00 s: Fault starts: gnss_bias; Controller detection, 0.10 s: Controller first reports sensor disagreement; Controller detection, 0.10 s: Controller first rejects the altimeter (Registered: 15 m from 0 s); Event, 4.20 s: Engine ignition (Registered: 15 m from 0 s); Event, 23.40 s: Touchdown: the nozzle plane reached the ground; Violation, 23.40 s: Distance from pad centre failed at contact: 14.417242 m where <= 10 m was required (Registered: 15 m from 0 s); Fault injected, 0.02 s: Fault starts: gnss_bias (Later: 9.72 m from 0.02 s); Event, 3.84 s: Engine ignition (Later: 9.72 m from 0.02 s); Runs part, 4.30 s: Later: 9.72 m from 0.02 s departs from Registered: 15 m from 0 s by more than 1 m (Later: 9.72 m from 0.02 s)]
+PASS MC rocket: clicking an event pauses at its instant
+PASS MC rocket: the event opens an evidence card with a way into analysis
+PASS MC rocket: the fault onset is on the timeline
+PASS MC rocket: cinematic mode hides the side panels
+PASS MC rocket: at the end every requirement is judged  [R1_vertical_speed:met, R2_horizontal_speed:met, R3_tilt:met, R4_angular_rate:met, R5_position:failed, R6_propellant_margin:met, S1_tilt_envelope:held, S2_keep_out:held, S3_axial_load:held, S4_no_relight:held, S5_no_powered_ascent:held]
+PASS MC rocket: Analyse opens at the same instant  [30.33836014269004]
+PASS Leaving the player releases the geospatial renderer  [{"renderer": "suspended", "scene": null}]
+PASS Returning to the player restores the geospatial view at the same instant
+PASS MC ground: Geospatial is unavailable for a millimetre grid, with the reason
+PASS MC ground: ground-vehicle telemetry, no aerospace metrics  [VEHICLE T East 1500 mm T North 2000 mm T Moved this tick 250.0 mm D To goal 3500 mm CONTROL C Command 250.0 mm D Mode no]
+PASS MC ground: three runs on the timeline
+PASS Layout 1440x900: no horizontal scroll in Flight console
+PASS Layout 1440x900: every control has a name
+PASS Layout 1280x800: no horizontal scroll in Flight console
+PASS Layout 1280x800: every control has a name
+PASS Layout 1024x640: no horizontal scroll in Flight console
+PASS Layout 1024x640: every control has a name
+PASS No environment: Geospatial is disabled and says why  [{"off": "true", "title": "No validated geographic environment is installed. See Settings, Environments."}]
+PASS No environment: the engineering scene plays offline
+PASS No environment: Flight console works on the engineering scene
+PASS Tampered pack: it is rejected with the reason  [ed packs are kept in <temporary folder>  Install a package… Import a pack folder… Open the imported packs folder]
+PASS Tampered pack: Geospatial is disabled and says why  [{"off": "true", "title": "No validated geographic environment is installed. See Settings, Environments."}]
+PASS Tampered pack: the engineering scene plays offline
+PASS Tampered pack: Flight console works on the engineering scene
+PASS no script error or console error
+
+78 of 78 checks passed; screenshots in <scratch folder>
