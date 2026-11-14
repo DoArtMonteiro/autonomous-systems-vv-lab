@@ -28,6 +28,7 @@ import { buildControl } from './control.js';
 import { sourcesInfo } from '../sources-info.js';
 import { openCatalogue } from '../env-catalogue.js';
 import { cinematicButton } from '../cinematic.js';
+import { reqView, safetyWording, SAFETY_NOTE } from '../requirements.js';
 
 let root;
 let navigate = () => {};
@@ -297,12 +298,55 @@ function phaseAt(t) {
   const td = run.record.scene && run.record.scene.touchdown;
   const met = run.record.outcome.status === 'success';
   if (end) {
-    // A failed contact says how hard it was and that the impact itself is not drawn.
-    const vz = td && !met ? metricValue(run, 'touchdown_vertical_speed') : null;
-    const bad = vz !== null && Number.isFinite(vz) ? `Contact at ${Math.abs(vz).toFixed(1)} m/s, requirements not met; impact not modelled` : 'Reached the ground, requirements not met';
+    // A failed contact names the requirement that failed, with its recorded value and limit (the
+    // first contact speed on its own can pass), and says the impact itself is not drawn.
+    const bad = td && !met ? failedContactText(run.record) : null;
     return { text: td ? (met ? 'Touchdown' : bad) : 'End of run', kind: met ? 'end' : 'end-bad', end: true };
   }
   return { text: ph ? ph.label : '', kind: ph ? ph.kind : '', end: false };
+}
+
+/** "Not met: <requirement> <value> (limit <limit>)": the failed mission requirement that is furthest past its limit. */
+function failedContactText(record) {
+  const failed = (record.requirements || []).filter((q) => q.status === 'fail' && q.category !== 'invariant');
+  if (!failed.length) return 'Reached the ground; impact not modelled';
+  const views = failed.map((q) => ({ q, v: reqView(q) }));
+  const past = (x) => (x.v.numeric && Number.isFinite(x.v.margin) ? -x.v.margin / Math.max(Math.abs(x.v.limit), 1e-9) : 0);
+  views.sort((x, y) => past(y) - past(x));
+  const top = views[0];
+  const more = views.length > 1 ? `, and ${views.length - 1} more not met` : '';
+  return `Not met: ${top.q.label} ${top.v.obsText} (limit ${top.v.limitText})${more}; impact not modelled`;
+}
+
+/**
+ * What the Cinematic View shows about the run it opens: the player's label for the run, the vehicle
+ * (named in the domain's catalog, marked exploratory unless the catalog calls it a reference case or
+ * the record says the case was changed) and the seed. All of it comes from the record and the catalog.
+ */
+function cinematicInfo(run) {
+  const rec = run.record;
+  const d = domainById(rec.request.domain);
+  const sc = d && d.catalog ? d.catalog.scenarios.find((s) => s.id === rec.request.scenario) : null;
+  const v = sc && d.catalog.vehicles ? d.catalog.vehicles.find((x) => x.id === sc.vehicle) : null;
+  const exploratory = (v ? v.evidence !== 'reference' : true) || (rec.notes || []).some((n) => n.startsWith('Exploratory case'));
+  return { runLabel: run.label, vehicle: v ? v.label.replace(/\s*\(exploratory\)/i, '') : null, exploratory, seed: rec.request.seed };
+}
+
+/** Reference case or exploratory, from the catalog and the record, for each distinct level among the held runs. */
+function caseChips() {
+  const levels = new Map();
+  for (const r of pl.runs) {
+    const info = cinematicInfo(r);
+    if (!info.vehicle) continue;
+    const key = info.exploratory ? 'explore' : 'ref';
+    levels.set(key, [...(levels.get(key) || []), r.label]);
+  }
+  if (!levels.size) return null;
+  const several = levels.size > 1;
+  return h('span', { class: 'pl-cases' }, [...levels].map(([key, who]) => h('span', {
+    class: ['hg-ev', key === 'ref' ? 'hg-ev-ref' : 'hg-ev-explore', 'pl-case'], dataset: { case: key },
+    title: key === 'ref' ? 'The frozen, pre-registered case the platform’s verification results rest on. Recomputed model behaviour, not validated against flight data.' : 'Illustrative values of the right order of magnitude, or a case you changed. Not evidence for any pre-registered claim.',
+  }, key === 'ref' ? 'Reference case' : 'Exploratory', several ? `: ${who.join(', ')}` : '')));
 }
 
 function sceneNote() {
@@ -378,12 +422,16 @@ function build() {
   const note = sceneNote();
   stage.append(...[viewport, phaseTag, hud, runBar, cameraButtons(), note].filter(Boolean));
 
+  // With two runs held, the person chooses which one the Cinematic View opens; it starts on the shown run.
+  const cinRun = runs.length > 1 ? h('select', { class: 'select select-sm pl-cin-run', 'aria-label': 'Run to open in the Cinematic View', title: 'Which of the held runs the Cinematic View opens', dataset: { action: 'cinematic-run' } },
+    runs.map((r, i) => h('option', { value: String(i), selected: i === pl.active }, r.label))) : null;
+  const cinIndex = () => (cinRun ? Number(cinRun.value) : pl.active);
   const head = h('header', { class: 'pl-head' },
     h('button', { type: 'button', class: 'pl-back', onclick: () => navigate('missions') }, h('span', { 'aria-hidden': 'true' }, '←'), ' Missions'),
     h('div', { class: 'pl-title' },
       h('p', { class: 'eyebrow' }, `${DOMAIN_NAMES[exp.domain] || exp.domain} · ${exp.kicker}`),
       h('h1', null, exp.title)),
-    h('span', { class: `grade grade-${grade.tone}`, title: grade.text }, grade.label),
+    h('div', { class: 'pl-badges' }, h('span', { class: `grade grade-${grade.tone}`, title: grade.text }, grade.label), caseChips()),
     // Second row: what the player shows on the left, what to do with the run on the right. Each
     // group wraps inside its own row, so no control can sit on top of another at any width.
     h('div', { class: 'pl-toolbar' },
@@ -391,13 +439,14 @@ function build() {
     h('div', { class: 'pl-head-actions', role: 'group', 'aria-label': 'Actions for the shown run' },
       h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'analyse' }, title: 'Open the shown run with every channel, requirement and its provenance', onclick: () => navigate('run', { runId: pl.runs[pl.active].runId, t: pl.cursor.t }) }, 'Analyse'),
       runs.length > 1 ? h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'compare' }, onclick: () => navigate('compare', { runIds: runs.map((r) => r.runId), demo: pl.demo }) }, 'Compare in detail') : null,
-      cinematicButton(() => pl.runs[pl.active].runId, () => pl.envId || (pl.envs.length ? defaultEnv(pl.envs) : null), pl.kind === 'rocket-3d' || pl.kind === 'ascent'),
-      h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'configure' }, title: 'Open the shown run in the Experiment Lab: change its conditions, run a new simulation and compare', onclick: () => navigate('lab', { runId: pl.runs[pl.active].runId }) }, 'Change the conditions'))));
+      cinRun,
+      cinematicButton(() => pl.runs[cinIndex()].runId, () => pl.envId || (pl.envs.length ? defaultEnv(pl.envs) : null), pl.kind === 'rocket-3d' || pl.kind === 'ascent', () => cinematicInfo(pl.runs[cinIndex()])),
+      h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'configure' }, title: 'Open the shown run in the Experiment Lab: change its conditions, run a new simulation and compare', onclick: () => navigate('lab', { runId: pl.runs[pl.active].runId }) }, 'Open in Experiment Lab'))));
 
   const side = h('aside', { class: 'pl-side', 'aria-label': 'Mission briefing and result' });
   const transport = buildTransport();
   root.append(h('div', { class: ['pl', pl.view === 'geospatial' ? 'pl-geo' : ''] }, head, h('div', { class: 'pl-body' }, stage, side), transport));
-  pl.dom = { viewport, hud, phaseTag, side, runBar, note };
+  pl.dom = { viewport, hud, phaseTag, side, runBar, note, cinRun };
   mountScene();
   renderSide();
   drawBand();
@@ -491,6 +540,7 @@ function setActive(i) {
   if (!pl || i === pl.active) return;
   pl.active = i;
   if (pl.dom.runBar) for (const b of pl.dom.runBar.children) b.setAttribute('aria-checked', String(Number(b.dataset.run) === i));
+  if (pl.dom.cinRun) pl.dom.cinRun.value = String(i);
   if (pl.kind === 'rocket-3d') mountScene();
   if (pl.control) pl.control.refresh();
   else drawBand();
@@ -679,8 +729,8 @@ function tone(status) {
   return 'neutral';
 }
 
-function verdictChip(text, status, sub) {
-  return h('span', { class: `vchip v-${tone(status)}` }, h('span', { class: 'vchip-k' }, sub), text);
+function verdictChip(text, status, sub, title) {
+  return h('span', { class: `vchip v-${tone(status)}`, title: title || null }, h('span', { class: 'vchip-k' }, sub), text);
 }
 
 function runResult(run) {
@@ -688,18 +738,16 @@ function runResult(run) {
   const reqs = rec.requirements || [];
   const failed = reqs.filter((q) => q.status === 'fail');
   const missionReqs = reqs.filter((q) => q.category !== 'invariant');
-  const invariants = reqs.filter((q) => q.category === 'invariant');
-  const brokenInv = invariants.filter((q) => q.status === 'fail');
   const metFail = missionReqs.filter((q) => q.status === 'fail');
   const metrics = pl.kind === 'rocket-3d' ? ROCKET_METRICS.map((id) => rec.metrics.find((m) => m.id === id)).filter(Boolean) : [];
   const missionText = metFail.length ? `${metFail.length} of ${missionReqs.length} requirements failed` : `all ${missionReqs.length} requirements met`;
-  const safetyText = brokenInv.length ? `${brokenInv.length} of ${invariants.length} safety rules broken` : `no safety rule broken (${invariants.length} checked)`;
+  const safetyText = safetyWording(rec).text;
   return h('div', { class: 'pl-run-result', dataset: { outcome: rec.outcome.code, safety: rec.safety.status } },
     h('p', { class: 'pl-run-name' }, h('span', { class: 'pl-swatch', style: { background: run.colour } }), run.label),
     h('p', { class: 'pl-run-head' }, rec.outcome.label),
     h('div', { class: 'pl-verdicts' },
       verdictChip(missionText, metFail.length ? 'fail' : 'pass', 'Mission'),
-      verdictChip(safetyText, rec.safety.status, 'Safety')),
+      verdictChip(safetyText, rec.safety.status, 'Safety', SAFETY_NOTE)),
     metrics.length ? h('dl', { class: 'pl-metrics' }, metrics.map((m) => h('div', null, h('dt', null, m.label), h('dd', { class: 'mono' }, m.value === null ? '—' : `${hudNum(m.value)} ${m.unit}`)))) : null,
     failed.length ? h('ul', { class: 'pl-failed' }, failed.map((q) => h('li', null,
       h('button', { type: 'button', class: 'link', title: 'Move the playback to the decisive instant', onclick: () => { if (Number.isFinite(q.t)) { pl.cursor.pause(); pl.cursor.set(q.t); } } }, q.label),

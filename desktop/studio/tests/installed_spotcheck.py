@@ -34,10 +34,11 @@ FACTS = {}
 
 def godot_children(parent_pid):
     ps = (
+        "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
         f"Get-CimInstance Win32_Process -Filter 'ParentProcessId={int(parent_pid)}' | Where-Object {{ $_.Name -like 'Godot*' }} "
         "| ForEach-Object { [pscustomobject]@{ pid = $_.ProcessId; name = $_.Name; cmd = $_.CommandLine } } | ConvertTo-Json -Compress"
     )
-    out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True).stdout.strip()
+    out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.strip().lstrip("﻿")
     if not out:
         return []
     data = json.loads(out)

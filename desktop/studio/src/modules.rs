@@ -1019,12 +1019,64 @@ pub async fn cinematic_uninstall(state: State<'_, AppState>) -> Result<Status, P
     .await
 }
 
+/// Display arguments for the module's readout: labels the Studio shows for the run (its label in the
+/// player, the vehicle name, the seed). They are text for the screen, never paths or switches: each
+/// is cut to a short length, control characters become spaces, and the module refuses anything else.
+#[derive(Default, Debug, PartialEq, Eq)]
+pub struct Display {
+    pub run_label: Option<String>,
+    pub vehicle: Option<String>,
+    pub exploratory: bool,
+    pub seed: Option<u64>,
+}
+
+const LABEL_MAX_CHARS: usize = 80;
+
+fn clean_label(s: &str) -> Option<String> {
+    let t: String = s
+        .chars()
+        .map(|c| if c.is_control() { ' ' } else { c })
+        .take(LABEL_MAX_CHARS)
+        .collect();
+    let t = t.trim().to_string();
+    (!t.is_empty()).then_some(t)
+}
+
+impl Display {
+    /// Appends the display arguments after the fixed ones (the module reads them after `--`).
+    pub fn append_to(&self, args: &mut Vec<String>) {
+        if let Some(l) = self.run_label.as_deref().and_then(clean_label) {
+            args.extend(["--run-label".to_string(), l]);
+        }
+        if let Some(v) = self.vehicle.as_deref().and_then(clean_label) {
+            args.extend(["--vehicle".to_string(), v]);
+        }
+        if self.exploratory {
+            args.push("--exploratory".to_string());
+        }
+        if let Some(s) = self.seed {
+            args.extend(["--seed".to_string(), s.to_string()]);
+        }
+    }
+}
+
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn cinematic_launch(
     state: State<'_, AppState>,
     run_id: String,
     env_id: String,
+    run_label: Option<String>,
+    vehicle: Option<String>,
+    exploratory: Option<bool>,
+    seed: Option<u64>,
 ) -> Result<(), PlatformError> {
+    let display = Display {
+        run_label,
+        vehicle,
+        exploratory: exploratory.unwrap_or(false),
+        seed,
+    };
     let p = state.platform()?;
     let run_dir = p.library().run_dir(&run_id).map_err(invalid)?;
     if !p.library().has_run(&run_id) {
@@ -1043,6 +1095,10 @@ pub async fn cinematic_launch(
         )?;
         // A refused launch means the cached "files matched" status is out of date.
         let started = launch_command(&modules.root, &run_dir, &env_dir)
+            .map(|mut launch| {
+                display.append_to(&mut launch.args);
+                launch
+            })
             .and_then(|launch| spawn_checked(&launch))
             .inspect_err(|_| modules.forget())?;
         *slot = Some(started);
@@ -1301,6 +1357,42 @@ mod tests {
             let s = install(&real, &zp).unwrap();
             assert!(s.installed && s.verified, "{s:?}");
         }
+    }
+
+    #[test]
+    fn display_arguments_are_short_text_after_the_fixed_ones() {
+        let mut args = vec!["--run".to_string(), "R".to_string()];
+        Display {
+            run_label: Some("Engine thrust 0.7 \u{d7}\n\t--shot x".to_string()),
+            vehicle: Some("Heavy return stage".to_string()),
+            exploratory: true,
+            seed: Some(5000),
+        }
+        .append_to(&mut args);
+        assert_eq!(
+            args,
+            [
+                "--run",
+                "R",
+                "--run-label",
+                "Engine thrust 0.7 \u{d7}  --shot x",
+                "--vehicle",
+                "Heavy return stage",
+                "--exploratory",
+                "--seed",
+                "5000"
+            ]
+        );
+        let mut none = Vec::new();
+        Display {
+            run_label: Some("   ".to_string()),
+            vehicle: Some("x".repeat(500)),
+            ..Display::default()
+        }
+        .append_to(&mut none);
+        assert_eq!(none.len(), 2);
+        assert_eq!(none[0], "--vehicle");
+        assert_eq!(none[1].chars().count(), LABEL_MAX_CHARS);
     }
 
     #[test]

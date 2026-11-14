@@ -3,6 +3,7 @@
 // is never drawn as a pass. Status is carried by a glyph and a word as well as by colour.
 
 import { h, icon, num, timeText, prose, words } from './dom.js';
+import { safetyWording, SAFETY_NOTE } from './requirements.js';
 import { CATEGORY_TITLE, STATUS_TEXT, verdictOfOutcome, verdictOfSafety, verdictOfRequirement } from './model.js';
 
 const GLYPH = { pass: 'check', fail: 'cross', unsafe: 'warn', partial: 'dash', neutral: 'dash' };
@@ -31,9 +32,9 @@ export function verdictBlocks(record) {
   const cls = record.safety.class;
   const safety = h('div', { class: ['verdict', `v-${sv}`], role: 'group', 'aria-label': 'Safety', tabindex: '0' },
     h('div', { class: 'verdict-k' }, 'Safety, judged on the true state'),
-    h('div', { class: 'verdict-v' }, verdictGlyph(sv), h('span', null, unjudged ? 'Not evaluated' : record.safety.status === 'safe' ? 'Safe' : record.safety.status === 'unsafe' ? 'Unsafe' : record.safety.status),
+    h('div', { class: 'verdict-v' }, verdictGlyph(sv), h('span', null, safetyWording(record).text),
       cls && !unjudged ? h('span', { class: ['class-badge', `class-${cls}`], title: 'Classification of the run reported by the domain verifier' }, `class ${cls}`) : null),
-    h('p', { class: 'verdict-x' }, prose(record.safety.explanation)));
+    h('p', { class: 'verdict-x' }, prose(record.safety.explanation), ' ', SAFETY_NOTE));
   return [outcome, safety];
 }
 

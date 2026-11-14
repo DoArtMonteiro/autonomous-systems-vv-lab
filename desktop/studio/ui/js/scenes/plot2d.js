@@ -83,7 +83,7 @@ export class Plot2D {
     const rule = cssVar('--rule');
     const fg3 = cssVar('--fg-3');
     const mono = cssVar('--mono');
-    ctx.font = `11px ${mono}`;
+    ctx.font = `12px ${mono}`;
     ctx.lineWidth = 1;
     const sx = niceStep(P.xmax - P.xmin, Math.max(2, P.pw / 90));
     const sy = niceStep(P.ymax - P.ymin, Math.max(2, P.ph / 60));

@@ -8,8 +8,9 @@ import { h, clear, prose } from '../dom.js';
 import { api } from '../api.js';
 import { domainById, visibleDomains, emit, loadRecord } from '../store.js';
 import { toast, errorText, askConfirm } from '../ui.js';
-import { verdictOfOutcome, verdictOfSafety, faultText, distinguishingLabels } from '../model.js';
+import { verdictOfOutcome, faultText, distinguishingLabels } from '../model.js';
 import { verdictGlyph } from '../verification.js';
+import { indexNumbers, limitOf, marginOf, unitOf, reqView, reqLabel, safetyWording, SAFETY_NOTE, headlineChange, fmtSig } from '../requirements.js';
 
 const REQUEST_SCHEMA = 'vv-run-request.v1';
 const BATCH = 8; // the platform's MAX_COMPARE
@@ -98,58 +99,10 @@ function failedOf(record) {
   return (record.requirements || []).filter((r) => r.status === 'fail');
 }
 
-// Numbers the domain publishes with a record: the metrics requirement_observed.<id>,
-// requirement_limit.<id> and requirement_margin.<id> (margin positive when met, in the unit of the
-// metric). They are read once per record into this table; a record without them (older records,
-// requirements that are not one quantity against one bound) falls back to the text of the requirement.
-const NUMBERS = new WeakMap();
-
-function indexNumbers(record) {
-  const byId = new Map((record.metrics || []).map((m) => [m.id, m]));
-  for (const r of record.requirements || []) {
-    const margin = byId.get(`requirement_margin.${r.id}`);
-    const limit = byId.get(`requirement_limit.${r.id}`);
-    if (margin && limit && Number.isFinite(margin.value) && Number.isFinite(limit.value)) NUMBERS.set(r, { margin: margin.value, limit: limit.value, unit: margin.unit || '' });
-  }
-  return record;
-}
+// The numbers of a requirement (observed, limit, margin, unit) are read by requirements.js.
 
 async function loadIndexed(runId) {
   return indexNumbers(await loadRecord(runId));
-}
-
-/** The number and comparison of a requirement's expected text ("<= 3 m/s", ">= 0.9962 cos"). */
-function limitOf(r) {
-  const n = NUMBERS.get(r);
-  if (n) return { op: '', value: n.limit };
-  const m = /^\s*(<=|>=|<|>)\s*(-?[\d.]+(?:e[-+]?\d+)?)/i.exec(r.expected || '');
-  return m ? { op: m[1], value: Number(m[2]) } : null;
-}
-
-function observedOf(r) {
-  const m = /(-?[\d.]+(?:e[-+]?\d+)?)/i.exec(r.observed || '');
-  return m ? Number(m[1]) : null;
-}
-
-/**
- * Margin to the limit in the requirement's unit, positive when met. It is the number the domain
- * published when there is one; otherwise it is parsed from the requirement's expected and observed
- * text, so it is only as precise as that text, and a composite observation gives none.
- */
-function marginOf(r) {
-  const n = NUMBERS.get(r);
-  if (n) return n.margin;
-  const lim = limitOf(r);
-  const obs = observedOf(r);
-  if (!lim || obs === null || !Number.isFinite(obs)) return null;
-  return lim.op.startsWith('<') ? lim.value - obs : obs - lim.value;
-}
-
-function unitOf(r) {
-  const n = NUMBERS.get(r);
-  if (n) return n.unit;
-  const m = /-?[\d.]+(?:e[-+]?\d+)?\s*(.*)$/i.exec(r.expected || '');
-  return m ? m[1].trim() : '';
 }
 
 // Element.append writes null as the text "null"; optional parts go through this instead.
@@ -345,7 +298,7 @@ function renderEmpty() {
   root.append(h('div', { class: 'lab lab-empty' },
     h('p', { class: 'eyebrow' }, 'Experiment Lab'),
     h('h1', null, 'Start from a run'),
-    h('p', { class: 'lab-lede' }, 'Pick a vehicle in the hangar, open a mission or a stored run and choose “Change the conditions”, or start from the default conditions of a domain. The Lab keeps that run as the baseline and compares every new run with it.'),
+    h('p', { class: 'lab-lede' }, 'Pick a vehicle in the hangar, open a mission or a stored run and choose “Open in Experiment Lab”, or start from the default conditions of a domain. The Lab keeps that run as the baseline and compares every new run with it.'),
     h('div', { class: 'row' }, h('button', { type: 'button', class: 'btn btn-primary', onclick: () => navigate('vehicles') }, 'Choose a vehicle'),
       doms.map((d) => h('button', { type: 'button', class: 'btn', onclick: (e) => startDefault(d, e.currentTarget) }, `Default run: ${d.manifest.name}`)),
       h('button', { type: 'button', class: 'btn btn-quiet', onclick: () => navigate('library') }, 'Choose a stored run'))));
@@ -377,11 +330,10 @@ async function startDefault(d, btn, scenarioId, openGroup) {
 
 function verdictPill(record) {
   const ov = verdictOfOutcome(record.outcome.status);
-  const unjudged = record.safety.status === 'safe' && record.safety.class === 'not_evaluated';
-  const sv = unjudged ? 'neutral' : verdictOfSafety(record.safety.status);
+  const sw = safetyWording(record);
   return h('div', { class: 'lab-verdicts' },
     h('span', { class: ['mini', `v-${ov}`], title: prose(record.outcome.explanation) }, verdictGlyph(ov), record.outcome.label),
-    h('span', { class: ['mini', `v-${sv}`], title: prose(record.safety.explanation) }, verdictGlyph(sv), unjudged ? 'Safety not evaluated' : record.safety.status === 'safe' ? 'Safety rules held' : record.safety.status));
+    h('span', { class: ['mini', `v-${sw.verdict}`], title: `${prose(record.safety.explanation)}\n${SAFETY_NOTE}` }, verdictGlyph(sw.verdict), sw.text));
 }
 
 function runLine(req) {
@@ -416,11 +368,12 @@ function renderBase(rec) {
         h('ul', { class: 'lab-req-list' }, failed.map((r) => {
           const on = lab.focus.has(r.id);
           const m = marginOf(r);
-          return h('li', null, h('button', { type: 'button', class: ['lab-req', on ? 'is-focus' : ''], 'aria-pressed': String(on), title: 'Highlight the parameters the domain lists as acting on this requirement', onclick: () => { if (on) lab.focus.delete(r.id); else lab.focus.add(r.id); render(); } },
-            h('span', { class: 'lab-req-l' }, r.label),
-            h('span', { class: 'lab-req-v mono' }, `${r.observed} · limit ${r.expected}`),
+          const rv = reqView(r);
+          return h('li', null, h('button', { type: 'button', class: ['lab-req', on ? 'is-focus' : ''], 'aria-pressed': String(on), title: `${rv.full}\nHighlight the parameters the domain lists as acting on this requirement`, onclick: () => { if (on) lab.focus.delete(r.id); else lab.focus.add(r.id); render(); } },
+            h('span', { class: 'lab-req-l' }, reqLabel(r)),
+            h('span', { class: 'lab-req-v mono' }, `${rv.obsText} · limit ${rv.limitText}`),
             marginBar(r),
-            m === null ? null : h('span', { class: 'lab-req-m small' }, `${fmt(Math.abs(m))} ${unitOf(r)} ${m >= 0 ? 'inside' : 'beyond'} the limit`)));
+            m === null ? null : h('span', { class: 'lab-req-m small' }, `${rv.numeric ? `${fmtSig(Math.abs(rv.margin))} ${rv.unit}` : `${fmtSig(Math.abs(m))} ${unitOf(r)}`} ${(rv.numeric ? rv.margin : m) >= 0 ? 'inside' : 'beyond'} the limit`)));
         })),
         h('p', { class: 'small dim' }, 'Margins are the numbers the domain publishes with the record; where it publishes none they are read from the expected and observed text, and a requirement made of several quantities shows no margin. Select a requirement to highlight the parameters the domain lists for it.'))
       : h('p', { class: 'lab-allmet' }, 'Every requirement met. Try a harder condition to find where this configuration stops meeting them.'),
@@ -476,7 +429,7 @@ function renderEdit(cat, sc) {
   const el = parts.edit;
   const base = lab.base.record.request;
   const vehicle = sc ? cat.vehicles.find((v) => v.id === sc.vehicle) : null;
-  el.append(h('p', { class: 'lab-h' }, 'Change the conditions'));
+  el.append(h('p', { class: 'lab-h' }, 'Conditions to change'));
 
   el.append(h('div', { class: 'lab-block' },
     h('label', { class: 'lab-field-l', for: 'lab-scenario' }, 'Vehicle and scenario'),
@@ -533,9 +486,9 @@ function renderEdit(cat, sc) {
 
   const diff = changes();
   el.append(h('div', { class: 'lab-run-bar' },
-    h('p', { class: 'small' }, diff.length ? `${diff.length} change${diff.length > 1 ? 's' : ''} from the baseline` : 'No change from the baseline yet'),
+    h('p', { class: 'small', id: 'lab-run-why' }, diff.length ? `${diff.length} change${diff.length > 1 ? 's' : ''} from the baseline` : 'Change one condition first'),
     diff.length ? h('button', { type: 'button', class: 'btn btn-quiet', onclick: () => { startFrom(lab.base.id, lab.base.record); render(); } }, 'Reset all') : null,
-    h('button', { type: 'button', class: ['btn', 'btn-primary', lab.busy === 'run' ? 'is-busy' : ''], id: 'lab-run', disabled: !!lab.busy || !diff.length, onclick: runExperiment }, 'Run experiment')));
+    h('button', { type: 'button', class: ['btn', 'btn-primary', lab.busy === 'run' ? 'is-busy' : ''], id: 'lab-run', 'aria-describedby': 'lab-run-why', disabled: !!lab.busy || !diff.length, onclick: runExperiment }, 'Run experiment')));
 }
 
 function renderResult() {
@@ -554,6 +507,18 @@ function renderResult() {
 function reqRows(base, exp) {
   const ids = [...new Set([...base.requirements.map((r) => r.id), ...exp.requirements.map((r) => r.id)])];
   return ids.map((id) => ({ id, a: base.requirements.find((r) => r.id === id), b: exp.requirements.find((r) => r.id === id) }));
+}
+
+/** Rows that fail in either run first, then the rest, each group in the record's own order. */
+function orderRows(rows) {
+  const failing = (r) => (r.a && r.a.status === 'fail') || (r.b && r.b.status === 'fail');
+  return [...rows.filter(failing), ...rows.filter((r) => !failing(r))];
+}
+
+/** The requirement that moved most between the two runs, with its numbers: what to look at first. */
+function headlineLine(a, b) {
+  const hc = headlineChange(a, b);
+  return h('p', { class: 'lab-headline', id: 'lab-headline' }, h('span', { class: 'dim small' }, 'Largest change: '), hc ? h('b', null, hc.text) : h('span', null, 'no requirement value differs between the two runs'));
 }
 
 function firstEvents(record) {
@@ -577,23 +542,25 @@ function renderComparison(el) {
     h('div', null, h('p', { class: 'lab-h2' }, 'Baseline'), verdictPill(a)),
     h('span', { class: 'lab-arrow', 'aria-hidden': 'true' }, '→'),
     h('div', null, h('p', { class: 'lab-h2' }, 'Experiment'), verdictPill(b))),
+  headlineLine(a, b),
   h('p', { class: 'lab-why' }, summary.length ? `The experiment ${summary.join(' and ')}.` : 'The same requirements pass and fail as in the baseline; the margins below show how far each moved.',
     judgingOnly ? ' Only a requirement limit changed: the flight is identical and only the judgement moved.' : ''),
   lab.exp.reused ? h('p', { class: 'small dim' }, 'An identical request was already in the library, so its stored run is shown; it was computed by the same simulator.') : null,
   h('div', { class: 'lab-diff' }, h('p', { class: 'lab-h2' }, 'What was changed'), h('ul', null, diff.map((d) => h('li', { class: 'small' }, d.text, d.judging ? h('span', { class: 'dim' }, ' (judging only)') : null)))),
   h('div', { class: 'lab-table-wrap' }, h('table', { class: 'grid-table lab-table' },
     h('thead', null, h('tr', null, h('th', null, 'Requirement'), h('th', null, 'Limit'), h('th', null, 'Baseline'), h('th', null, 'Experiment'), h('th', null, 'Margin change'))),
-    h('tbody', null, rows.map(({ a: ra, b: rb }) => {
-      const ma = ra ? marginOf(ra) : null;
-      const mb = rb ? marginOf(rb) : null;
-      const delta = ma !== null && mb !== null ? mb - ma : null;
+    h('tbody', null, orderRows(rows).map(({ a: ra, b: rb }) => {
       const r = rb || ra;
-      const cell = (x) => (x ? h('td', { class: ['mono', 'small', `st-${x.status}`] }, `${x.status === 'pass' ? '✓' : x.status === 'fail' ? '✕' : '·'} ${x.observed}`) : h('td', null, '–'));
-      return h('tr', { class: ra && rb && ra.status !== rb.status ? 'is-flip' : '' },
-        h('td', null, r.label, r.category === 'invariant' ? h('span', { class: 'dim small' }, ' · safety') : null),
-        h('td', { class: 'mono small' }, rb ? rb.expected : ra.expected),
-        cell(ra), cell(rb),
-        h('td', { class: ['mono', 'small', delta === null ? '' : delta > 1e-12 ? 'is-better' : delta < -1e-12 ? 'is-worse' : ''] }, delta === null ? '–' : `${delta > 0 ? '+' : ''}${fmt(delta)} ${unitOf(r)}`));
+      const va = ra ? reqView(ra) : null;
+      const vb = rb ? reqView(rb) : null;
+      const delta = va && vb && va.numeric && vb.numeric ? vb.margin - va.margin : null;
+      // Each cell: the verdict, the observed value and its margin to the limit, not only Pass or Fail.
+      const cell = (x, v) => (x ? h('td', { class: ['mono', 'small', `st-${x.status}`], title: v.full }, h('span', { class: 'lab-cell-v' }, `${x.status === 'pass' ? '✓' : x.status === 'fail' ? '✕' : '·'} ${v.obsText}`), v.marginText ? h('span', { class: 'lab-cell-m dim' }, `margin ${v.marginText}`) : null) : h('td', null, '–'));
+      return h('tr', { class: ra && rb && ra.status !== rb.status ? 'is-flip' : '', dataset: { req: r.id } },
+        h('td', { title: (vb || va).full }, reqLabel(r)),
+        h('td', { class: 'mono small' }, (vb || va).limitText),
+        cell(ra, va), cell(rb, vb),
+        h('td', { class: ['mono', 'small', delta === null ? '' : delta > 1e-12 ? 'is-better' : delta < -1e-12 ? 'is-worse' : ''] }, delta === null ? '–' : Math.abs(delta) < 1e-12 ? `0 ${(vb || va).unit}` : `${delta > 0 ? '+' : '-'}${fmtSig(Math.abs(delta))} ${(vb || va).unit}`));
     })))),
   eventDeltas(a, b),
   h('p', { class: 'small dim' }, `One run on seed ${b.request.seed}. A change that helps one seed may not help another: check it across seeds below.`),
@@ -656,7 +623,8 @@ function renderGeneralisation(el) {
   }
   if (!g) {
     box.append(h('p', { class: 'small dim' }, 'Runs the baseline conditions and your conditions on the same development seeds from 5000 upward. Protected seeds are never used.'),
-      h('div', { class: 'row' }, [8, 16, 32].map((n) => h('button', { type: 'button', class: 'btn', dataset: { seeds: n }, disabled: !!lab.busy || !changes().length, onclick: () => checkSeeds(n) }, `${n} seeds`))));
+      h('div', { class: 'row' }, [8, 16, 32].map((n) => h('button', { type: 'button', class: 'btn', dataset: { seeds: n }, 'aria-describedby': 'lab-seeds-why', disabled: !!lab.busy || !changes().length, onclick: () => checkSeeds(n) }, `${n} seeds`))),
+      !changes().length ? h('p', { class: 'small dim', id: 'lab-seeds-why' }, lab.exp ? 'The conditions are back at the baseline: change one condition first.' : 'Run an experiment first.') : null);
     return;
   }
   const n = g.seeds.length;
@@ -731,7 +699,7 @@ function sweepResult(sw, cat) {
       return h('tr', { class: passes(rec) ? 'is-pass' : '' },
         h('td', { class: 'mono' }, h('button', { type: 'button', class: 'link mono', title: 'Use this value in the experiment', onclick: () => { if (v === spec.default) delete lab.form.params[spec.id]; else lab.form.params[spec.id] = v; render(); } }, fmt(v, 6))),
         h('td', null, rec.outcome.label),
-        reqIds.map((id) => { const q = rec.requirements.find((r) => r.id === id); return h('td', { class: ['mono', 'small', q ? `st-${q.status}` : ''] }, q ? q.observed : '–'); }));
+        reqIds.map((id) => { const q = rec.requirements.find((r) => r.id === id); const rv = q ? reqView(q) : null; return h('td', { class: ['mono', 'small', q ? `st-${q.status}` : ''], title: rv ? rv.full : '' }, rv ? rv.obsText : '–'); }));
     }))));
   const target = reqIds.find((id) => sw.records.some((r) => r && r.requirements.find((q) => q.id === id && marginOf(q) !== null)));
   return h('div', null, target ? sweepChart(sw, spec, target, label(target)) : null, table,

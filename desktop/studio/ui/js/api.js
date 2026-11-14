@@ -57,7 +57,7 @@ export const api = {
   cinematicStatus: () => invoke('cinematic_status'),
   cinematicInstallFromFile: () => invoke('cinematic_install_from_file'),
   cinematicUninstall: () => invoke('cinematic_uninstall'),
-  cinematicLaunch: (runId, envId) => invoke('cinematic_launch', { runId, envId }),
+  cinematicLaunch: (runId, envId, display = {}) => invoke('cinematic_launch', { runId, envId, runLabel: display.runLabel ?? null, vehicle: display.vehicle ?? null, exploratory: !!display.exploratory, seed: Number.isInteger(display.seed) && display.seed >= 0 ? display.seed : null }),
 };
 
 let reporting = false;

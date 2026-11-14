@@ -22,7 +22,7 @@ export function cinematicStatus() {
 }
 
 const OPENING_MS = 30000; // how long "Opening the Cinematic View" stays when the window is not dismissed
-const mbText =(b) => `${(b / 1048576).toFixed(0)} MB`;
+const mbText = (b) => `${(b / 1048576).toFixed(0)} MB`;
 
 /**
  * "Cinematic view" button for the player: opens the stored run `runId()` on environment `envId()`
@@ -33,7 +33,7 @@ const mbText =(b) => `${(b / 1048576).toFixed(0)} MB`;
  * aria-describedby points to, so a keyboard or screen-reader user can read why. Returns a wrapper
  * (the button and that text); the button carries data-action="cinematic".
  */
-export function cinematicButton(runId, envId, replayable) {
+export function cinematicButton(runId, envId, replayable, info) {
   const reasonId = `cin-why-${++cinSeq}`;
   const why = h('span', { class: 'sr-only', id: reasonId });
   const b = h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'cinematic' }, 'aria-disabled': 'true', 'aria-describedby': reasonId, title: 'Checking the Cinematic View module…' }, 'Cinematic view');
@@ -53,7 +53,7 @@ export function cinematicButton(runId, envId, replayable) {
   }).catch((e) => off(`The module status could not be read: ${errorText(e)}`));
   b.addEventListener('click', () => {
     if (b.getAttribute('aria-disabled') === 'true') return;
-    api.cinematicLaunch(runId(), envId()).then(() => {
+    api.cinematicLaunch(runId(), envId(), info ? info() : {}).then(() => {
       // The module decodes its assets before it draws (about 12 to 15 s on the reference PC), so say
       // so in a status that stays until the window has had time to open, or until it is dismissed.
       const opening = toast('Opening the Cinematic View in its own window. The first frame takes about 15 seconds.', 'info', 0);

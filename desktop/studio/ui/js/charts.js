@@ -38,7 +38,7 @@ function alpha(hex, a) {
 export function axisStyle() {
   const muted = cssVar('--fg-3');
   const rule = cssVar('--rule');
-  const font = `11px ${cssVar('--mono')}`;
+  const font = `12px ${cssVar('--mono')}`;
   return {
     stroke: muted,
     font,

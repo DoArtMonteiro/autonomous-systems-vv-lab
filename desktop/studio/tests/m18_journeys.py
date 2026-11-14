@@ -269,7 +269,7 @@ def player_header(s):
         r = header_overlaps(s)
         NUMBERS[f"player_header_{w}x{hgt}"] = r
         check(f"Player header {w}x{hgt}: the window has the size asked for", abs(got[0] - w) <= 1 and abs(got[1] - hgt) <= 1, json.dumps(got))
-        check(f"Player header {w}x{hgt}: Analyse, Compare in detail, Cinematic view and Change the conditions are all there", r["actions"] == ["Analyse", "Compare in detail", "Cinematic view", "Change the conditions"], json.dumps(r["actions"]))
+        check(f"Player header {w}x{hgt}: Analyse, Compare in detail, Cinematic view and Open in Experiment Lab are all there", r["actions"] == ["Analyse", "Compare in detail", "Cinematic view", "Open in Experiment Lab"], json.dumps(r["actions"]))
         check(f"Player header {w}x{hgt}: no two controls overlap", not r["clash"], "; ".join(r["clash"])[:300])
         check(f"Player header {w}x{hgt}: every control is inside the window", not r["outside"], ", ".join(r["outside"]))
         check(f"Player header {w}x{hgt}: the header stays compact", r["headHeight"] <= 150, f"{r['headHeight']} px")

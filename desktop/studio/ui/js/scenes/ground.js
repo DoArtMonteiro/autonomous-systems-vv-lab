@@ -31,7 +31,7 @@ function drawWorld(ctx, P, g) {
     ctx.setLineDash([]);
     ctx.lineWidth = 1.5;
     ctx.strokeRect(P.x(g.bounds.min_x), P.y(g.bounds.max_y), P.x(g.bounds.max_x) - P.x(g.bounds.min_x), P.y(g.bounds.min_y) - P.y(g.bounds.max_y));
-    ctx.font = `10.5px ${c('--sans')}`;
+    ctx.font = `12px ${c('--sans')}`;
     ctx.fillStyle = c('--fg-3');
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
@@ -68,7 +68,7 @@ function drawWorld(ctx, P, g) {
 }
 
 function label(ctx, P, text, x, y) {
-  ctx.font = `11px ${P.colour('--sans')}`;
+  ctx.font = `12px ${P.colour('--sans')}`;
   ctx.fillStyle = P.colour('--fg-2');
   ctx.textAlign = 'left';
   ctx.textBaseline = 'bottom';

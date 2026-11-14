@@ -58,6 +58,7 @@ function card(e, current, onPick) {
   return h('article', { class: ['at-card', chosen ? 'is-current' : ''], dataset: { env: e.id } },
     h('div', { class: 'at-art' }, img,
       h('span', { class: `at-level at-level-${lv.tone}` }, lv.word),
+      h('span', { class: 'at-ctx', title: 'The simulation runs on flat ground. The landscape is geographic context: it is never an input to the physics.' }, 'Terrain is context only'),
       chosen ? h('span', { class: 'at-using' }, 'Used by the missions') : null),
     h('div', { class: 'at-body' },
       h('h3', { class: 'at-name', tabindex: '-1' }, e.name),
@@ -74,14 +75,14 @@ function card(e, current, onPick) {
 }
 
 export async function showAtlas() {
-  const status = h('p', { class: 'small dim' }, 'Reading the validated environment packs…');
+  const status = h('p', { class: 'small dim' }, 'Reading the environment packs…');
   const grid = h('div', { class: 'at-grid' });
   const cine = h('section', { class: 'at-cine', 'aria-label': 'Cinematic View' });
   const page = h('div', { class: 'at' },
     h('header', { class: 'at-head' },
       h('p', { class: 'eyebrow' }, 'Environments and cinematic experiences'),
       h('h1', null, 'Choose where the mission flies.'),
-      h('p', { class: 'at-lede' }, 'Real places built from open geographic data: orthophotos, lidar and survey terrain, OpenStreetMap buildings and lidar-measured vegetation. Each pack is validated on this machine before it is listed: file hashes, grid sizes and its own geodetic check points. The simulation runs on flat ground in every case; the landscape is context, never an input to the physics.'),
+      h('p', { class: 'at-lede' }, 'Real places built from open geographic data: orthophotos, lidar and survey terrain, OpenStreetMap buildings and lidar-measured vegetation. Each pack is integrity-checked on this machine before it is listed: file hashes, grid sizes and its own geodetic check points. The simulation runs on flat ground in every case; the landscape is context, never an input to the physics.'),
       status),
     grid, cine);
   // A polite status that says what a choice did; the cards are redrawn, so it lives outside them.
@@ -94,11 +95,14 @@ export async function showAtlas() {
     h('p', { class: 'eyebrow' }, 'Cinematic View'),
     h('h2', null, 'The same record, rendered for the eye'),
     h('p', { class: 'small' }, 'An optional replay window with physically based lighting, atmosphere, volumetric plume and terrain detail. It reads the stored run record and the environment pack and never simulates: positions, attitude, throttle and events are those of the record, and the verdicts are hidden until the end of playback. Open it from a rocket landing in the mission player.'),
-    h('p', { class: 'small at-cine-status', 'aria-live': 'polite' }, 'Checking the module…')));
+    h('p', { class: 'small at-cine-status', 'aria-live': 'polite' }, 'Checking the module: the first check reads all of its files, which takes a few seconds…')));
+  // The check is slow only the first time; after a while the text says it is still working, never silence.
+  const late = setTimeout(() => { const el = cine.querySelector('.at-cine-status'); if (el && /^Checking/.test(el.textContent)) el.textContent = 'Still checking the module: reading about 450 MB of files. This is the first check of this session.'; }, 8000);
   cinematicStatus().then((s) => {
+    clearTimeout(late);
     const el = cine.querySelector('.at-cine-status');
     el.textContent = s.installed && s.verified ? `Installed: version ${s.version}; every file matches its manifest.` : `${s.reason || 'Not installed.'} Install it in Settings from a module zip.`;
-  }).catch((e) => { cine.querySelector('.at-cine-status').textContent = `The module status could not be read: ${errorText(e)}`; });
+  }).catch((e) => { clearTimeout(late); cine.querySelector('.at-cine-status').textContent = `The module status could not be read: ${errorText(e)}`; });
   cine.append(h('div', { class: 'row' },
     h('button', { type: 'button', class: 'btn btn-primary', onclick: () => { const id = pref('missionEnvironment') || (envs[0] && envs[0].id); if (id) useEnv(id); navigate('mission', { experienceId: 'first-landing' }); } }, 'Open a landing in the player'),
     h('button', { type: 'button', class: 'btn btn-quiet', onclick: () => navigate('settings') }, 'Module settings')));
@@ -123,6 +127,6 @@ export async function showAtlas() {
       if (title) title.focus();
     }
   };
-  status.textContent = `${envs.length} environments validated and installed, ${mb(envs.reduce((a, e) => a + (e.bytes || 0), 0))} in all.${list.rejected && list.rejected.length ? ` ${list.rejected.length} pack${list.rejected.length > 1 ? 's were' : ' was'} rejected; see Settings, Environments.` : ''}`;
+  status.textContent = `${envs.length} environments integrity-checked and installed, ${mb(envs.reduce((a, e) => a + (e.bytes || 0), 0))} in all.${list.rejected && list.rejected.length ? ` ${list.rejected.length} pack${list.rejected.length > 1 ? 's were' : ' was'} rejected; see Settings, Environments.` : ''}`;
   render();
 }

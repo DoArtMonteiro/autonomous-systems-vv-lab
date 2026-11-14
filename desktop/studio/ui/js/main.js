@@ -50,6 +50,15 @@ export async function navigate(view, opts) {
     if (b.dataset.view === (NAV_OF[view] || view)) b.setAttribute('aria-current', 'page');
     else b.removeAttribute('aria-current');
   }
+  // The "More" menu of a narrow window stands for the workspaces it holds.
+  const moreBtn = document.getElementById('nav-more');
+  if (moreBtn) {
+    const inMore = [...document.querySelectorAll('.nav-more-item')].some((b) => b.dataset.view === (NAV_OF[view] || view));
+    if (inMore) moreBtn.setAttribute('aria-current', 'page'); else moreBtn.removeAttribute('aria-current');
+    for (const b of document.querySelectorAll('.nav-more-item')) {
+      if (b.dataset.view === (NAV_OF[view] || view)) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+    }
+  }
   try {
     if (view === 'home') showHome();
     else if (view === 'missions') showMissions(opts);
@@ -183,7 +192,7 @@ async function openPalette() {
   try {
     const runs = await api.listRuns();
     for (const m of runs.slice(0, 300)) {
-      items.push({ group: 'run', title: m.label || `${m.summary.scenario} · ${m.summary.controller} · seed ${m.summary.seed}`, hint: `${m.run_id} · ${m.summary.faults.length ? m.summary.faults.join(' + ') : 'no fault'} · ${m.summary.outcome_label}, ${m.summary.safety_status}`, run: () => navigate('run', { runId: m.run_id, meta: m }) });
+      items.push({ group: 'run', title: m.label || `${m.summary.scenario} · ${m.summary.controller} · seed ${m.summary.seed}`, hint: `${m.run_id} · ${m.summary.faults.length ? m.summary.faults.join(' + ') : 'no fault'} · ${m.summary.outcome_label}, ${m.summary.safety_status === 'safe' ? 'no safety rule broken' : 'a safety rule broken'}`, run: () => navigate('run', { runId: m.run_id, meta: m }) });
     }
     for (const s of await api.listScenarios()) items.push({ group: 'scenario', title: s.name, hint: `${s.requests.length} requests`, run: () => openSaved(s) });
   } catch (e) {
@@ -234,6 +243,39 @@ document.addEventListener('keydown', (e) => {
 });
 
 for (const b of document.querySelectorAll('.nav-btn')) b.addEventListener('click', () => navigate(b.dataset.view));
+
+// Below 1100 px the secondary workspaces collapse into this menu (CSS shows the button). It is a
+// menu button: Enter, Space or Down open it, the arrow keys, Home and End move, Escape closes and
+// returns focus to the button, and choosing an item opens that workspace.
+{
+  const btn = document.getElementById('nav-more');
+  const menu = document.getElementById('nav-more-menu');
+  const items = () => [...menu.querySelectorAll('.nav-more-item')];
+  const close = (focus) => { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); if (focus) btn.focus(); };
+  const open = (which) => {
+    menu.hidden = false;
+    btn.setAttribute('aria-expanded', 'true');
+    const list = items();
+    (which === 'last' ? list[list.length - 1] : list[0]).focus();
+  };
+  btn.addEventListener('click', () => (menu.hidden ? open('first') : close(true)));
+  btn.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); open('first'); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); open('last'); }
+  });
+  menu.addEventListener('keydown', (e) => {
+    const list = items();
+    const i = list.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown') { e.preventDefault(); list[(i + 1) % list.length].focus(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); list[(i - 1 + list.length) % list.length].focus(); }
+    else if (e.key === 'Home') { e.preventDefault(); list[0].focus(); }
+    else if (e.key === 'End') { e.preventDefault(); list[list.length - 1].focus(); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(true); }
+    else if (e.key === 'Tab') close(false);
+  });
+  for (const b of items()) b.addEventListener('click', () => { close(false); navigate(b.dataset.view); });
+  document.addEventListener('click', (e) => { if (!menu.hidden && !e.target.closest('#nav-more-wrap')) close(false); });
+}
 document.getElementById('open-help').addEventListener('click', () => showHelp());
 document.getElementById('open-palette').addEventListener('click', () => openPalette());
 

@@ -27,7 +27,7 @@ const ROLE = {
  * the cautious reading.
  */
 function evidence(v) {
-  if (v.evidence === 'reference') return { word: 'Reference case', tone: 'ref', text: 'The frozen, pre-registered case the platform’s verification results rest on. Verified model behaviour, not validated against flight data.' };
+  if (v.evidence === 'reference') return { word: 'Reference case', tone: 'ref', text: 'The frozen, pre-registered case the platform’s verification results rest on. Recomputed model behaviour, not validated against flight data.' };
   return { word: 'Exploratory', tone: 'explore', text: 'Illustrative values of the right order of magnitude. Runs are recomputable records of this model, not evidence for any pre-registered claim.' };
 }
 
@@ -101,7 +101,7 @@ function card(d, v, scale) {
       h('div', { class: 'hg-actions' },
         design ? h('button', { type: 'button', class: 'btn btn-primary btn-sm', dataset: { action: 'design', scenario: design.id },
           title: 'Simulate this vehicle as defined, then change what it is made of and fly it again in the Experiment Lab',
-          onclick: () => navigate('lab', { domain: d.manifest.id, scenario: design.id, open: role.group }) }, role.group === 'Vehicle design' ? 'Design and fly' : 'Configure and fly') : null,
+          onclick: () => navigate('lab', { domain: d.manifest.id, scenario: design.id, open: role.group }) }, role.group === 'Vehicle design' ? 'Open in Experiment Lab' : 'Open in Experiment Lab') : null,
         flies.length ? h('button', { type: 'button', class: 'btn btn-sm', dataset: { action: 'watch', experience: flies[0].e.id }, onclick: () => navigate('mission', { experienceId: flies[0].e.id }) }, `Watch: ${flies[0].e.title}`) : null),
       flies.length > 1 ? h('p', { class: 'small dim hg-more' }, `Also in ${flies.length - 1} more mission${flies.length > 2 ? 's' : ''}: ${flies.slice(1).map((x) => x.e.title).join(', ')}.`) : null));
 }
@@ -134,9 +134,10 @@ export function showVehicles() {
     h('header', { class: 'hg-head' },
       h('p', { class: 'eyebrow' }, 'Vehicle hangar'),
       h('h1', null, 'Pick a vehicle. Change what it is made of. Fly it.'),
+      h('p', { class: 'hg-disclaimer', role: 'note' }, h('b', null, 'Exploratory models, not real vehicles; nothing is validated against flight data.'), ' Only the cases marked Reference case are the frozen, pre-registered ones the platform’s verification results rest on.'),
       h('p', { class: 'hg-lede' }, `${all.length} vehicles across ${doms.length} simulation domains. Each one is a set of physical parameters the simulator integrates, not a skin. What a change does to a landing or an ascent is read from the new run, not assumed. Design changes run as new simulations in the Experiment Lab and can be watched, compared and replayed.`),
       h('ul', { class: 'hg-legend' },
-        h('li', null, h('span', { class: 'hg-ev hg-ev-ref' }, 'Reference case'), ' frozen, pre-registered case; verified model behaviour, not flight data'),
+        h('li', null, h('span', { class: 'hg-ev hg-ev-ref' }, 'Reference case'), ' frozen, pre-registered case; recomputed model behaviour, not flight data'),
         h('li', null, h('span', { class: 'hg-ev hg-ev-explore' }, 'Exploratory'), ' illustrative values; recomputable, not evidence for a claim'),
         h('li', null, h('span', { class: 'hg-ev hg-ev-ill' }, 'Illustrative'), ' silhouettes and 3D models are drawn, never read by the simulation'))),
     sections,

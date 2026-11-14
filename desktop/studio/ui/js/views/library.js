@@ -94,7 +94,7 @@ function filters() {
   filtersEl = h('div', { class: 'lib-filters' }, q,
     sel('domain', 'Domain', domains.map((d) => [d, domainName(d)])),
     sel('outcome', 'Outcome', [['success', 'success'], ['partial', 'partial'], ['failure', 'failure']]),
-    sel('safety', 'Safety', [['safe', 'safe'], ['unsafe', 'unsafe']]),
+    sel('safety', 'Safety rules', [['safe', 'none broken'], ['unsafe', 'a rule broken']]),
     h('div', { class: 'spacer' }),
     h('span', { class: 'dim small', id: 'lib-count' }),
     cmpBtn);
@@ -156,7 +156,7 @@ function drawRows() {
     h('td', { class: 'mono' }, String(s.seed)),
     h('td', { class: 'small' }, s.faults.length ? s.faults.map(words).join(', ') : h('span', { class: 'dim' }, 'none')),
     h('td', null, h('span', { class: ['cell', `v-${ov}`] }, verdictGlyph(ov), s.outcome_label)),
-    h('td', null, h('span', { class: ['cell', `v-${sv}`] }, verdictGlyph(sv), unjudged ? 'not evaluated' : s.safety_status, s.safety_class && !unjudged ? h('span', { class: ['class-badge', `class-${s.safety_class}`] }, s.safety_class) : null)),
+    h('td', null, h('span', { class: ['cell', `v-${sv}`], title: 'Safety rules are judged on the true state throughout the run. Contact speed and position are mission requirements, judged separately.' }, verdictGlyph(sv), unjudged ? 'not evaluated' : s.safety_status === 'safe' ? 'No safety rule broken' : 'A safety rule broken', s.safety_class && !unjudged ? h('span', { class: ['class-badge', `class-${s.safety_class}`] }, s.safety_class) : null)),
     h('td', { class: 'failed' }, s.failed.join(' ')),
     h('td', { class: 'mono dim small' }, m.created_utc.replace('T', ' ').replace('Z', '')));
     tbody.append(tr);
