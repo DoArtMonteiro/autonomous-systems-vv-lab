@@ -28,7 +28,13 @@ export function indexNumbers(record) {
   for (const r of record.requirements || []) {
     const margin = byId.get(`requirement_margin.${r.id}`);
     const limit = byId.get(`requirement_limit.${r.id}`);
-    if (margin && limit && Number.isFinite(margin.value) && Number.isFinite(limit.value)) NUMBERS.set(r, { margin: margin.value, limit: limit.value, unit: margin.unit || '' });
+    const observed = byId.get(`requirement_observed.${r.id}`);
+    if (margin && limit && observed && Number.isFinite(margin.value) && Number.isFinite(limit.value) && Number.isFinite(observed.value)) {
+      // The bound it is held to: the margin is limit minus observed for an upper bound, observed minus limit for a lower one.
+      const tol = 1e-9 * Math.max(1, Math.abs(limit.value), Math.abs(observed.value));
+      const op = Math.abs(margin.value - (limit.value - observed.value)) <= tol ? '<=' : Math.abs(margin.value - (observed.value - limit.value)) <= tol ? '>=' : '';
+      NUMBERS.set(r, { margin: margin.value, limit: limit.value, observed: observed.value, op, unit: margin.unit || '' });
+    }
   }
   return record;
 }
@@ -36,6 +42,8 @@ export function indexNumbers(record) {
 const NUM = '(-?[\\d.]+(?:e[-+]?\\d+)?)';
 
 export function opOf(r) {
+  const n = NUMBERS.get(r);
+  if (n) return n.op;
   const m = /^\s*(<=|>=|<|>)/.exec(r.expected || '');
   return m ? m[1] : '';
 }
@@ -48,6 +56,9 @@ export function limitOf(r) {
 }
 
 export function observedOf(r) {
+  // The domain's published reading, not the first number of its sentence ("apoapsis 301.90 km, error +1.90 km").
+  const n = NUMBERS.get(r);
+  if (n) return n.observed;
   const m = new RegExp(NUM, 'i').exec(r.observed || '');
   return m ? Number(m[1]) : null;
 }
@@ -130,7 +141,8 @@ export function safetyWording(record) {
   const broken = inv.filter((q) => q.status === 'fail').length;
   const unjudged = record.safety.status === 'safe' && record.safety.class === 'not_evaluated';
   if (unjudged) return { text: 'Safety not evaluated', verdict: 'neutral', n: inv.length, broken: 0, unjudged: true };
-  if (record.safety.status === 'unsafe' || broken) return { text: inv.length ? `${broken || 1} of ${inv.length} safety rules broken` : 'A safety rule was broken', verdict: 'unsafe', n: inv.length, broken, unjudged: false };
+  // A count is shown only when the records' own invariant rows give it; an unsafe verdict with none says so without a number.
+  if (record.safety.status === 'unsafe' || broken) return { text: broken ? `${broken} of ${inv.length} safety rules broken` : 'A safety rule was broken', verdict: 'unsafe', n: inv.length, broken, unjudged: false };
   return { text: inv.length ? `No safety rule broken (${inv.length} checked)` : 'No safety rule broken', verdict: 'pass', n: inv.length, broken: 0, unjudged: false };
 }
 

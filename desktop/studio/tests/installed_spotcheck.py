@@ -38,7 +38,7 @@ def godot_children(parent_pid):
         f"Get-CimInstance Win32_Process -Filter 'ParentProcessId={int(parent_pid)}' | Where-Object {{ $_.Name -like 'Godot*' }} "
         "| ForEach-Object { [pscustomobject]@{ pid = $_.ProcessId; name = $_.Name; cmd = $_.CommandLine } } | ConvertTo-Json -Compress"
     )
-    out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.strip().lstrip("﻿")
+    out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.strip().lstrip(chr(0xFEFF))
     if not out:
         return []
     data = json.loads(out)
@@ -138,6 +138,8 @@ def main():
             try:
                 m18.home(s)
                 m18.hangar(s)
+                # An environment is chosen on purpose: the Cinematic View then opens on the one the player shows.
+                m18.environments(s)
                 base_id, exp_id = m18.vehicle_experiment(s)
                 m18.compare(s, base_id, exp_id)
                 st = s.page.evaluate("() => window.__TAURI__.core.invoke('cinematic_status')")

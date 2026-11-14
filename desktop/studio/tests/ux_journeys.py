@@ -163,6 +163,8 @@ def lab_and_compare(s):
     check("Lab: failed rows come first", flags == sorted(flags, reverse=True) and flags[0], json.dumps(flags))
     tilt = next((r for r in rows if r["req"] == "R3_tilt"), None)
     check("Lab: tilt is shown in degrees", bool(tilt) and "°" in tilt["text"] and " cos" not in tilt["text"], tilt["text"] if tilt else "no tilt row")
+    pills = s.js("[...document.querySelectorAll('.lab-result .lab-verdicts')].map((e) => e.innerText.replace(/\\s+/g, ' ').trim())")
+    check("Lab: the verdict pills say No safety rule broken (5 checked), never a bare safe", len(pills) == 2 and all("No safety rule broken (5 checked)" in x for x in pills), json.dumps(pills))
     s.js("document.querySelector('.lab-result').scrollIntoView()")
     s.shot("ux-lab-result-dark")
     ids = (base, exp)
@@ -184,8 +186,26 @@ def lab_and_compare(s):
     check("Compare: the count of differing rows is grammatical", bool(re.match(r"^(1 row differs|\d+ rows differ) between the runs", summ)), summ)
     small_text(s, "the comparison")
     s.shot("ux-compare-dark")
+    s.nav("library")
+    s.wait("document.querySelectorAll('.lib-table tbody tr[data-run]').length >= 2 || document.querySelectorAll('tbody tr[data-run]').length >= 2", 30, "library rows")
+    lib = s.js("[...document.querySelectorAll('tbody tr[data-run]')].map((e) => e.innerText.replace(/\\s+/g, ' ')).filter((x) => x.includes('Reached the ground'))")
+    check("Library: the safety column says No safety rule broken, never a bare safe", len(lib) >= 2 and all("No safety rule broken" in x and not re.search(r"\bsafe\b", x) for x in lib), json.dumps(lib)[:200])
+    s.shot("ux-library-dark")
+    s.page.dblclick(f"tbody tr[data-run='{exp}']")
+    s.wait("window.__studio.view() === 'run' && document.querySelector(\".verdict[aria-label='Safety'] .verdict-v\")", 30, "run view")
+    rv = s.js("document.querySelector(\".verdict[aria-label='Safety'] .verdict-v\").innerText.replace(/\\s+/g, ' ').trim()")
+    check("Run view: the safety verdict says No safety rule broken (5 checked)", rv.startswith("No safety rule broken (5 checked)"), rv)
+    s.shot("ux-run-view-dark")
+    small_text(s, "the run view")
     FACTS["compare_headline"] = hl
     return ids
+
+
+def reference_chip(s):
+    s.page.evaluate("(id) => document.dispatchEvent(new CustomEvent('vv-open-mission', { detail: id }))", "first-landing")
+    s.wait("(() => { const p = window.__studio.player(); return p && p.experience === 'first-landing' && document.querySelector('.pl-head'); })()", 90, "first landing")
+    chips = s.js("[...document.querySelectorAll('.pl-cases .pl-case')].map((e) => [e.dataset.case, e.textContent.trim()])")
+    check("Player: the registered first landing carries the Reference case chip", chips == [["ref", "Reference case"]], json.dumps(chips))
 
 
 def player_and_cinematic(s, ids, shots):
@@ -275,6 +295,56 @@ def cinematic_checks(s, studio_pid, ids, shots):
     FACTS["cinematic_args"] = out
 
 
+OVERLAP_JS = """(pairs) => {
+  const box = (e) => { const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom }; };
+  const vis = (e) => e.offsetParent !== null || getComputedStyle(e).position === 'fixed';
+  const clash = [];
+  let seen = 0;
+  for (const [aSel, bSel] of pairs) {
+    for (const a of [...document.querySelectorAll(aSel)].filter(vis)) for (const b of [...document.querySelectorAll(bSel)].filter(vis)) {
+      seen += 1;
+      const x = box(a); const y = box(b);
+      const w = Math.min(x.r, y.r) - Math.max(x.l, y.l); const h = Math.min(x.b, y.b) - Math.max(x.t, y.t);
+      if (w > 1 && h > 1) clash.push(aSel + ' x ' + bSel);
+    }
+  }
+  return { clash, seen };
+}"""
+
+
+def narrow_player(s):
+    """Item 10: the two-run engineering scene and the Flight console at narrow sizes."""
+    for w, h in ((1024, 640), (820, 900)):
+        s.resize(w, h)
+        s.page.click(".pl-views [data-view='engineering']")
+        s.wait("(() => { const p = window.__studio.player(); return p && p.view === 'engineering'; })()", 60, "engineering")
+        time.sleep(1.0)
+        r = s.js(OVERLAP_JS, [[".pl-scene-note", ".pl-cams"], [".pl-scene-note", ".pl-runs"], [".pl-cams", ".pl-runs"]])
+        check(f"Player {w}x{h} (engineering, two runs): the scene note does not overlap the camera bar or the run pills", not r["clash"] and r["seen"] >= 2, json.dumps(r))
+        s.shot(f"ux-player-engineering-{w}x{h}-dark")
+        if w == 1024:
+            s.page.click(".pl-views [data-view='control']")
+            s.wait("document.querySelector('.mc')", 30, "flight console")
+            time.sleep(2.5)
+            r = s.js(OVERLAP_JS, [[".si-credit", ".mc-cams"], [".mc .pl-scene-note", ".mc-cams"], [".mc .pl-scene-note", ".mc-strip"]])
+            check("Flight console 1024x640: the attribution does not overlap the camera bar", not r["clash"], json.dumps(r))
+            r = s.js(OVERLAP_JS, [[".mc-id", ".mc-time"], [".mc-time", ".mc-tools"], [".mc-id", ".mc-tools"]])
+            edge = s.js("(() => { const e = document.querySelector('.mc-tools'); return Math.round([...e.children].map((c) => c.getBoundingClientRect().right).reduce((a, b) => Math.max(a, b), 0)) - innerWidth; })()")
+            check("Flight console 1024x640: the end chip does not crowd the title or push the tools out of the window", not r["clash"] and edge <= 0, json.dumps(r) + f" tools edge {edge}")
+            names = s.js("[...document.querySelectorAll('.mc-v-l')].filter((e) => e.scrollWidth > e.clientWidth + 1).length")
+            check("Flight console 1024x640: requirement names wrap instead of being cut", names == 0, f"{names} cut")
+            s.shot("ux-flight-console-1024x640-dark")
+            s.page.click(".mc-back")
+            s.wait("document.querySelector('.pl-head')", 20, "player")
+    s.resize(1440, 900)
+    s.page.click(".pl-views [data-view='control']")
+    s.wait("document.querySelector('.mc')", 30, "flight console")
+    time.sleep(2.0)
+    s.shot("ux-flight-console-1440x900-dark")
+    s.page.click(".mc-back")
+    s.wait("document.querySelector('.pl-head')", 20, "player")
+
+
 def geo_1024(s):
     """Item 10: at 1024x640 the attribution and the camera bar do not collide."""
     s.resize(1024, 640)
@@ -300,6 +370,9 @@ def lab_ascent(s):
     labels = s.js("[...document.querySelectorAll('.lab-table tbody tr td:first-child')].map((e) => e.textContent.trim())")
     dup = sorted({x for x in labels if labels.count(x) > 1})
     check("Lab (ascent): no two requirement rows have the same name (stage names added)", not dup and any("Upper stage" in x for x in labels) and any("Stack" in x for x in labels), json.dumps(dup) or f"{len(labels)} rows")
+    row = s.js("(() => { const r = document.querySelector(\".lab-table tbody tr[data-req='upper.R5_apoapsis']\"); return r ? [...r.cells].map((c) => c.innerText.replace(/\\s+/g, ' ').trim()) : null; })()")
+    nums = [float(m) for c in (row or [])[2:4] for m in re.findall(r"(?<![\w.])-?\d+(?:\.\d+)?(?= km)", c)[:1]]
+    check("Lab (ascent): the apoapsis row shows the error reading against its limit, not the apoapsis altitude", bool(row) and row[1] == "<= 15 km" and len(nums) == 2 and all(abs(x) < 100 for x in nums), json.dumps(row))
     s.shot("ux-lab-ascent-dark")
 
 
@@ -345,9 +418,11 @@ def main():
                     check(f"{name} completed", False, repr(e)[:300])
             try:
                 ids = lab_and_compare(s)
+                reference_chip(s)
                 player_and_cinematic(s, ids, a.shots)
                 if not a.no_cinematic:
                     cinematic_checks(s, proc.pid, ids, a.shots)
+                narrow_player(s)
                 geo_1024(s)
             except Exception as e:  # noqa: BLE001
                 check("lab, compare and player completed", False, repr(e)[:400])

@@ -319,3 +319,17 @@
 }
 .pl-hud[hidden] { display: none; }
 .mc .pl-scene-note.is-entity { top: 150px; bottom: auto; left: 18px; width: 300px; }
+
+/* Attributions are read on top of imagery: opaque backing and the strong text colour, and in the
+   Flight console the credit stays clear of the camera bar. */
+.si-credit, .pl-credit, .mc .pl-credit { background: color-mix(in srgb, var(--bg-1) 94%, transparent); color: var(--fg-1); }
+.mc .pl-scene-note.is-geo { max-width: min(760px, calc(100% - 520px)); }
+@media (max-width: 1100px) {
+  .pl:not(.pl-geo) .pl-runs, .pl:not(.pl-geo) .pl-cams { bottom: 68px; }
+}
+
+/* The end chip of a failed contact is a sentence (requirement, value, limit): in the Flight console
+   it wraps under the clock inside a bounded centre column, so the title and the tools keep their room. */
+.mc-time { max-width: min(28vw, 360px); text-align: center; }
+.mc-phase { white-space: normal; line-height: 1.35; }
+.mc-phase.ph-end-bad { text-transform: none; letter-spacing: .02em; font-size: 13px; }
