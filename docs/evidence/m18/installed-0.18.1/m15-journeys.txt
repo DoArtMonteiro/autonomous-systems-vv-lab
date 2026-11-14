@@ -5,9 +5,9 @@ Fly it, break it, find out why.
 
 A deterministic simulator of autonomous ]
 PASS Explorer: Home has one primary action to a first landing
-PASS Explorer: one click from Home to a landing on screen  [0.2 s]
+PASS Explorer: one click from Home to a landing on screen  [0.7 s]
 PASS Explorer: the landing plays by itself
-PASS Explorer: readouts are labelled as true state, estimate or derived  [Robust controller  T Altitude 2172 m T Descent rate 218.8 m/s T Horizontal speed 9.82 m/s T Tilt 1.33 ° T Throttle 0.00 ]
+PASS Explorer: readouts are labelled as true state, estimate or derived  [Robust controller  T Altitude 2172 m T Descent rate 218.8 m/s T Horizontal speed 9.82 m/s T Tilt 1.33 ┬░ T Throttle 0.00 ]
 PASS Explorer: the phase is shown  [Engine off]
 PASS Explorer: the result is hidden until the end
 PASS Explorer: the result says the stage landed safely  [[["landed", "safe"]]]
@@ -26,7 +26,7 @@ PASS Researcher: registered bias fails R5 only, later smaller bias fails R1  [[[
 PASS Researcher: the finding is labelled exploratory
 PASS Researcher: the claim behind the mission can be challenged  [CHALLENGE THIS CLAIM
 
-“The guarded M9.1 controller touches down within R1 (vertical speed at most 3 m/s) when the GNSS position is biased by 5 to 30 m, whenever]
+ÔÇ£The guarded M9.1 controller touches down within R1 (vertical speed at most 3 m/s) when the GNSS position is biased by 5 to 30 m, whenever]
 PASS Researcher: Challenge this claim opens that claim in Investigate  [G3 under a late GNSS bias]
 PASS Researcher: the claim page explains what a challenge does
 PASS Researcher: the mitigation trades an unsafe hard landing for an R5 failure  [[["hard_landing", "unsafe"], ["hard_landing", "safe"]]]

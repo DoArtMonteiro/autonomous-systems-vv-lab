@@ -12,7 +12,7 @@ PASS One change is counted
 PASS The experiment is a new run with its own record
 PASS The outcome changed through a new simulation  [Reached the ground, requirements not met -> Landed]
 PASS The Lab says which requirements changed  [The experiment now meets Vertical speed at contact, Horizontal speed at contact.]
-PASS The Lab lists what was changed  [What was changed  Controller: Baseline → Robust]
+PASS The Lab lists what was changed  [What was changed  Controller: Baseline ÔåÆ Robust]
 PASS The experiment replays by recomputation  [{"schema": "vv-run-replay.v1", "status": "verified", "checks": [{"name": "request.json equals the request inside record.json", "pass": true, "detail": ""}, {"name": "the stored seed is allowed by the ]
 PASS The baseline record is unchanged
 PASS The seed check runs both conditions on 8 development seeds  [{"n": 8, "base": 0, "exp": 7}]

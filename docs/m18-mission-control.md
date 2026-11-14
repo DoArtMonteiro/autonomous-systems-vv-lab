@@ -2,7 +2,7 @@
 
 O Studio 0.17.0 tinha a ciência e as funcionalidades, mas escondia-as: a página inicial vendia três modos abstratos, o Experiment Lab abria com três botões "Default run", os veículos novos só apareciam numa lista do Lab, cinco dos oito ambientes estavam em ficheiros zip que só se instalavam por um diálogo nativo, e uma corrida feita no Lab não se podia ver no leitor de missões. O M18 corrige a arquitetura de informação e liga o percurso completo, sem mudar nenhum resultado científico existente.
 
-Estado: ramo `m17-integration`, por cima do PR #30. Nada foi integrado em `main`. Studio 0.18.0 construído (`desktop/build.ps1`, instalador de 42,3 MB contra 19,7 MB do 0.17.0, por causa dos oito pacotes). Os percursos correram no executável de `desktop/target/release`, não numa instalação; o Studio instalado continua a ser o 0.17.0.
+Estado: o M18 está em `main` (Studio 0.18.0, instalador de 42,3 MB contra 19,7 MB do 0.17.0, por causa dos oito pacotes). O Studio **0.18.1** (só muda o número de versão e acrescenta o estado «Opening the Cinematic View», ver abaixo) está instalado nesta máquina por cima do 0.17.0 e foi verificado no executável instalado, não no da pasta de compilação: ver [a evidência da instalação](evidence/m18/installed-0.18.1/README.md). Os números das secções seguintes foram medidos no executável de `desktop/target/release` do 0.18.0, como diz cada uma; a secção «Studio 0.18.1 instalado» tem os da instalação.
 
 ## O que mudou no produto
 
@@ -51,6 +51,12 @@ Outras verificações, todas no Studio 0.18.0 compilado ou no repositório nesta
 - Percursos anteriores no mesmo executável: M15 48/48, M16 77/77 e M17 Lab 34/34. O percurso M15 passou a ler o cabeçalho de Mission Control (`.hm-head`) em vez do antigo `.home-hero`.
 - Duas regressões encontradas pelos percursos e corrigidas antes do fecho: o prefixo `mc-` da nova página inicial colidia com o modo Mission Control do leitor (a página inicial herdava `overflow: hidden` e deixava de deslizar); passou a `hm-`. A lista de ambientes é alfabética, por isso o ambiente por omissão passou a ser Svalbard; o leitor volta a usar Cape Canaveral quando nenhum foi escolhido.
 
+## Studio 0.18.1 instalado
+
+O instalador NSIS do 0.18.1 foi instalado em silêncio por cima do 0.17.0 (a biblioteca do utilizador ficou idêntica) e o módulo Cinematic 0.2.1 foi instalado pelo código de instalação do Studio. Contra o executável instalado: M15 48/48, M16 78/78, M17 Lab 34/34, M17 Cinematic 11/11, M18 72/72 e o percurso de utilizador `installed_spotcheck.py` 40/40 (Mission Control, hangar, «Design and fly», Compare, leitor e Cinematic View para uma aterragem e uma subida, com Direct3D 12). Desempenho, hashes, o que não foi verificado e as instruções de recuperação estão em [docs/evidence/m18/installed-0.18.1/README.md](evidence/m18/installed-0.18.1/README.md).
+
+O primeiro frame da Cinematic View chega 12 a 16 s depois do clique, porque o módulo descodifica os ativos CC0 ao arrancar. O 0.18.1 diz isso no Studio (um estado «Opening the Cinematic View in its own window. The first frame takes about 15 seconds.» durante 30 s) e o módulo 0.2.1 mostra uma imagem de arranque (`boot_splash`) logo que a janela abre.
+
 ## Revisão independente
 
 Um revisor independente (Fable 5.1, só leitura, capturas antes e depois e código) concluiu: três caminhos e catálogo de ambientes cumpridos; personalização de veículos, Lab e separação entre simulação e ilustração parcialmente cumpridos; vista 3D e geoespacial com melhoria **marginal**. Corrigido a seguir: "Safe" junto de um impacto a 60 m/s passou a "Safety rules held"; o título do leitor diz "baseline and your change"; os passos do percurso na página inicial apontam para onde dizem; as ilustrações da página inicial têm a etiqueta "Illustration"; "real physical differences" passou a "distinct physical parameters"; o estado do módulo diz "every file matches its manifest" em vez de "verified"; a barra de navegação mostra a barra de deslocamento abaixo de 1240 px.
@@ -74,7 +80,7 @@ Os quatro defeitos que ficaram por corrigir foram tratados na recuperação (sec
 
 - **Recuperação controlada do booster** (manobra de regresso e queima de aterragem): código escrito num ramo local separado (`feat/m18-booster-recovery`, commit `bfe78a4` marcado como trabalho em curso, não publicado), nunca compilado por completo nem testado; ver a secção sobre o Defender. O hangar diz "Not in this build". O booster continua balístico depois da separação.
 - Operações orbitais para além do voo livre de 600 s, naves espaciais e aeronaves: não há modelo.
-- A Cinematic View só reproduz aterragens; a subida não tem cena cinemática.
+- Cinematic View: reproduz aterragens e, desde o módulo 0.2.0, subidas de lançadores de dois andares (`docs/m17-cinematic.md`). No Studio 0.18.1 instalado abriu-se para uma corrida de cada tipo (ver a secção seguinte). A cena da subida é uma ilustração do registo, sem atitude gravada.
 - **Melhoria visual**: o M18 não muda o renderizador geoespacial nem o módulo Godot. A avaliação prévia do Unreal Engine 5 e do Cesium está em `docs/m18-cinematic-preflight.md`, com a aprovação exata necessária. O objetivo gráfico não está cumprido.
 
 ## Ambiente desta máquina

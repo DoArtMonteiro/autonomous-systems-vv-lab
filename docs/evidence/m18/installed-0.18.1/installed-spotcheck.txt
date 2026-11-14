@@ -10,16 +10,16 @@ PASS Lab: the baseline flies the heavy stage
 PASS Lab: the experiment is a new record with the thrust factor
 PASS Lab: a weaker engine changes the measured flight (requirement observations differ)  [{"R1_vertical_speed": ["1.658384 m/s", "60.077734 m/s"], "R2_horizontal_speed": ["1.583657 m/s", "4.822859 m/s"], "R3_tilt": ["0.999912 cos", "0.999586 cos"], "R4_angular_rate": ["0.022553 rad/s", "0.062207 rad/s"], "R5_position": ["1.368585 m", "3.739863 m"], "R6_propellant_margin": ["5151.088793 k]
 PASS Lab: the experiment is labelled exploratory
-PASS Compare: both runs are open  [Comparison of 2 runs Rocket powered landing Save comparison… Engine thrust 1 × (default) Open Reached the ground, requirements not met safe Robust · seed 5000 · no injected fault · cad03fec2ff1582d En]
+PASS Compare: both runs are open  [Comparison of 2 runs Rocket powered landing Save comparisonÔÇª Engine thrust 1 ├ù (default) Open Reached the ground, requirements not met safe Robust ┬À seed 5000 ┬À no injected fault ┬À cad03fec2ff1582d En]
 PASS Compare: the two runs have different labels  [["Engine thrust 1 \u00d7 (default)", "Engine thrust 0.7 \u00d7"]]
 PASS Compare: the labels name the changed parameter and its value, not the whole configuration  [["Engine thrust 1 \u00d7 (default)", "Engine thrust 0.7 \u00d7"]]
 PASS Compare: no label is truncated  [[{"text": "Engine thrust 1 \u00d7 (default)", "cut": false}, {"text": "Engine thrust 0.7 \u00d7", "cut": false}]]
-PASS Cinematic module is installed and verified  [{"installed": true, "verified": true, "version": "0.2.0"}]
+PASS Cinematic module is installed and verified  [{"installed": true, "verified": true, "version": "0.2.1"}]
 PASS Player landing: plays both records of the Lab
 PASS Player landing: Engineering view shows the scene  [{"view": "engineering", "renderer": "engineering"}]
 PASS Cinematic landing: the module process started
-PASS Cinematic landing: Godot was started with --rendering-driver d3d12  ["%USERPROFILE%\AppData\Local\org.vvlab.studio\modules\cinematic\0.2.0\godot/Godot_v4.7.2-stable_win64.exe" --rendering-driver d3d12 --path]
-PASS Cinematic landing: the first frame was drawn  [14.7 s after the click]
+PASS Cinematic landing: Godot was started with --rendering-driver d3d12  ["%USERPROFILE%\AppData\Local\org.vvlab.studio\modules\cinematic\0.2.1\godot/Godot_v4.7.2-stable_win64.exe" --rendering-driver d3d12 --path]
+PASS Cinematic landing: the first frame was drawn  [15.6 s after the click]
 PASS Cinematic landing: Direct3D 12 is the renderer in the module's own log  [D3D12 12_0 - Forward+ - Using Device #0: AMD - AMD Radeon RX 7700 XT]
 PASS Cinematic landing: the module's own --shot wrote a picture of this run  [659562 bytes at t = 16.3 s]
 PASS Lab: starting another vehicle asks before replacing an experiment in progress  [Replace the experiment in progress?]
@@ -33,8 +33,8 @@ PASS Ascent: the Lab shows a numeric margin change for the requirements that hav
 PASS Ascent: no requirement that has numbers shows an empty margin
 PASS Player ascent: plays the launch records
 PASS Cinematic ascent: the module process started
-PASS Cinematic ascent: Godot was started with --rendering-driver d3d12  ["%USERPROFILE%\AppData\Local\org.vvlab.studio\modules\cinematic\0.2.0\godot/Godot_v4.7.2-stable_win64.exe" --rendering-driver d3d12 --path]
-PASS Cinematic ascent: the first frame was drawn  [12.4 s after the click]
+PASS Cinematic ascent: Godot was started with --rendering-driver d3d12  ["%USERPROFILE%\AppData\Local\org.vvlab.studio\modules\cinematic\0.2.1\godot/Godot_v4.7.2-stable_win64.exe" --rendering-driver d3d12 --path]
+PASS Cinematic ascent: the first frame was drawn  [13.7 s after the click]
 PASS Cinematic ascent: Direct3D 12 is the renderer in the module's own log  [D3D12 12_0 - Forward+ - Using Device #0: AMD - AMD Radeon RX 7700 XT]
 PASS Cinematic ascent: the module's own --shot wrote a picture of this run  [236620 bytes at t = 570.3 s]
 PASS No page error or console error

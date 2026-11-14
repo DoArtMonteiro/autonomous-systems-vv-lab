@@ -4,11 +4,11 @@
  "buffer_mem_used_bytes": 87396798,
  "draw_calls_in_frame": 452,
  "driver": "d3d12",
- "frame_ms_max": 6.58,
- "frame_ms_p50": 1.932,
- "frame_ms_p95": 5.133,
- "frame_ms_p99": 5.383,
- "frames": 5107,
+ "frame_ms_max": 7.814,
+ "frame_ms_p50": 1.942,
+ "frame_ms_p95": 5.153,
+ "frame_ms_p99": 5.392,
+ "frames": 5105,
  "primitives_in_frame": 21725353,
  "profile": "balanced",
  "profile_reason": "Chosen on the command line",
@@ -37,7 +37,7 @@
   "vegetation_shadows": false,
   "volumetric_fog": false
  },
- "static_memory_bytes": 231190080,
+ "static_memory_bytes": 231190344,
  "t": 23.3361272857644,
  "texture_mem_used_bytes": 1016672256,
  "video_mem_used_bytes": 1422077952,
@@ -61,15 +61,15 @@
   "trees": 4904
  },
  "harness": {
-  "command": "--rendering-driver d3d12 --path %USERPROFILE%\\AppData\\Local\\org.vvlab.studio\\modules\\cinematic\\0.2.0\\project --resolution 1440x900 -- --run <repo>\\tests\\fixtures\\cinematic\\landing-run --env %USERPROFILE%\\AppData\\Local\\VV Lab Studio\\environments\\cape-canaveral --profile balanced --camera director --bench <scratch folder> --bench-seconds 12.0",
-  "wall_s_to_first_frame": 11.579,
-  "engine_ms_to_first_frame": 10632,
-  "peak_working_set_bytes": 743063552,
-  "peak_private_bytes": 1960923136,
+  "command": "--rendering-driver d3d12 --path %USERPROFILE%\\AppData\\Local\\org.vvlab.studio\\modules\\cinematic\\0.2.1\\project --resolution 1440x900 -- --run <repo>\\tests\\fixtures\\cinematic\\landing-run --env %USERPROFILE%\\AppData\\Local\\VV Lab Studio\\environments\\cape-canaveral --profile balanced --camera director --bench <scratch folder> --bench-seconds 12.0",
+  "wall_s_to_first_frame": 12.342,
+  "engine_ms_to_first_frame": 11332,
+  "peak_working_set_bytes": 743862272,
+  "peak_private_bytes": 1962364928,
   "exit": 0,
   "log_tail": [
    "cinematic: pack cape-canaveral verified (6 files, SHA-256 against environment.json)",
-   "cinematic: scene built in 10244 ms (profile balanced: Chosen on the command line)"
+   "cinematic: scene built in 10908 ms (profile balanced: Chosen on the command line)"
   ]
  }
 }
