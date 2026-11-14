@@ -4,11 +4,11 @@
  "buffer_mem_used_bytes": 87401526,
  "draw_calls_in_frame": 463,
  "driver": "d3d12",
- "frame_ms_max": 8.136,
- "frame_ms_p50": 1.936,
- "frame_ms_p95": 5.121,
- "frame_ms_p99": 5.364,
- "frames": 5120,
+ "frame_ms_max": 5.469,
+ "frame_ms_p50": 1.905,
+ "frame_ms_p95": 5.075,
+ "frame_ms_p99": 5.361,
+ "frames": 5181,
  "primitives_in_frame": 21725945,
  "profile": "balanced",
  "profile_reason": "Chosen on the command line",
@@ -37,7 +37,7 @@
   "vegetation_shadows": false,
   "volumetric_fog": false
  },
- "static_memory_bytes": 227438572,
+ "static_memory_bytes": 227440040,
  "t": 23.3361272857644,
  "texture_mem_used_bytes": 1016541184,
  "video_mem_used_bytes": 1400320000,
@@ -62,14 +62,14 @@
  },
  "harness": {
   "command": "--rendering-driver d3d12 --path %USERPROFILE%\\AppData\\Local\\org.vvlab.studio\\modules\\cinematic\\0.2.3\\project --resolution 1440x900 -- --run <repo>\\tests\\fixtures\\cinematic\\landing-run --env %USERPROFILE%\\AppData\\Local\\VV Lab Studio\\environments\\cape-canaveral --profile balanced --camera director --bench <scratch folder> --bench-seconds 12.0",
-  "wall_s_to_first_frame": 12.158,
-  "engine_ms_to_first_frame": 11154,
-  "peak_working_set_bytes": 748867584,
-  "peak_private_bytes": 1962520576,
+  "wall_s_to_first_frame": 11.481,
+  "engine_ms_to_first_frame": 10564,
+  "peak_working_set_bytes": 749006848,
+  "peak_private_bytes": 1961566208,
   "exit": 0,
   "log_tail": [
    "cinematic: pack cape-canaveral verified (6 files, SHA-256 against environment.json)",
-   "cinematic: scene built in 10748 ms (profile balanced: Chosen on the command line)"
+   "cinematic: scene built in 10181 ms (profile balanced: Chosen on the command line)"
   ]
  }
 }

@@ -31,5 +31,8 @@ python -m unittest discover -s tests -p "test_*.py"            Ran 432 tests, OK
                                                                argumentos de apresentação do módulo (tests/test_cinematic_cli.py)
 desktop/ cargo fmt --check, clippy -D warnings, cargo test     exit 0 (as duas partes: 37 suites, 304 testes, 0 falhas)
 node --check em todos os ficheiros de desktop/studio/ui/js     sem erros
-desktop/build.ps1 (compilação de lançamento completa)          exit 0, instalador a3663b5f7332a873e1be7f70ad6208901230a4ba981dc80320d9ec11cb33d925
+desktop/build.ps1 (compilação de lançamento completa)          exit 0, instalador final e57f0af483eb12315dcc99226bae21f4172d05416c3de6f0a58d00f15a84d765
 A campanha e a compilação de lançamento da raiz não foram repetidas (a raiz não mudou).
+
+Depois das últimas alterações (CSS, requirements.js, testes de percurso, módulo 0.2.3): python -m unittest com VV_GODOT: Ran 432 tests, OK (skipped=6);
+cargo fmt --check em desktop/: exit 0; node --check em requirements.js: sem erros. O contrato de ui_smoke.py foi atualizado e não foi executado.

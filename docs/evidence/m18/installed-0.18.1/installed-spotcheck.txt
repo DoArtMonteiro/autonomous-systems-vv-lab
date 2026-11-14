@@ -5,6 +5,10 @@ PASS Mission Control: no horizontal scroll at 1440 px
 PASS Hangar: every vehicle of the installed domains is listed  [small, medium, landing-stage, heavy-return-stage, light-demonstrator, ground-2d]
 PASS Hangar: the heavy stage shows its template's attributes (30 t dry, 760 kN)  [Dry mass30 t; Propellant11 t; Engine thrust760 kN; Specific impulse300 s; Thrust over full-load weight1.89; Throttle floor55%]
 PASS Hangar: exploratory and reference vehicles are labelled
+PASS Environments: all eight packs are visible  [adventdalen-svalbard, cape-canaveral, el-arenosillo, goms-alpine-valley, mahia-peninsula, santa-maria-azores, spaceport-america, wallops-island]
+PASS Environments: Wallops Island is the one chosen environment  [["wallops-island"]]
+PASS Environments: focus stays on the card that was chosen after the cards are redrawn  [{"env": "wallops-island", "tag": "H3", "inBody": false}]
+PASS Environments: the choice is announced in a polite status  [Wallops Island, Virginia is now the environment used by the missions.]
 PASS Lab: the vehicle design parameters are open
 PASS Lab: the baseline flies the heavy stage
 PASS Lab: the experiment is a new record with the thrust factor
@@ -19,9 +23,9 @@ PASS Player landing: plays both records of the Lab
 PASS Player landing: Engineering view shows the scene  [{"view": "engineering", "renderer": "engineering"}]
 PASS Cinematic landing: the module process started
 PASS Cinematic landing: Godot was started with --rendering-driver d3d12  ["%USERPROFILE%\AppData\Local\org.vvlab.studio\modules\cinematic\0.2.3\godot/Godot_v4.7.2-stable_win64.exe" --rendering-driver d3d12 --path]
-PASS Cinematic landing: the first frame was drawn  [14.7 s after the click]
+PASS Cinematic landing: the first frame was drawn  [14.2 s after the click]
 PASS Cinematic landing: Direct3D 12 is the renderer in the module's own log  [D3D12 12_0 - Forward+ - Using Device #0: AMD - AMD Radeon RX 7700 XT]
-PASS Cinematic landing: the module's own --shot wrote a picture of this run  [657845 bytes at t = 16.3 s]
+PASS Cinematic landing: the module's own --shot wrote a picture of this run  [674459 bytes at t = 16.3 s]
 PASS Lab: starting another vehicle asks before replacing an experiment in progress  [Replace the experiment in progress?]
 PASS Lab: keeping it leaves the heavy-stage baseline in place  [cad03fec2ff1582d cad03fec2ff1582d]
 PASS Lab: the baseline in progress is announced as a status
@@ -34,9 +38,9 @@ PASS Ascent: no requirement that has numbers shows an empty margin
 PASS Player ascent: plays the launch records
 PASS Cinematic ascent: the module process started
 PASS Cinematic ascent: Godot was started with --rendering-driver d3d12  ["%USERPROFILE%\AppData\Local\org.vvlab.studio\modules\cinematic\0.2.3\godot/Godot_v4.7.2-stable_win64.exe" --rendering-driver d3d12 --path]
-PASS Cinematic ascent: the first frame was drawn  [12.6 s after the click]
+PASS Cinematic ascent: the first frame was drawn  [12.1 s after the click]
 PASS Cinematic ascent: Direct3D 12 is the renderer in the module's own log  [D3D12 12_0 - Forward+ - Using Device #0: AMD - AMD Radeon RX 7700 XT]
-PASS Cinematic ascent: the module's own --shot wrote a picture of this run  [262437 bytes at t = 570.3 s]
+PASS Cinematic ascent: the module's own --shot wrote a picture of this run  [251863 bytes at t = 570.3 s]
 PASS No page error or console error
 
-40/40 checks passed
+44/44 checks passed
