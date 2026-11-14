@@ -1,15 +1,15 @@
 {
  "adapter": "AMD Radeon RX 7700 XT",
  "bench_seconds": 12.0,
- "buffer_mem_used_bytes": 103448830,
- "draw_calls_in_frame": 1327,
+ "buffer_mem_used_bytes": 103453558,
+ "draw_calls_in_frame": 1338,
  "driver": "d3d12",
- "frame_ms_max": 18.954,
- "frame_ms_p50": 3.24,
- "frame_ms_p95": 8.335,
- "frame_ms_p99": 13.578,
- "frames": 2574,
- "primitives_in_frame": 93236124,
+ "frame_ms_max": 15.698,
+ "frame_ms_p50": 3.255,
+ "frame_ms_p95": 8.325,
+ "frame_ms_p99": 13.637,
+ "frames": 2571,
+ "primitives_in_frame": 93236440,
  "profile": "high",
  "profile_reason": "Auto: 12.9 GB of video memory (registry qwMemorySize); automatic choice stops at High",
  "replay_from_t": 0.0,
@@ -37,10 +37,10 @@
   "vegetation_shadows": true,
   "volumetric_fog": true
  },
- "static_memory_bytes": 261542698,
+ "static_memory_bytes": 261163476,
  "t": 23.3361272857644,
- "texture_mem_used_bytes": 2099179520,
- "video_mem_used_bytes": 2527981568,
+ "texture_mem_used_bytes": 2099048448,
+ "video_mem_used_bytes": 2500456448,
  "vram_capacity_bytes": 12868124672,
  "vram_capacity_source": "registry qwMemorySize",
  "vsync": "disabled",
@@ -61,15 +61,15 @@
   "trees": 8108
  },
  "harness": {
-  "command": "--rendering-driver d3d12 --path %USERPROFILE%\\AppData\\Local\\org.vvlab.studio\\modules\\cinematic\\0.2.1\\project --resolution 1440x900 -- --run <repo>\\tests\\fixtures\\cinematic\\landing-run --env %USERPROFILE%\\AppData\\Local\\VV Lab Studio\\environments\\cape-canaveral --profile auto --camera director --bench <scratch folder> --bench-seconds 12.0",
-  "wall_s_to_first_frame": 14.899,
-  "engine_ms_to_first_frame": 13551,
-  "peak_working_set_bytes": 777240576,
-  "peak_private_bytes": 3213189120,
+  "command": "--rendering-driver d3d12 --path %USERPROFILE%\\AppData\\Local\\org.vvlab.studio\\modules\\cinematic\\0.2.3\\project --resolution 1440x900 -- --run <repo>\\tests\\fixtures\\cinematic\\landing-run --env %USERPROFILE%\\AppData\\Local\\VV Lab Studio\\environments\\cape-canaveral --profile auto --camera director --bench <scratch folder> --bench-seconds 12.0",
+  "wall_s_to_first_frame": 14.134,
+  "engine_ms_to_first_frame": 13073,
+  "peak_working_set_bytes": 782028800,
+  "peak_private_bytes": 3214028800,
   "exit": 0,
   "log_tail": [
    "cinematic: pack cape-canaveral verified (6 files, SHA-256 against environment.json)",
-   "cinematic: scene built in 13080 ms (profile high: Auto: 12.9 GB of video memory (registry qwMemorySize); automatic choice stops at High)"
+   "cinematic: scene built in 12624 ms (profile high: Auto: 12.9 GB of video memory (registry qwMemorySize); automatic choice stops at High)"
   ]
  }
 }

@@ -24,3 +24,12 @@ Cenários do README (`cargo run --bin vv-lab -- run scenarios/basic-mission.json
 Defeito de documentação (não corrigido, não bloqueia a versão): os comandos `cargo run -- run ...` e
 `cargo run -- replay ...` do README falham com "cargo run could not determine which binary to run", porque o pacote da
 raiz tem três binários (vv-adversary, vv-lab, vv-repair) e não tem `default-run`. Com `--bin vv-lab` funcionam.
+
+Repetição na árvore da passagem de interface (2026-11-14), mesmos comandos, VV_GODOT definido:
+cargo fmt --check, cargo clippy --all-targets -- -D warnings, cargo test (raiz)   exit 0
+python -m unittest discover -s tests -p "test_*.py"            Ran 432 tests, OK (skipped=6); os cinco testes novos são os dos
+                                                               argumentos de apresentação do módulo (tests/test_cinematic_cli.py)
+desktop/ cargo fmt --check, clippy -D warnings, cargo test     exit 0 (as duas partes: 37 suites, 304 testes, 0 falhas)
+node --check em todos os ficheiros de desktop/studio/ui/js     sem erros
+desktop/build.ps1 (compilação de lançamento completa)          exit 0, instalador a3663b5f7332a873e1be7f70ad6208901230a4ba981dc80320d9ec11cb33d925
+A campanha e a compilação de lançamento da raiz não foram repetidas (a raiz não mudou).

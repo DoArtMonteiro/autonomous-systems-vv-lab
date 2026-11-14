@@ -1,0 +1,73 @@
+PASS Nav 820 px: the primary workspaces fit without a scrollbar  [{"scroll": false, "moreVisible": true, "workHidden": true, "primary": ["Mission Control", "Missions", "Vehicles", "Environments", "Experiment", "Investigate"], "cut": false}]
+PASS Nav 820 px: Configure, Analyse, Compare and Records are in a More menu  [{"scroll": false, "moreVisible": true, "workHidden": true, "primary": ["Mission Control", "Missions", "Vehicles", "Environments", "Experiment", "Investigate"], "cut": false}]
+PASS More menu: Enter opens it and focus moves to its first item  [{"open": true, "expanded": "true", "focus": "Configure"}]
+PASS More menu: the arrow keys and End move through the items  [Records]
+PASS More menu: Escape closes it and returns focus to the button  [{"open": false, "focus": "nav-more"}]
+PASS More menu: choosing Records opens the Library and More is the current item
+PASS Nav 1440 px: the More menu is not shown
+PASS Home: says exploratory models, not real vehicles, nothing validated against flight data  [Exploratory models, not real vehicles; nothing is validated against flight data. Results are recompu]
+PASS Home: no environment text says validated offline
+PASS Text size: nothing on Mission Control is below 12 px
+PASS Hangar: says exploratory models, not real vehicles, nothing validated against flight data  [Exploratory models, not real vehicles; nothing is validated against flight data. Only the cases mark]
+PASS Hangar: the legend says recomputed model behaviour, not verified  [Reference case frozen, pre-registered case; recomputed model behaviour, not flight data
+Exploratory illustrative values;]
+PASS Hangar: one label for the way into the Lab  [["Open in Experiment Lab"]]
+PASS Text size: nothing on the hangar is below 12 px
+PASS Environments: every description is shown in full (nothing clipped)  [0 clipped]
+PASS Environments: every card says Terrain is context only  [["Terrain is context only", "Terrain is context only", "Terrain is context only", "Terrain is context only", "Terrain is]
+PASS Environments: the module status resolves (it does not stay at Checking)  [0.3 s: Installed: version 0.2.3; every file matches its manifest.]
+PASS Environments: no text says validated offline
+PASS Text size: nothing on Environments is below 12 px
+PASS Lab: Run experiment is visible from the start and says why it is off  [{"disabled": true, "why": "Change one condition first", "describedby": "lab-run-why", "visible": true, "overflow": "visible", "maxHeight": "none"}]
+PASS Lab: the conditions column has no scroll of its own  [{"disabled": true, "why": "Change one condition first", "describedby": "lab-run-why", "visible": true, "overflow": "visible", "maxHeight": "none"}]
+PASS Lab: the seed buttons are off and say Run an experiment first  [[True, True, True] Run an experiment first.]
+PASS Text size: nothing on the Lab is below 12 px
+PASS Lab: after one change the button is on and the bar counts the change  [{"disabled": false, "why": "1 change from the baseline"}]
+PASS Lab: the headline names the largest change with its numbers and limit  [Largest change: Vertical speed at contact 1.658 ÔåÆ 60.08 m/s (limit <= 3 m/s)]
+PASS Lab: a cell shows the observed value, the margin and 4 significant figures  [Vertical speed at contact <= 3 m/s Ô£ô 1.658 m/s margin +1.342 m/s Ô£ò 60.08 m/s margin -57.08 m/s -58.42 m/s]
+PASS Lab: failed rows come first  [[true, true, false, false, false, false, false, false, false, false, false]]
+PASS Lab: tilt is shown in degrees  [Tilt at contact <= 5 ┬░ Ô£ô 0.7601 ┬░ margin +4.24 ┬░ Ô£ô 1.649 ┬░ margin +3.351 ┬░ -0.8886 ┬░]
+PASS Compare: no run is labelled with a bare safe  [["Reached the ground, requirements not met No safety rule broken (5 checked)", "Reached the ground, requirements not met No safety rule broken (5 checked)"]]
+PASS Compare: the Safety rules row says how many were checked  [["No safety rule broken (5 checked)", "No safety rule broken (5 checked)"]]
+PASS Compare: a note says contact speed is a mission requirement  [Safety rules are judged on the true state throughout the run. Contact speed and position are mission]
+PASS Compare: the headline reads Vertical speed at contact 1.658 -> 60.08 m/s (limit 3)  [Largest change: Vertical speed at contact 1.658 ÔåÆ 60.08 m/s (limit <= 3 m/s) (passes, then fails)]
+PASS Compare: each cell shows the observed value and the margin, not only Pass or Fail  [["Vertical speed at contact limit <= 3 m/s \u00b7 R1_vertical_speed (differs)", "Pass \u00b7 1.658 m/s margin +1.342 m/s", "Fail \u00b7 60.08 m/s margin -57.08 m/s"]]
+PASS Compare: the count of differing rows is grammatical  [9 rows differ between the runs (marked), 1 in its verdict, the others in a value.]
+PASS Text size: nothing on the comparison is below 12 px
+PASS Player: the run chips say Reference case or Exploratory for each held run  [["Exploratory"]]
+PASS Player: the baseline's end chip names the failing requirement with its value and limit  [Not met: Horizontal speed at contact 1.584 m/s (limit <= 1 m/s); impact not modelled]
+PASS Player: the experiment's end chip names Vertical speed at contact 60.08 m/s, limit 3  [Not met: Vertical speed at contact 60.08 m/s (limit <= 3 m/s), and 1 more not met; impact not modelled]
+PASS Player: the result chips say No safety rule broken (5 checked)  [["MISSION 1 of 6 requirements failed", "SAFETY No safety rule broken (5 checked)", "MISSION 2 of 6 requirements failed", "SAFETY No safety rule broken (5 checked)"]]
+PASS Player: the player holds the environment chosen in Environments  [wallops-island]
+PASS Text size: nothing on the player is below 12 px
+PASS Cinematic: with two runs held the person chooses which one opens  [["Baseline", "Engine thrust 0.7 \u00d7"]]
+PASS Cinematic (experiment): the module started
+PASS Cinematic (experiment): it opens the run that was chosen  [9e6edb2ebcf3bbba]
+PASS Cinematic (experiment): it uses the player's environment (Wallops Island)  [wallops-island]
+PASS Cinematic (experiment): it is given the run label, the vehicle, the seed and the exploratory flag  [{"--run-label": "Engine thrust 0.7 \u00d7", "--vehicle": "41 t heavy return stage", "--seed": "5000"}]
+PASS Cinematic (experiment): the vehicle is named and the seed is the run's  [{"--vehicle": "41 t heavy return stage", "--seed": "5000"}]
+PASS Cinematic (experiment): the exploratory flag is passed
+PASS Cinematic (experiment): the first frame was drawn and Direct3D 12 is the renderer  [14.2 s]
+PASS Cinematic (experiment): the module's own --shot wrote the picture with those arguments  [594285 bytes]
+PASS Cinematic (baseline): the module started
+PASS Cinematic (baseline): it opens the run that was chosen  [cad03fec2ff1582d]
+PASS Cinematic (baseline): it uses the player's environment (Wallops Island)  [wallops-island]
+PASS Cinematic (baseline): it is given the run label, the vehicle, the seed and the exploratory flag  [{"--run-label": "Baseline", "--vehicle": "41 t heavy return stage", "--seed": "5000"}]
+PASS Cinematic (baseline): the vehicle is named and the seed is the run's  [{"--vehicle": "41 t heavy return stage", "--seed": "5000"}]
+PASS Cinematic (baseline): the exploratory flag is passed
+PASS Player 1024x640: the attribution does not overlap the camera bar  [{"clash": [], "credits": 2, "bars": 2}]
+PASS Text size: nothing on the 1024x640 player is below 12 px
+PASS Lab: starting another vehicle asks before replacing an experiment in progress  [Replace the experiment in progress?]
+PASS Lab: keeping it leaves the heavy-stage baseline in place  [cad03fec2ff1582d cad03fec2ff1582d]
+PASS Lab: the baseline in progress is announced as a status
+PASS Lab: replacing it starts the new vehicle's baseline  [e41f71c23324683f]
+PASS Ascent: 600 kg payload changes which requirements pass  [upper.R4_periapsis, upper.R6_propellant_margin, mission.R8_orbit_insertion]
+PASS Ascent: the record publishes a numeric margin for the single-bound requirements  [requirement_margin.booster.R2_propellant_margin, requirement_margin.booster.R3_recovery_zone, requirement_margin.stack.S1_max_dynamic_pressure, requirement_margin.stack.S2_axial_acceleration, requirement_margin.upper.R4_periapsis, requirement_margin.upper.R5_apoapsis, requirement_margin.upper.R6_propellant_margin, requirement_margin.upper.S2_axial_acceleration]
+PASS Ascent: composite requirements publish none
+PASS Ascent: the Lab shows a numeric margin change for the requirements that have one  [[["Periapsis altitude \u00b7 Upper stage", "-1157 km"], ["Upper-stage propellant margin \u00b7 Upper stage", "-141.9 kg"], ["Orbit insertion", "\u2013"], ["Maximum dynamic pressure \u00b7 Stack \u00b7 safety", "-329.2 Pa"], ["Maximum sensed acceleration \u00b7 Stack \u00b7 safety", "+0.003517 g"], ["Maximum sensed acceleration \u00b7 Upper stage \u00b7 safety", "+0.7408 g"], ["Separation window \u]
+PASS Ascent: no requirement that has numbers shows an empty margin
+PASS Lab (ascent): no two requirement rows have the same name (stage names added)  [[]]
+PASS Exploratory chip: the Lab and the hangar use the same colour  [rgb(182, 166, 255) vs rgb(182, 166, 255)]
+PASS No page error or console error
+
+70/70 checks passed

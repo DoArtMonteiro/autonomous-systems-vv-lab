@@ -14,7 +14,7 @@ PASS Lab: the baseline flies the heavy stage
 PASS Lab: the experiment is a new record with the thrust factor
 PASS Lab: a weaker engine changes the measured flight (requirement observations differ)  [{"R1_vertical_speed": ["1.658384 m/s", "60.077734 m/s"], "R2_horizontal_speed": ["1.583657 m/s", "4.822859 m/s"], "R3_tilt": ["0.999912 cos", "0.999586 cos"], "R4_angular_rate": ["0.022553 rad/s", "0.062207 rad/s"], "R5_position": ["1.368585 m", "3.739863 m"], "R6_propellant_margin": ["5151.088793 k]
 PASS Lab: the experiment is labelled exploratory
-PASS Compare: both runs are open  [Comparison of 2 runs Rocket powered landing Save comparisonÔÇª Engine thrust 1 ├ù (default) Open Reached the ground, requirements not met safe Robust ┬À seed 5000 ┬À no injected fault ┬À cad03fec2ff1582d En]
+PASS Compare: both runs are open  [Comparison of 2 runs Rocket powered landing Save comparisonÔÇª Engine thrust 1 ├ù (default) Open Reached the ground, requirements not met No safety rule broken (5 checked) Robust ┬À seed 5000 ┬À no injecte]
 PASS Compare: the two runs have different labels  [["Engine thrust 1 \u00d7 (default)", "Engine thrust 0.7 \u00d7"]]
 PASS Compare: the labels name the changed parameter and its value, not the whole configuration  [["Engine thrust 1 \u00d7 (default)", "Engine thrust 0.7 \u00d7"]]
 PASS Compare: no label is truncated  [[{"text": "Engine thrust 1 \u00d7 (default)", "cut": false}, {"text": "Engine thrust 0.7 \u00d7", "cut": false}]]
@@ -30,26 +30,26 @@ PASS Player: the geospatial view uses the chosen environment  [wallops-island]
 PASS Flight console: the player's operations layout is called Flight console  [[["engineering", "Engineering"], ["geospatial", "Geospatial"], ["control", "Flight console"]]]
 PASS Flight console: the player does not use the name of the home page
 PASS Player header 1024x640: the window has the size asked for  [[1024, 640]]
-PASS Player header 1024x640: Analyse, Compare in detail, Cinematic view and Change the conditions are all there  [["Analyse", "Compare in detail", "Cinematic view", "Change the conditions"]]
+PASS Player header 1024x640: Analyse, Compare in detail, Cinematic view and Open in Experiment Lab are all there  [["Analyse", "Compare in detail", "Cinematic view", "Open in Experiment Lab"]]
 PASS Player header 1024x640: no two controls overlap
 PASS Player header 1024x640: every control is inside the window
-PASS Player header 1024x640: the header stays compact  [113 px]
+PASS Player header 1024x640: the header stays compact  [115 px]
 PASS Player header 1024x640: no horizontal scroll
 PASS Player header 1440x900: the window has the size asked for  [[1440, 900]]
-PASS Player header 1440x900: Analyse, Compare in detail, Cinematic view and Change the conditions are all there  [["Analyse", "Compare in detail", "Cinematic view", "Change the conditions"]]
+PASS Player header 1440x900: Analyse, Compare in detail, Cinematic view and Open in Experiment Lab are all there  [["Analyse", "Compare in detail", "Cinematic view", "Open in Experiment Lab"]]
 PASS Player header 1440x900: no two controls overlap
 PASS Player header 1440x900: every control is inside the window
-PASS Player header 1440x900: the header stays compact  [89 px]
+PASS Player header 1440x900: the header stays compact  [91 px]
 PASS Player header 1440x900: no horizontal scroll
 PASS Player header 1920x1080: the window has the size asked for  [[1920, 1080]]
-PASS Player header 1920x1080: Analyse, Compare in detail, Cinematic view and Change the conditions are all there  [["Analyse", "Compare in detail", "Cinematic view", "Change the conditions"]]
+PASS Player header 1920x1080: Analyse, Compare in detail, Cinematic view and Open in Experiment Lab are all there  [["Analyse", "Compare in detail", "Cinematic view", "Open in Experiment Lab"]]
 PASS Player header 1920x1080: no two controls overlap
 PASS Player header 1920x1080: every control is inside the window
-PASS Player header 1920x1080: the header stays compact  [89 px]
+PASS Player header 1920x1080: the header stays compact  [91 px]
 PASS Player header 1920x1080: no horizontal scroll
-PASS Cinematic: the button is enabled exactly when the module is installed and verified  [{"disabled": false, "title": "Open this run (landing or launch ascent) in the Cinematic View 0.2.1 (a separate window; read-only replay of the record)", "focusable": true, "described": true} status {"installed": true, "verified": true, "version": "0.2.1"}]
-PASS Cinematic: the button is focusable and names its reason or its action through aria-describedby  [{"disabled": false, "title": "Open this run (landing or launch ascent) in the Cinematic View 0.2.1 (a separate window; read-only replay of the record)", "focusable": true, "described": true}]
-PASS Cinematic: the enabled button says which module version opens this record  [Open this run (landing or launch ascent) in the Cinematic View 0.2.1 (a separate window; read-only replay of the record)]
+PASS Cinematic: the button is enabled exactly when the module is installed and verified  [{"disabled": false, "title": "Open this run (landing or launch ascent) in the Cinematic View 0.2.3 (a separate window; read-only replay of the record)", "focusable": true, "described": true} status {"installed": true, "verified": true, "version": "0.2.3"}]
+PASS Cinematic: the button is focusable and names its reason or its action through aria-describedby  [{"disabled": false, "title": "Open this run (landing or launch ascent) in the Cinematic View 0.2.3 (a separate window; read-only replay of the record)", "focusable": true, "described": true}]
+PASS Cinematic: the enabled button says which module version opens this record  [Open this run (landing or launch ascent) in the Cinematic View 0.2.3 (a separate window; read-only replay of the record)]
 PASS Cinematic: the module process started for this run
 PASS Player: Land a rocket here opens the mission on the chosen environment  [{"environment": "cape-canaveral", "view": "geospatial"}]
 PASS Player: choosing another environment while the same mission is held changes what the player shows  [{"environment": "wallops-island", "experience": "first-landing"}]
@@ -61,7 +61,7 @@ PASS Lab: replacing it starts the new vehicle's baseline  [e41f71c23324683f]
 PASS Ascent: 600 kg payload changes which requirements pass  [upper.R4_periapsis, upper.R6_propellant_margin, mission.R8_orbit_insertion]
 PASS Ascent: the record publishes a numeric margin for the single-bound requirements  [requirement_margin.booster.R2_propellant_margin, requirement_margin.booster.R3_recovery_zone, requirement_margin.stack.S1_max_dynamic_pressure, requirement_margin.stack.S2_axial_acceleration, requirement_margin.upper.R4_periapsis, requirement_margin.upper.R5_apoapsis, requirement_margin.upper.R6_propellant_margin, requirement_margin.upper.S2_axial_acceleration]
 PASS Ascent: composite requirements publish none
-PASS Ascent: the Lab shows a numeric margin change for the requirements that have one  [[["Maximum dynamic pressure \u00b7 safety", "-329 Pa"], ["Maximum sensed acceleration \u00b7 safety", "+0.00352 g"], ["Maximum sensed acceleration \u00b7 safety", "+0.741 g"], ["Separation window", "\u2013"], ["Booster propellant margin", "-2.16 kg"], ["Booster impact in the recovery zone", "-11.3 km"], ["Periapsis altitude", "-1160 km"], ["Apoapsis on target", "+1.13 km"], ["Upper-stage propellan]
+PASS Ascent: the Lab shows a numeric margin change for the requirements that have one  [[["Periapsis altitude \u00b7 Upper stage", "-1157 km"], ["Upper-stage propellant margin \u00b7 Upper stage", "-141.9 kg"], ["Orbit insertion", "\u2013"], ["Maximum dynamic pressure \u00b7 Stack \u00b7 safety", "-329.2 Pa"], ["Maximum sensed acceleration \u00b7 Stack \u00b7 safety", "+0.003517 g"], ["Maximum sensed acceleration \u00b7 Upper stage \u00b7 safety", "+0.7408 g"], ["Separation window \u]
 PASS Ascent: no requirement that has numbers shows an empty margin
 PASS Layout 1024x700: home has no horizontal scroll
 PASS Layout 1024x700: vehicles has no horizontal scroll

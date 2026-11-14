@@ -5,7 +5,7 @@ Fly it, break it, find out why.
 
 A deterministic simulator of autonomous ]
 PASS Explorer: Home has one primary action to a first landing
-PASS Explorer: one click from Home to a landing on screen  [0.7 s]
+PASS Explorer: one click from Home to a landing on screen  [0.2 s]
 PASS Explorer: the landing plays by itself
 PASS Explorer: readouts are labelled as true state, estimate or derived  [Robust controller  T Altitude 2172 m T Descent rate 218.8 m/s T Horizontal speed 9.82 m/s T Tilt 1.33 ┬░ T Throttle 0.00 ]
 PASS Explorer: the phase is shown  [Engine off]
@@ -20,7 +20,7 @@ PASS Explorer: the difference is located in time
 PASS Explorer: a failed requirement names expected and observed
 PASS Analyst: Analyse opens the shown run with full telemetry
 PASS Analyst: Compare in detail opens the matrix of both runs
-PASS Analyst: Change the conditions opens the run in the Experiment Lab
+PASS Analyst: Open in Experiment Lab opens the run in the Experiment Lab
 PASS Library: the Challenge a claim filter shows the claim-backed missions  [3]
 PASS Researcher: registered bias fails R5 only, later smaller bias fails R1  [[["hard_landing", "safe"], ["hard_landing", "safe"]]]
 PASS Researcher: the finding is labelled exploratory

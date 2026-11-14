@@ -1,0 +1,197 @@
+{
+  "flow": "m16",
+  "exe": "vv-studio.exe",
+  "machine": {
+    "cpu": "AMD64 Family 25 Model 97 Stepping 2, AuthenticAMD",
+    "os": "Windows-11-10.0.26300-SP0",
+    "python": "3.14.6"
+  },
+  "cold_start_to_ready_s": 0.97,
+  "idle_memory": {
+    "processes": 7,
+    "working_set_mb": 425.8,
+    "private_mb": 295.0,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "idle_frames": {
+    "frames": 112,
+    "mean_ms": 17.95,
+    "p50_ms": 18,
+    "p95_ms": 18.4,
+    "p99_ms": 18.5,
+    "max_ms": 20.4,
+    "over_33ms": 0
+  },
+  "clicks_to_landing": 1,
+  "click_to_landing_on_screen_s": 0.29,
+  "machine_time_to_landing_s": 1.26,
+  "playback_detected": true,
+  "playback_frames": {
+    "frames": 279,
+    "mean_ms": 17.9,
+    "p50_ms": 17.9,
+    "p95_ms": 18.5,
+    "p99_ms": 18.6,
+    "max_ms": 18.7,
+    "over_33ms": 0
+  },
+  "playback_memory": {
+    "processes": 7,
+    "working_set_mb": 479.4,
+    "private_mb": 361.6,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "webgl": "ANGLE (AMD, AMD Radeon RX 7700 XT (0x0000747E) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "window_inner": [
+    1440,
+    900,
+    1
+  ],
+  "engineering_playback_cpu_percent_of_one_core": 24.4,
+  "engineering_gpu": {
+    "gpu_dedicated_mb": 137.8,
+    "gpu_3d_utilisation_percent": 1.6
+  },
+  "geo_switch_to_terrain_on_gpu_s": 0.478,
+  "geo_playback_frames": {
+    "frames": 279,
+    "mean_ms": 17.93,
+    "p50_ms": 18,
+    "p95_ms": 18.5,
+    "p99_ms": 18.8,
+    "max_ms": 19.2,
+    "over_33ms": 0
+  },
+  "geo_playback_cpu_percent_of_one_core": 36.6,
+  "geo_playback_memory": {
+    "processes": 7,
+    "working_set_mb": 852.4,
+    "private_mb": 1049.2,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "geo_gpu": {
+    "gpu_dedicated_mb": 463.6,
+    "gpu_3d_utilisation_percent": 24.8
+  },
+  "geo_scene": {
+    "renders": 512,
+    "triangles": 4489118,
+    "geometries": 50,
+    "textures": 10,
+    "camera": {
+      "mode": "follow",
+      "position": [
+        88,
+        -163.4,
+        42.2
+      ],
+      "target": [
+        -0.5,
+        3.1,
+        19
+      ],
+      "fov": 30,
+      "distance": 190,
+      "stageFraction": 0.411,
+      "observer": null,
+      "shot": null
+    },
+    "world": {
+      "buildings": 687,
+      "lidar_structures": 8,
+      "structures": 39,
+      "trees": 8248,
+      "shrubs": 97479,
+      "tiles": 47,
+      "vegetation_in_range": 105727,
+      "vegetation_tiers": [
+        64104,
+        41623,
+        0
+      ]
+    }
+  },
+  "switch_to_control_s": 0.484,
+  "control_playback_frames": {
+    "frames": 279,
+    "mean_ms": 17.91,
+    "p50_ms": 17.9,
+    "p95_ms": 18.5,
+    "p99_ms": 18.8,
+    "max_ms": 18.9,
+    "over_33ms": 0
+  },
+  "control_playback_cpu_percent_of_one_core": 28.8,
+  "control_memory": {
+    "processes": 7,
+    "working_set_mb": 911.1,
+    "private_mb": 1105.5,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "after_leaving_memory": {
+    "processes": 7,
+    "working_set_mb": 811.5,
+    "private_mb": 818.9,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "after_leaving_gpu": {
+    "gpu_dedicated_mb": 247.8,
+    "gpu_3d_utilisation_percent": 0
+  },
+  "long_session_start_memory": {
+    "processes": 7,
+    "working_set_mb": 933.4,
+    "private_mb": 1279.0,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "long_session_s": 180,
+  "long_session_p99_ms_samples": [
+    18.8,
+    18.9,
+    19.1,
+    18.7,
+    19,
+    18.7,
+    18.6,
+    18.7,
+    18.8,
+    18.8,
+    18.8,
+    18.7,
+    18.9,
+    18.7,
+    18.9,
+    18.9,
+    18.7,
+    18.7
+  ],
+  "long_session_end_memory": {
+    "processes": 7,
+    "working_set_mb": 907.3,
+    "private_mb": 1095.1,
+    "by_name": [
+      "msedgewebview2.exe",
+      "vv-studio.exe"
+    ]
+  },
+  "webview_requests": 19,
+  "webview_requests_leaving_the_machine": []
+}
