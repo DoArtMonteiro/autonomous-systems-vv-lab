@@ -55,6 +55,23 @@ Outras verificações, todas no Studio 0.18.0 compilado ou no repositório nesta
 
 O instalador NSIS do 0.18.1 foi instalado em silêncio por cima do 0.17.0 (a biblioteca do utilizador ficou idêntica) e o módulo Cinematic 0.2.1 foi instalado pelo código de instalação do Studio. Contra o executável instalado: M15 48/48, M16 78/78, M17 Lab 34/34, M17 Cinematic 11/11, M18 72/72 e o percurso de utilizador `installed_spotcheck.py` 40/40 (Mission Control, hangar, «Design and fly», Compare, leitor e Cinematic View para uma aterragem e uma subida, com Direct3D 12). Desempenho, hashes, o que não foi verificado e as instruções de recuperação estão em [docs/evidence/m18/installed-0.18.1/README.md](evidence/m18/installed-0.18.1/README.md).
 
+### Revisão de interface do 0.18.1 e correções
+
+Uma revisão independente das capturas do 0.18.1 instalado concluiu «boa, com lacunas». Corrigido no mesmo número de versão (ainda não publicado):
+
+1. **Segurança**: «safe» sozinho numa corrida que toca no solo a 60 m/s era enganador. Compare, Library, Lab, a vista de execução e o leitor dizem agora «No safety rule broken (N checked)» (ou «k of N safety rules broken»), com uma nota de que a velocidade de contacto é um requisito da missão (`ui/js/requirements.js`, `safetyWording`).
+2. **Duas corridas lêem-se como diferentes**: Compare e Lab abrem com a maior mudança de um requisito (por exemplo «Vertical speed at contact 1.658 → 60.08 m/s (limit <= 3 m/s)»); cada célula mostra o valor observado, o limite (na linha) e a margem; «1 row differs» / «N rows differ»; as linhas que falham vêm primeiro; números com 4 algarismos significativos e o valor completo na dica; o ângulo de inclinação em graus (derivado do cosseno gravado, dito na dica); na subida o nome do andar distingue requisitos repetidos.
+3. **Cartão do leitor**: «Not met: Horizontal speed at contact 1.584 m/s (limit <= 1 m/s); impact not modelled» em vez de «Contact at 1.7 m/s» (um valor que passa).
+4. **Cinematic View**: o leitor deixa escolher qual das duas corridas se abre; o módulo recebe o rótulo, o veículo, a semente e o ambiente do leitor (a verificação confirma o `--env` na linha de comandos do processo).
+5. **Texto**: declaração «Exploratory models, not real vehicles; nothing is validated against flight data» em Mission Control e no hangar; «integrity-checked offline» em vez de «validated offline»; «recomputed model behaviour»; uma só etiqueta, «Open in Experiment Lab», para o caminho para o Lab.
+6. **Navegação**: abaixo de 1100 px, Configure, Analyse, Compare e Records passam para um menu «More» (botão de menu: Enter, setas, Escape).
+7. **Lab**: «Run experiment» sempre visível e desativado com «Change one condition first»; sem deslocamento aninhado; os botões de sementes dizem «Run an experiment first.».
+8. **Ambientes**: descrição completa, «Terrain is context only» em cada cartão e o estado do módulo diz que a primeira verificação lê todos os ficheiros (e continua a dizer se demorar).
+9. Uma só cor para «Exploratory»; «Reference case» no leitor quando o veículo é o caso pré-registado.
+10. Nenhum texto abaixo de 12 px nas vistas verificadas (o percurso mede o tamanho calculado); o cinzento de apoio do tema escuro (`--fg-3`) passou de 4,5:1 (sobre o fundo mais claro) a 5,7:1 ou mais sobre os fundos dos painéis (razões de luminância calculadas dos próprios tokens; as sobreposições sobre imagens não foram medidas); os nomes dos requisitos quebram linha em vez de serem cortados.
+
+O percurso `desktop/studio/tests/ux_journeys.py` verifica os pontos 1 a 8 e 10 no executável instalado; o resultado e as capturas de revisão estão em [docs/evidence/m18/installed-0.18.1/README.md](evidence/m18/installed-0.18.1/README.md).
+
 O primeiro frame da Cinematic View chega 12 a 16 s depois do clique, porque o módulo descodifica os ativos CC0 ao arrancar. O 0.18.1 diz isso no Studio (um estado «Opening the Cinematic View in its own window. The first frame takes about 15 seconds.» durante 30 s) e o módulo 0.2.1 mostra uma imagem de arranque (`boot_splash`) logo que a janela abre.
 
 ## Revisão independente
