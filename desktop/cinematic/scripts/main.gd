@@ -317,6 +317,7 @@ func _build() -> void:
 	# Interface.
 	hud = Hud.new()
 	hud.build(self, record, pack, record.t0(), record.t1(), Profiles.ORDER + ["custom"], cameras)
+	hud.set_run_info(cli.run_label, cli.vehicle, cli.exploratory, cli.seed, cli.run_dir.rstrip("/\\").get_file(), record)
 	hud.play_btn.pressed.connect(func(): _set_playing(not playing))
 	hud.slider.value_changed.connect(func(v): if not hud.slider_blocked(): _set_time(v))
 	hud.speed_menu.item_selected.connect(func(i): speed = [0.25, 0.5, 1.0, 2.0][i])
@@ -364,7 +365,10 @@ func _first_frame() -> void:
 
 
 func _update_note() -> void:
-	hud.note.text = "Graphics: %s (%s). %s" % [profile_name.capitalize(), profile_reason, " ".join(notes.slice(1))]
+	# A short label that always fits the playback bar (the profile menu above it names the profile); the reason and the notes are in its tooltip.
+	var how := profile_reason.get_slice(":", 0).strip_edges()
+	hud.note.text = "Graphics: %s" % ("auto" if how.begins_with("Auto") else "set")
+	hud.note.tooltip_text = "Graphics: %s (%s). %s" % [profile_name.capitalize(), profile_reason, " ".join(notes.slice(1))]
 
 
 func _switch_profile(name: String, reason: String) -> void:

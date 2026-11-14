@@ -9,8 +9,8 @@ extends RefCounted
 
 const ILLUSTRATIVE := "Illustrative, not data: stage geometry (42 m), landing pad, lights and masts, ground texture and boulders near the pad, scanned plants (their positions and sizes are the pack's), HDRI sky, plume and exhaust, glow and dust, crown shapes, scrub colour and foliage cards, building walls and roofs, sky, haze, water finish, ground beyond the pack."
 const ILLUSTRATIVE_ASCENT := "Illustrative, not data: vehicle shapes (from the record's visual block), body axis drawn along the recorded velocity, reversed (tail first) while an engine burns in a steep descent (no attitude is recorded or simulated), the direction east (the record has no heading), the upper stage drawn offset from the first stage's recorded point, plume and exhaust, glow and dust, landing pad and lights, the Earth beyond the pack as a plain sphere with no geography, atmosphere, sky and haze."
-const DATA_ASCENT := "Data: each entity's position, altitude, speed and throttle from the record (interpolated between its samples for display); an entity exists from its first to its last sample; terrain and imagery of the pad's surroundings from the validated pack. Nothing here is simulated."
-const DATA := "Data: stage pose from the record (interpolated for display), throttle, verdicts; terrain, imagery, footprints, heights, plant positions from the validated pack. Nothing here is simulated."
+const DATA_ASCENT := "Data: each entity's position, altitude, inertial speed (as the record defines it) and throttle (percent of the maximum) from the record (interpolated between its samples for display); an entity exists from its first to its last sample; terrain and imagery of the pad's surroundings from the validated pack. Nothing here is simulated."
+const DATA := "Data: stage pose from the record (interpolated for display), throttle (percent of the maximum), speed |v| (the length of the recorded velocity vector), verdicts; terrain, imagery, footprints, heights, plant positions from the validated pack. Nothing here is simulated."
 const MARGIN := 18
 
 var layer: CanvasLayer
@@ -21,6 +21,7 @@ var revealed := false
 var status: Label
 var credit_line: Label
 var credits_panel: PanelContainer
+var credit_panel: PanelContainer
 var slider: HSlider
 var play_btn: Button
 var cam_buttons := {}
@@ -31,6 +32,9 @@ var bar: PanelContainer
 var rows: Array = []
 var entity_buttons := {}
 var is_v2 := false
+var run_line: Label
+var sample_line: Label
+var speed_word := "speed"
 var _block_slider := false
 
 
@@ -74,11 +78,19 @@ func build(root: Node, record, pack, t0: float, t1: float, profiles: Array, came
 	var vb := VBoxContainer.new()
 	vb.add_theme_constant_override("separation", 1)
 	top.add_child(vb)
-	var title := _label(11, Color(0.72, 0.77, 0.82))
+	var title := _label(12, Color(0.82, 0.86, 0.9))
 	title.text = "Cinematic View: replay of a recorded run  |  %s" % str(pack.m.get("name", pack.m.get("id", "")))
 	vb.add_child(title)
+	# Which run this is: the Studio's label for it, its identifier, the vehicle and the seed.
+	run_line = _label(13, Color(0.97, 0.98, 1.0))
+	run_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	run_line.custom_minimum_size = Vector2(420, 0)
+	vb.add_child(run_line)
 	readout = _label(14)
 	vb.add_child(readout)
+	# The recorded sample the readout reads (a technical detail, kept on a quieter line).
+	sample_line = _label(12, Color(0.78, 0.82, 0.87))
+	vb.add_child(sample_line)
 	layer.add_child(top)
 	# Top right: the record's verdicts, verbatim.
 	var vr := PanelContainer.new()
@@ -87,7 +99,7 @@ func build(root: Node, record, pack, t0: float, t1: float, profiles: Array, came
 	vr.offset_left = -360 - MARGIN
 	vr.offset_right = -MARGIN
 	vr.offset_top = MARGIN
-	verdict = _label(11)
+	verdict = _label(12)
 	verdict.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	verdict.custom_minimum_size = Vector2(340, 0)
 	var o: Dictionary = record.outcome()
@@ -97,14 +109,14 @@ func build(root: Node, record, pack, t0: float, t1: float, profiles: Array, came
 	_show_verdict(false)
 	layer.add_child(vr)
 	# Bottom left: the persistent illustrative label.
-	status = _label(10, Color(0.88, 0.9, 0.92))
+	status = _label(12, Color(0.95, 0.96, 0.98))
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	if is_v2:
 		status.text = ILLUSTRATIVE_ASCENT + "\n" + DATA_ASCENT + "\nColoured lines (record): the recorded path of each entity."
 	else:
 		status.text = ILLUSTRATIVE + "\n" + DATA + "\nRings (record): green R5 landing radius, red S2 keep-out. White line: nozzle track on the ground."
 	var sp := PanelContainer.new()
-	sp.add_theme_stylebox_override("panel", _panel(0.45))
+	sp.add_theme_stylebox_override("panel", _panel(0.92))
 	_anchor(sp, 0, 1, 0, 1)
 	sp.offset_left = MARGIN
 	sp.offset_right = MARGIN + 560
@@ -116,16 +128,25 @@ func build(root: Node, record, pack, t0: float, t1: float, profiles: Array, came
 	sp.add_child(status)
 	layer.add_child(sp)
 	# Bottom right: one short credit line; C opens the full attributions.
-	credit_line = _label(10, Color(0.88, 0.9, 0.92))
+	credit_line = _label(12, Color(0.95, 0.96, 0.98))
 	credit_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	var has_osm: bool = typeof(pack.m.get("world")) == TYPE_DICTIONARY and typeof(pack.m["world"].get("features")) == TYPE_DICTIONARY
 	credit_line.text = ("© OpenStreetMap contributors (ODbL). " if has_osm else "") + "Terrain and imagery credits: press C."
-	_anchor(credit_line, 1, 1, 1, 1)
-	credit_line.offset_left = -420 - MARGIN
-	credit_line.offset_right = -MARGIN
-	credit_line.offset_top = -MARGIN - 16
-	credit_line.offset_bottom = -MARGIN
-	layer.add_child(credit_line)
+	var cp := PanelContainer.new()
+	cp.add_theme_stylebox_override("panel", _panel(0.85))
+	_anchor(cp, 1, 1, 1, 1)
+	cp.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	cp.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	cp.offset_right = -MARGIN
+	cp.offset_bottom = -MARGIN
+	cp.offset_left = -MARGIN
+	cp.offset_top = -MARGIN
+	credit_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	credit_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	credit_line.custom_minimum_size = Vector2(360, 0)
+	credit_panel = cp
+	cp.add_child(credit_line)
+	layer.add_child(cp)
 	credits_panel = PanelContainer.new()
 	credits_panel.add_theme_stylebox_override("panel", _panel(0.85))
 	_anchor(credits_panel, 0.5, 0.5, 0.5, 0.5)
@@ -144,7 +165,7 @@ func build(root: Node, record, pack, t0: float, t1: float, profiles: Array, came
 	bar.add_theme_stylebox_override("panel", _panel(0.6))
 	_anchor(bar, 0, 1, 1, 1)
 	bar.offset_left = MARGIN + 580
-	bar.offset_right = -MARGIN - 440
+	bar.offset_right = -MARGIN - 400
 	bar.offset_top = -MARGIN - 88
 	bar.offset_bottom = -MARGIN - 4
 	var col := VBoxContainer.new()
@@ -202,8 +223,9 @@ func build(root: Node, record, pack, t0: float, t1: float, profiles: Array, came
 			eb.add_theme_font_size_override("font_size", 12)
 			ent_row.add_child(eb)
 			entity_buttons[en["id"]] = eb
-	note = _label(10, Color(1.0, 0.86, 0.55))
+	note = _label(12, Color(1.0, 0.9, 0.62))
 	note.clip_text = true
+	note.mouse_filter = Control.MOUSE_FILTER_STOP
 	note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row2.add_child(note)
 	layer.add_child(bar)
@@ -220,13 +242,38 @@ static func presentation_line(record) -> String:
 	return line
 
 
+# Which run is on screen. Values are the Studio's display arguments or, when the module is started on
+# its own, what the record itself says (the seed of its request, the identifier of its folder).
+func set_run_info(label: String, vehicle: String, exploratory: bool, seed: int, run_id: String, record) -> void:
+	var parts := PackedStringArray()
+	var name := label
+	if name == "":
+		name = "Run %s" % run_id.substr(0, 8)
+	elif run_id != "":
+		name = "%s (%s)" % [name, run_id.substr(0, 8)]
+	parts.append(name)
+	var sd := seed
+	if sd < 0 and record != null:
+		var rq = record.data.get("request", {})
+		if typeof(rq) == TYPE_DICTIONARY and rq.get("seed") != null:
+			sd = int(rq["seed"])
+	if sd >= 0:
+		parts.append("seed %d" % sd)
+	if vehicle != "":
+		parts.append("%s%s" % [vehicle, " (exploratory, not a real vehicle)" if exploratory else ""])
+	elif exploratory:
+		parts.append("exploratory, not a real vehicle")
+	run_line.text = "  |  ".join(parts)
+	speed_word = "inertial speed" if is_v2 else "speed |v|"
+
+
 func set_presentation(on: bool, record = null) -> void:
 	if not on:
 		return
 	for c in layer.get_children():
-		if c != credit_line:
+		if c != credit_panel:
 			c.visible = false
-	var l := _label(10, Color(0.9, 0.92, 0.95))
+	var l := _label(12, Color(0.95, 0.96, 0.98))
 	l.text = presentation_line(record)
 	# One line from the left margin to the credit line (420 px wide at the right); a label that does
 	# not fit in a narrow window is cut with an ellipsis instead of running under the credit line.
@@ -270,7 +317,10 @@ func set_time(t: float, record) -> void:
 	var v := func(id: String, d: int) -> String:
 		var x = record.sample_value(id, t)
 		return "n/a" if x == null else String.num(float(x), d)
-	readout.text = "t %.2f s  (sample %.2f s)\nalt %s m   speed %s m/s   throttle %s" % [t, st, v.call(record.nozzle_ids[2], 1), v.call("speed", 1), v.call("act_throttle", 3)]
+	var th = record.sample_value("act_throttle", t)
+	var th_text := "n/a" if th == null else "%d %%" % int(round(float(th) * 100.0))
+	readout.text = "t %.2f s\naltitude %s m   %s %s m/s   throttle %s" % [t, v.call(record.nozzle_ids[2], 1), speed_word, v.call("speed", 1), th_text]
+	sample_line.text = "reads the recorded sample at t %.2f s" % st
 	_block_slider = true
 	slider.value = t
 	_block_slider = false
@@ -291,8 +341,11 @@ func _set_time_ascent(t: float, record) -> void:
 			var v := func(name: String, d: int, scale: float) -> String:
 				var x = record.entity_value(e, name, t)
 				return "n/a" if x == null else String.num(float(x) * scale, d)
-			lines.append("%s: alt %s km   speed %s m/s   throttle %s" % [short, v.call("altitude_km", 2, 1.0), v.call("speed_m_s", 1, 1.0), v.call("throttle", 2, 1.0)])
+			var thr = record.entity_value(e, "throttle", t)
+			var thr_text := "n/a" if thr == null else "%d %%" % int(round(float(thr) * 100.0))
+			lines.append("%s: altitude %s km   %s %s m/s   throttle %s" % [short, v.call("altitude_km", 2, 1.0), speed_word, v.call("speed_m_s", 1, 1.0), thr_text])
 	readout.text = "\n".join(lines)
+	sample_line.text = "reads each entity's recorded samples at the mission clock"
 	_block_slider = true
 	slider.value = t
 	_block_slider = false

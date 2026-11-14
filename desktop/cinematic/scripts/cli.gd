@@ -4,6 +4,7 @@ extends RefCounted
 
 const CAMERAS := ["director", "follow", "pad", "closeup", "wide", "overhead", "lowwide"]
 const POSE_LIMIT_M := 1.0e8
+const LABEL_MAX := 100
 const PROFILES := ["auto", "performance", "balanced", "high", "ultra", "custom"]
 
 var run_dir := ""
@@ -24,6 +25,10 @@ var bench_t1 := NAN
 var play := false
 var controls := true
 var presentation := false
+var run_label := ""     # display only: the Studio's label for the run (text, at most LABEL_MAX characters)
+var vehicle := ""       # display only: the vehicle's name
+var exploratory := false  # display only: the vehicle or the case is not a reference case
+var seed := -1          # display only: the seed of the run, or -1 when not given
 var entity := "auto"   # launch ascent: the entity the follow camera tracks, or auto
 var has_camera_pose := false
 var camera_pose: PackedFloat64Array = PackedFloat64Array()  # east, north, up of the eye; of the target; vertical fov in degrees
@@ -31,7 +36,7 @@ var error := ""
 
 
 static func usage() -> String:
-	return "usage: -- --run <run dir> [--env <pack dir>] [--pose-dump t1,t2,...] [--profile auto|performance|balanced|high|ultra|custom] [--custom key=value,...] [--vram-bytes N] [--camera director|follow|pad|closeup|wide|overhead|lowwide] [--t seconds] [--play] [--controls shown|hidden] [--presentation] [--policy-dump] [--entity auto|<entity id>] [--camera-pose ex,ey,ez,tx,ty,tz,fov] [--shot out.png] [--bench out.json --bench-seconds S --bench-from T --bench-to T]"
+	return "usage: -- --run <run dir> [--env <pack dir>] [--pose-dump t1,t2,...] [--profile auto|performance|balanced|high|ultra|custom] [--custom key=value,...] [--vram-bytes N] [--camera director|follow|pad|closeup|wide|overhead|lowwide] [--t seconds] [--play] [--controls shown|hidden] [--presentation] [--policy-dump] [--entity auto|<entity id>] [--run-label text] [--vehicle text] [--exploratory] [--seed N] [--camera-pose ex,ey,ez,tx,ty,tz,fov] [--shot out.png] [--bench out.json --bench-seconds S --bench-from T --bench-to T]"
 
 
 static func parse(args: PackedStringArray) -> RefCounted:
@@ -39,7 +44,7 @@ static func parse(args: PackedStringArray) -> RefCounted:
 	var i := 0
 	while i < args.size():
 		var k := args[i]
-		var needs_value := k in ["--run", "--env", "--pose-dump", "--profile", "--custom", "--vram-bytes", "--camera", "--t", "--shot", "--bench", "--bench-seconds", "--bench-from", "--bench-to", "--controls", "--camera-pose", "--entity"]
+		var needs_value := k in ["--run", "--env", "--pose-dump", "--profile", "--custom", "--vram-bytes", "--camera", "--t", "--shot", "--bench", "--bench-seconds", "--bench-from", "--bench-to", "--controls", "--camera-pose", "--entity", "--run-label", "--vehicle", "--seed"]
 		var v := ""
 		if needs_value:
 			if i + 1 >= args.size():
@@ -104,6 +109,25 @@ static func parse(args: PackedStringArray) -> RefCounted:
 				c.presentation = true
 			"--policy-dump":
 				c.has_policy_dump = true
+			"--run-label", "--vehicle":
+				# Text for the screen only. Anything that is too long or holds a control character is refused.
+				var okt := v.length() >= 1 and v.length() <= LABEL_MAX
+				for ch in v:
+					okt = okt and ch.unicode_at(0) >= 32 and ch.unicode_at(0) != 127
+				if not okt:
+					c.error = "%s takes 1 to %d characters of text without control characters" % [k, LABEL_MAX]
+					return c
+				if k == "--run-label":
+					c.run_label = v
+				else:
+					c.vehicle = v
+			"--exploratory":
+				c.exploratory = true
+			"--seed":
+				if not v.is_valid_int() or v.length() > 18 or v.to_int() < 0:
+					c.error = "--seed takes a non-negative integer"
+					return c
+				c.seed = v.to_int()
 			"--entity":
 				var ok := v.length() >= 1 and v.length() <= 32
 				for ch in v:
