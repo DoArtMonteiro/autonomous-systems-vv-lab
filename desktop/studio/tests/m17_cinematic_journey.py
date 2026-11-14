@@ -130,6 +130,11 @@ def main():
                     launched = godot_pids(proc.pid)
                     time.sleep(0.5)
                 check("Cinematic: the player opens the module window on the shown run", bool(launched))
+                # While the module decodes its assets (12 to 15 s) the Studio says so in a status that stays.
+                opening = s.js("(() => { const t = [...document.querySelectorAll('#toasts [role=status]')].find((e) => /Opening the Cinematic View/.test(e.textContent)); return t ? t.textContent : null; })()")
+                check("Cinematic: a status says the view is opening and the first frame takes about 15 seconds", bool(opening) and "about 15 seconds" in opening, str(opening))
+                time.sleep(6)
+                check("Cinematic: that status is still there six seconds later", bool(s.js("[...document.querySelectorAll('#toasts [role=status]')].some((e) => /Opening the Cinematic View/.test(e.textContent))")))
                 # The module's own log says whether it verified the pack, drew a first frame and
                 # rendered without errors. (No desktop screenshot: it would capture other windows.)
                 # The first frame takes about 12 to 15 s after the click on the reference PC (the module
