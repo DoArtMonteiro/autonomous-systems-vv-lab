@@ -29,6 +29,8 @@ var profile_menu: OptionButton
 var speed_menu: OptionButton
 var quality_label: Label
 var result_btn: Button
+var legend_btn: Button
+var legend_panel: PanelContainer
 var note: Label
 var bar: PanelContainer
 var rows: Array = []
@@ -107,7 +109,7 @@ func build(root: Node, record, pack, t0: float, t1: float, profiles: Array, came
 	vb.add_theme_constant_override("separation", 1)
 	top.add_child(vb)
 	var title := _label(12, Color(0.82, 0.86, 0.9))
-	title.text = "Cinematic View: replay of a recorded run  |  %s" % str(pack.m.get("name", pack.m.get("id", "")))
+	title.text = "Cinematic View: this view computes nothing. It draws the recorded run  |  %s" % str(pack.m.get("name", pack.m.get("id", "")))
 	vb.add_child(title)
 	# Which run this is: the Studio's label for it, its identifier, the vehicle and the seed.
 	run_line = _label(13, Color(0.97, 0.98, 1.0))
@@ -155,6 +157,7 @@ func build(root: Node, record, pack, t0: float, t1: float, profiles: Array, came
 	status.custom_minimum_size = Vector2(540, 0)
 	sp.add_child(status)
 	layer.add_child(sp)
+	legend_panel = sp
 	# Bottom right: one short credit line; C opens the full attributions.
 	credit_line = _label(12, Color(0.95, 0.96, 0.98))
 	credit_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -228,6 +231,14 @@ func build(root: Node, record, pack, t0: float, t1: float, profiles: Array, came
 	result_btn.text = "Show result"
 	result_btn.tooltip_text = "Show the record's verdicts now (V)"
 	row.add_child(result_btn)
+	# The legend of what is drawn can be folded away; it starts open, as the label must be on screen.
+	legend_btn = Button.new()
+	legend_btn.text = "Hide what is drawn"
+	legend_btn.toggle_mode = false
+	legend_btn.pressed.connect(func():
+		legend_panel.visible = not legend_panel.visible
+		legend_btn.text = "Hide what is drawn" if legend_panel.visible else "Show what is drawn")
+	row.add_child(legend_btn)
 	var row2 := HFlowContainer.new()
 	col.add_child(row2)
 	rows = [row, row2]
@@ -362,7 +373,7 @@ func set_time(t: float, record) -> void:
 		return "n/a" if x == null else String.num(float(x), d)
 	var th = record.sample_value("act_throttle", t)
 	var th_text := "n/a" if th == null else "%d %%" % int(round(float(th) * 100.0))
-	readout.text = "t %.2f s\naltitude %s m   %s %s m/s   throttle %s" % [t, v.call(record.nozzle_ids[2], 1), speed_word, v.call("speed", 1), th_text]
+	readout.text = "t %.2f s of %.2f s\naltitude %s m   %s %s m/s   throttle %s" % [t, record.t1(), v.call(record.nozzle_ids[2], 1), speed_word, v.call("speed", 1), th_text]
 	sample_line.text = "reads the recorded sample at t %.2f s" % st
 	_block_slider = true
 	slider.value = t
@@ -373,7 +384,7 @@ func set_time(t: float, record) -> void:
 # speed and throttle (before its first sample it has not started; after its last it has ended).
 func _set_time_ascent(t: float, record) -> void:
 	var lines := PackedStringArray()
-	lines.append("t %.2f s (mission clock)" % t)
+	lines.append("t %.2f s of %.2f s (mission clock)" % [t, record.t1()])
 	for e in record.entities:
 		var short := str(e["label"]).get_slice(" (", 0)
 		if t < e["t_start"] - 1e-9:

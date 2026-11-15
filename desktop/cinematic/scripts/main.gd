@@ -141,6 +141,8 @@ func _policy_dump() -> void:
 		"auto": Profiles.auto_pick(vram),
 		"vram_bytes": vram["bytes"],
 		"presentation_line": Hud.presentation_line(record),
+		# The display arguments as the module will show them (bidi controls removed), for the tests.
+		"display": {"run_label": cli.run_label, "vehicle": cli.vehicle, "exploratory": cli.exploratory, "seed": cli.seed},
 	}
 	print("POLICY " + JSON.stringify(out, "", true, true))
 	get_tree().quit(0)

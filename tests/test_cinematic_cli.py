@@ -3,6 +3,7 @@
 Needs Godot 4.7.2: set VV_GODOT to the console executable; without it the tests are skipped.
 """
 
+import json
 import os
 import subprocess
 import unittest
@@ -80,7 +81,14 @@ class DisplayArguments(unittest.TestCase):
 
     def test_the_largest_seed_is_accepted_and_bidi_overrides_are_removed_not_refused(self):
         self.assertEqual(self.run_with("--seed", "9" * 18).returncode, 0)
-        self.assertEqual(self.run_with("--run-label", "a‮b⁦c").returncode, 0)
+        out = subprocess.run([self.godot, "--headless", "--path", PROJECT, "--", "--run", RUN, "--policy-dump", "--run-label", "a\u202eb\u2066c", "--vehicle", "x\u202ey", "--seed", "42"],
+                             capture_output=True, text=True, timeout=120, encoding="utf-8", errors="replace")
+        self.assertEqual(out.returncode, 0, out.stderr[-500:])
+        line = next(ln for ln in out.stdout.splitlines() if ln.startswith("POLICY "))
+        shown = json.loads(line[len("POLICY "):])["display"]
+        self.assertEqual(shown["run_label"], "abc")
+        self.assertEqual(shown["vehicle"], "xy")
+        self.assertEqual(shown["seed"], 42)
 
     def test_the_seed_is_a_non_negative_integer(self):
         self.assertEqual(self.run_with("--seed", "-1").returncode, 2)
