@@ -15,7 +15,7 @@ PASS Hangar: one label for the way into the Lab  [["Open in Experiment Lab"]]
 PASS Text size: nothing on the hangar is below 12 px
 PASS Environments: every description is shown in full (nothing clipped)  [0 clipped]
 PASS Environments: every card says Terrain is context only  [["Terrain is context only", "Terrain is context only", "Terrain is context only", "Terrain is context only", "Terrain is]
-PASS Environments: the module status resolves (it does not stay at Checking)  [0.3 s: Installed: version 0.2.6; every file matches its manifest.]
+PASS Environments: the module status resolves (it does not stay at Checking)  [0.3 s: Installed: version 0.2.7; every file matches its manifest.]
 PASS Environments: no text says validated offline
 PASS Text size: nothing on Environments is below 12 px
 PASS Lab: Run experiment is visible from the start and says why it is off  [{"disabled": true, "why": "Change one condition first", "describedby": "lab-run-why", "visible": true, "overflow": "visible", "maxHeight": "none"}]
@@ -31,11 +31,11 @@ PASS Lab: the verdict pills say No safety rule broken (5 checked), never a bare 
 PASS Compare: no run is labelled with a bare safe  [["Reached the ground, requirements not met No safety rule broken (5 checked)", "Reached the ground, requirements not met No safety rule broken (5 checked)"]]
 PASS Compare: the Safety rules row says how many were checked  [["No safety rule broken (5 checked)", "No safety rule broken (5 checked)"]]
 PASS Compare: a note says mission requirements are judged separately from safety rules  [Safety rules are judged on the true state throughout the run. Mission requirements are judged separately: a requirement ]
-PASS Compare: the headline reads Vertical speed at contact 1.658 -> 60.08 m/s (limit 3)  [Largest change: Vertical speed at contact 1.658 ÔåÆ 60.08 m/s (limit <= 3 m/s) (passes, then fails)]
+PASS Compare: the headline reads Vertical speed at contact 1.658 -> 60.08 m/s (limit 3)  [Largest change: Engine thrust 0.7 ├ù fails it; Baseline passes it. Vertical speed at contact 1.658 ÔåÆ 60.08 m/s (limit <= 3 m/s)]
 PASS Compare: each cell shows the observed value and the margin, not only Pass or Fail  [["Vertical speed at contact limit <= 3 m/s \u00b7 R1_vertical_speed (differs)", "Pass \u00b7 1.658 m/s D margin +1.342 m/s", "Fail \u00b7 60.08 m/s D margin -57.08 m/s"]]
 PASS Compare: the count of differing rows is grammatical  [9 rows differ between the runs (marked), 1 in its verdict, the others in a value.]
 PASS Text size: nothing on the comparison is below 12 px
-PASS Library: the Safety rules column says None broken, never a bare safe  [[" Conditions: default conditions bd19998592dc1e7e Rocket powered landing Heavy return stage (exploratory) Robust 5000 none Reached the ground, requirements not met None broken Requirements: Horizonta]
+PASS Library: the Safety rules column says None broken, never a bare safe  [[" Engine thrust 0.7 \u00d7 (from bd19998592) Conditions: Engine thrust 0.7 \u00d7 d3c2d223f3a36e95 experimentfrom:bd19998592dc1e7e Rocket powered landing Heavy return stage (exploratory) Robust 5000 ]
 PASS Run view: the safety verdict says No safety rule broken (5 checked)  [No safety rule broken (5 checked)]
 PASS Text size: nothing on the run view is below 12 px
 PASS Player: the registered first landing carries the Reference case chip  [[["ref", "Reference case"]]]
@@ -45,7 +45,7 @@ PASS Player: the experiment's end chip names Vertical speed at contact 60.08 m/s
 PASS Player: the result chips say No safety rule broken (5 checked)  [["MISSION 1 of 6 requirements failed", "SAFETY RULES No safety rule broken (5 checked)", "MISSION 2 of 6 requirements failed", "SAFETY RULES No safety rule broken (5 checked)"]]
 PASS Player: the player holds the environment chosen in Environments  [wallops-island]
 PASS Text size: nothing on the player is below 12 px
-PASS Cinematic: with two runs held the person chooses which one opens  [["Baseline", "Engine thrust 0.7 \u00d7"]]
+PASS Cinematic: with two runs held the person chooses which one opens  [["Baseline \u00b7 default conditions \u00b7 bd199985", "Engine thrust 0.7 \u00d7 \u00b7 d3c2d223"]]
 PASS Cinematic (experiment): the module started
 PASS Cinematic (experiment): it opens the run that was chosen  [d3c2d223f3a36e95]
 PASS Cinematic (experiment): it uses the player's environment (Wallops Island)  [wallops-island]
@@ -53,7 +53,7 @@ PASS Cinematic (experiment): it is given the run label, the vehicle, the seed an
 PASS Cinematic (experiment): the vehicle is named and the seed is the run's  [{"--vehicle": "41 t heavy return stage", "--seed": "5000"}]
 PASS Cinematic (experiment): the exploratory flag is passed
 PASS Cinematic (experiment): the first frame was drawn and Direct3D 12 is the renderer  [13.6 s]
-PASS Cinematic (experiment): the module's own --shot wrote the picture with those arguments  [609432 bytes]
+PASS Cinematic (experiment): the module's own --shot wrote the picture with those arguments  [613138 bytes]
 PASS Cinematic (baseline): the module started
 PASS Cinematic (baseline): it opens the run that was chosen  [bd19998592dc1e7e]
 PASS Cinematic (baseline): it uses the player's environment (Wallops Island)  [wallops-island]

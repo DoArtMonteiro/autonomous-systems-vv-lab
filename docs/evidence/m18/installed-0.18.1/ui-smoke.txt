@@ -1,0 +1,94 @@
+exe %USERPROFILE%\AppData\Local\VV Lab Studio\vv-studio.exe
+domains (installed resource directory)
+library <temporary folder>
+config <temporary folder>
+PASS preferences start empty in the scratch configuration
+PASS startup reaches ready
+PASS platform ready with at least three domains and none rejected
+PASS developer domain hidden by default
+PASS user-facing domains listed
+PASS J1 ground nominal: outcome completed
+PASS J1 ground nominal: safety safe
+PASS J1 ground nominal: demonstration expectation shown
+PASS J1 ground nominal: 2D scene drawn
+PASS J2 form: request accepted by the platform before running
+PASS J2 injected failure: mission outcome still completed
+PASS J2 injected failure: safety unsafe, shown separately
+PASS J2 injected failure: safe_fallback invariant failed
+PASS failed requirement click moves the time cursor
+PASS replay verified
+PASS replay lists its checks
+PASS matched comparison of two controllers from the form
+PASS saved scenario reopens into the form
+PASS saved comparison reopens from the library
+PASS library multi-select opens a comparison
+PASS advanced view shows every parameter with its description
+PASS protected seed refused inline with the reason
+PASS run disabled while the seed is protected
+PASS J3 rocket nominal: landed
+PASS J3 rocket nominal: safety safe
+PASS J3 rocket nominal: 3D scene present
+PASS J3 rocket nominal: top and profile views drawn
+PASS J3 rocket nominal: events on the timeline
+  playback frame interval over 2.5 s: n=141 p50=17.6 ms p95=18.5 ms
+PASS playback advances the cursor and keeps a median frame interval under 20 ms
+PASS signal picker narrows the charts to one signal
+PASS the chart shows the selected estimation error
+PASS telemetry arranged by unit
+PASS metrics, provenance, notes and verification tabs render
+PASS provenance lists artifacts with hashes and reproduce commands
+PASS J5 unsafe: compare view shows all three runs
+PASS J5 unsafe: one run unsafe in the legend
+PASS J5 unsafe baseline: safety unsafe
+PASS J5 unsafe baseline: outcome reported separately from safety
+PASS J5 unsafe baseline: S5 no powered ascent failed
+PASS J5 unsafe baseline: model validity shown
+PASS J5 notes tab lists the domain notes
+PASS library search finds the injected-failure run by id
+PASS library search finds the run by its new label
+PASS library shows no user name or profile path
+PASS ? opens the keyboard shortcut help
+PASS Escape closes the shortcut help
+PASS Ctrl+K palette finds demonstrations and runs
+PASS evidence package exported to the library
+PASS theme switch to light
+PASS theme switch to dark
+PASS developer domain listed when enabled
+PASS reference domain: protected seed refused inline
+PASS reference domain: run opens with no scene and full verification
+PASS reference domain: outcome and safety shown
+PASS settings show no user name or profile path
+PASS 1024x640: no horizontal scroll in any workspace
+PASS library opens a stored run in the workspace
+PASS 1024x640: rocket run workspace without horizontal scroll
+PASS 1366x768: no horizontal scroll in the run workspace
+PASS 1920x1080: no horizontal scroll in the run workspace
+PASS discover: both bundled claims are listed
+PASS discover: claim view shows the envelope and the declared hypotheses
+PASS discover corridor: investigated and recomputed in the app
+PASS discover corridor: claim refuted
+PASS discover corridor: mechanism supported, 250 mm radius effective, 10 mm radius leaves counterexamples
+PASS discover corridor: every recomputation check passed
+PASS discover corridor: timeline charts drawn from the kept runs
+PASS discover corridor: no horizontal scroll
+PASS discover G3: investigated and recomputed in the app
+PASS discover G3: claim refuted
+PASS discover G3: rule-1 non-engagement supported, both pathway rivals contradicted
+PASS discover G3: the 1 m threshold shows its trade-off, the 2 m threshold its residual counterexamples
+PASS discover G3: summary states the counterexample, the registered result and what else fails there
+PASS discover G3: belief and truth drawn apart
+PASS discover G3: the 1 m threshold envelope shows fixed cells and no broken cell
+PASS discover G3: no horizontal scroll at 1024x640
+PASS discover: a tampered package fails recomputation in the app, naming the checks
+PASS discover: after a failed recomputation the verdicts are withdrawn, not shown
+PASS discover: the rail and the body withdraw the failed package too
+PASS no script error in the page
+window 1440x900: real window (1440x900)
+window 1024x640: real window (1024x640)
+window 1366x768: real window (1366x768)
+window 1920x1080: real window (1920x1080)
+window 1440x900: real window (1440x900)
+window 1024x640: real window (1024x640)
+window 1440x900: real window (1440x900)
+
+80 of 80 checks passed; screenshots in <scratch folder>

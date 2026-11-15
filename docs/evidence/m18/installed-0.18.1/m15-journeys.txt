@@ -7,7 +7,7 @@ A deterministic simulator of autonomous ]
 PASS Explorer: Home has one primary action to a first landing
 PASS Explorer: one click from Home to a landing on screen  [0.2 s]
 PASS Explorer: the landing plays by itself
-PASS Explorer: readouts are labelled as true state, estimate or derived  [Robust controller  T Altitude 2172 m T Descent rate 218.8 m/s T Horizontal speed 9.82 m/s T Tilt 1.33 ┬░ T Throttle 0.00 ]
+PASS Explorer: readouts are labelled as true state, estimate or derived  [Robust controller  T Altitude 2150 m T Descent rate 219.2 m/s T Horizontal speed 9.79 m/s T Tilt 1.36 ┬░ T Throttle 0.00 ]
 PASS Explorer: the phase is shown  [Engine off]
 PASS Explorer: the result is hidden until the end
 PASS Explorer: the result says the stage landed safely  [[["landed", "safe"]]]

@@ -52,3 +52,8 @@ tests/test_honesty_wording.py, cinco testes, e o teste Node de 27 casos); node -
 (corrido à mão, fora do ficheiro de registo da verificação); build.ps1 exit 0, instalador b7f21c8395ced32ef49b59048168a9a992ced99bef3fab3172971fd92c5fc0d5;
 módulo 0.2.6 bed8aedfdffccd8a0e9eef777bbcbe19e486750f2b70f598a6808fce5721140f. A campanha e a compilação de lançamento da raiz não foram repetidas (a raiz não mudou).
 ui_smoke.py correu contra o executável de lançamento e contra o instalado da terceira passagem com o mesmo resultado (44 de 47, três falhas anteriores a esta passagem).
+
+Quinta passagem (2026-11-15), mesmos comandos, VV_GODOT definido: fmt, clippy -D warnings e cargo test na raiz e em desktop/ exit 0
+(37 suites, 306 testes); python -m unittest discover -s tests: Ran 441 tests, OK (skipped=6; inclui tests/test_honesty_wording.py, seis testes, e o teste
+Node de 27 casos); node --check em todos os ficheiros de desktop/studio/ui/js sem erros (corrido à mão); build.ps1 exit 0, instalador e928851928a58556a56e7e803b41ba72f795e0c190526b010f4d6e64b25dcf80;
+módulo 0.2.7 4d0a0715a15fadba5eda364a6ab5a56c6da9aebff443cfc59538031d0b1d3afe. ui_smoke.py contra o instalado: 80/80.

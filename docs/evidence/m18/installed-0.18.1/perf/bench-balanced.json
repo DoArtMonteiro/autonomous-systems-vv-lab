@@ -4,10 +4,10 @@
  "buffer_mem_used_bytes": 87407814,
  "draw_calls_in_frame": 475,
  "driver": "d3d12",
- "frame_ms_max": 5.47,
- "frame_ms_p50": 1.925,
- "frame_ms_p95": 5.127,
- "frame_ms_p99": 5.384,
+ "frame_ms_max": 5.494,
+ "frame_ms_p50": 1.927,
+ "frame_ms_p95": 5.102,
+ "frame_ms_p99": 5.413,
  "frames": 5192,
  "primitives_in_frame": 21727083,
  "profile": "balanced",
@@ -37,7 +37,7 @@
   "vegetation_shadows": false,
   "volumetric_fog": false
  },
- "static_memory_bytes": 228621106,
+ "static_memory_bytes": 228627026,
  "t": 23.3361272857644,
  "texture_mem_used_bytes": 1016541184,
  "video_mem_used_bytes": 1401368576,
@@ -61,15 +61,15 @@
   "trees": 4904
  },
  "harness": {
-  "command": "--rendering-driver d3d12 --path %USERPROFILE%\\AppData\\Local\\org.vvlab.studio\\modules\\cinematic\\0.2.6\\project --resolution 1440x900 -- --run <repo>\\tests\\fixtures\\cinematic\\landing-run --env %USERPROFILE%\\AppData\\Local\\VV Lab Studio\\environments\\cape-canaveral --profile balanced --camera director --bench <scratch folder> --bench-seconds 12.0",
-  "wall_s_to_first_frame": 11.41,
-  "engine_ms_to_first_frame": 10448,
-  "peak_working_set_bytes": 749117440,
-  "peak_private_bytes": 1962590208,
+  "command": "--rendering-driver d3d12 --path %USERPROFILE%\\AppData\\Local\\org.vvlab.studio\\modules\\cinematic\\0.2.7\\project --resolution 1440x900 -- --run <repo>\\tests\\fixtures\\cinematic\\landing-run --env %USERPROFILE%\\AppData\\Local\\VV Lab Studio\\environments\\cape-canaveral --profile balanced --camera director --bench <scratch folder> --bench-seconds 12.0",
+  "wall_s_to_first_frame": 11.398,
+  "engine_ms_to_first_frame": 10429,
+  "peak_working_set_bytes": 749125632,
+  "peak_private_bytes": 1961840640,
   "exit": 0,
   "log_tail": [
    "cinematic: pack cape-canaveral verified (6 files, SHA-256 against environment.json)",
-   "cinematic: scene built in 10068 ms (profile balanced: Chosen on the command line)"
+   "cinematic: scene built in 10048 ms (profile balanced: Chosen on the command line)"
   ]
  }
 }

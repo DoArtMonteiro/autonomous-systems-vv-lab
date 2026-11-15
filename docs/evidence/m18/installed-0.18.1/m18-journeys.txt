@@ -33,7 +33,7 @@ PASS Player header 1024x640: the window has the size asked for  [[1024, 640]]
 PASS Player header 1024x640: Analyse, Compare in detail, Open Cinematic View and Open in Experiment Lab are all there  [["Analyse", "Compare in detail", "Open Cinematic View", "Open in Experiment Lab"]]
 PASS Player header 1024x640: no two controls overlap
 PASS Player header 1024x640: every control is inside the window
-PASS Player header 1024x640: the header stays compact  [115 px]
+PASS Player header 1024x640: the header stays compact  [104 px]
 PASS Player header 1024x640: no horizontal scroll
 PASS Player header 1440x900: the window has the size asked for  [[1440, 900]]
 PASS Player header 1440x900: Analyse, Compare in detail, Open Cinematic View and Open in Experiment Lab are all there  [["Analyse", "Compare in detail", "Open Cinematic View", "Open in Experiment Lab"]]
@@ -47,9 +47,9 @@ PASS Player header 1920x1080: no two controls overlap
 PASS Player header 1920x1080: every control is inside the window
 PASS Player header 1920x1080: the header stays compact  [91 px]
 PASS Player header 1920x1080: no horizontal scroll
-PASS Cinematic: the button is enabled exactly when the module is installed and verified  [{"disabled": false, "title": "Open this run (landing or launch ascent) in the Cinematic View 0.2.6 (a separate window; read-only replay of the record)", "focusable": true, "described": true} status {"installed": true, "verified": true, "version": "0.2.6"}]
-PASS Cinematic: the button is focusable and names its reason or its action through aria-describedby  [{"disabled": false, "title": "Open this run (landing or launch ascent) in the Cinematic View 0.2.6 (a separate window; read-only replay of the record)", "focusable": true, "described": true}]
-PASS Cinematic: the enabled button says which module version opens this record  [Open this run (landing or launch ascent) in the Cinematic View 0.2.6 (a separate window; read-only replay of the record)]
+PASS Cinematic: the button is enabled exactly when the module is installed and verified  [{"disabled": false, "title": "Open this run (landing or launch ascent) in the Cinematic View 0.2.7 (a separate window; read-only replay of the record)", "focusable": true, "described": true} status {"installed": true, "verified": true, "version": "0.2.7"}]
+PASS Cinematic: the button is focusable and names its reason or its action through aria-describedby  [{"disabled": false, "title": "Open this run (landing or launch ascent) in the Cinematic View 0.2.7 (a separate window; read-only replay of the record)", "focusable": true, "described": true}]
+PASS Cinematic: the enabled button says which module version opens this record  [Open this run (landing or launch ascent) in the Cinematic View 0.2.7 (a separate window; read-only replay of the record)]
 PASS Cinematic: the module process started for this run
 PASS Player: Land a rocket here opens the mission on the chosen environment  [{"environment": "cape-canaveral", "view": "geospatial"}]
 PASS Player: choosing another environment while the same mission is held changes what the player shows  [{"environment": "wallops-island", "experience": "first-landing"}]

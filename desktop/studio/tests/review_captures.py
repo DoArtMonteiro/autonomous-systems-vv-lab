@@ -50,6 +50,10 @@ def at_sizes(s, tag, rebuild, pairs, reopen):
         check(f"{tag} {w}x{h}: pills, caption and camera buttons do not overlap one another or the readout card (nor the 2D plot with its axis labels)", not o["clash"], json.dumps(o))
         r = s.js(PILLS_JS)
         check(f"{tag} {w}x{h}: no run pill is clipped", not r["bad"], json.dumps(r))
+        side = s.js("""() => { const v = document.getElementById('view-mission'); const out = [...document.querySelectorAll('.pl-head button, .pl-head select, .pl-transport button, .pl-hud')].filter((e) => e.offsetParent !== null && (e.getBoundingClientRect().right > innerWidth + 1 || e.getBoundingClientRect().left < -1)).map((e) => (e.textContent || e.className).trim().slice(0, 30)); return { over: v.scrollWidth - v.clientWidth, out }; }""")
+        check(f"{tag} {w}x{h}: the player does not scroll sideways and its header, transport and readout are inside the window", side["over"] <= 1 and not side["out"], json.dumps(side))
+        ph = s.js("[...document.querySelectorAll('.pl-viewport canvas')].filter((e) => e.offsetParent !== null).map((e) => Math.round(e.getBoundingClientRect().height))")
+        check(f"{tag} {w}x{h}: the scene or plot is at least 200 px tall", bool(ph) and max(ph) >= 200, json.dumps(ph))
         s.shot(f"ux4-{tag}-{w}x{h}-dark")
     # The light theme: the theme switch goes through Settings, so the player is opened again afterwards.
     s.resize(1440, 900)

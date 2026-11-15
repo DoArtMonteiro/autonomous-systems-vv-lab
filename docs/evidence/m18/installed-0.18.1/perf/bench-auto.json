@@ -4,11 +4,11 @@
  "buffer_mem_used_bytes": 103459846,
  "draw_calls_in_frame": 1350,
  "driver": "d3d12",
- "frame_ms_max": 13.828,
- "frame_ms_p50": 3.173,
- "frame_ms_p95": 8.262,
- "frame_ms_p99": 13.675,
- "frames": 2614,
+ "frame_ms_max": 13.805,
+ "frame_ms_p50": 3.165,
+ "frame_ms_p95": 8.243,
+ "frame_ms_p99": 13.689,
+ "frames": 2605,
  "primitives_in_frame": 93237608,
  "profile": "high",
  "profile_reason": "Auto: 12.9 GB of video memory (registry qwMemorySize); automatic choice stops at High",
@@ -37,7 +37,7 @@
   "vegetation_shadows": true,
   "volumetric_fog": true
  },
- "static_memory_bytes": 262346630,
+ "static_memory_bytes": 262352334,
  "t": 23.3361272857644,
  "texture_mem_used_bytes": 2099048448,
  "video_mem_used_bytes": 2502029312,
@@ -61,15 +61,15 @@
   "trees": 8108
  },
  "harness": {
-  "command": "--rendering-driver d3d12 --path %USERPROFILE%\\AppData\\Local\\org.vvlab.studio\\modules\\cinematic\\0.2.6\\project --resolution 1440x900 -- --run <repo>\\tests\\fixtures\\cinematic\\landing-run --env %USERPROFILE%\\AppData\\Local\\VV Lab Studio\\environments\\cape-canaveral --profile auto --camera director --bench <scratch folder> --bench-seconds 12.0",
-  "wall_s_to_first_frame": 13.486,
-  "engine_ms_to_first_frame": 12522,
-  "peak_working_set_bytes": 782721024,
-  "peak_private_bytes": 3213766656,
+  "command": "--rendering-driver d3d12 --path %USERPROFILE%\\AppData\\Local\\org.vvlab.studio\\modules\\cinematic\\0.2.7\\project --resolution 1440x900 -- --run <repo>\\tests\\fixtures\\cinematic\\landing-run --env %USERPROFILE%\\AppData\\Local\\VV Lab Studio\\environments\\cape-canaveral --profile auto --camera director --bench <scratch folder> --bench-seconds 12.0",
+  "wall_s_to_first_frame": 13.988,
+  "engine_ms_to_first_frame": 12950,
+  "peak_working_set_bytes": 783437824,
+  "peak_private_bytes": 3214114816,
   "exit": 0,
   "log_tail": [
    "cinematic: pack cape-canaveral verified (6 files, SHA-256 against environment.json)",
-   "cinematic: scene built in 12107 ms (profile high: Auto: 12.9 GB of video memory (registry qwMemorySize); automatic choice stops at High)"
+   "cinematic: scene built in 12528 ms (profile high: Auto: 12.9 GB of video memory (registry qwMemorySize); automatic choice stops at High)"
   ]
  }
 }

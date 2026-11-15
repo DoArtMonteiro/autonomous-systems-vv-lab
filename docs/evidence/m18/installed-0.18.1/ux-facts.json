@@ -13,7 +13,7 @@
    "vehicle": "41 t heavy return stage"
   }
  },
- "compare_headline": "Largest change: Vertical speed at contact 1.658 \u2192 60.08 m/s (limit <= 3 m/s) (passes, then fails)",
+ "compare_headline": "Largest change: Engine thrust 0.7 \u00d7 fails it; Baseline passes it. Vertical speed at contact 1.658 \u2192 60.08 m/s (limit <= 3 m/s)",
  "explore_chip_hangar": "rgb(182, 166, 255)",
  "explore_chip_lab": "rgb(182, 166, 255)"
 }
