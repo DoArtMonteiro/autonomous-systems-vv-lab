@@ -5,13 +5,14 @@
 import uPlot from '../../vendor/uplot/uPlot.esm.js';
 import { h, clear, icon, num, prose, timeText, lowerIndex, nextId } from '../dom.js';
 import { state, domainById, loadRecord, pref, setPref } from '../store.js';
-import { modelOf, distinguishingLabels, requestText, verdictOfOutcome, verdictOfSafety, verdictOfRequirement, RUN_COLOURS, runDash, runSwatch, CATEGORY_TITLE, STATUS_TEXT } from '../model.js';
+import { modelOf, distinguishingLabels, conditionsName, conditionsShared, requestText, verdictOfOutcome, verdictOfRequirement, RUN_COLOURS, runDash, runSwatch, CATEGORY_TITLE, STATUS_TEXT } from '../model.js';
 import { verdictGlyph } from '../verification.js';
 import { axisStyle, cursorLine, cssVar } from '../charts.js';
 import { sceneFor, sceneKind } from '../scenes/registry.js';
 import { TimeCursor } from '../cursor.js';
 import { api } from '../api.js';
 import { toast, errorText, askName } from '../ui.js';
+import { indexNumbers, reqView, reqLabel, safetyWording, SAFETY_NOTE, headlineChange, statusLine, DERIVED_NOTE } from '../requirements.js';
 
 const MAX = 8;
 let root;
@@ -29,12 +30,12 @@ export function comparison() {
 
 export async function showCompare(opts) {
   if (opts && opts.runIds) {
-    await open(opts.runIds.slice(0, MAX), opts.errors || [], opts.demo || null, opts.name || null);
+    await open(opts.runIds.slice(0, MAX), opts.errors || [], opts.demo || null, opts.name || null, opts.labels || null);
   } else if (!cmp) {
     clear(root).append(h('div', { class: 'settings' },
       h('h1', null, 'Nothing to compare yet'),
-      h('p', { class: 'dim' }, 'Tick several controllers in Configure, run a multi-run mission or demonstration, or select up to eight runs in Records.'),
-      h('div', { class: 'row' }, h('button', { type: 'button', class: 'btn btn-primary', onclick: () => navigate('prepare') }, 'Configure'), h('button', { type: 'button', class: 'btn', onclick: () => navigate('library') }, 'Records'))));
+      h('p', { class: 'dim' }, 'Tick several controllers in Configure, run a multi-run mission or demonstration, or select up to eight runs in Runs.'),
+      h('div', { class: 'row' }, h('button', { type: 'button', class: 'btn btn-primary', onclick: () => navigate('prepare') }, 'Configure'), h('button', { type: 'button', class: 'btn', onclick: () => navigate('library') }, 'Runs'))));
   } else {
     requestAnimationFrame(() => resizeCharts());
   }
@@ -49,13 +50,13 @@ function dispose() {
   cmp = null;
 }
 
-async function open(runIds, errors, demo, name) {
+async function open(runIds, errors, demo, name, given) {
   clear(root).append(h('div', { class: 'busy-overlay' }, h('p', null, `Loading ${runIds.length} run records…`)));
   const records = [];
   const loadErrors = [...errors];
   for (const id of runIds) {
     try {
-      records.push({ id, record: await loadRecord(id) });
+      records.push({ id, record: indexNumbers(await loadRecord(id)) });
     } catch (e) {
       loadErrors.push({ runId: id, error: e });
     }
@@ -64,11 +65,17 @@ async function open(runIds, errors, demo, name) {
   const models = records.map((r) => modelOf(r.record));
   const domainIds = [...new Set(records.map((r) => r.record.domain.id))];
   const cat = domainIds.length === 1 && domainById(domainIds[0]) ? domainById(domainIds[0]).catalog : null;
-  const labels = distinguishingLabels(records.map((r) => r.record.request), cat);
+  // One label per run: the one the caller names it by (the player and the Lab say Baseline and what changed),
+  // else the parameters that tell the runs apart.
+  // Runs the caller does not name are named by their conditions (the one shared naming function); if two
+  // runs would get the same name, the parameters that tell them apart name them instead.
+  const byConditions = records.map((r) => conditionsName(r.record.request, cat));
+  const labels = given && given.length === records.length ? given.slice()
+    : new Set(byConditions).size === byConditions.length ? byConditions : distinguishingLabels(records.map((r) => r.record.request), cat);
   const t0 = Math.min(...models.map((m) => m.t0));
   const t1 = Math.max(...models.map((m) => m.t1));
   const unit = cat ? cat.time.unit : 's';
-  cmp = { runIds: records.map((r) => r.id), records, models, labels, errors: loadErrors, demo, name, cat, unit, domainIds, t0, t1, colours: RUN_COLOURS };
+  cmp = { runIds: records.map((r) => r.id), given: given || null, records, models, labels, errors: loadErrors, demo, name, cat, unit, domainIds, t0, t1, colours: RUN_COLOURS };
   if (records.length) cmp.cursor = new TimeCursor({ t0, t1, unit, samples: models[0].primary ? models[0].timebases[models[0].primary] : [], events: [] });
   state.comparison = cmp;
   build();
@@ -89,17 +96,21 @@ function build() {
       const rec = r.record;
       const rt = requestText(rec.request, cat);
       const ov = verdictOfOutcome(rec.outcome.status);
-      const unjudged = rec.safety.status === 'safe' && rec.safety.class === 'not_evaluated';
-      const sv = unjudged ? 'neutral' : verdictOfSafety(rec.safety.status);
+      const sw = safetyWording(rec);
       return h('div', { class: 'run-key', role: 'listitem', dataset: { run: r.id } },
         h('span', { class: 'key-swatch', style: { background: runSwatch(colours[i], runDash(i)) }, 'aria-hidden': 'true' }),
         h('span', { class: 'key-label', title: labels[i] }, labels[i]),
         h('button', { type: 'button', class: 'link small', 'aria-label': `Open run ${i + 1}`, onclick: () => navigate('run', { runId: r.id }) }, 'Open'),
         h('span', { class: 'key-verdicts' },
           h('span', { class: ['mini', `v-${ov}`], title: prose(rec.outcome.explanation) }, verdictGlyph(ov), rec.outcome.label),
-          h('span', { class: ['mini', `v-${sv}`], title: prose(rec.safety.explanation) }, verdictGlyph(sv), unjudged ? 'not evaluated' : rec.safety.status, rec.safety.class && !unjudged ? ` · class ${rec.safety.class}` : '')),
-        h('span', { class: 'key-sub', title: `${rt.controller} · seed ${rt.seed} · ${rt.faults} · ${r.id}` }, `${rt.controller} · seed ${rt.seed} · ${rt.faults} · ${r.id}`));
+          h('span', { class: ['mini', `v-${sw.verdict}`], title: `${prose(rec.safety.explanation)}\n${SAFETY_NOTE}` }, verdictGlyph(sw.verdict), sw.text)),
+        h('span', { class: 'key-cond small', dataset: { conditions: conditionsName(rec.request, cat) } }, `Conditions: ${conditionsName(rec.request, cat)}`),
+        h('span', { class: 'key-count' }, failureCount(rec)),
+        h('span', { class: 'key-sub', title: `${rt.controller} · seed ${rt.seed} · ${r.id}` }, `${rt.controller} · seed ${rt.seed} · ${r.id}`));
     })),
+    h('p', { class: 'cmp-shared', dataset: { shared: '1' } }, conditionsShared(records.map((r) => r.record.request), cat).text + '.'),
+    headlines(),
+    h('p', { class: 'small dim cmp-safety-note' }, SAFETY_NOTE),
     cmp.errors.length ? h('div', { class: 'cmp-errors', role: 'alert' }, h('strong', null, `${cmp.errors.length} run${cmp.errors.length > 1 ? 's' : ''} could not be included`),
       h('ul', null, cmp.errors.map((e) => h('li', { class: 'small' }, e.request ? `${e.request.controller}, seed ${e.request.seed}: ` : `${e.runId}: `, errorText(e.error))))) : null);
 
@@ -126,7 +137,39 @@ function build() {
   if (records.length) buildSignals(signals);
 }
 
+/** "2 of 6 requirements failed" or "all 6 requirements met", from the record's mission requirement rows. */
+function failureCount(rec) {
+  return statusLine(rec);
+}
+
+/** One sentence per run after the first: the requirement that moved most, with its numbers and limit. */
+function headlines() {
+  const { records, labels } = cmp;
+  if (records.length < 2) return null;
+  const lines = [];
+  for (let i = 1; i < records.length; i += 1) {
+    const hc = headlineChange(records[0].record, records[i].record);
+    // When the verdict flips, the sentence names the run that fails first: "B fails it; A passes it."
+    const flipText = hc && hc.flip && (hc.from === 'pass' || hc.to === 'pass')
+      ? `${hc.from === 'pass' ? labels[i] : labels[0]} fails it; ${hc.from === 'pass' ? labels[0] : labels[i]} passes it. `
+      : '';
+    lines.push(h('li', { class: 'cmp-headline-row', dataset: { run: String(i + 1) } },
+      h('span', { class: 'dim small' }, records.length > 2 ? `${labels[i]} against ${labels[0]}: ` : 'Largest change: '),
+      flipText ? h('span', { class: 'small' }, flipText) : null,
+      hc ? h('b', { class: hc.flip ? 'cmp-hc-flip' : '' }, hc.text) : h('span', null, 'no requirement value differs'),
+      hc && hc.flip && !flipText ? h('span', { class: 'small dim' }, ' (verdict changes)') : null,
+      records.length > 2 ? h('span', { class: 'sr-only' }, labels[i]) : null));
+  }
+  return h('ul', { class: 'cmp-headline', 'aria-label': 'What changed most between the runs' }, lines);
+}
+
 // ----------------------------------------------------------------------------- matrix
+
+/** Two observed values count as the same when they agree to 0.1 % of the limit. */
+function fmtKey(obs, limit) {
+  const q = Math.max(Math.abs(limit), 1e-9) * 1e-3;
+  return String(Math.round(obs / q));
+}
 
 function matrix() {
   const { records, labels, colours } = cmp;
@@ -134,51 +177,69 @@ function matrix() {
   let onlyDiff = false;
   const table = h('table', { class: 'matrix' });
   const toggleId = nextId('diff');
-  const toggle = h('label', { class: 'toggle small', for: toggleId }, h('input', { type: 'checkbox', id: toggleId, onchange: (e) => { onlyDiff = e.target.checked; draw(); } }), 'Only rows where the runs disagree');
+  const toggle = h('label', { class: 'toggle small', for: toggleId }, h('input', { type: 'checkbox', id: toggleId, onchange: (e) => { onlyDiff = e.target.checked; draw(); } }), 'Only rows that differ');
   const draw = () => {
     clear(table);
-    table.append(h('thead', null, h('tr', null, h('th', { scope: 'col' }, 'Verdict'), records.map((r, i) => h('th', { scope: 'col', title: labels[i] }, h('span', { class: 'key-swatch', style: { background: runSwatch(colours[i], runDash(i)) } }), `Run ${i + 1}`)))));
+    table.append(h('thead', null, h('tr', null, h('th', { scope: 'col' }, 'Verdict'), records.map((r, i) => h('th', { scope: 'col', title: labels[i] }, h('span', { class: 'key-swatch', style: { background: runSwatch(colours[i], runDash(i)) } }), labels[i])))));
     const tb = h('tbody');
     const rows = [];
     rows.push(['Mission outcome', records.map((r) => ({ v: verdictOfOutcome(r.record.outcome.status), text: r.record.outcome.label, key: r.record.outcome.code, title: prose(r.record.outcome.explanation) }))]);
-    rows.push(['Safety', records.map((r) => {
-      const unjudged = r.record.safety.status === 'safe' && r.record.safety.class === 'not_evaluated';
-      return { v: unjudged ? 'neutral' : verdictOfSafety(r.record.safety.status), text: unjudged ? 'not evaluated' : `${r.record.safety.status}${r.record.safety.class ? ` · class ${r.record.safety.class}` : ''}`, key: `${r.record.safety.status}${r.record.safety.class}`, title: prose(r.record.safety.explanation) };
+    rows.push(['Safety rules', records.map((r) => {
+      const sw = safetyWording(r.record);
+      return { v: sw.verdict, text: sw.text, key: `${r.record.safety.status}${r.record.safety.class}${sw.broken}`, title: `${prose(r.record.safety.explanation)}\n${SAFETY_NOTE}` };
     })]);
     const ids = [];
     const cats = new Map();
     for (const r of records) for (const q of r.record.requirements || []) if (!ids.includes(q.id)) { ids.push(q.id); cats.set(q.id, q.category); }
     let diffCount = 0;
+    let verdictDiff = 0;
     const emitRow = (name, cells, extra) => {
       const keys = new Set(cells.map((c) => c.key));
       const differs = keys.size > 1;
       if (differs) diffCount += 1;
+      if (differs && new Set(cells.map((c) => c.status || c.key)).size > 1) verdictDiff += 1;
       if (onlyDiff && !differs) return;
       tb.append(h('tr', { class: differs ? 'differs' : '', dataset: { row: extra || name } },
         h('th', { scope: 'row' }, typeof name === 'string' ? name : name, differs ? h('span', { class: 'sr-only' }, ' (differs)') : null),
-        cells.map((c) => h('td', { title: c.title || '' }, h('span', { class: ['cell', `v-${c.v}`] }, verdictGlyph(c.v), h('span', { class: ['cell-text', `v-${c.v}-text`] }, c.text))))));
+        cells.map((c) => h('td', { title: c.title || '' }, h('span', { class: ['cell', `v-${c.v}`] }, verdictGlyph(c.v), h('span', { class: ['cell-text', `v-${c.v}-text`] }, c.text), c.sub ? h('span', { class: 'cell-sub dim small' }, c.derived ? h('abbr', { class: 'kind kind-D', title: DERIVED_NOTE }, 'D') : null, c.derived ? ' ' : null, c.sub) : null)))));
     };
     for (const [name, cells] of rows) emitRow(name, cells);
+    // Rows whose verdict changes between the runs come first, in a group of their own.
+    const statusOf = (r, id) => ((r.record.requirements || []).find((x) => x.id === id) || {}).status || 'absent';
+    const flips = ids.filter((id) => new Set(records.map((r) => statusOf(r, id))).size > 1);
+    const buildCells = (id) => records.map((r) => {
+      const q = (r.record.requirements || []).find((x) => x.id === id);
+      if (!q) return { v: 'neutral', text: 'absent', key: 'absent', title: 'This run does not report this id.' };
+      const v = verdictOfRequirement(q);
+      const rv = reqView(q);
+      return { v, text: `${STATUS_TEXT[q.status] || q.status} · ${rv.obsText}`, sub: rv.marginText ? `margin ${rv.marginText}` : '', derived: rv.marginDerived, key: `${q.status}|${rv.numeric ? fmtKey(rv.obs, rv.limit) : q.observed}`, status: q.status, title: `${rv.full}${q.t !== null ? `\nat ${timeText(q.t, cmp.unit)}` : ''}` };
+    });
+    const reqRow = (id) => {
+      const firstReq = records.map((r) => (r.record.requirements || []).find((x) => x.id === id)).find(Boolean) || {};
+      emitRow(h('span', { class: 'req-name' }, h('span', { class: 'req-label' }, reqLabel(firstReq)), h('span', { class: 'dim small', title: reqView(firstReq).limitText }, reqView(firstReq).numeric ? `limit ${reqView(firstReq).limitText} · ` : '', h('span', { class: 'mono' }, id))), buildCells(id), id);
+    };
+    if (flips.length) {
+      tb.append(h('tr', { class: 'sep' }, h('th', { colspan: String(records.length + 1) }, 'Verdict changes between the runs')));
+      for (const id of flips) reqRow(id);
+    }
+    const failedBoth = ids.filter((id) => !flips.includes(id) && records.every((r) => statusOf(r, id) === 'fail'));
+    if (failedBoth.length) {
+      tb.append(h('tr', { class: 'sep' }, h('th', { colspan: String(records.length + 1) }, 'Failed in every run')));
+      for (const id of failedBoth) reqRow(id);
+    }
     const order = ['invariant', 'requirement', 'declaration'];
-    const catList = [...new Set(ids.map((id) => cats.get(id)))].sort((a, b) => (order.indexOf(a) + 1 || 9) - (order.indexOf(b) + 1 || 9));
+    const catList = [...new Set(ids.filter((id) => !flips.includes(id) && !failedBoth.includes(id)).map((id) => cats.get(id)))].sort((a, b) => (order.indexOf(a) + 1 || 9) - (order.indexOf(b) + 1 || 9));
     for (const cat of catList) {
       tb.append(h('tr', { class: 'sep' }, h('th', { colspan: String(records.length + 1) }, CATEGORY_TITLE[cat] || cat)));
-      for (const id of ids.filter((x) => cats.get(x) === cat)) {
-        const cells = records.map((r) => {
-          const q = (r.record.requirements || []).find((x) => x.id === id);
-          if (!q) return { v: 'neutral', text: 'absent', key: 'absent', title: 'This run does not report this id.' };
-          const v = verdictOfRequirement(q);
-          return { v, text: STATUS_TEXT[q.status] || q.status, key: q.status, title: `${q.label}\nexpected ${q.expected}\nobserved ${q.observed}${q.t !== null ? `\nat ${timeText(q.t, cmp.unit)}` : ''}` };
-        });
-        const first = (records.map((r) => (r.record.requirements || []).find((x) => x.id === id)).find(Boolean) || {}).label || '';
-        emitRow(h('span', { class: 'req-name' }, h('span', { class: 'mono' }, id), h('span', { class: 'dim small' }, first)), cells, id);
-      }
+      for (const id of ids.filter((x) => cats.get(x) === cat && !flips.includes(x) && !failedBoth.includes(x))) reqRow(id);
     }
     table.append(tb);
-    summary.textContent = diffCount ? `${diffCount} row${diffCount > 1 ? 's' : ''} differ between the runs (marked).` : 'All runs agree on every verdict.';
+    table.append(h('tfoot', null, h('tr', null, h('td', { colspan: String(records.length + 1), class: 'dim small' }, DERIVED_NOTE))));
+    summary.textContent = !diffCount ? 'All runs agree on every verdict and value.'
+      : `${diffCount === 1 ? '1 row differs' : `${diffCount} rows differ`} between the runs (marked), ${verdictDiff === 1 ? '1 in its verdict' : `${verdictDiff} in their verdict`}, the others in a value.`;
   };
   const summary = h('p', { class: 'small', 'aria-live': 'polite' });
-  const wrap = h('div', null, h('div', { class: 'row', style: { justifyContent: 'space-between', marginBottom: '6px' } }, h('h2', { class: 'pane-title' }, 'Outcome, safety and requirements'), toggle), summary, table);
+  const wrap = h('div', null, h('div', { class: 'row', style: { justifyContent: 'space-between', marginBottom: '6px' } }, h('h2', { class: 'pane-title' }, 'Outcome, safety rules and requirements'), toggle), summary, table);
   draw();
   return wrap;
 }
@@ -325,7 +386,7 @@ export function compareKey(e) {
 }
 
 export function rethemeCompare() {
-  if (cmp && cmp.records.length) open(cmp.runIds, cmp.errors.filter((e) => e.request), cmp.demo, cmp.name);
+  if (cmp && cmp.records.length) open(cmp.runIds, cmp.errors.filter((e) => e.request), cmp.demo, cmp.name, cmp.given);
 }
 
 export { cssVar };

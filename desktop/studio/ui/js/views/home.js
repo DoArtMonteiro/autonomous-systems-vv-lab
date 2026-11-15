@@ -81,7 +81,7 @@ export function showHome() {
 
   const envCount = h('b', { class: 'mono' }, '…');
   const mosaic = h('div', { class: 'hm-mosaic', 'aria-hidden': 'true' });
-  const envNames = h('p', { class: 'hm-path-sub' }, 'Reading the validated packs…');
+  const envNames = h('p', { class: 'hm-path-sub' }, 'Reading the packs…');
   listEnvironments().then((l) => {
     const envs = l.environments;
     envCount.textContent = String(envs.length);
@@ -102,7 +102,8 @@ export function showHome() {
     h('div', null,
       h('p', { class: 'eyebrow' }, 'Mission Control'),
       h('h1', { class: 'hm-h1' }, 'Fly it, break it, find out why.'),
-      h('p', { class: 'hm-lead' }, 'A deterministic simulator of autonomous vehicles on this machine: launch a two-stage rocket to orbit or land a reusable stage, change what the vehicle is made of, and watch the same recorded mission as engineering telemetry or as a cinematic replay. Every run is a record the platform can replay and recompute.')),
+      h('p', { class: 'hm-lead' }, 'A deterministic simulator of autonomous vehicles on this machine: launch a two-stage rocket to orbit or land a reusable stage, change what the vehicle is made of, and watch the same recorded mission as engineering telemetry or as a cinematic replay. Every run is a record the platform can replay and recompute.'),
+      h('p', { class: 'hm-disclaimer', role: 'note' }, h('b', null, 'Exploratory models, not real vehicles; nothing is validated against flight data.'), ' Results are recomputable records of idealised models, not predictions about any real vehicle.')),
     h('dl', { class: 'hm-stats', 'aria-label': 'What is installed' },
       h('div', null, h('dt', null, 'Missions'), h('dd', { class: 'mono' }, String(missions))),
       h('div', null, h('dt', null, 'Vehicles'), h('dd', { class: 'mono' }, String(vehicles))),
@@ -116,9 +117,9 @@ export function showHome() {
       h('div', { class: 'hm-path-body' },
         h('p', { class: 'hm-path-k mono' }, '01'),
         h('h2', null, 'Launch and explore a mission'),
-        h('p', null, 'Ascent to orbit with staging, powered landings, sensor faults. Each mission runs the real simulator and plays back what happened, with the verdicts at the end.'),
+        h('p', null, 'Ascent to orbit with staging, powered landings, sensor faults. Each mission runs the simulator again and plays back that run, not a stored animation; the verdicts come at the end.'),
         h('div', { class: 'hm-quicks' }, quick('to-orbit'), quick('first-landing')),
-        h('button', { type: 'button', class: 'btn btn-primary', dataset: { action: 'missions' }, onclick: () => navigate('missions') }, 'Open the mission library'))),
+        h('button', { type: 'button', class: 'btn btn-primary', dataset: { action: 'missions' }, onclick: () => navigate('missions') }, 'Open the missions'))),
     h('article', { class: 'hm-path', dataset: { path: 'vehicle' } },
       vehicleArt(),
       h('span', { class: 'hm-art-note' }, 'Illustration, not to scale'),
@@ -134,7 +135,7 @@ export function showHome() {
       h('div', { class: 'hm-path-body' },
         h('p', { class: 'hm-path-k mono' }, '03'),
         h('h2', null, 'Explore environments and cinematic replays'),
-        h('p', null, 'Real launch sites and landscapes from open geographic data, validated offline. Fly a mission over one, or replay a recorded landing in the Cinematic View.'),
+        h('p', null, 'Real launch sites and landscapes from open geographic data, integrity-checked offline. Play a mission against one as a backdrop (terrain is context only), or open a recorded landing in the Cinematic View.'),
         envNames,
         h('button', { type: 'button', class: 'btn btn-primary', dataset: { action: 'environments' }, onclick: () => navigate('environments') }, 'Open the environments'))));
 
@@ -145,7 +146,7 @@ export function showHome() {
       flowStep('Pick a landscape', 'Environments', () => navigate('environments')),
       // Steps 3 to 6 happen inside the Experiment Lab, which needs a baseline run from the hangar:
       // they are descriptions, not links, so none opens an empty page.
-      flowInfo('Run the mission', 'In the hangar: Design and fly'),
+      flowInfo('Run the mission', 'In the hangar: Open in Experiment Lab'),
       flowInfo('Change a parameter', 'In the Lab: vehicle design'),
       flowInfo('Compare the runs', 'In the Lab: the comparison'),
       flowInfo('Watch both', 'In the Lab: Watch both runs')));

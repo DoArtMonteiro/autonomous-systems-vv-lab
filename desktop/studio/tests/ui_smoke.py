@@ -79,7 +79,12 @@ class Studio:
         return path
 
     def nav(self, view):
-        self.page.click(f".nav-btn[data-view='{view}']")
+        # On a narrow window the secondary views are in the More menu, so their buttons are not visible: click them through the page.
+        btn = self.page.locator(f".nav-btn[data-view='{view}']")
+        if btn.is_visible():
+            btn.click()
+        else:
+            self.js(f"document.querySelector(\".nav-btn[data-view='{view}']\").click()")
         self.wait(f"window.__studio.view() === '{view}'")
 
     def theme(self, name):
@@ -178,7 +183,7 @@ def journeys(s):
     # (1) Nominal ground mission demonstration.
     s.demo("ground-vehicle", "nominal-drive", multi=False)
     check("J1 ground nominal: outcome completed", "Mission completed" in s.verdict("Mission outcome"), s.verdict("Mission outcome"))
-    check("J1 ground nominal: safety safe", s.verdict("Safety").startswith("Safe"), s.verdict("Safety"))
+    check("J1 ground nominal: safety safe", s.verdict("Safety").startswith("No safety rule broken"), s.verdict("Safety"))
     check("J1 ground nominal: demonstration expectation shown", "Expected" in p.inner_text(".demo-banner"))
     check("J1 ground nominal: 2D scene drawn", p.locator(".scene-pane canvas").count() >= 1 and s.js("window.__studio.run().scene") == "ground-2d" and p.locator(".scene-pane .error-text").count() == 0)
     p.keyboard.press("End")
@@ -201,7 +206,7 @@ def journeys(s):
     s.wait("window.__studio.view() === 'run' && window.__studio.run() && document.querySelector('.verdict')")
     time.sleep(0.8)
     check("J2 injected failure: mission outcome still completed", "Mission completed" in s.verdict("Mission outcome"), s.verdict("Mission outcome"))
-    check("J2 injected failure: safety unsafe, shown separately", s.verdict("Safety").startswith("Unsafe"), s.verdict("Safety"))
+    check("J2 injected failure: safety unsafe, shown separately", (s.verdict("Safety").startswith("A safety rule") or ("safety rules broken" in s.verdict("Safety") and not s.verdict("Safety").startswith("No "))), s.verdict("Safety"))
     check("J2 injected failure: safe_fallback invariant failed", p.locator(".req.v-unsafe[data-id='safe_fallback']").count() == 1)
     # Failed requirement click moves the time cursor.
     t_req = p.inner_text(".req[data-id='safe_fallback'] .req-t")
@@ -214,7 +219,8 @@ def journeys(s):
     # Replay verified (recomputation in the domain host).
     p.click(".run-actions button:has-text('Replay')")
     s.wait("document.querySelector('.replay-verdict')", what="replay verdict")
-    check("replay verified", "Verified" in p.inner_text(".replay-verdict"), p.inner_text(".replay-verdict"))
+    # The verdict is drawn in capitals, so the text read from the screen is compared without case.
+    check("replay verified", "verified" in p.inner_text(".replay-verdict").lower(), p.inner_text(".replay-verdict"))
     check("replay lists its checks", p.locator(".checks li").count() >= 3)
     p.evaluate("document.querySelector('.replay-verdict').scrollIntoView({ block: 'start' })")
     time.sleep(0.2)
@@ -277,7 +283,7 @@ def journeys(s):
     # (3) Nominal rocket landing demonstration (robust controller, one run).
     s.demo("rocket-landing", "nominal-landing", multi=False)
     check("J3 rocket nominal: landed", "Landed" in s.verdict("Mission outcome"), s.verdict("Mission outcome"))
-    check("J3 rocket nominal: safety safe", s.verdict("Safety").startswith("Safe"), s.verdict("Safety"))
+    check("J3 rocket nominal: safety safe", s.verdict("Safety").startswith("No safety rule broken"), s.verdict("Safety"))
     check("J3 rocket nominal: 3D scene present", s.js("window.__studio.run().scene") == "rocket-3d" and p.locator("#view-run .r3d canvas").count() == 1 and p.locator(".scene-pane .error-text").count() == 0)
     check("J3 rocket nominal: top and profile views drawn", p.locator("#view-run .pane-top canvas").count() == 2 and p.locator("#view-run .pane-prof canvas").count() == 2)
     check("J3 rocket nominal: events on the timeline", p.locator(".tl-mark").count() >= 2)
@@ -346,7 +352,7 @@ def journeys(s):
     s.both("journey-5-two-faults-compare")
     idx = s.js("[...document.querySelectorAll('.run-key')].findIndex((k) => k.querySelector('.mini.v-unsafe'))")
     s.open_compared(idx)
-    check("J5 unsafe baseline: safety unsafe", s.verdict("Safety").startswith("Unsafe"), s.verdict("Safety"))
+    check("J5 unsafe baseline: safety unsafe", (s.verdict("Safety").startswith("A safety rule") or ("safety rules broken" in s.verdict("Safety") and not s.verdict("Safety").startswith("No "))), s.verdict("Safety"))
     check("J5 unsafe baseline: outcome reported separately from safety", s.verdict("Mission outcome") != s.verdict("Safety"))
     check("J5 unsafe baseline: S5 no powered ascent failed", p.locator(".req.v-unsafe[data-id='S5_no_powered_ascent']").count() == 1)
     check("J5 unsafe baseline: model validity shown", "not flight software" in p.inner_text(".validity-strip"))
@@ -385,8 +391,14 @@ def journeys(s):
     p.locator("body").press("?")
     s.wait("!document.getElementById('modal-root').hidden && document.querySelector('.shortcuts')", what="shortcut help")
     check("? opens the keyboard shortcut help", p.locator(".shortcuts tr").count() >= 8)
+    focus = s.js("document.activeElement && (document.activeElement.tagName + '.' + document.activeElement.className + ' inside=' + !!document.activeElement.closest('#modal-root'))")
     p.keyboard.press("Escape")
-    s.wait("document.getElementById('modal-root').hidden")
+    try:
+        s.wait("document.getElementById('modal-root').hidden", timeout=10)
+    except TimeoutError:
+        check("Escape closes the shortcut help", False, f"focus was {focus}")
+        raise
+    check("Escape closes the shortcut help", True, f"focus was {focus}")
     p.keyboard.press("Control+k")
     s.wait("document.querySelector('.palette-input')", what="palette")
     p.keyboard.type("altimeter")
@@ -635,7 +647,8 @@ def main():
                 s.wait("window.__studio && document.getElementById('startup').hidden", timeout=90, what="platform ready")
                 check("startup reaches ready", True, f"{time.time() - t0:.1f} s")
                 info = s.invoke("app_info")
-                check("platform ready with three domains and none rejected", info["ready"] and info["start"]["domains"] == 3 and not info["start"]["rejected"], json.dumps(info.get("start")))
+                # Three domains from a build folder; the installed application also carries the launch-ascent domain (four).
+                check("platform ready with at least three domains and none rejected", info["ready"] and info["start"]["domains"] >= 3 and not info["start"]["rejected"], json.dumps(info.get("start")))
                 journeys(s)
                 discovery_journeys(s, library)
             except Exception as e:

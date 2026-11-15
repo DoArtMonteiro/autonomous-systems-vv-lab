@@ -1,6 +1,7 @@
 // Application state shared by the views: platform info, domains, preferences and the open work
 // (one run, or a set of runs being compared). Views subscribe to named topics.
 
+import { indexNumbers } from './requirements.js';
 import { api, logUiError } from './api.js';
 import { debounce } from './dom.js';
 
@@ -81,7 +82,8 @@ export function domainById(id) {
 
 export async function loadRecord(runId) {
   if (state.records.has(runId)) return state.records.get(runId);
-  const rec = await api.record(runId);
+  // The published requirement numbers are read once, when the record is first held, so every view sees them.
+  const rec = indexNumbers(await api.record(runId));
   state.records.set(runId, rec);
   return rec;
 }

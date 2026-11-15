@@ -6,7 +6,7 @@ import { h, clear, icon, num, prose, words, debounce, nextId } from '../dom.js';
 import { api } from '../api.js';
 import { state, pref, setPref, visibleDomains, domainById, on, emit } from '../store.js';
 import { toast, errorText, askName } from '../ui.js';
-import { faultText } from '../model.js';
+import { faultText, conditionsName } from '../model.js';
 
 const REQUEST_SCHEMA = 'vv-run-request.v1';
 const MAX_COMPARE = 8;
@@ -261,11 +261,12 @@ function demoCard(d, demo) {
   const n = demo.requests.length;
   const cat = d.catalog;
   const ctrls = [...new Set(demo.requests.map((r) => label(cat.controllers, r.controller)))].join(', ');
-  const faults = [...new Set(demo.requests.flatMap((r) => r.faults.map((f) => words(f.kind))))];
+  // Every non-default parameter and every fault of the demonstration's runs (never "no injected fault" while a noise or a limit is set).
+  const conditions = [...new Set(demo.requests.map((r) => conditionsName(r, cat)))];
   const runBtn = h('button', { type: 'button', class: 'btn btn-primary', dataset: { demo: demo.id }, onclick: () => runDemo(d, demo, runBtn) }, icon('play'), n > 1 ? `Run all ${n} and compare` : 'Run demonstration');
   return h('article', { class: 'demo', dataset: { demo: demo.id } },
     h('div', { class: 'demo-title' }, demo.title),
-    h('div', { class: 'demo-meta' }, `${n} run${n > 1 ? 's' : ''} · ${ctrls} · seed ${[...new Set(demo.requests.map((r) => r.seed))].join(', ')} · ${faults.length ? faults.join(' + ') : 'no injected fault'}`),
+    h('div', { class: 'demo-meta' }, `${n} run${n > 1 ? 's' : ''} · ${ctrls} · seed ${[...new Set(demo.requests.map((r) => r.seed))].join(', ')} · ${conditions.join(' / ')}`),
     h('details', null,
       h('summary', null, icon('chev'), 'Narrative, what to look at, expected result'),
       h('div', { class: 'demo-body' },
@@ -358,7 +359,7 @@ function renderMain() {
     changed();
   } }, 'Add fault');
   formEl.append(section('Faults', `Up to ${cat.max_faults}; windows in ${cat.time.label.toLowerCase()}`, [
-    form.faults.length ? faultRows : h('p', { class: 'dim' }, 'No injected fault: a nominal run.'),
+    form.faults.length ? faultRows : h('p', { class: 'dim' }, 'No injected fault.'),
     full ? h('p', { class: 'dim small' }, `The domain accepts at most ${cat.max_faults} faults per run.`) : h('div', { class: 'add-fault' }, addSel, addBtn),
   ]));
 

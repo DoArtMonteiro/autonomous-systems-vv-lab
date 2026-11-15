@@ -45,9 +45,9 @@ Os testes de interação verificam a ordem por prazo e sequência, rejeição de
 
 ```sh
 python scripts/minimize_failure.py scenarios/m2/g-zone-fault.json --seed 42 --output runs/m2-reduced-final --max-candidates 80 --time-budget-seconds 30
-cargo run -- replay runs/m2-reduced-final/original/events.json
-cargo run -- replay runs/m2-reduced-final/final/events.json
-cargo run -- run runs/m2-reduced-final/scenarios/minimized.json --seed 42 --output runs/reduced
+cargo run --bin vv-lab -- replay runs/m2-reduced-final/original/events.json
+cargo run --bin vv-lab -- replay runs/m2-reduced-final/final/events.json
+cargo run --bin vv-lab -- run runs/m2-reduced-final/scenarios/minimized.json --seed 42 --output runs/reduced
 ```
 
 Em Windows, foi usado `--binary target/release/vv-lab.exe`. A execução retida terminou em 1,137337 s: 14 candidatos, sete reduções aceites, sete rejeições por alteração da propriedade e nenhuma configuração inválida. Ambos os artefactos foram reproduzidos e as análises de missão reconstruídas coincidiram com as respetivas execuções.

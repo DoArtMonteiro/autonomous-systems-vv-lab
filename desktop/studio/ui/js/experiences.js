@@ -139,7 +139,7 @@ export const EXPERIENCES = [
   },
   {
     id: 'axis-policy', domain: 'ground-vehicle', demo: 'axis-policy-comparison',
-    title: 'Stalled but safe', kicker: 'Compare systems',
+    title: 'Stalled, no safety rule broken', kicker: 'Compare systems',
     summary: 'Two controllers, one mission. One arrives; the other shuttles in place and never turns north.',
     objective: 'Reach a waypoint 2 m north and 0.25 m east with 0.5 m steps.',
     watch: ['x_first jumps over the small x error every tick.'], learn: ['Why a stalled mission is not an unsafe run'],

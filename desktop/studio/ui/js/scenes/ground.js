@@ -24,6 +24,24 @@ function geometry(scene) {
   };
 }
 
+/**
+ * The rectangle the mission view fits: the path, the start, the goal and the restricted zones, with a margin,
+ * at least 800 mm on each side. A wide plot keeps the scale of its height (equal axes), so the step into a
+ * zone stays as big as the plot allows instead of shrinking to a few pixels on a 50 000 mm wide axis.
+ */
+function fitRect(g, pathX, pathY) {
+  const zx = g.zones.flatMap((z) => (z.vertices || []).map((p) => p.x));
+  const zy = g.zones.flatMap((z) => (z.vertices || []).map((p) => p.y));
+  const xs = [g.start && g.start.x, g.goal && g.goal.x, ...zx, ...pathX].filter((v) => v !== null && v !== undefined);
+  const ys = [g.start && g.start.y, g.goal && g.goal.y, ...zy, ...pathY].filter((v) => v !== null && v !== undefined);
+  let [x0, x1] = extent([xs], 0.1);
+  let [y0, y1] = extent([ys], 0.12);
+  for (const [lo, hi, set] of [[x0, x1, (a, b) => { x0 = a; x1 = b; }], [y0, y1, (a, b) => { y0 = a; y1 = b; }]]) {
+    if (hi - lo < 800) set((lo + hi) / 2 - 400, (lo + hi) / 2 + 400);
+  }
+  return { xmin: x0, xmax: x1, ymin: y0, ymax: y1 };
+}
+
 function drawWorld(ctx, P, g) {
   const c = P.colour;
   if (g.bounds) {
@@ -31,7 +49,7 @@ function drawWorld(ctx, P, g) {
     ctx.setLineDash([]);
     ctx.lineWidth = 1.5;
     ctx.strokeRect(P.x(g.bounds.min_x), P.y(g.bounds.max_y), P.x(g.bounds.max_x) - P.x(g.bounds.min_x), P.y(g.bounds.min_y) - P.y(g.bounds.max_y));
-    ctx.font = `10.5px ${c('--sans')}`;
+    ctx.font = `12px ${c('--sans')}`;
     ctx.fillStyle = c('--fg-3');
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
@@ -68,7 +86,7 @@ function drawWorld(ctx, P, g) {
 }
 
 function label(ctx, P, text, x, y) {
-  ctx.font = `11px ${P.colour('--sans')}`;
+  ctx.font = `12px ${P.colour('--sans')}`;
   ctx.fillStyle = P.colour('--fg-2');
   ctx.textAlign = 'left';
   ctx.textBaseline = 'bottom';
@@ -104,16 +122,7 @@ function mount(host, model, cursor) {
   const gy = vals(model, CH.gy);
   const times = tx ? tx.t : [];
   let mode = 'mission';
-  const missionView = () => {
-    const xs = [g.start && g.start.x, g.goal && g.goal.x, ...(tx ? tx.v : []), ...(gx ? gx.v : [])].filter((v) => v !== null && v !== undefined);
-    const ys = [g.start && g.start.y, g.goal && g.goal.y, ...(ty ? ty.v : []), ...(gy ? gy.v : [])].filter((v) => v !== null && v !== undefined);
-    const [x0, x1] = extent([xs], 0.12);
-    const [y0, y1] = extent([ys], 0.12);
-    const span = Math.max(x1 - x0, y1 - y0, 1000);
-    const cx = (x0 + x1) / 2;
-    const cy = (y0 + y1) / 2;
-    return { xmin: cx - span / 2, xmax: cx + span / 2, ymin: cy - span / 2, ymax: cy + span / 2 };
-  };
+  const missionView = () => fitRect(g, [...(tx ? tx.v : []), ...(gx ? gx.v : [])], [...(ty ? ty.v : []), ...(gy ? gy.v : [])]);
   const worldView = () => (g.bounds ? { xmin: g.bounds.min_x, xmax: g.bounds.max_x, ymin: g.bounds.min_y, ymax: g.bounds.max_y } : missionView());
   const dropouts = Array.isArray(scene.gps_dropout_windows) ? scene.gps_dropout_windows : [];
   const readout = h('div', { class: 'scene-readout mono overlay right', 'aria-live': 'off' });
@@ -213,15 +222,12 @@ function compare(host, models, colours, labels, cursor) {
   const g = geometry(models[0].record.scene);
   const differ = models.some((m) => JSON.stringify(geometry(m.record.scene)) !== JSON.stringify(g));
   const paths = models.map((m) => ({ tx: vals(m, CH.tx), ty: vals(m, CH.ty), gx: vals(m, CH.gx), gy: vals(m, CH.gy) }));
-  const xs = [g.start && g.start.x, g.goal && g.goal.x];
-  const ys = [g.start && g.start.y, g.goal && g.goal.y];
+  const pathX = [];
+  const pathY = [];
   for (const p of paths) {
-    if (p.tx) xs.push(...p.tx.v);
-    if (p.ty) ys.push(...p.ty.v);
+    if (p.tx) pathX.push(...p.tx.v);
+    if (p.ty) pathY.push(...p.ty.v);
   }
-  const [x0, x1] = extent([xs.filter((v) => v !== null && v !== undefined)], 0.12);
-  const [y0, y1] = extent([ys.filter((v) => v !== null && v !== undefined)], 0.12);
-  const span = Math.max(x1 - x0, y1 - y0, 1000);
   const plotHost = h('div', { class: 'scene-canvas' });
   host.append(
     h('div', { class: 'scene-bar' }, h('h3', null, 'Paths, top view'), h('span', { class: 'dim small' }, 'true path solid, GPS samples as dots; x east, y north, mm')),
@@ -248,7 +254,7 @@ function compare(host, models, colours, labels, cursor) {
       });
     },
   });
-  plot.setView({ xmin: (x0 + x1) / 2 - span / 2, xmax: (x0 + x1) / 2 + span / 2, ymin: (y0 + y1) / 2 - span / 2, ymax: (y0 + y1) / 2 + span / 2 });
+  plot.setView(fitRect(g, pathX, pathY));
   const unsub = cursor ? cursor.subscribe((t) => plot.drawTop(t)) : () => {};
   return { dispose: () => { unsub(); plot.dispose(); } };
 }

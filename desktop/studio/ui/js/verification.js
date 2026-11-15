@@ -3,6 +3,7 @@
 // is never drawn as a pass. Status is carried by a glyph and a word as well as by colour.
 
 import { h, icon, num, timeText, prose, words } from './dom.js';
+import { safetyWording, SAFETY_NOTE, failureSentence, reqView, shortText } from './requirements.js';
 import { CATEGORY_TITLE, STATUS_TEXT, verdictOfOutcome, verdictOfSafety, verdictOfRequirement } from './model.js';
 
 const GLYPH = { pass: 'check', fail: 'cross', unsafe: 'warn', partial: 'dash', neutral: 'dash' };
@@ -15,25 +16,24 @@ export function verdictGlyph(v) {
 export function verdictBlocks(record) {
   const ov = verdictOfOutcome(record.outcome.status);
   // A run whose invariants were never judged (the vehicle never flew) is not shown as safe.
-  const unjudged = record.safety.status === 'safe' && record.safety.class === 'not_evaluated';
-  const sv = unjudged ? 'neutral' : verdictOfSafety(record.safety.status);
+  const sw = safetyWording(record);
+  const unjudged = sw.unjudged;
+  const sv = sw.verdict;
   // A completed mission can still have failed requirements outside the safety invariants; say so
   // first, so the one-line clamp keeps it visible.
   const failedReqs = (record.requirements || []).filter((r) => r.category !== 'invariant' && r.status === 'fail');
-  const failedNote = failedReqs.length
-    ? `${failedReqs.length} requirement${failedReqs.length > 1 ? 's' : ''} outside the safety invariants failed: ${failedReqs.map((r) => r.id).join(', ')}. `
-    : '';
+  const failedNote = failedReqs.length ? `${failureSentence(record)} ` : '';
   // Focusable, so keyboard users can expand the clamped explanation (:focus-within).
   const outcome = h('div', { class: ['verdict', `v-${ov}`], role: 'group', 'aria-label': 'Mission outcome', tabindex: '0' },
     h('div', { class: 'verdict-k' }, 'Mission outcome'),
     h('div', { class: 'verdict-v' }, verdictGlyph(ov), h('span', null, record.outcome.label), h('span', { class: 'verdict-s mono' }, record.outcome.status)),
-    h('p', { class: 'verdict-x' }, failedNote ? h('b', null, failedNote) : null, prose(record.outcome.explanation)));
+    h('p', { class: 'verdict-x', title: prose(record.outcome.explanation) }, failedNote ? h('b', null, failedNote) : null, shortText(prose(record.outcome.explanation))));
   const cls = record.safety.class;
   const safety = h('div', { class: ['verdict', `v-${sv}`], role: 'group', 'aria-label': 'Safety', tabindex: '0' },
     h('div', { class: 'verdict-k' }, 'Safety, judged on the true state'),
-    h('div', { class: 'verdict-v' }, verdictGlyph(sv), h('span', null, unjudged ? 'Not evaluated' : record.safety.status === 'safe' ? 'Safe' : record.safety.status === 'unsafe' ? 'Unsafe' : record.safety.status),
+    h('div', { class: 'verdict-v' }, verdictGlyph(sv), h('span', null, sw.text),
       cls && !unjudged ? h('span', { class: ['class-badge', `class-${cls}`], title: 'Classification of the run reported by the domain verifier' }, `class ${cls}`) : null),
-    h('p', { class: 'verdict-x' }, prose(record.safety.explanation)));
+    h('p', { class: 'verdict-x', title: prose(record.safety.explanation) }, shortText(prose(record.safety.explanation)), ' ', SAFETY_NOTE));
   return [outcome, safety];
 }
 
@@ -53,7 +53,9 @@ export function requirementList(record, unit, onTime) {
   const order = ['invariant', 'requirement', 'declaration'];
   const cats = [...new Set(reqs.map((r) => r.category))].sort((a, b) => (order.indexOf(a) + 1 || 9) - (order.indexOf(b) + 1 || 9));
   const sections = cats.map((cat) => {
-    const list = reqs.filter((r) => r.category === cat);
+    // Failed rows first, each group in the record's own order.
+    const inCat = reqs.filter((r) => r.category === cat);
+    const list = [...inCat.filter((r) => r.status === 'fail'), ...inCat.filter((r) => r.status !== 'fail')];
     const c = counts(list);
     const summary = [c.fail ? `${c.fail} failed` : null, `${c.pass} passed`, c.not_evaluated ? `${c.not_evaluated} not evaluated` : null].filter(Boolean).join(' · ');
     return h('section', { class: 'req-section', 'aria-label': CATEGORY_TITLE[cat] || words(cat) },
@@ -72,6 +74,9 @@ function requirementRow(r, unit, onTime) {
   const when = hasT
     ? h('button', { type: 'button', class: 'req-t mono', title: 'Move the time cursor to this instant', 'aria-label': `Move the cursor to ${timeText(r.t, unit)}`, onclick: () => onTime && onTime(r.t, r) }, timeText(r.t, unit))
     : h('span', { class: 'req-t mono dim', title: 'Judged over the whole run' }, 'whole run');
+  // A tilt recorded as a cosine is shown as an angle (derived, display only); the recorded text is in the title.
+  const rv = reqView(r);
+  const deg = rv.numeric && rv.unit === '°';
   const row = h('li', { class: ['req', `v-${v}`], dataset: { id: r.id } },
     verdictGlyph(v),
     h('div', { class: 'req-main' },
@@ -80,8 +85,8 @@ function requirementRow(r, unit, onTime) {
         h('span', { class: 'req-label' }, r.label),
         h('span', { class: ['req-status', `v-${v}-text`] }, STATUS_TEXT[r.status] || r.status)),
       h('dl', { class: 'req-eo' },
-        h('dt', null, 'expected'), h('dd', { class: 'mono' }, r.expected),
-        h('dt', null, 'observed'), h('dd', { class: 'mono' }, r.observed)),
+        h('dt', null, deg ? 'limit' : 'expected'), h('dd', { class: 'mono', title: deg ? `Recorded: ${r.expected}. Shown as an angle: arccos of the recorded cosine.` : null }, deg ? `${rv.limitText} (${r.expected})` : r.expected),
+        h('dt', null, deg ? 'worst' : 'observed'), h('dd', { class: 'mono', title: deg ? `Recorded: ${r.observed}. Shown as an angle: arccos of the recorded cosine.` : null }, deg ? `${rv.obsText} (${r.observed})` : r.observed)),
       r.explanation ? h('p', { class: 'req-x' }, prose(r.explanation)) : null),
     when);
   return row;

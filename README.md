@@ -68,8 +68,8 @@ For the M8 model, see the [reference cases and model assumptions](docs/m8-rocket
 Requirements: Rust and Cargo as pinned in `rust-toolchain.toml`; Python 3.10 or newer for campaign scripts.
 
 ```sh
-cargo run -- run scenarios/basic-mission.json --seed 42 --output runs/basic
-cargo run -- replay runs/basic/events.json
+cargo run --bin vv-lab -- run scenarios/basic-mission.json --seed 42 --output runs/basic
+cargo run --bin vv-lab -- replay runs/basic/events.json
 cargo test
 python -m unittest discover -s tests -p "test_*.py"
 ```

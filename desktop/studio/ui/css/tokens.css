@@ -20,7 +20,7 @@
   --rule-strong: #2a323c;
   --fg-1: #e4e9ef;
   --fg-2: #b0bac5;
-  --fg-3: #7b8694;
+  --fg-3: #8e99a7;
   --accent: #79c3d6;
   --accent-ink: #06222a;
   --accent-wash: rgba(121, 195, 214, .12);
@@ -93,8 +93,8 @@
    vocabulary shared by the mission player, the Flight console, Analyse and Compare. */
 :root {
   --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --sp-6: 32px; --sp-7: 48px;
-  --t-micro: 600 10.5px/1.2 var(--sans);      /* uppercase labels, tracked .14em */
-  --t-small: 400 11.5px/1.45 var(--sans);
+  --t-micro: 600 12px/1.2 var(--sans);      /* uppercase labels, tracked .14em */
+  --t-small: 400 12px/1.45 var(--sans);
   --t-body: 400 13px/1.5 var(--sans);
   --t-title: 600 19px/1.15 var(--display);
   --t-display: 300 44px/1 var(--mono);         /* mission clock */

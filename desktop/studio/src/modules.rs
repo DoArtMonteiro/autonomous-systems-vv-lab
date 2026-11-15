@@ -1019,12 +1019,90 @@ pub async fn cinematic_uninstall(state: State<'_, AppState>) -> Result<Status, P
     .await
 }
 
+/// Display arguments for the module's readout: labels the Studio shows for the run (its label in the
+/// player, the vehicle name, the seed). They are text for the screen, never paths or switches: each
+/// is cut to a short length, control characters become spaces, and the module refuses anything else.
+#[derive(Default, Debug, PartialEq, Eq)]
+pub struct Display {
+    pub run_label: Option<String>,
+    pub vehicle: Option<String>,
+    pub exploratory: bool,
+    pub seed: Option<u64>,
+    /// The run's non-default parameters and faults, in the Studio's words ("GPS noise 1 mm").
+    pub conditions: Option<String>,
+}
+
+const LABEL_MAX_CHARS: usize = 80;
+/// The conditions text can list several parameters and faults, so it may be longer than a label.
+const CONDITIONS_MAX_CHARS: usize = 160;
+/// The largest seed the module accepts (18 digits); a larger one is left out of the display.
+const SEED_MAX: u64 = 999_999_999_999_999_999;
+
+/// Unicode bidirectional overrides and isolates: they can make text read in another order than it is
+/// written, so they are removed from every label.
+fn is_bidi_control(c: char) -> bool {
+    matches!(c, '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}')
+}
+
+fn clean_label(s: &str) -> Option<String> {
+    clean_text(s, LABEL_MAX_CHARS)
+}
+
+fn clean_text(s: &str, max: usize) -> Option<String> {
+    let t: String = s
+        .chars()
+        .filter(|c| !is_bidi_control(*c))
+        .map(|c| if c.is_control() { ' ' } else { c })
+        .take(max)
+        .collect();
+    let t = t.trim().to_string();
+    (!t.is_empty()).then_some(t)
+}
+
+impl Display {
+    /// Appends the display arguments after the fixed ones (the module reads them after `--`).
+    pub fn append_to(&self, args: &mut Vec<String>) {
+        if let Some(l) = self.run_label.as_deref().and_then(clean_label) {
+            args.extend(["--run-label".to_string(), l]);
+        }
+        if let Some(v) = self.vehicle.as_deref().and_then(clean_label) {
+            args.extend(["--vehicle".to_string(), v]);
+        }
+        if self.exploratory {
+            args.push("--exploratory".to_string());
+        }
+        if let Some(s) = self.seed.filter(|s| *s <= SEED_MAX) {
+            args.extend(["--seed".to_string(), s.to_string()]);
+        }
+        if let Some(c) = self
+            .conditions
+            .as_deref()
+            .and_then(|c| clean_text(c, CONDITIONS_MAX_CHARS))
+        {
+            args.extend(["--conditions".to_string(), c]);
+        }
+    }
+}
+
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn cinematic_launch(
     state: State<'_, AppState>,
     run_id: String,
     env_id: String,
+    run_label: Option<String>,
+    vehicle: Option<String>,
+    exploratory: Option<bool>,
+    seed: Option<u64>,
+    conditions: Option<String>,
 ) -> Result<(), PlatformError> {
+    let display = Display {
+        run_label,
+        vehicle,
+        exploratory: exploratory.unwrap_or(false),
+        seed,
+        conditions,
+    };
     let p = state.platform()?;
     let run_dir = p.library().run_dir(&run_id).map_err(invalid)?;
     if !p.library().has_run(&run_id) {
@@ -1043,6 +1121,10 @@ pub async fn cinematic_launch(
         )?;
         // A refused launch means the cached "files matched" status is out of date.
         let started = launch_command(&modules.root, &run_dir, &env_dir)
+            .map(|mut launch| {
+                display.append_to(&mut launch.args);
+                launch
+            })
             .and_then(|launch| spawn_checked(&launch))
             .inspect_err(|_| modules.forget())?;
         *slot = Some(started);
@@ -1301,6 +1383,71 @@ mod tests {
             let s = install(&real, &zp).unwrap();
             assert!(s.installed && s.verified, "{s:?}");
         }
+    }
+
+    #[test]
+    fn display_arguments_are_short_text_after_the_fixed_ones() {
+        let mut args = vec!["--run".to_string(), "R".to_string()];
+        Display {
+            run_label: Some("Engine thrust 0.7 \u{d7}\n\t--shot x".to_string()),
+            vehicle: Some("Heavy return stage".to_string()),
+            exploratory: true,
+            seed: Some(5000),
+            conditions: Some(
+                "GPS noise 1 mm \u{b7} Arrival radius 250 mm\n--shot y\u{202E}".to_string(),
+            ),
+        }
+        .append_to(&mut args);
+        assert_eq!(
+            args,
+            [
+                "--run",
+                "R",
+                "--run-label",
+                "Engine thrust 0.7 \u{d7}  --shot x",
+                "--vehicle",
+                "Heavy return stage",
+                "--exploratory",
+                "--seed",
+                "5000",
+                "--conditions",
+                "GPS noise 1 mm \u{b7} Arrival radius 250 mm --shot y"
+            ]
+        );
+        // A seed with more than 18 digits and bidi overrides are left out or removed.
+        let mut odd = Vec::new();
+        Display {
+            run_label: Some("a\u{202E}b\u{2066}c".to_string()),
+            seed: Some(SEED_MAX + 1),
+            ..Display::default()
+        }
+        .append_to(&mut odd);
+        assert_eq!(odd, ["--run-label", "abc"]);
+        let mut top = Vec::new();
+        Display {
+            seed: Some(SEED_MAX),
+            ..Display::default()
+        }
+        .append_to(&mut top);
+        assert_eq!(top, ["--seed", "999999999999999999"]);
+        let mut none = Vec::new();
+        Display {
+            run_label: Some("   ".to_string()),
+            vehicle: Some("x".repeat(500)),
+            ..Display::default()
+        }
+        .append_to(&mut none);
+        assert_eq!(none.len(), 2);
+        assert_eq!(none[0], "--vehicle");
+        assert_eq!(none[1].chars().count(), LABEL_MAX_CHARS);
+        let mut long = Vec::new();
+        Display {
+            conditions: Some("c".repeat(500)),
+            ..Display::default()
+        }
+        .append_to(&mut long);
+        assert_eq!(long[0], "--conditions");
+        assert_eq!(long[1].chars().count(), CONDITIONS_MAX_CHARS);
     }
 
     #[test]

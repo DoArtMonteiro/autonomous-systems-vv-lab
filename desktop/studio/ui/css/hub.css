@@ -27,7 +27,7 @@
 .hm-mosaic { height: 170px; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); gap: 2px; background: var(--bg-3); }
 .hm-mosaic img { width: 100%; height: 100%; object-fit: cover; display: block; filter: saturate(.9) contrast(1.05); }
 .hm-path-body { display: grid; grid-template-rows: auto auto 1fr auto auto; gap: 8px; padding: 18px 20px 20px; }
-.hm-path-k { color: var(--accent); font-size: 11px; }
+.hm-path-k { color: var(--accent); font-size: 12px; }
 .hm-path h2 { font: 600 20px/1.2 var(--display); letter-spacing: -.015em; }
 .hm-path p:not(.hm-path-k):not(.hm-path-sub) { color: var(--fg-2); line-height: 1.55; font-size: 13px; }
 .hm-path-sub { color: var(--fg-3); font-size: 12px; line-height: 1.45; }
@@ -47,7 +47,7 @@
 .hm-step-info:hover { background: var(--bg-1); }
 .hm-step b { font: 600 13.5px/1.3 var(--sans); color: var(--fg-1); }
 .hm-step b::before { content: counter(fl, decimal-leading-zero) "  "; font: 500 11px var(--mono); color: var(--accent); }
-.hm-step span { font-size: 11.5px; color: var(--fg-3); }
+.hm-step span { font-size: 12px; color: var(--fg-3); }
 .hm-featured header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 
 /* ------------------------------------------------------------------ hangar */
@@ -55,7 +55,7 @@
 .hg-head h1, .at-head h1 { font: 600 clamp(28px, 3vw, 42px)/1.08 var(--display); letter-spacing: -.025em; margin: 6px 0 14px; text-wrap: balance; }
 .hg-lede, .at-lede { color: var(--fg-2); line-height: 1.6; max-width: 76ch; font-size: 14px; }
 .hg-legend { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-top: 14px; font-size: 12px; color: var(--fg-3); }
-.hg-ev { display: inline-block; font: 600 10.5px/1 var(--sans); letter-spacing: .04em; padding: 4px 7px; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; }
+.hg-ev { display: inline-block; font: 600 12px/1 var(--sans); letter-spacing: .04em; padding: 4px 7px; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; }
 .hg-ev-ref { color: var(--prov-sim); }
 .hg-ev-explore { color: var(--grade-explore); }
 .hg-ev-ill { color: var(--prov-ill); }
@@ -74,7 +74,7 @@
 .hg-name { font: 600 16.5px/1.25 var(--display); letter-spacing: -.01em; }
 .hg-desc { color: var(--fg-2); font-size: 12.5px; line-height: 1.5; }
 .hg-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 14px; padding: 10px 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
-.hg-facts dt { font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--fg-3); }
+.hg-facts dt { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fg-3); }
 .hg-facts dd { font-size: 13px; color: var(--fg-1); }
 .hg-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .hg-more { margin-top: -2px; }
@@ -94,17 +94,17 @@
 .at-img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .6s var(--ease); }
 .at-card:hover .at-img { transform: scale(1.03); }
 .at-img.is-missing { visibility: hidden; }
-.at-level, .at-using { position: absolute; top: 10px; font: 600 10.5px/1 var(--sans); letter-spacing: .04em; padding: 5px 8px; border-radius: 999px; background: var(--glass-strong); backdrop-filter: blur(8px); border: 1px solid var(--glass-rule); }
+.at-level, .at-using { position: absolute; top: 10px; font: 600 12px/1 var(--sans); letter-spacing: .04em; padding: 5px 8px; border-radius: 999px; background: var(--glass-strong); backdrop-filter: blur(8px); border: 1px solid var(--glass-rule); }
 .at-level { left: 10px; color: var(--fg-1); }
 .at-level-a { color: var(--prov-sim); }
 .at-level-b { color: var(--prov-ctx); }
 .at-using { right: 10px; color: var(--accent); }
 .at-body { display: grid; gap: 8px; padding: 14px 16px 16px; align-content: start; }
 .at-name { font: 600 17px/1.25 var(--display); letter-spacing: -.01em; }
-.at-sum { color: var(--fg-2); font-size: 12.5px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.at-sum { color: var(--fg-2); font-size: 12.5px; line-height: 1.5; }
 .at-facts { display: grid; gap: 2px; font-size: 12px; color: var(--fg-2); padding: 8px 0; border-top: 1px solid var(--rule); }
 .at-facts li::before { content: "·"; color: var(--accent); margin-right: 6px; }
-.at-credit { font-size: 11px; color: var(--fg-3); line-height: 1.45; }
+.at-credit { font-size: 12px; color: var(--fg-3); line-height: 1.45; }
 .at-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
 .at-cine { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px 32px; align-items: end; border-top: 1px solid var(--rule-strong); padding-top: 20px; }
 .at-cine h2 { font: 600 20px/1.2 var(--display); letter-spacing: -.015em; margin: 4px 0 8px; }
@@ -150,8 +150,43 @@
 }
 @media (max-width: 1100px) {
   #platform-status { display: none; }
+  /* The secondary workspaces move into the More menu; the primary ones always fit without a scrollbar. */
+  .nav-work, .nav-sep { display: none; }
+  .appbar .nav-more { display: block; }
+  .nav { overflow-x: visible; flex: 0 1 auto; }
 }
+.nav-more { display: none; position: relative; height: 100%; }
+.nav-more-btn { height: 100%; background: none; border: 0; padding: 0 10px; color: var(--fg-2); cursor: pointer; font-weight: 500; position: relative; white-space: nowrap; }
+.nav-more-btn::after { content: ""; display: inline-block; margin-left: 6px; border: 4px solid transparent; border-top-color: currentColor; border-bottom: 0; vertical-align: middle; }
+.nav-more-btn:hover, .nav-more-btn[aria-expanded="true"], .nav-more-btn[aria-current="page"] { color: var(--fg-1); }
+.nav-more-btn[aria-current="page"]::before { content: ""; position: absolute; left: 8px; right: 8px; bottom: 0; height: 2px; background: var(--accent); }
+.nav-more-btn:focus-visible { outline-offset: -3px; }
+.nav-more-menu { position: absolute; top: calc(100% + 1px); left: 0; z-index: 70; min-width: 190px; padding: 4px; display: grid; gap: 1px; background: var(--bg-1); border: 1px solid var(--rule-strong); border-radius: 6px; box-shadow: var(--shadow); }
+.nav-more-menu[hidden] { display: none; }
+.nav-more-item { text-align: left; background: none; border: 0; border-radius: 4px; padding: 8px 12px; color: var(--fg-1); cursor: pointer; font-size: 13px; }
+.nav-more-item:hover { background: var(--bg-3); }
+.nav-more-item[aria-current="page"] { box-shadow: inset 3px 0 0 var(--accent); }
+.nav-more-item:focus-visible { outline-offset: -2px; }
 .nav-btn[aria-current="page"]::after { bottom: 0; }
 
 .hm-path { position: relative; }
-.hm-art-note { position: absolute; top: 8px; right: 10px; font: 500 10px/1 var(--sans); letter-spacing: .04em; color: var(--fg-3); background: var(--glass); padding: 3px 6px; border-radius: 999px; }
+.hm-art-note { position: absolute; top: 8px; right: 10px; font: 500 12px/1 var(--sans); letter-spacing: .04em; color: var(--fg-3); background: var(--glass); padding: 3px 6px; border-radius: 999px; }
+
+.hm-disclaimer, .hg-disclaimer { margin: 0; max-width: 76ch; padding: 8px 12px; border: 1px solid color-mix(in srgb, var(--grade-explore) 45%, transparent); border-left-width: 3px; border-radius: 4px; background: color-mix(in srgb, var(--grade-explore) 8%, transparent); color: var(--fg-1); font-size: 13px; line-height: 1.5; }
+.hm-disclaimer { margin-top: 14px; }
+.at-ctx { position: absolute; left: 10px; bottom: 10px; font: 600 12px/1 var(--sans); padding: 5px 8px; border-radius: 999px; background: var(--glass-strong); border: 1px solid var(--rule-strong); color: var(--fg-1); }
+
+/* Home statistics: four cells that wrap as a block, never one label over another. */
+.hm-stats { grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 1px; background: var(--rule); overflow: hidden; }
+.hm-stats > div, .hm-stats > div:nth-child(n) { border: 0; background: var(--bg-1); min-width: 0; }
+.hm-stats dt { overflow-wrap: anywhere; letter-spacing: .08em; }
+/* The reference case is a neutral fact, not a pass: it does not borrow the pass colour. */
+.hg-ev-ref { color: var(--fg-1); border-color: var(--fg-3); }
+.at-img { width: 100%; height: 100%; object-fit: cover; }
+#view-library { background: var(--bg-0); }
+/* Runs page: the names of failed requirements are words, not code. */
+td.failed { font-family: var(--sans); font-size: 12px; min-width: 190px; }
+
+/* The reference chip is not cut; the reference card says what it is. */
+.hg-card-art .hg-ev { white-space: normal; text-align: center; line-height: 1.15; }
+.hg-refnote { margin: 0; color: var(--fg-1); font-weight: 600; }

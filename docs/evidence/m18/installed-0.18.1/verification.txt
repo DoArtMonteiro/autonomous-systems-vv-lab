@@ -1,0 +1,69 @@
+Verificação da árvore release/0.18.1 (commit "chore: Studio 0.18.1"), 2026-11-12, Windows 11 Pro 26300.
+Comandos do AGENTS.md na raiz e no espaço de trabalho desktop/ (VV_GODOT definido para os testes do módulo):
+
+cargo fmt --check                                              exit 0
+cargo clippy --all-targets -- -D warnings                      exit 0
+cargo test                                                     exit 0 (13 suites, 138 testes, 0 falhas)
+cargo build --release                                          exit 0
+cargo build --release --manifest-path crates/vv-rocket/Cargo.toml
+                                                               exit 0 (39 testes Python precisam deste binário)
+python -m unittest discover -s tests -p "test_*.py"            Ran 427 tests, OK (skipped=6: bibliotecas do construtor de
+                                                               pacotes geo, ligações simbólicas, CINEMATIC_CC0_STAGING,
+                                                               VV_WORKBENCH_RUN). Sem o binário vv-rocket, skipped=45.
+python scripts/run_campaign.py --seeds 42,1337,2026 --output-root runs/campaign
+                                                               exit 0, status passed, 87 casos, 324 invocações do simulador
+desktop/ cargo fmt --check                                     exit 0
+desktop/build.ps1 -StageOnly (prepara desktop/target/release/domains, que o build.rs do Studio exige)
+                                                               exit 0
+desktop/ cargo clippy --all-targets -- -D warnings             exit 0
+desktop/ cargo test                                            exit 0 (24 suites, 165 testes, 0 falhas)
+
+Cenários do README (`cargo run --bin vv-lab -- run scenarios/basic-mission.json --seed 42 --output runs/basic`, `replay`,
+`vv-rocket verify`, `vv-rocket land ... altimeter-bias.json --seed 0`, `vv-rocket replay`): exit 0.
+
+Defeito de documentação (não corrigido, não bloqueia a versão): os comandos `cargo run -- run ...` e
+`cargo run -- replay ...` do README falham com "cargo run could not determine which binary to run", porque o pacote da
+raiz tem três binários (vv-adversary, vv-lab, vv-repair) e não tem `default-run`. Com `--bin vv-lab` funcionam.
+
+Repetição na árvore da passagem de interface (2026-11-14), mesmos comandos, VV_GODOT definido:
+cargo fmt --check, cargo clippy --all-targets -- -D warnings, cargo test (raiz)   exit 0
+python -m unittest discover -s tests -p "test_*.py"            Ran 432 tests, OK (skipped=6); os cinco testes novos são os dos
+                                                               argumentos de apresentação do módulo (tests/test_cinematic_cli.py)
+desktop/ cargo fmt --check, clippy -D warnings, cargo test     exit 0 (as duas partes: 37 suites, 304 testes, 0 falhas)
+node --check em todos os ficheiros de desktop/studio/ui/js     sem erros
+desktop/build.ps1 (compilação de lançamento completa)          exit 0, instalador final e57f0af483eb12315dcc99226bae21f4172d05416c3de6f0a58d00f15a84d765
+A campanha e a compilação de lançamento da raiz não foram repetidas (a raiz não mudou).
+
+Depois das últimas alterações (CSS, requirements.js, testes de percurso, módulo 0.2.3): python -m unittest com VV_GODOT: Ran 432 tests, OK (skipped=6);
+cargo fmt --check em desktop/: exit 0; node --check em requirements.js: sem erros. O contrato de ui_smoke.py foi atualizado e não foi executado.
+
+Segunda passagem (2026-11-15), mesmos comandos, VV_GODOT definido: cargo fmt --check, clippy -D warnings e cargo test na raiz e em desktop/ exit 0
+(37 suites, 304 testes); python -m unittest discover -s tests: Ran 434 tests, OK (skipped=6; inclui o teste Node de safetyWording e os testes novos dos
+argumentos de apresentação); node --check em todos os ficheiros de desktop/studio/ui/js sem erros; build.ps1 exit 0, instalador
+75eb323618c6f7992cfe5595a99178b23a1cd914936a5dc39114cbb279fdde2f; módulo 0.2.4 (62d7ace945d517434b1137230129f1abae689fdee8ad9a40af8be1c31bc443f0).
+
+Terceira passagem (2026-11-15), mesmos comandos, VV_GODOT definido: fmt, clippy -D warnings e cargo test na raiz e em desktop/ exit 0 (37 suites, 304 testes);
+python -m unittest discover -s tests: Ran 434 tests, OK (skipped=6); o teste Node de safetyWording corre também numa cópia em 'v&v lab';
+node --check sem erros; build.ps1 exit 0, instalador 29a4d131430be7440f8d90212f821c9920286486fcb0cd3220e9a8ab163a2c46; módulo 0.2.5 6a191c64c50b83ad280e294052771dfa1f1882eef6a7da29940f677d9b176050.
+
+Quarta passagem (2026-11-15), mesmos comandos, VV_GODOT definido: fmt, clippy -D warnings e cargo test na raiz e em desktop/ exit 0
+(37 suites, 306 testes: dois testes novos de evidence.rs); python -m unittest discover -s tests: Ran 439 tests, OK (skipped=6; inclui
+tests/test_honesty_wording.py, cinco testes, e o teste Node de 27 casos); node --check em todos os ficheiros de desktop/studio/ui/js sem erros
+(corrido à mão, fora do ficheiro de registo da verificação); build.ps1 exit 0, instalador b7f21c8395ced32ef49b59048168a9a992ced99bef3fab3172971fd92c5fc0d5;
+módulo 0.2.6 bed8aedfdffccd8a0e9eef777bbcbe19e486750f2b70f598a6808fce5721140f. A campanha e a compilação de lançamento da raiz não foram repetidas (a raiz não mudou).
+ui_smoke.py correu contra o executável de lançamento e contra o instalado da terceira passagem com o mesmo resultado (44 de 47, três falhas anteriores a esta passagem).
+
+Quinta passagem (2026-11-15), mesmos comandos, VV_GODOT definido: fmt, clippy -D warnings e cargo test na raiz e em desktop/ exit 0
+(37 suites, 306 testes); python -m unittest discover -s tests: Ran 441 tests, OK (skipped=6; inclui tests/test_honesty_wording.py, seis testes, e o teste
+Node de 27 casos); node --check em todos os ficheiros de desktop/studio/ui/js sem erros (corrido à mão); build.ps1 exit 0, instalador 9ccb649818882decb77636c0961bb0857bc1f2035605738dd2b9e8b7f2a7b3c2;
+módulo 0.2.7 4d0a0715a15fadba5eda364a6ab5a56c6da9aebff443cfc59538031d0b1d3afe. ui_smoke.py contra o instalado: 80/80.
+
+Sexta passagem (2026-11-15), mesmos comandos, VV_GODOT definido: fmt, clippy -D warnings e cargo test na raiz e em desktop/ exit 0
+(37 suites, 306 testes); python -m unittest discover -s tests: Ran 442 tests, OK (skipped=6; inclui tests/test_honesty_wording.py, quatro testes, e o teste
+Node de 31 casos); node --check em todos os ficheiros de desktop/studio/ui/js sem erros (corrido à mão); os 16 mutantes do revisor falham o teste de guarda
+(16 de 16, numa cópia de trabalho); build.ps1 exit 0, instalador 0e37bbcf7228b7170ab392966b0cdc79b2e7446280e801cc9912c16bb0ebd0e1; módulo 0.2.8 a8608a2da3da61567520a4e927dbd25c8f5a13b29a0eb37223d2d6d7f90c3df8. ui_smoke.py contra o instalado: 80/80.
+
+Fecho da sexta passagem (só testes e documentação, 2026-11-15): python -m unittest discover -s tests: Ran 443 tests, OK (skipped=6); node --test
+tests/ui_requirements.test.mjs: 31 casos; mutantes do teste de guarda em cópias de trabalho: 16 de 16 (conjunto anterior) e, no conjunto novo, apanhados
+A B C E F G H J K L M O P S U V W, por apanhar (documentados) D I N Q R, controlo T sem falha. Nenhum ficheiro Rust nem de produto mudou: fmt e clippy não foram repetidos.
+

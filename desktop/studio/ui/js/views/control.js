@@ -65,19 +65,19 @@ export function buildControl(pl, ctx) {
   const clock = h('span', { class: 'mc-clock mono' });
   const phase = h('span', { class: 'mc-phase' });
   const densitySeg = h('div', { class: 'seg mc-density', role: 'radiogroup', 'aria-label': 'Density' },
-    [['cinematic', 'Cinematic'], ['technical', 'Technical']].map(([d, text]) => h('button', { type: 'button', role: 'radio', class: 'seg-btn', 'aria-checked': String(d === density), dataset: { density: d }, onclick: () => setDensity(d) }, text)));
+    [['cinematic', 'Clean'], ['technical', 'Technical']].map(([d, text]) => h('button', { type: 'button', role: 'radio', class: 'seg-btn', 'aria-checked': String(d === density), dataset: { density: d }, onclick: () => setDensity(d) }, text)));
   const top = h('header', { class: 'mc-top' },
     h('div', { class: 'mc-id' },
       h('button', { type: 'button', class: 'mc-back', title: 'Back to the mission player', onclick: () => ctx.setView(pl.lastView && pl.lastView !== 'control' ? pl.lastView : 'engineering') }, h('span', { 'aria-hidden': 'true' }, '←'), ' Player'),
-      h('div', { class: 'mc-id-t' }, h('p', { class: 'mc-eyebrow' }, `Flight console · ${ctx.domainName}`), h('h1', { class: 'mc-title' }, pl.exp.title))),
+      h('div', { class: 'mc-id-t' }, h('p', { class: 'mc-eyebrow' }, `Flight console · ${ctx.domainName}`), h('h1', { class: 'mc-title' }, pl.exp.title), ctx.badges ? ctx.badges() : null)),
     h('div', { class: 'mc-time' }, h('span', { class: 'mc-eyebrow' }, pl.unit === 'tick' ? 'Mission tick' : 'Mission elapsed time'), clock, phase),
     h('div', { class: 'mc-tools' }, ctx.viewSwitch(), ctx.envSelect(), densitySeg));
   const left = h('aside', { class: 'mc-left', 'aria-label': 'Telemetry at the playback time' });
   const right = h('aside', { class: 'mc-right', 'aria-label': 'Mission status, events and investigation' });
   const strip = h('div', { class: 'mc-strip', role: 'group', 'aria-label': 'Key values' });
   const runs = pl.runs.length > 1 ? h('div', { class: 'mc-runs', role: 'radiogroup', 'aria-label': 'Run shown in the scene' },
-    pl.runs.map((r, i) => h('button', { type: 'button', role: 'radio', class: 'mc-run', 'aria-checked': String(i === pl.active), dataset: { run: String(i) }, onclick: () => ctx.setActive(i) },
-      h('span', { class: 'pl-swatch', style: { background: r.colour } }), r.label))) : null;
+    pl.runs.map((r, i) => h('button', { type: 'button', role: 'radio', class: 'mc-run', 'aria-checked': String(i === pl.active), dataset: { run: String(i) }, title: ctx.runName ? ctx.runName(r) : r.label, onclick: () => ctx.setActive(i) },
+      h('span', { class: 'pl-swatch', style: { background: r.colour } }), r.label, ctx.runId ? h('span', { class: 'mc-run-id mono small' }, ` · ${ctx.runId(r)}`) : null))) : null;
   evidenceIsOpen = ctx.evidenceOpen || (() => false);
   const tl = buildTimeline(pl, (ev) => select(ev));
 
@@ -181,7 +181,7 @@ export function buildControl(pl, ctx) {
     const out = [
       h('section', { class: 'mc-group', dataset: { group: 'requirements' } }, h('h2', { class: 'mc-h' }, 'Mission requirements'), h('ul', { class: 'mc-vlist' }, reqs.filter((q) => q.category !== 'invariant').map(verdictLine)),
         h('p', { class: 'mc-note' }, 'Judged at their decisive instant, usually contact; pending until then.')),
-      h('section', { class: 'mc-group', dataset: { group: 'invariants' } }, h('h2', { class: 'mc-h' }, 'Safety invariants'), h('ul', { class: 'mc-vlist' }, reqs.filter((q) => q.category === 'invariant').map(verdictLine)),
+      h('section', { class: 'mc-group', dataset: { group: 'invariants' } }, h('h2', { class: 'mc-h' }, 'Safety rules'), h('ul', { class: 'mc-vlist' }, reqs.filter((q) => q.category === 'invariant').map(verdictLine)),
         h('p', { class: 'mc-note' }, 'Judged on the true state throughout the run.')),
       h('section', { class: 'mc-group', dataset: { group: 'events' } }, h('h2', { class: 'mc-h' }, 'Events'),
         allEvents.length ? h('ol', { class: 'mc-evlist' }, allEvents.map((e) => {
@@ -261,7 +261,7 @@ export function buildControl(pl, ctx) {
 
   function buildLegend() {
     const tags = ['T', 'E', 'O', 'C', 'D', ...(ctx.geoActive() && pl.track ? ['G'] : [])];
-    legend.replaceChildren(...tags.map((k) => h('span', { title: TAG_WORD[k] }, h('abbr', { class: `kind kind-${k}` }, k), ` ${TAG_WORD[k].split(',')[0]}`)));
+    legend.replaceChildren(...tags.map((k) => h('span', { title: TAG_WORD[k] }, h('abbr', { class: `kind kind-${k}` }, k), ` ${TAG_WORD[k].split(',')[0]}`)), h('span', { class: 'mc-badge-note', title: 'The small number on a timeline mark counts the findings recorded at that instant.' }, h('abbr', { class: 'kind' }, '#'), ' number = findings at this instant'));
   }
 
   // Values change only from one recorded sample to the next: refresh them then, not every frame.
