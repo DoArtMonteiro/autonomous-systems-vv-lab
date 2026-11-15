@@ -47,8 +47,8 @@ python -m unittest discover -s tests: Ran 434 tests, OK (skipped=6); o teste Nod
 node --check sem erros; build.ps1 exit 0, instalador 29a4d131430be7440f8d90212f821c9920286486fcb0cd3220e9a8ab163a2c46; módulo 0.2.5 6a191c64c50b83ad280e294052771dfa1f1882eef6a7da29940f677d9b176050.
 
 Quarta passagem (2026-11-15), mesmos comandos, VV_GODOT definido: fmt, clippy -D warnings e cargo test na raiz e em desktop/ exit 0
-(37 suites, 306 testes: dois testes novos de evidence.rs); python -m unittest discover -s tests: Ran 438 tests, OK (skipped=6; inclui
-tests/test_honesty_wording.py, quatro testes, e o teste Node de 27 casos); node --check em todos os ficheiros de desktop/studio/ui/js sem erros
-(corrido à mão, fora do ficheiro de registo da verificação); build.ps1 exit 0, instalador d54b8e194eafe81349973fa86ebed0f0c42aeab8aeeb95a9693111ea2aa455c4;
+(37 suites, 306 testes: dois testes novos de evidence.rs); python -m unittest discover -s tests: Ran 439 tests, OK (skipped=6; inclui
+tests/test_honesty_wording.py, cinco testes, e o teste Node de 27 casos); node --check em todos os ficheiros de desktop/studio/ui/js sem erros
+(corrido à mão, fora do ficheiro de registo da verificação); build.ps1 exit 0, instalador b7f21c8395ced32ef49b59048168a9a992ced99bef3fab3172971fd92c5fc0d5;
 módulo 0.2.6 bed8aedfdffccd8a0e9eef777bbcbe19e486750f2b70f598a6808fce5721140f. A campanha e a compilação de lançamento da raiz não foram repetidas (a raiz não mudou).
 ui_smoke.py correu contra o executável de lançamento e contra o instalado da terceira passagem com o mesmo resultado (44 de 47, três falhas anteriores a esta passagem).

@@ -1,4 +1,5 @@
-d54b8e194eafe81349973fa86ebed0f0c42aeab8aeeb95a9693111ea2aa455c4  VV Lab Studio_0.18.1_x64-setup.exe
+b7f21c8395ced32ef49b59048168a9a992ced99bef3fab3172971fd92c5fc0d5  VV Lab Studio_0.18.1_x64-setup.exe
+d54b8e194eafe81349973fa86ebed0f0c42aeab8aeeb95a9693111ea2aa455c4  VV Lab Studio_0.18.1_x64-setup-ux-round-4c.exe
 9d4cb6c64102e461d72e6e37b9720c48b1979cc393e68f506858af7d590e1e08  VV Lab Studio_0.18.1_x64-setup-ux-round-4b.exe
 29a4d131430be7440f8d90212f821c9920286486fcb0cd3220e9a8ab163a2c46  VV Lab Studio_0.18.1_x64-setup-ux-round-4.exe
 b9927fb468e4fff870f7a6840fbab721f60357a96c24cbc292c54fb7cd696e7d  VV Lab Studio_0.18.1_x64-setup-ux-round-3b.exe

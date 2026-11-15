@@ -2,7 +2,7 @@
  "facts": {
   "ascent": {
    "driver_in_command_line": true,
-   "module_log_scene_line": "cinematic: scene built in 10002 ms (profile high: Auto: 12.9 GB of video memory (registry qwMemorySize); automatic choice stops at High)",
+   "module_log_scene_line": "cinematic: scene built in 10041 ms (profile high: Auto: 12.9 GB of video memory (registry qwMemorySize); automatic choice stops at High)",
    "seconds_click_to_first_frame": 12.1,
    "shot_bytes": 265465,
    "shot_line": "SHOT {\"adapter\":\"AMD Radeon RX 7700 XT\",\"buffer_mem_used_bytes\":91470730,\"camera\":\"director\",\"camera_dir_enu\":[0.0,0.844701051712036,-0.53523850440979],\"camera_eye_enu\":[0.0,-2339972.0,1482705.625],\"camera_fov\":40.0,\"draw_calls_in_frame\":337,\"driver\":\"d3d12\",\"file\":\"cinematic-ascent.png\",\"primitives_in_frame\":18632996,\"profile\":\"high\",\"profile_reason\":\"Auto: 12.9 GB of video memory (registry qwMem",
@@ -17,7 +17,7 @@
   },
   "landing": {
    "driver_in_command_line": true,
-   "module_log_scene_line": "cinematic: scene built in 11889 ms (profile high: Auto: 12.9 GB of video memory (registry qwMemorySize); automatic choice stops at High)",
+   "module_log_scene_line": "cinematic: scene built in 11857 ms (profile high: Auto: 12.9 GB of video memory (registry qwMemorySize); automatic choice stops at High)",
    "seconds_click_to_first_frame": 13.6,
    "shot_bytes": 690522,
    "shot_line": "SHOT {\"adapter\":\"AMD Radeon RX 7700 XT\",\"buffer_mem_used_bytes\":85651062,\"camera\":\"director\",\"camera_dir_enu\":[-0.586674630641937,0.796551644802094,-0.146008253097534],\"camera_eye_enu\":[91.7643051147461,-163.039031982422,659.981811523438],\"camera_fov\":29.8628349304199,\"draw_calls_in_frame\":159,\"driver\":\"d3d12\",\"file\":\"cinematic-landing.png\",\"primitives_in_frame\":6421131,\"profile\":\"high\",\"profile_r",
@@ -28,7 +28,7 @@
     "bd19998592dc1e7e",
     "d3c2d223f3a36e95"
    ],
-   "scene": null,
+   "scene": "rocket-3d",
    "view": "geospatial"
   }
  },
