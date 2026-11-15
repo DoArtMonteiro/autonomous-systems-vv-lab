@@ -1,15 +1,15 @@
 {
  "adapter": "AMD Radeon RX 7700 XT",
  "bench_seconds": 12.0,
- "buffer_mem_used_bytes": 87404670,
- "draw_calls_in_frame": 473,
+ "buffer_mem_used_bytes": 87407814,
+ "draw_calls_in_frame": 475,
  "driver": "d3d12",
- "frame_ms_max": 5.514,
- "frame_ms_p50": 1.899,
- "frame_ms_p95": 5.089,
- "frame_ms_p99": 5.405,
- "frames": 5192,
- "primitives_in_frame": 21726785,
+ "frame_ms_max": 5.452,
+ "frame_ms_p50": 1.904,
+ "frame_ms_p95": 5.094,
+ "frame_ms_p99": 5.357,
+ "frames": 5193,
+ "primitives_in_frame": 21727083,
  "profile": "balanced",
  "profile_reason": "Chosen on the command line",
  "replay_from_t": 0.0,
@@ -37,10 +37,10 @@
   "vegetation_shadows": false,
   "volumetric_fog": false
  },
- "static_memory_bytes": 227619375,
+ "static_memory_bytes": 227674097,
  "t": 23.3361272857644,
  "texture_mem_used_bytes": 1016541184,
- "video_mem_used_bytes": 1395994624,
+ "video_mem_used_bytes": 1401368576,
  "vram_capacity_bytes": 12868124672,
  "vram_capacity_source": "registry qwMemorySize",
  "vsync": "disabled",
@@ -61,15 +61,15 @@
   "trees": 4904
  },
  "harness": {
-  "command": "--rendering-driver d3d12 --path %USERPROFILE%\\AppData\\Local\\org.vvlab.studio\\modules\\cinematic\\0.2.4\\project --resolution 1440x900 -- --run <repo>\\tests\\fixtures\\cinematic\\landing-run --env %USERPROFILE%\\AppData\\Local\\VV Lab Studio\\environments\\cape-canaveral --profile balanced --camera director --bench <scratch folder> --bench-seconds 12.0",
-  "wall_s_to_first_frame": 11.328,
-  "engine_ms_to_first_frame": 10414,
-  "peak_working_set_bytes": 748941312,
-  "peak_private_bytes": 1962242048,
+  "command": "--rendering-driver d3d12 --path %USERPROFILE%\\AppData\\Local\\org.vvlab.studio\\modules\\cinematic\\0.2.5\\project --resolution 1440x900 -- --run <repo>\\tests\\fixtures\\cinematic\\landing-run --env %USERPROFILE%\\AppData\\Local\\VV Lab Studio\\environments\\cape-canaveral --profile balanced --camera director --bench <scratch folder> --bench-seconds 12.0",
+  "wall_s_to_first_frame": 11.357,
+  "engine_ms_to_first_frame": 10422,
+  "peak_working_set_bytes": 749772800,
+  "peak_private_bytes": 1962450944,
   "exit": 0,
   "log_tail": [
    "cinematic: pack cape-canaveral verified (6 files, SHA-256 against environment.json)",
-   "cinematic: scene built in 10040 ms (profile balanced: Chosen on the command line)"
+   "cinematic: scene built in 10048 ms (profile balanced: Chosen on the command line)"
   ]
  }
 }

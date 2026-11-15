@@ -1,4 +1,6 @@
-75eb323618c6f7992cfe5595a99178b23a1cd914936a5dc39114cbb279fdde2f  VV Lab Studio_0.18.1_x64-setup.exe
+29a4d131430be7440f8d90212f821c9920286486fcb0cd3220e9a8ab163a2c46  VV Lab Studio_0.18.1_x64-setup.exe
+b9927fb468e4fff870f7a6840fbab721f60357a96c24cbc292c54fb7cd696e7d  VV Lab Studio_0.18.1_x64-setup-ux-round-3b.exe
+75eb323618c6f7992cfe5595a99178b23a1cd914936a5dc39114cbb279fdde2f  VV Lab Studio_0.18.1_x64-setup-ux-round-3.exe
 c879688c3798461d4b7258f0a7beb1cfffa1ed73eb37ace5368584e635d33406  VV Lab Studio_0.18.1_x64-setup-ux-round-2.exe
 e57f0af483eb12315dcc99226bae21f4172d05416c3de6f0a58d00f15a84d765  VV Lab Studio_0.18.1_x64-setup-ux-round-1.exe
 0e07f7df4d1bf930913c9501195e3e19e39ed6b892805b8112b3b656551251ce  VV Lab Studio_0.18.1_x64-setup-ux-pass-3.exe
@@ -8,4 +10,4 @@ a3663b5f7332a873e1be7f70ad6208901230a4ba981dc80320d9ec11cb33d925  VV Lab Studio_
 b0c2cf4180219ec427e6157072d3291c2c71e6beda2a75d22b3f3d867a8597ee  VV Lab Studio_0.18.1_x64-setup-prebuild.exe
 ce9fa33a526518ea5438f7d2a30a9f6c71e5fbcca7cbd2fafef9251f9ddbc972  VV Lab Studio_0.17.0_x64-setup.exe
 8ad87eba2f7223186a4a265eea06da6a88fef21878c1fb74bc630d554471fb46  VV Lab Studio_0.18.0_x64-setup.exe
-62d7ace945d517434b1137230129f1abae689fdee8ad9a40af8be1c31bc443f0  vv-cinematic-0.2.4.zip
+6a191c64c50b83ad280e294052771dfa1f1882eef6a7da29940f677d9b176050  vv-cinematic-0.2.5.zip
