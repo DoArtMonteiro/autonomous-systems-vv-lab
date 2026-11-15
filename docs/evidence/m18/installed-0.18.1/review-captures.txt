@@ -2,7 +2,7 @@ scratch library: <temporary folder>
 PASS The 60 m/s run at its end: the chip names the failing requirement  [Not met: Vertical speed at contact 60.08 m/s (limit <= 3 m/s), and 1 more not met; impact not modelled]
 PASS Cinematic 60ms-run: the Studio started the module
 PASS Cinematic 60ms-run: the arguments carry the player's label, conditions and exploratory flag  [{"--run-label": "Engine thrust 0.7 \u00d7", "--conditions": "Engine thrust 0.7 \u00d7", "--vehicle": "41 t heavy return stage", "--seed": "5000"} --exploratory]
-PASS Cinematic 60ms-run: the module's own --shot drew the panel of this run  [912037 bytes, exit 0]
+PASS Cinematic 60ms-run: the module's own --shot drew the panel of this run  [921975 bytes, exit 0]
 PASS end-state-60ms-run 1440x900: pills, caption and camera buttons do not overlap one another or the readout card (nor the 2D plot with its axis labels)  [{"clash": [], "seen": 4, "per": {".pl-cams x .pl-hud": 1, ".pl-cams x .pl-runs": 1, ".pl-scene-note x .pl-cams": 1, ".pl-scene-note x .pl-runs": 1}, "unseen": []}]
 PASS end-state-60ms-run 1440x900: no run pill is clipped  [{"n": 2, "bad": []}]
 PASS end-state-60ms-run 1440x900: the player does not scroll sideways and its header, transport and readout are inside the window  [{"over": 0, "out": []}]
@@ -14,7 +14,7 @@ PASS end-state-60ms-run 1024x640: the scene or plot is at least 200 px tall  [[4
 PASS end-state-60ms-run 820x900: pills, caption and camera buttons do not overlap one another or the readout card (nor the 2D plot with its axis labels)  [{"clash": [], "seen": 4, "per": {".pl-cams x .pl-hud": 1, ".pl-cams x .pl-runs": 1, ".pl-scene-note x .pl-cams": 1, ".pl-scene-note x .pl-runs": 1}, "unseen": []}]
 PASS end-state-60ms-run 820x900: no run pill is clipped  [{"n": 2, "bad": []}]
 PASS end-state-60ms-run 820x900: the player does not scroll sideways and its header, transport and readout are inside the window  [{"over": 0, "out": []}]
-PASS end-state-60ms-run 820x900: the scene or plot is at least 200 px tall  [[520]]
+PASS end-state-60ms-run 820x900: the scene or plot is at least 200 px tall  [[560]]
 PASS Corridor: the run with a broken safety rule has the warning pill  [1]
 PASS Corridor: a violation marker is on the timeline  [["tick 21: Invariant violated: Truth stays outside the restricted zone"]]
 PASS Corridor: a violation marker has a shape (safety rule or requirement) and the colour of its run  [[["rule", "rgb(230, 159, 0)"]]]
@@ -26,15 +26,19 @@ PASS corridor-broken-rule-run 1440x900: the scene or plot is at least 200 px tal
 PASS corridor-broken-rule-run 1024x640: pills, caption and camera buttons do not overlap one another or the readout card (nor the 2D plot with its axis labels)  [{"clash": [], "seen": 2, "per": {".pl-cams x .pl-hud": 0, ".pl-cams x .pl-runs": 0, ".pl-scene-note x .pl-runs": 1, ".pl-viewport.is-2d x .pl-runs": 1}, "unseen": [".pl-cams x .pl-hud", ".pl-cams x .pl-runs"]}]
 PASS corridor-broken-rule-run 1024x640: no run pill is clipped  [{"n": 3, "bad": []}]
 PASS corridor-broken-rule-run 1024x640: the player does not scroll sideways and its header, transport and readout are inside the window  [{"over": 0, "out": []}]
-PASS corridor-broken-rule-run 1024x640: the scene or plot is at least 200 px tall  [[228, 228]]
+PASS corridor-broken-rule-run 1024x640: the scene or plot is at least 200 px tall  [[210, 210]]
 PASS corridor-broken-rule-run 820x900: pills, caption and camera buttons do not overlap one another or the readout card (nor the 2D plot with its axis labels)  [{"clash": [], "seen": 2, "per": {".pl-cams x .pl-hud": 0, ".pl-cams x .pl-runs": 0, ".pl-scene-note x .pl-runs": 1, ".pl-viewport.is-2d x .pl-runs": 1}, "unseen": [".pl-cams x .pl-hud", ".pl-cams x .pl-runs"]}]
 PASS corridor-broken-rule-run 820x900: no run pill is clipped  [{"n": 3, "bad": []}]
 PASS corridor-broken-rule-run 820x900: the player does not scroll sideways and its header, transport and readout are inside the window  [{"over": 0, "out": []}]
-PASS corridor-broken-rule-run 820x900: the scene or plot is at least 200 px tall  [[207, 207]]
+PASS corridor-broken-rule-run 820x900: the scene or plot is at least 200 px tall  [[247, 247]]
+PASS Threshold mission 1024x640: every run pill keeps its conditions and an 8-hex id  [[{"id": true, "cond": true, "text": "Threshold 3 m (default) \u00b7 GNSS bias 9.72 m [0.02, 40] s \u00b7 7efed40d \u00b7 1 of 6 requirements f"}, {"id": true, "cond": true, "text": "Threshold 1 m (mitigation)\u00b7 Altimeter rejection threshold 1 m \u00b7 GNSS bias 9.72 m [0.02, 40"}]]
 PASS Threshold landing: the end chip names the failed requirement and the broken safety rule  [Not met: Vertical speed at contact 24.23 m/s (limit <= 3 m/s); safety rule broken: Climb under power; impact not modelled]
 PASS Cinematic broken-rule-landing: the Studio started the module
 PASS Cinematic broken-rule-landing: the arguments carry the player's label, conditions and exploratory flag  [{"--run-label": "Threshold 3 m (default)", "--conditions": "GNSS bias 9.72 m [0.02, 40] s", "--vehicle": "22 t landing stage", "--seed": "5017"}]
-PASS Cinematic broken-rule-landing: the module's own --shot drew the panel of this run  [888347 bytes, exit 0]
+PASS Cinematic broken-rule-landing: the module's own --shot drew the panel of this run  [901692 bytes, exit 0]
+PASS Cinematic ascent-launch: the Studio started the module
+PASS Cinematic ascent-launch: the arguments carry the player's label, conditions and exploratory flag  [{"--run-label": "Small launcher, nominal", "--conditions": "default conditions", "--vehicle": "Small launcher", "--seed": "5000"} --exploratory]
+PASS Cinematic ascent-launch: the module's own --shot drew the panel of this run  [369503 bytes, exit 0]
 PASS No page error or console error
 
-37/37 checks passed
+41/41 checks passed

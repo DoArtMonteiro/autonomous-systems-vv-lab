@@ -1,4 +1,5 @@
-9ccb649818882decb77636c0961bb0857bc1f2035605738dd2b9e8b7f2a7b3c2  VV Lab Studio_0.18.1_x64-setup.exe
+0e37bbcf7228b7170ab392966b0cdc79b2e7446280e801cc9912c16bb0ebd0e1  VV Lab Studio_0.18.1_x64-setup.exe
+9ccb649818882decb77636c0961bb0857bc1f2035605738dd2b9e8b7f2a7b3c2  VV Lab Studio_0.18.1_x64-setup-ux-round-6.exe
 bda261a4727a06575c5e8dce5d6510444856bcb27ae99ebd68ce11f3cbdad1ba  VV Lab Studio_0.18.1_x64-setup-ux-round-5c.exe
 e928851928a58556a56e7e803b41ba72f795e0c190526b010f4d6e64b25dcf80  VV Lab Studio_0.18.1_x64-setup-ux-round-5b.exe
 b7f21c8395ced32ef49b59048168a9a992ced99bef3fab3172971fd92c5fc0d5  VV Lab Studio_0.18.1_x64-setup-ux-round-5.exe
@@ -19,3 +20,4 @@ ce9fa33a526518ea5438f7d2a30a9f6c71e5fbcca7cbd2fafef9251f9ddbc972  VV Lab Studio_
 6a191c64c50b83ad280e294052771dfa1f1882eef6a7da29940f677d9b176050  vv-cinematic-0.2.5.zip
 bed8aedfdffccd8a0e9eef777bbcbe19e486750f2b70f598a6808fce5721140f  vv-cinematic-0.2.6.zip
 4d0a0715a15fadba5eda364a6ab5a56c6da9aebff443cfc59538031d0b1d3afe  vv-cinematic-0.2.7.zip
+a8608a2da3da61567520a4e927dbd25c8f5a13b29a0eb37223d2d6d7f90c3df8  vv-cinematic-0.2.8.zip

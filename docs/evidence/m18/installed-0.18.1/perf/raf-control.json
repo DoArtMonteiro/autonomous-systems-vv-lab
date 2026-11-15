@@ -2,13 +2,13 @@
  "studio_home_idle": {
   "frames": 221,
   "p50_ms": 18.1,
-  "p99_ms": 19.1,
-  "mean_ms": 18.16
+  "p99_ms": 19,
+  "mean_ms": 18.17
  },
  "blank_page_in_the_same_window": {
   "frames": 222,
   "p50_ms": 18,
-  "p99_ms": 19.2,
-  "mean_ms": 18.13
+  "p99_ms": 19.1,
+  "mean_ms": 18.1
  }
 }

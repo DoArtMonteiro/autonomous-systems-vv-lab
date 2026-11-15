@@ -30,7 +30,7 @@ PASS J3 rocket nominal: safety safe
 PASS J3 rocket nominal: 3D scene present
 PASS J3 rocket nominal: top and profile views drawn
 PASS J3 rocket nominal: events on the timeline
-  playback frame interval over 2.5 s: n=141 p50=17.5 ms p95=18.3 ms
+  playback frame interval over 2.5 s: n=139 p50=17.9 ms p95=18.4 ms
 PASS playback advances the cursor and keeps a median frame interval under 20 ms
 PASS signal picker narrows the charts to one signal
 PASS the chart shows the selected estimation error
