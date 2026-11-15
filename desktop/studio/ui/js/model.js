@@ -149,7 +149,7 @@ export function conditionsShared(requests, catalog) {
   if (seeds.size > 1) differ.push('seed');
   const n = requests.length;
   const who = n === 2 ? 'Both runs' : `All ${n} runs`;
-  const text = `${who}: ${shared.length ? shared.join(' · ') : 'default conditions'}; ${differ.length ? `they differ only in ${byParam(differ).join(', ')}` : 'nothing in their conditions differs'}`;
+  const text = `${who}: ${shared.length ? shared.join(' · ') : 'no non-default condition in common'}; ${differ.length ? `they differ only in ${byParam(differ).join(', ')}` : 'nothing in their conditions differs'}`;
   return { shared, differ, text };
 }
 

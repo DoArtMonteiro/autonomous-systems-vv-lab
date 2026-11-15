@@ -373,6 +373,20 @@ def identity_checks(s):
         bad = s.js(BARE_SAFE_JS)
         check("Identity: Compare has no visible text that is a bare safe or Safe verdict", not bad, json.dumps(bad))
         s.shot("ux4-compare-identity-dark")
+        # Two runs: GPS noise 1 mm, and the same with a 250 mm arrival radius. The line says exactly that.
+        pair = [i for i, n in names.items() if n in ("GPS noise 1 mm", "Arrival radius 250 mm · GPS noise 1 mm")]
+        if len(pair) == 2:
+            s.nav("library")
+            s.wait("document.querySelectorAll('tbody tr[data-run]').length >= 3", 30, "runs")
+            s.js("document.querySelectorAll('tbody tr[data-run] input[type=checkbox]:checked').forEach((c) => c.click())")
+            for rid2 in pair:
+                s.page.check(f"tbody tr[data-run='{rid2}'] input[type=checkbox]")
+            s.page.click("#lib-compare")
+            s.wait("window.__studio.view() === 'compare' && document.querySelector('.matrix')", 30, "compare")
+            time.sleep(1.5)
+            shared2 = s.js("(document.querySelector('.cmp-shared') || {}).textContent")
+            check("Compare (two runs): the line reads Both runs: GPS noise 1 mm; they differ only in Arrival radius", shared2 == "Both runs: GPS noise 1 mm; they differ only in Arrival radius.", str(shared2))
+            s.shot("ux4-compare-two-runs-dark")
         # Analyse of the first of them, then the player: the same name for the same id.
         rid = keys[0]["id"]
         s.nav("library")

@@ -192,7 +192,7 @@ async function openPalette() {
   try {
     const runs = await api.listRuns();
     for (const m of runs.slice(0, 300)) {
-      items.push({ group: 'run', title: m.label || `${m.summary.scenario} · ${m.summary.controller} · seed ${m.summary.seed}`, hint: `${m.run_id} · ${m.summary.faults.length ? m.summary.faults.join(' + ') : 'no fault'} · ${m.summary.outcome_label}, ${m.summary.safety_status === 'safe' ? 'no safety rule broken' : 'a safety rule broken'}`, run: () => navigate('run', { runId: m.run_id, meta: m }) });
+      items.push({ group: 'run', title: m.label || `${m.summary.scenario} · ${m.summary.controller} · seed ${m.summary.seed}`, hint: `${m.run_id} · ${m.summary.faults.length ? `${m.summary.faults.join(' + ')} · ` : ''}${m.summary.outcome_label}, ${m.summary.safety_status === 'safe' ? 'no safety rule broken' : 'a safety rule broken'}`, run: () => navigate('run', { runId: m.run_id, meta: m }) });
     }
     for (const s of await api.listScenarios()) items.push({ group: 'scenario', title: s.name, hint: `${s.requests.length} requests`, run: () => openSaved(s) });
   } catch (e) {

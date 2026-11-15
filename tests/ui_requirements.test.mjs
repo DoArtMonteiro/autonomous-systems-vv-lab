@@ -199,7 +199,9 @@ test('conditionsShared says what both runs share and what they differ in', () =>
   const s = conditionsShared([request({ gps_noise_mm: 1 }), request({ gps_noise_mm: 1, arrival_radius_mm: 250 })], CATALOG);
   assert.equal(s.text, 'Both runs: GPS noise 1 mm; they differ only in Arrival radius');
   const t = conditionsShared([request({ gps_noise_mm: 1 }), request({ gps_noise_mm: 2 })], CATALOG);
-  assert.equal(t.text, 'Both runs: default conditions; they differ only in GPS noise');
+  assert.equal(t.text, 'Both runs: no non-default condition in common; they differ only in GPS noise');
+  const u = conditionsShared([request({}), request({ gps_noise_mm: 1 }), request({ gps_noise_mm: 1, arrival_radius_mm: 250 })], CATALOG);
+  assert.equal(u.text, 'All 3 runs: no non-default condition in common; they differ only in GPS noise, Arrival radius');
 });
 
 test('displayRunLabel keeps a stored label and names an Experiment run by its parameters', () => {

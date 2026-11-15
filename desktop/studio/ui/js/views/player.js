@@ -424,6 +424,13 @@ function build() {
       h('span', { class: 'pl-swatch', style: { background: r.colour } }), r.label, h('span', { class: 'pl-run-v small', dataset: { v: String(i) } })))) : null;
   const note = sceneNote();
   stage.append(...[viewport, phaseTag, hud, runBar, cameraButtons(), note].filter(Boolean));
+  // A flat (2D) scene stops above the run pills, whatever number of lines they take, so the pills never
+  // cover its axis labels; the pills grow when the verdicts are added, so the gap follows their size.
+  if (runBar && !rocket) {
+    const clear2d = () => { viewport.style.bottom = `${Math.ceil(parseFloat(getComputedStyle(runBar).bottom) + runBar.offsetHeight + 8)}px`; };
+    clear2d();
+    if (typeof ResizeObserver === 'function') new ResizeObserver(clear2d).observe(runBar);
+  }
 
   // With two runs held, the person chooses which one the Cinematic View opens; it starts on the shown run.
   const cinRunSel = runs.length > 1 ? h('select', { class: 'select select-sm pl-cin-run', id: 'pl-cin-run', 'aria-label': 'Run to open in the Cinematic View', title: 'Which of the held runs the Cinematic View opens', dataset: { action: 'cinematic-run' } },
@@ -774,18 +781,21 @@ function runResult(run) {
   const rec = run.record;
   const reqs = rec.requirements || [];
   const failed = reqs.filter((q) => q.status === 'fail');
-  const missionReqs = reqs.filter((q) => q.category !== 'invariant');
+  const missionReqs = reqs.filter((q) => q.category === 'requirement');
   const metFail = missionReqs.filter((q) => q.status === 'fail');
   const metrics = pl.kind === 'rocket-3d' ? ROCKET_METRICS.map((id) => rec.metrics.find((m) => m.id === id)).filter(Boolean) : [];
   const missionText = requirementWording(rec) || 'no mission requirement listed';
-  const safetyText = safetyWording(rec).text;
+  const sw = safetyWording(rec);
+  const safetyText = sw.text;
+  // The chip's colour comes from the same reading as its words: a broken rule is never drawn green, an unjudged run is never drawn as a pass.
+  const safetyTone = sw.verdict === 'unsafe' ? 'unsafe' : sw.verdict === 'neutral' ? 'neutral' : 'pass';
   return h('div', { class: 'pl-run-result', dataset: { outcome: rec.outcome.code, safety: rec.safety.status } },
     h('p', { class: 'pl-run-name' }, h('span', { class: 'pl-swatch', style: { background: run.colour } }), run.label),
     h('p', { class: 'pl-run-cond small dim', dataset: { run: run.runId, conditions: conditionsName(rec.request, (domainById(rec.request.domain) || {}).catalog) } }, `Conditions: ${conditionsName(rec.request, (domainById(rec.request.domain) || {}).catalog)}`),
     h('p', { class: 'pl-run-head' }, rec.outcome.label),
     h('div', { class: 'pl-verdicts' },
       verdictChip(missionText, metFail.length ? 'fail' : /not evaluated/.test(missionText) ? 'neutral' : 'pass', 'Mission'),
-      verdictChip(safetyText, rec.safety.status, 'Safety rules', SAFETY_NOTE)),
+      verdictChip(safetyText, safetyTone, 'Safety rules', SAFETY_NOTE)),
     metrics.length ? h('dl', { class: 'pl-metrics' }, metrics.map((m) => h('div', null, h('dt', null, m.label), h('dd', { class: 'mono' }, m.value === null ? '—' : `${hudNum(m.value)} ${m.unit}`)))) : null,
     failed.length ? h('ul', { class: 'pl-failed' }, failed.map((q) => h('li', null,
       h('button', { type: 'button', class: 'link', title: 'Move the playback to the decisive instant', onclick: () => { if (Number.isFinite(q.t)) { pl.cursor.pause(); pl.cursor.set(q.t); } } }, q.label),
