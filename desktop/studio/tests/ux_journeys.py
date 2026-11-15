@@ -238,7 +238,7 @@ def player_and_cinematic(s, ids, shots):
     small_text(s, "the player")
     # Cinematic View: choose the run, check what the module was given.
     chooser = s.js("(() => { const c = document.querySelector('.pl-cin-run'); return c ? [...c.options].map((o) => o.textContent.trim()) : null; })()")
-    check("Cinematic: with two runs held the person chooses which one opens", bool(chooser) and len(chooser) == 2 and chooser[0] == "Baseline", json.dumps(chooser))
+    check("Cinematic: with two runs held the person chooses which one opens", bool(chooser) and len(chooser) == 2 and chooser[0].startswith("Baseline"), json.dumps(chooser))
     return chooser
 
 

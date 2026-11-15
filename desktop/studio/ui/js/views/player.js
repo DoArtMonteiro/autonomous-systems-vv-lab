@@ -298,27 +298,67 @@ function phaseAt(t) {
   const end = t >= run.model.t1 - 1e-9;
   const td = run.record.scene && run.record.scene.touchdown;
   const met = run.record.outcome.status === 'success';
-  if (end) {
-    // A failed contact names the requirement that failed, with its recorded value and limit (the
-    // first contact speed on its own can pass), and says the impact itself is not drawn.
-    const bad = td && !met ? failedContactText(run.record) : null;
-    return { text: td ? (met ? 'Touchdown' : bad) : 'End of run', kind: met ? 'end' : 'end-bad', end: true };
-  }
+  if (end) return endState(run, td, met);
   return { text: ph ? ph.label : '', kind: ph ? ph.kind : '', end: false };
+}
+
+/** The labels of the safety rules the record says were broken (its own rows, never the ids). */
+function brokenRules(record) {
+  return (record.requirements || []).filter((q) => q.category === 'invariant' && q.status === 'fail').map((q) => q.label || q.id);
+}
+
+/**
+ * The chip at the end of the run. A landing names the failed requirement with its value and limit
+ * and, when a safety rule was broken, that rule too, then says the impact is not drawn ("Not met:
+ * Vertical speed at contact 24.23 m/s (limit <= 3 m/s); safety rule broken: Climb under power; impact
+ * not modelled"). A scene without a ground contact says how the run ended, the requirements that were
+ * not met and the rules that were broken, never only "End of run".
+ */
+function endState(run, td, met) {
+  const rec = run.record;
+  const rules = brokenRules(rec);
+  const ruleText = rules.length ? `safety rule${rules.length > 1 ? 's' : ''} broken: ${rules.join(', ')}` : '';
+  const bad = !met || rules.length > 0;
+  if (td) {
+    const parts = [met ? 'Touchdown' : failedContactText(rec)];
+    if (ruleText) parts.push(ruleText);
+    if (bad) parts.push('impact not modelled');
+    return { text: parts.join('; '), kind: bad ? 'end-bad' : 'end', end: true };
+  }
+  const failed = (rec.requirements || []).filter((q) => q.category === 'requirement' && q.status === 'fail').map((q) => q.label || q.id);
+  const parts = [`End of run: ${rec.outcome.label}`];
+  if (failed.length) parts.push(`requirement${failed.length > 1 ? 's' : ''} not met: ${failed.join(', ')}`);
+  if (ruleText) parts.push(ruleText);
+  return { text: parts.join('; '), kind: bad ? 'end-bad' : 'end', end: true };
 }
 
 /** "Not met: <requirement> <value> (limit <limit>)": the failed mission requirement that is furthest past its limit. */
 function failedContactText(record) {
   indexNumbers(record);
-  const failed = (record.requirements || []).filter((q) => q.status === 'fail' && q.category !== 'invariant');
-  if (!failed.length) return 'Reached the ground; impact not modelled';
+  const failed = (record.requirements || []).filter((q) => q.status === 'fail' && q.category === 'requirement');
+  if (!failed.length) return 'Reached the ground';
   const views = failed.map((q) => ({ q, v: reqView(q) }));
   const past = (x) => (x.v.numeric && Number.isFinite(x.v.margin) ? -x.v.margin / Math.max(Math.abs(x.v.limit), 1e-9) : 0);
   views.sort((x, y) => past(y) - past(x));
   const top = views[0];
   const more = views.length > 1 ? `, and ${views.length - 1} more not met` : '';
-  return `Not met: ${top.q.label} ${top.v.obsText} (limit ${top.v.limitText})${more}; impact not modelled`;
+  return `Not met: ${top.q.label} ${top.v.obsText} (limit ${top.v.limitText})${more}`;
 }
+
+/** The run's non-default parameters and faults, in the Studio's words (the one naming function). */
+function runConditions(run) {
+  const rec = run.record;
+  const d = domainById(rec.request.domain);
+  return conditionsName(rec.request, d && d.catalog);
+}
+
+/** The curated mission label with the conditions after it ("Threshold 3 m (default threshold) · GNSS bias 9.72 m"); not repeated when the label already says them. */
+function runFullName(run) {
+  const c = runConditions(run);
+  return run.label.toLowerCase().includes(c.toLowerCase()) ? run.label : `${run.label} · ${c}`;
+}
+
+const shortId = (run) => String(run.runId).slice(0, 8);
 
 /**
  * What the Cinematic View shows about the run it opens: the player's label for the run, the vehicle
@@ -331,7 +371,7 @@ function cinematicInfo(run) {
   const sc = d && d.catalog ? d.catalog.scenarios.find((s) => s.id === rec.request.scenario) : null;
   const v = sc && d.catalog.vehicles ? d.catalog.vehicles.find((x) => x.id === sc.vehicle) : null;
   const exploratory = (v ? v.evidence !== 'reference' : true) || (rec.notes || []).some((n) => n.startsWith('Exploratory case'));
-  return { runLabel: run.label, vehicle: v ? v.label.replace(/\s*\(exploratory\)/i, '') : null, exploratory, seed: rec.request.seed };
+  return { runLabel: run.label, vehicle: v ? v.label.replace(/\s*\(exploratory\)/i, '') : null, exploratory, seed: rec.request.seed, conditions: runConditions(run) };
 }
 
 /** Reference case or exploratory, from the catalog and the record, for each distinct level among the held runs. */
@@ -366,6 +406,7 @@ function sceneNote() {
         : 'True paths and GPS samples, one sample per tick. Top view, x east, y north.'));
     if (pl.geoError) note.append(h('p', { class: 'pl-geo-warn' }, `Geospatial view unavailable: ${pl.geoError} The engineering scene is shown instead.`));
   }
+  note.title = note.textContent; // the whole text, when a short window shows one line of it
   return note;
 }
 
@@ -400,6 +441,7 @@ function build() {
     const ctx = {
       domainName: DOMAIN_NAMES[exp.domain] || exp.domain,
       setView, setActive, navigate, viewSwitch, envSelect, sceneNote, phaseAt, analysisToggle, evidenceOpen,
+      runName: (r) => `${runFullName(r)} · ${shortId(r)}`, runId: shortId,
       badges: () => h('div', { class: 'pl-badges mc-badges' }, h('span', { class: `grade grade-${grade.tone}`, title: grade.text }, grade.label), caseChips()),
       geoActive: () => wantGeo(),
       geo: () => (wantGeo() && pl.track ? { track: pl.track } : null),
@@ -418,23 +460,32 @@ function build() {
   const stage = h('div', { class: 'pl-stage', id: 'pl-stage' });
   const viewport = h('div', { class: ['pl-viewport', rocket ? 'is-3d' : 'is-2d'], id: 'pl-viewport' });
   const hud = h('div', { class: 'pl-hud', role: 'group', 'aria-label': 'Readouts at the playback time' });
-  const phaseTag = h('div', { class: 'pl-phase', 'aria-hidden': 'true' });
+  const phaseTag = h('div', { class: ['pl-phase', rocket ? '' : 'is-2d'], 'aria-hidden': 'true' });
   const runBar = runs.length > 1 ? h('div', { class: 'pl-runs', role: 'radiogroup', 'aria-label': 'Run shown in the scene' },
     runs.map((r, i) => h('button', { type: 'button', role: 'radio', class: 'pl-run', 'aria-checked': String(i === pl.active), dataset: { run: String(i) }, onclick: () => setActive(i) },
-      h('span', { class: 'pl-swatch', style: { background: r.colour } }), r.label, h('span', { class: 'pl-run-v small', dataset: { v: String(i) } })))) : null;
+      h('span', { class: 'pl-swatch', style: { background: r.colour } }),
+      h('span', { class: 'pl-run-t' },
+        h('span', { class: 'pl-run-l' }, r.label),
+        runFullName(r) !== r.label ? h('span', { class: 'pl-run-c small' }, ` · ${runConditions(r)}`) : null,
+        h('span', { class: 'pl-run-id mono small', title: `Run ${r.runId}` }, ` · ${shortId(r)}`),
+        h('span', { class: 'pl-run-v small', dataset: { v: String(i) } }))))) : null;
   const note = sceneNote();
   stage.append(...[viewport, phaseTag, hud, runBar, cameraButtons(), note].filter(Boolean));
-  // A flat (2D) scene stops above the run pills, whatever number of lines they take, so the pills never
-  // cover its axis labels; the pills grow when the verdicts are added, so the gap follows their size.
-  if (runBar && !rocket) {
-    const clear2d = () => { viewport.style.bottom = `${Math.ceil(parseFloat(getComputedStyle(runBar).bottom) + runBar.offsetHeight + 8)}px`; };
-    clear2d();
-    if (typeof ResizeObserver === 'function') new ResizeObserver(clear2d).observe(runBar);
+  // A flat (2D) scene stops above the run pills, whatever number of lines they take, and below the clock and the end chip
+  // (which can take two lines), so neither covers its axis labels or its path; both grow when their text changes, so the
+  // gaps follow their size.
+  if (!rocket) {
+    const fit2d = () => {
+      if (runBar) viewport.style.bottom = `${Math.ceil(parseFloat(getComputedStyle(runBar).bottom) + runBar.offsetHeight + 8)}px`;
+      viewport.style.top = `${Math.max(48, Math.ceil(phaseTag.offsetTop + phaseTag.offsetHeight + 6))}px`;
+    };
+    fit2d();
+    if (typeof ResizeObserver === 'function') { const ro = new ResizeObserver(fit2d); if (runBar) ro.observe(runBar); ro.observe(phaseTag); }
   }
 
   // With two runs held, the person chooses which one the Cinematic View opens; it starts on the shown run.
   const cinRunSel = runs.length > 1 ? h('select', { class: 'select select-sm pl-cin-run', id: 'pl-cin-run', 'aria-label': 'Run to open in the Cinematic View', title: 'Which of the held runs the Cinematic View opens', dataset: { action: 'cinematic-run' } },
-    runs.map((r, i) => h('option', { value: String(i), selected: i === pl.active }, r.label))) : null;
+    runs.map((r, i) => h('option', { value: String(i), selected: i === pl.active }, `${runFullName(r)} · ${shortId(r)}`))) : null;
   const cinRun = cinRunSel;
   const cinRunBox = cinRunSel ? h('label', { class: 'pl-cin-run-box', for: 'pl-cin-run' }, h('span', { class: 'dim small' }, 'Run:'), cinRunSel) : null;
   const cinIndex = () => (cinRun ? Number(cinRun.value) : pl.active);
@@ -613,7 +664,8 @@ function buildTransport() {
       pl.kind === 'rocket-3d' ? h('span', null, h('i', { class: 'lg-powered' }), 'engine on') : null,
       h('span', null, h('i', { class: 'lg-onset' }), 'injected fault starts'),
       h('span', null, h('i', { class: 'lg-detect' }), 'controller detection'),
-      h('span', null, h('i', { class: 'lg-violation' }), 'requirement or rule violated'),
+      h('span', null, h('i', { class: 'lg-violation' }), 'safety rule broken (square)'),
+      h('span', null, h('i', { class: 'lg-violation lg-req' }), 'requirement failed (circle); colour = run'),
       pl.runs.length > 1 ? h('span', null, h('i', { class: 'lg-diverge' }), 'runs part') : null));
 }
 
@@ -631,10 +683,13 @@ function drawBand() {
   // playback reaches them, or analysis mode is on, or the result is shown: they are kept here as
   // data and created by gateMarks when allowed, so neither the page nor assistive technology holds
   // an outcome the viewer has not reached.
-  const button = (m) => h('button', { type: 'button', class: `pl-mark ${m.cls}`, style: { left: pos(m.t) }, 'aria-label': m.label, title: m.label, dataset: m.gated ? { t: String(m.t), gated: '1' } : {}, onclick: () => { c.pause(); c.set(m.t); } });
+  const button = (m) => h('button', { type: 'button', class: `pl-mark ${m.cls}`, style: { left: pos(m.t), ...(m.colour ? { background: m.colour } : {}) }, 'aria-label': m.label, title: m.label, dataset: m.gated ? { t: String(m.t), gated: '1' } : {}, onclick: () => { c.pause(); c.set(m.t); } });
   pl.gated = [];
-  const mark = (cls, t, label, gated) => {
-    const m = { cls, t, label, gated: !!gated, el: null, button };
+  // A violation marker takes the colour of its run; its shape says what broke: a square for a safety
+  // rule (invariant), a circle for a requirement.
+  const violationClass = (e, base) => (e.severity !== 'violation' ? base : `${base} ${e.kind === 'invariant_violation' ? 'is-rule' : 'is-req'}`);
+  const mark = (cls, t, label, gated, colour) => {
+    const m = { cls, t, label, gated: !!gated, el: null, button, colour: colour || null };
     if (gated) pl.gated.push(m);
     else marks.append(button(m));
   };
@@ -644,7 +699,7 @@ function drawBand() {
     const key = `${e.severity}@${e.t}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    mark(`sev-${e.severity}`, e.t, `${timeText(e.t, pl.unit)}: ${prose(e.label)}`, true);
+    mark(violationClass(e, `sev-${e.severity}`), e.t, `${timeText(e.t, pl.unit)}: ${prose(e.label)}`, true, e.severity === 'violation' ? run.colour : null);
   }
   // A broken safety rule is drawn for every run, not only the shown one, so a run that is not on screen
   // still shows where its rule broke; its marker names the run.
@@ -655,7 +710,7 @@ function drawBand() {
       const key = `${i}:violation@${e.t}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      mark('sev-violation', e.t, `${other.label}, ${timeText(e.t, pl.unit)}: ${prose(e.label)}`, true);
+      mark(violationClass(e, 'sev-violation'), e.t, `${other.label}, ${timeText(e.t, pl.unit)}: ${prose(e.label)}`, true, other.colour);
     }
   });
   for (const f of run.record.request.faults || []) mark('sev-onset', f.start, `${timeText(f.start, pl.unit)}: injected fault ${f.kind} starts`);

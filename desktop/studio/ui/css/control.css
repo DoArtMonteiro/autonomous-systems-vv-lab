@@ -371,3 +371,4 @@
 .mc-run[aria-checked="true"] { background: var(--glass-strong); color: var(--fg-1); font-weight: 600; border-color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
 .mc-bottom .mc-legend { padding-right: 176px; }
 .mc .mc-badges .hg-ev { background: var(--glass-strong); backdrop-filter: blur(var(--glass-blur)); }
+.mc-run-id { color: var(--fg-3); }

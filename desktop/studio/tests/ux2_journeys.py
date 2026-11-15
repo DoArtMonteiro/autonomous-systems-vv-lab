@@ -166,10 +166,23 @@ def player_checks(s, ids):
         time.sleep(0.6)
         r = s.js("""() => {
           const pills = [...document.querySelectorAll('.pl-run-v')].map((e) => e.textContent.trim());
+          const shown = [...document.querySelectorAll('.pl-run')].map((b) => ({ active: b.getAttribute('aria-checked') === 'true', visible: b.querySelector('.pl-run-v').offsetParent !== null, hasId: !!b.querySelector('.pl-run-id') }));
           const bar = document.querySelector('.pl-runs').getBoundingClientRect();
-          return { pills, inView: bar.top >= 0 && bar.bottom <= innerHeight };
+          return { pills, shown, inView: bar.top >= 0 && bar.bottom <= innerHeight };
         }""")
-        check(f"Player {w}x{h}: after the result each run pill carries its mission and safety verdicts, in view without scrolling", len(r["pills"]) == 2 and "1 of 6 requirements failed · 5 of 5 safety rules held" in r["pills"][0] and "2 of 6 requirements failed · 5 of 5 safety rules held" in r["pills"][1] and r["inView"], json.dumps(r))
+        # On a short window the run pills are one row: the shown run in full, the others as their name (and the warning icon).
+        short = h < 700
+        vis_ok = all(x["visible"] == (x["active"] or not short) for x in r["shown"])
+        check(f"Player {w}x{h}: after the result each run pill carries its mission and safety verdicts (the shown run in full on a short window), in view without scrolling", len(r["pills"]) == 2 and "1 of 6 requirements failed · 5 of 5 safety rules held" in r["pills"][0] and "2 of 6 requirements failed · 5 of 5 safety rules held" in r["pills"][1] and r["inView"] and vis_ok and all(x["hasId"] for x in r["shown"]), json.dumps(r))
+        ident = s.js("""() => {
+          const conds = Object.fromEntries([...document.querySelectorAll('.pl-run-cond')].map((e) => [e.dataset.run, e.dataset.conditions]));
+          const pills = [...document.querySelectorAll('.pl-run')].map((b) => { const id = (b.querySelector('.pl-run-id').title || '').replace('Run ', ''); return { id, text: b.textContent.toLowerCase(), cond: (conds[id] || '').toLowerCase() }; });
+          const opts = [...document.querySelectorAll('.pl-cin-run option')].map((o) => o.textContent.toLowerCase());
+          return { pills, opts };
+        }""")
+        check(f"Player {w}x{h}: each run pill and each Run option carries the run's conditions and its short id", len(ident["pills"]) == 2 and all(p["cond"] and p["cond"] in p["text"] and p["id"][:8] in p["text"] for p in ident["pills"]) and all(p["id"][:8] in o and p["cond"] in o for p, o in zip(ident["pills"], ident["opts"])), json.dumps(ident)[:400])
+        area = s.js("(() => { const c = [...document.querySelectorAll('.pl-viewport canvas')].filter((e) => e.offsetParent !== null).map((e) => Math.round(e.getBoundingClientRect().height)); return c; })()")
+        check(f"Player {w}x{h}: the scene is at least 200 px tall", bool(area) and max(area) >= 200, json.dumps(area))
         o = s.js(ux1.OVERLAP_JS, [[".pl-cams", ".pl-hud"], [".pl-cams", ".pl-runs"], [".pl-scene-note", ".pl-cams"]])
         check(f"Player {w}x{h}: the camera row does not cover the readout card, the run pills or the note", not o["clash"] and not o["unseen"], json.dumps(o))
         check_pills(s, f"Engineering {w}x{h}")
@@ -245,6 +258,9 @@ def capture_sizes(s):
         go(s, "compare")
         s.shot(f"ux3-compare-{w}x{h}-dark")
         go(s, "run")
+        panes = s.js("[...document.querySelectorAll('.scene-pane canvas')].filter((e) => e.offsetParent !== null).map((e) => Math.round(e.getBoundingClientRect().height))")
+        if w < 1440:
+            check(f"Analyse {w}x{h}: every plot of the scene (3D, profile, top view) is at least 200 px tall", len(panes) >= 3 and min(panes) >= 200, json.dumps(panes))
         if w <= 900:
             st = s.js("""() => { const a = document.querySelector('.scene-pane'); const b = document.querySelector('.tele'); if (!a || !b) return null; const ra = a.getBoundingClientRect(); const rb = b.getBoundingClientRect(); return { sceneBottom: Math.round(ra.bottom + scrollY), teleTop: Math.round(rb.top + scrollY), sameColumn: Math.abs(ra.left - rb.left) < 2 }; }""")
             check(f"Analyse {w}x{h}: the scene is above the telemetry and the two do not overlap", bool(st) and st["sameColumn"] and st["teleTop"] >= st["sceneBottom"] - 1, json.dumps(st))
@@ -252,6 +268,11 @@ def capture_sizes(s):
             check(f"Analyse {w}x{h}: no overlap between the scene controls and the telemetry header", not o["clash"], json.dumps(o))
         s.shot(f"ux3-analyse-{w}x{h}-dark")
         go(s, "library")
+        # With a run selected (its detail panel open) the Outcome, Safety rules and Failed columns are all in view.
+        s.js("(() => { const r = document.querySelector('tbody tr[data-run]'); if (r) r.click(); })()")
+        time.sleep(0.6)
+        cols = s.js("""() => [...document.querySelectorAll('thead th')].filter((e) => e.offsetParent !== null && /Outcome|Safety rules|Failed/.test(e.textContent)).map((e) => { const r = e.getBoundingClientRect(); return { name: e.textContent.trim(), left: Math.round(r.left), right: Math.round(r.right), inside: r.left >= 0 && r.right <= innerWidth + 1 }; })""")
+        check(f"Runs {w}x{h} with the detail panel open: Outcome, Safety rules and Failed are in view", len(cols) == 3 and all(c["inside"] for c in cols), json.dumps(cols))
         s.shot(f"ux3-runs-{w}x{h}-dark")
         check(f"Layout {w}x{h}: the Lab, Compare, Analyse and Runs pages have no horizontal page scroll", s.no_hscroll())
     s.resize(1440, 900)
@@ -372,6 +393,9 @@ def identity_checks(s):
         check("Compare: the line says what the runs share and where they differ", bool(shared) and re.match(r"(Both runs|All \d+ runs): .+; (they differ only in .+|nothing in their conditions differs)\.$", shared), str(shared))
         bad = s.js(BARE_SAFE_JS)
         check("Identity: Compare has no visible text that is a bare safe or Safe verdict", not bad, json.dumps(bad))
+        rows = s.js("[...document.querySelectorAll('.cmp-headline-row')].map((e) => e.innerText.replace(/\\s+/g, ' ').trim())")
+        flips = [x for x in rows if "fails it;" in x or "passes it." in x]
+        check("Compare: when a verdict flips, the sentence names the run that fails first", bool(flips) and all(x.index("fails it;") < x.index("passes it.") for x in flips), json.dumps(rows)[:400])
         s.shot("ux4-compare-identity-dark")
         # Two runs: GPS noise 1 mm, and the same with a 250 mm arrival radius. The line says exactly that.
         pair = [i for i, n in names.items() if n in ("GPS noise 1 mm", "Arrival radius 250 mm · GPS noise 1 mm")]

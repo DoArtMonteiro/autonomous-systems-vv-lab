@@ -142,7 +142,7 @@ func _policy_dump() -> void:
 		"vram_bytes": vram["bytes"],
 		"presentation_line": Hud.presentation_line(record),
 		# The display arguments as the module will show them (bidi controls removed), for the tests.
-		"display": {"run_label": cli.run_label, "vehicle": cli.vehicle, "exploratory": cli.exploratory, "seed": cli.seed},
+		"display": {"run_label": cli.run_label, "vehicle": cli.vehicle, "exploratory": cli.exploratory, "seed": cli.seed, "conditions": cli.conditions},
 	}
 	print("POLICY " + JSON.stringify(out, "", true, true))
 	get_tree().quit(0)
@@ -319,7 +319,7 @@ func _build() -> void:
 	# Interface.
 	hud = Hud.new()
 	hud.build(self, record, pack, record.t0(), record.t1(), Profiles.ORDER + ["custom"], cameras)
-	hud.set_run_info(cli.run_label, cli.vehicle, cli.exploratory, cli.seed, cli.run_dir.rstrip("/\\").get_file(), record)
+	hud.set_run_info(cli.run_label, cli.vehicle, cli.exploratory, cli.seed, cli.run_dir.rstrip("/\\").get_file(), record, cli.conditions)
 	hud.play_btn.pressed.connect(func(): _set_playing(not playing))
 	hud.result_btn.pressed.connect(func(): hud.reveal())
 	hud.slider.value_changed.connect(func(v): if not hud.slider_blocked(): _set_time(v))

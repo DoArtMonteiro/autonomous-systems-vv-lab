@@ -11,6 +11,7 @@ so they stay out of the repository.
 import argparse
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import time
@@ -18,6 +19,7 @@ import time
 from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import installed_spotcheck as spot  # noqa: E402
 import m18_journeys as m18  # noqa: E402
 import ux_journeys as ux1  # noqa: E402
 from m15_journeys import check, errors, results  # noqa: E402
@@ -57,6 +59,34 @@ def at_sizes(s, tag, rebuild, pairs, reopen):
     s.shot(f"ux4-{tag}-1440x900-light")
     s.theme("dark")
     s.resize(1440, 900)
+
+
+def studio_panel(s, proc, tag, shots, expect):
+    """Opens the Cinematic View from the player, as a person does, reads the command line the Studio gave the module,
+    stops that window, and draws the end of the run with the same arguments (--t late, --shot): the panel carries the
+    identity the player shows. `expect` is {label, conditions, exploratory}."""
+    s.wait("document.querySelector('.pl-head [data-action=\"cinematic\"]:not([aria-disabled=\"true\"])')", 40, "cinematic button enabled")
+    s.page.click(".pl-head [data-action='cinematic']")
+    t0 = time.time()
+    kids = []
+    while time.time() - t0 < 40 and not kids:
+        kids = spot.godot_children(proc.pid)
+        time.sleep(0.25)
+    check(f"Cinematic {tag}: the Studio started the module", bool(kids))
+    if not kids:
+        return
+    cmd = kids[0]["cmd"] or ""
+    args = spot.module_args(cmd)
+    pick = lambda k: args[args.index(k) + 1] if k in args else None  # noqa: E731
+    check(f"Cinematic {tag}: the arguments carry the player's label, conditions and exploratory flag", pick("--run-label") == expect["label"] and pick("--conditions") == expect["conditions"] and (expect["exploratory"] is None or ("--exploratory" in args) == expect["exploratory"]), json.dumps({k: pick(k) for k in ("--run-label", "--conditions", "--vehicle", "--seed")}) + (" --exploratory" if "--exploratory" in args else ""))
+    for k in kids:
+        subprocess.run(["taskkill", "/F", "/PID", str(k["pid"])], capture_output=True)
+    time.sleep(1.5)
+    exe = cmd.split('"')[1] if cmd.startswith('"') else cmd.split()[0]
+    console = os.path.join(os.path.dirname(exe), "Godot_v4.7.2-stable_win64_console.exe")
+    out = os.path.join(shots, f"cinematic-panel-{tag}.png")
+    r = subprocess.run([console] + args + ["--t", "100", "--shot", out], capture_output=True, text=True, timeout=300)
+    check(f"Cinematic {tag}: the module's own --shot drew the panel of this run", os.path.isfile(out) and os.path.getsize(out) > 10000, f"{os.path.isfile(out) and os.path.getsize(out)} bytes, exit {r.returncode}")
 
 
 def main():
@@ -111,6 +141,8 @@ def main():
                         s.page.click("[data-action='reveal']")
                     s.wait("document.querySelector('.pl-result')", 10, "result")
 
+                info60 = s.js("(() => { const r = [...document.querySelectorAll('.pl-run')][1]; return { label: r.querySelector('.pl-run-l').textContent, id: (r.querySelector('.pl-run-id').title || '').replace('Run ', '') }; })()")
+                studio_panel(s, proc, "60ms-run", a.shots, {"label": info60["label"], "conditions": s.js("(id) => document.querySelector(`.pl-run-cond[data-run='${id}']`).dataset.conditions", info60["id"]), "exploratory": True})
                 at_sizes(s, "end-state-60ms-run", to_engineering,
                          [[".pl-cams", ".pl-hud"], [".pl-cams", ".pl-runs"], [".pl-scene-note", ".pl-cams"], [".pl-scene-note", ".pl-runs"]], reopen_60)
 
@@ -125,6 +157,10 @@ def main():
                     time.sleep(0.8)
                 marks = s.js("[...document.querySelectorAll('.pl-mark.sev-violation')].map((e) => e.getAttribute('aria-label'))")
                 check("Corridor: a violation marker is on the timeline", bool(marks), json.dumps(marks))
+                shapes = s.js("[...document.querySelectorAll('.pl-mark.sev-violation')].map((e) => [e.classList.contains('is-rule') ? 'rule' : e.classList.contains('is-req') ? 'requirement' : '?', e.style.background])")
+                check("Corridor: a violation marker has a shape (safety rule or requirement) and the colour of its run", bool(shapes) and all(x[0] != '?' and x[1] for x in shapes), json.dumps(shapes))
+                chip = s.js("document.querySelector('.pl-phase-name') && document.querySelector('.pl-phase-name').textContent")
+                check("Corridor: the end chip says how the run ended and names the broken safety rule, not only End of run", bool(chip) and chip.startswith("End of run: Mission incomplete") and "safety rule broken: Truth stays outside the restricted zone" in chip, str(chip))
 
                 def rebuild_corridor():
                     # The scene follows the window; the run with the broken rule stays the active one.
@@ -152,6 +188,10 @@ def main():
                 s.wait("document.querySelector('.pl-result')", 60, "result")
                 time.sleep(1.0)
                 s.shot("ux4-threshold-trade-off-player-dark")
+                chip2 = s.js("document.querySelector('.pl-phase-name') && document.querySelector('.pl-phase-name').textContent")
+                check("Threshold landing: the end chip names the failed requirement and the broken safety rule", bool(chip2) and chip2.startswith("Not met: Vertical speed at contact") and "; safety rule broken: Climb under power; impact not modelled" in chip2, str(chip2))
+                info_t = s.js("(() => { const r = document.querySelector('.pl-run[aria-checked=\"true\"]'); return { label: r.querySelector('.pl-run-l').textContent, id: (r.querySelector('.pl-run-id').title || '').replace('Run ', '') }; })()")
+                studio_panel(s, proc, "broken-rule-landing", a.shots, {"label": info_t["label"], "conditions": s.js("(id) => document.querySelector(`.pl-run-cond[data-run='${id}']`).dataset.conditions", info_t["id"]), "exploratory": None})
             except Exception as e:  # noqa: BLE001
                 check("captures completed", False, repr(e)[:300])
             check("No page error or console error", not errors, "; ".join(errors)[:300])

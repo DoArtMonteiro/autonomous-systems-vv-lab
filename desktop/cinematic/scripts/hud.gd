@@ -183,7 +183,10 @@ func build(root: Node, record, pack, t0: float, t1: float, profiles: Array, came
 	# the evidence README), never the bare status; the domain's own sentence is quoted under it.
 	var failed := _failed_requirements(record)
 	var failed_line := ("\nRequirements failed: %s." % ", ".join(failed)) if failed.size() > 0 else ""
-	verdict_text = "From the record, shown as written and not re-verified here.\nOutcome: %s. %s%s\n%s\nThe record says: \"%s\"" % [str(o.get("label", o.get("code", "n/a"))), str(o.get("explanation", "")), failed_line, safety_phrase(record), str(s.get("explanation", ""))]
+	# A landing record has a ground contact: the stage is drawn whole whatever the contact speed.
+	var sc = record.data.get("scene", {})
+	var contact_line := "\nImpact is not modelled: the stage is drawn intact whatever the contact speed." if (typeof(sc) == TYPE_DICTIONARY and sc.get("touchdown") != null) else ""
+	verdict_text = "From the record, shown as written and not re-verified here.\nOutcome: %s. %s%s%s\n%s\nThe record says: \"%s\"" % [str(o.get("label", o.get("code", "n/a"))), str(o.get("explanation", "")), failed_line, contact_line, safety_phrase(record), str(s.get("explanation", ""))]
 	vr.add_child(verdict)
 	_show_verdict(false)
 	layer.add_child(vr)
@@ -343,7 +346,7 @@ static func presentation_line(record) -> String:
 
 # Which run is on screen. Values are the Studio's display arguments or, when the module is started on
 # its own, what the record itself says (the seed of its request, the identifier of its folder).
-func set_run_info(label: String, vehicle: String, exploratory: bool, seed: int, run_id: String, record) -> void:
+func set_run_info(label: String, vehicle: String, exploratory: bool, seed: int, run_id: String, record, conditions := "") -> void:
 	var parts := PackedStringArray()
 	var name := label
 	if name == "":
@@ -366,6 +369,8 @@ func set_run_info(label: String, vehicle: String, exploratory: bool, seed: int, 
 		parts.append("%s%s" % [vehicle, " (exploratory, not a real vehicle)" if exploratory else ""])
 	elif exploratory:
 		parts.append("exploratory, not a real vehicle")
+	if conditions != "":
+		parts.append("conditions: %s" % conditions)
 	run_line.text = "  |  ".join(parts)
 	speed_word = "inertial speed" if is_v2 else "speed"
 

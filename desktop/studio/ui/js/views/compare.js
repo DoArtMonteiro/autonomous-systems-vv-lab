@@ -149,10 +149,15 @@ function headlines() {
   const lines = [];
   for (let i = 1; i < records.length; i += 1) {
     const hc = headlineChange(records[0].record, records[i].record);
+    // When the verdict flips, the sentence names the run that fails first: "B fails it; A passes it."
+    const flipText = hc && hc.flip && (hc.from === 'pass' || hc.to === 'pass')
+      ? `${hc.from === 'pass' ? labels[i] : labels[0]} fails it; ${hc.from === 'pass' ? labels[0] : labels[i]} passes it. `
+      : '';
     lines.push(h('li', { class: 'cmp-headline-row', dataset: { run: String(i + 1) } },
       h('span', { class: 'dim small' }, records.length > 2 ? `${labels[i]} against ${labels[0]}: ` : 'Largest change: '),
+      flipText ? h('span', { class: 'small' }, flipText) : null,
       hc ? h('b', { class: hc.flip ? 'cmp-hc-flip' : '' }, hc.text) : h('span', null, 'no requirement value differs'),
-      hc && hc.flip ? h('span', { class: 'small dim' }, ` (${hc.from === 'pass' ? 'passes, then fails' : hc.to === 'pass' ? 'fails, then passes' : 'verdict changes'})`) : null,
+      hc && hc.flip && !flipText ? h('span', { class: 'small dim' }, ' (verdict changes)') : null,
       records.length > 2 ? h('span', { class: 'sr-only' }, labels[i]) : null));
   }
   return h('ul', { class: 'cmp-headline', 'aria-label': 'What changed most between the runs' }, lines);

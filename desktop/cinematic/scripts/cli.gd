@@ -5,6 +5,7 @@ extends RefCounted
 const CAMERAS := ["director", "follow", "pad", "closeup", "wide", "overhead", "lowwide"]
 const POSE_LIMIT_M := 1.0e8
 const LABEL_MAX := 100
+const CONDITIONS_MAX := 200
 const PROFILES := ["auto", "performance", "balanced", "high", "ultra", "custom"]
 
 var run_dir := ""
@@ -29,6 +30,7 @@ var run_label := ""     # display only: the Studio's label for the run (text, at
 var vehicle := ""       # display only: the vehicle's name
 var exploratory := false  # display only: the vehicle or the case is not a reference case
 var seed := -1          # display only: the seed of the run, or -1 when not given
+var conditions := ""    # display only: the run's non-default parameters and faults, in the Studio's words (at most CONDITIONS_MAX characters)
 var entity := "auto"   # launch ascent: the entity the follow camera tracks, or auto
 var has_camera_pose := false
 var camera_pose: PackedFloat64Array = PackedFloat64Array()  # east, north, up of the eye; of the target; vertical fov in degrees
@@ -46,7 +48,7 @@ static func _strip_bidi(s: String) -> String:
 
 
 static func usage() -> String:
-	return "usage: -- --run <run dir> [--env <pack dir>] [--pose-dump t1,t2,...] [--profile auto|performance|balanced|high|ultra|custom] [--custom key=value,...] [--vram-bytes N] [--camera director|follow|pad|closeup|wide|overhead|lowwide] [--t seconds] [--play] [--controls shown|hidden] [--presentation] [--policy-dump] [--entity auto|<entity id>] [--run-label text] [--vehicle text] [--exploratory] [--seed N] [--camera-pose ex,ey,ez,tx,ty,tz,fov] [--shot out.png] [--bench out.json --bench-seconds S --bench-from T --bench-to T]"
+	return "usage: -- --run <run dir> [--env <pack dir>] [--pose-dump t1,t2,...] [--profile auto|performance|balanced|high|ultra|custom] [--custom key=value,...] [--vram-bytes N] [--camera director|follow|pad|closeup|wide|overhead|lowwide] [--t seconds] [--play] [--controls shown|hidden] [--presentation] [--policy-dump] [--entity auto|<entity id>] [--run-label text] [--vehicle text] [--conditions text] [--exploratory] [--seed N] [--camera-pose ex,ey,ez,tx,ty,tz,fov] [--shot out.png] [--bench out.json --bench-seconds S --bench-from T --bench-to T]"
 
 
 static func parse(args: PackedStringArray) -> RefCounted:
@@ -54,7 +56,7 @@ static func parse(args: PackedStringArray) -> RefCounted:
 	var i := 0
 	while i < args.size():
 		var k := args[i]
-		var needs_value := k in ["--run", "--env", "--pose-dump", "--profile", "--custom", "--vram-bytes", "--camera", "--t", "--shot", "--bench", "--bench-seconds", "--bench-from", "--bench-to", "--controls", "--camera-pose", "--entity", "--run-label", "--vehicle", "--seed"]
+		var needs_value := k in ["--run", "--env", "--pose-dump", "--profile", "--custom", "--vram-bytes", "--camera", "--t", "--shot", "--bench", "--bench-seconds", "--bench-from", "--bench-to", "--controls", "--camera-pose", "--entity", "--run-label", "--vehicle", "--conditions", "--seed"]
 		var v := ""
 		if needs_value:
 			if i + 1 >= args.size():
@@ -119,18 +121,21 @@ static func parse(args: PackedStringArray) -> RefCounted:
 				c.presentation = true
 			"--policy-dump":
 				c.has_policy_dump = true
-			"--run-label", "--vehicle":
+			"--run-label", "--vehicle", "--conditions":
 				# Text for the screen only. Bidirectional overrides and isolates are removed; anything that is
 				# then too long or holds a control character is refused.
 				v = _strip_bidi(v)
-				var okt := v.length() >= 1 and v.length() <= LABEL_MAX
+				var limit := CONDITIONS_MAX if k == "--conditions" else LABEL_MAX
+				var okt := v.length() >= 1 and v.length() <= limit
 				for ch in v:
 					okt = okt and ch.unicode_at(0) >= 32 and ch.unicode_at(0) != 127
 				if not okt:
-					c.error = "%s takes 1 to %d characters of text without control characters" % [k, LABEL_MAX]
+					c.error = "%s takes 1 to %d characters of text without control characters" % [k, limit]
 					return c
 				if k == "--run-label":
 					c.run_label = v
+				elif k == "--conditions":
+					c.conditions = v
 				else:
 					c.vehicle = v
 			"--exploratory":

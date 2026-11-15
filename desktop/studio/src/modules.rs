@@ -1028,9 +1028,13 @@ pub struct Display {
     pub vehicle: Option<String>,
     pub exploratory: bool,
     pub seed: Option<u64>,
+    /// The run's non-default parameters and faults, in the Studio's words ("GPS noise 1 mm").
+    pub conditions: Option<String>,
 }
 
 const LABEL_MAX_CHARS: usize = 80;
+/// The conditions text can list several parameters and faults, so it may be longer than a label.
+const CONDITIONS_MAX_CHARS: usize = 160;
 /// The largest seed the module accepts (18 digits); a larger one is left out of the display.
 const SEED_MAX: u64 = 999_999_999_999_999_999;
 
@@ -1041,11 +1045,15 @@ fn is_bidi_control(c: char) -> bool {
 }
 
 fn clean_label(s: &str) -> Option<String> {
+    clean_text(s, LABEL_MAX_CHARS)
+}
+
+fn clean_text(s: &str, max: usize) -> Option<String> {
     let t: String = s
         .chars()
         .filter(|c| !is_bidi_control(*c))
         .map(|c| if c.is_control() { ' ' } else { c })
-        .take(LABEL_MAX_CHARS)
+        .take(max)
         .collect();
     let t = t.trim().to_string();
     (!t.is_empty()).then_some(t)
@@ -1066,6 +1074,13 @@ impl Display {
         if let Some(s) = self.seed.filter(|s| *s <= SEED_MAX) {
             args.extend(["--seed".to_string(), s.to_string()]);
         }
+        if let Some(c) = self
+            .conditions
+            .as_deref()
+            .and_then(|c| clean_text(c, CONDITIONS_MAX_CHARS))
+        {
+            args.extend(["--conditions".to_string(), c]);
+        }
     }
 }
 
@@ -1079,12 +1094,14 @@ pub async fn cinematic_launch(
     vehicle: Option<String>,
     exploratory: Option<bool>,
     seed: Option<u64>,
+    conditions: Option<String>,
 ) -> Result<(), PlatformError> {
     let display = Display {
         run_label,
         vehicle,
         exploratory: exploratory.unwrap_or(false),
         seed,
+        conditions,
     };
     let p = state.platform()?;
     let run_dir = p.library().run_dir(&run_id).map_err(invalid)?;
@@ -1376,6 +1393,9 @@ mod tests {
             vehicle: Some("Heavy return stage".to_string()),
             exploratory: true,
             seed: Some(5000),
+            conditions: Some(
+                "GPS noise 1 mm \u{b7} Arrival radius 250 mm\n--shot y\u{202E}".to_string(),
+            ),
         }
         .append_to(&mut args);
         assert_eq!(
@@ -1389,7 +1409,9 @@ mod tests {
                 "Heavy return stage",
                 "--exploratory",
                 "--seed",
-                "5000"
+                "5000",
+                "--conditions",
+                "GPS noise 1 mm \u{b7} Arrival radius 250 mm --shot y"
             ]
         );
         // A seed with more than 18 digits and bidi overrides are left out or removed.
@@ -1418,6 +1440,14 @@ mod tests {
         assert_eq!(none.len(), 2);
         assert_eq!(none[0], "--vehicle");
         assert_eq!(none[1].chars().count(), LABEL_MAX_CHARS);
+        let mut long = Vec::new();
+        Display {
+            conditions: Some("c".repeat(500)),
+            ..Display::default()
+        }
+        .append_to(&mut long);
+        assert_eq!(long[0], "--conditions");
+        assert_eq!(long[1].chars().count(), CONDITIONS_MAX_CHARS);
     }
 
     #[test]

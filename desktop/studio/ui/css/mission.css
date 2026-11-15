@@ -304,3 +304,40 @@
 @media (max-width: 1100px) and (min-height: 800px) {
   .pl-body { grid-template-rows: minmax(430px, 1fr) minmax(0, 34%); }
 }
+
+/* Pills: the curated label, the run's conditions, its short id, then the status once the result is shown. The words are
+   one run of text, so a long pill wraps inside itself. */
+.pl-run-t { min-width: 0; }
+.pl-run-c, .pl-run-id { color: var(--fg-3); }
+.pl-run { height: auto; min-height: 30px; padding-top: 3px; padding-bottom: 3px; text-align: left; line-height: 1.35; }
+.pl-cin-run { max-width: 340px; }
+/* Violation markers take the colour of their run; a square is a safety rule, a circle a requirement. */
+.pl-mark.sev-violation.is-req { border-radius: 50%; }
+.pl-mark.sev-violation.is-rule { border-radius: 1px; }
+.pl-legend .lg-violation.lg-req { border-radius: 50%; }
+
+/* A short, narrow window (1024x640): the player is a page that scrolls. The stage keeps room for a 2D plot of at least 220 px, the
+   run pills are one row (the shown run in full, the others as their name and the warning icon), the transport stays at the bottom
+   of the window, and the objective and the result are under the stage. */
+@media (max-width: 1100px) and (max-height: 700px) {
+  #view-mission { overflow-y: auto; }
+  .pl:not(.pl-control) { height: auto; min-height: 100%; grid-template-rows: auto auto auto; }
+  .pl:not(.pl-control) .pl-body { grid-template-rows: auto auto; }
+  .pl:not(.pl-control) .pl-stage { min-height: max(390px, calc(100vh - 227px)); }
+  .pl-title .eyebrow { display: none; }
+  /* The clock and the end chip of a flat scene share a row, so the plot has the height the chip would have taken. */
+  .pl:not(.pl-control) .pl-phase.is-2d { flex-wrap: nowrap; align-items: flex-start; }
+  .pl:not(.pl-control) .pl-phase.is-2d .pl-phase-name { flex: 1 1 auto; min-width: 0; }
+  .pl:not(.pl-control):not(.pl-geo) .pl-scene-note p { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pl:not(.pl-control) .pl-side { overflow: visible; max-height: none; }
+  .pl:not(.pl-control) .pl-transport { position: sticky; bottom: 0; z-index: 3; }
+  .pl:not(.pl-control) .pl-legend { grid-column: 1 / -1; }
+  .pl:not(.pl-control) .pl-viewport.is-2d { inset: 48px 260px 104px 16px; }
+  .pl:not(.pl-control):not(.pl-geo) .pl-runs { flex-wrap: nowrap; bottom: 40px; max-width: calc(100% - 32px); }
+  .pl:not(.pl-control):not(.pl-geo) .pl-run { flex: 0 1 auto; min-width: 0; }
+  .pl:not(.pl-control):not(.pl-geo) .pl-run[aria-checked="false"] { flex-shrink: 0; white-space: nowrap; }
+  .pl:not(.pl-control):not(.pl-geo) .pl-run[aria-checked="true"] { flex: 1 1 auto; }
+  .pl:not(.pl-control):not(.pl-geo) .pl-run[aria-checked="false"] .pl-run-c,
+  .pl:not(.pl-control):not(.pl-geo) .pl-run[aria-checked="false"] .pl-run-id,
+  .pl:not(.pl-control):not(.pl-geo) .pl-run[aria-checked="false"] .pl-run-v { display: none; }
+}

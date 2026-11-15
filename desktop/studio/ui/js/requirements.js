@@ -161,6 +161,16 @@ export function safetyWording(record) {
   return { ...base, text: `No safety rule broken (${count})`, heldText: held, verdict: 'pass', unjudged: false };
 }
 
+/**
+ * The safety words for a run known only by its list summary (no rows): the same rule as safetyWording,
+ * without a count the summary does not carry. A run whose rules were never judged is "safety not evaluated".
+ */
+export function summarySafetyText(s) {
+  if (s.safety_status === 'unsafe') return 'a safety rule broken';
+  if (s.safety_status === 'safe' && s.safety_class === 'not_evaluated') return 'safety not evaluated';
+  return 'no safety rule broken';
+}
+
 /** "2 of 6 requirements failed" or "all 6 requirements met"; nothing when the record lists no mission requirement. */
 export function requirementWording(record) {
   // Mission requirements only: a controller declaration is judged against the truth but is not a requirement.

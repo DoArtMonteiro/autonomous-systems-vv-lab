@@ -76,8 +76,8 @@ export function buildControl(pl, ctx) {
   const right = h('aside', { class: 'mc-right', 'aria-label': 'Mission status, events and investigation' });
   const strip = h('div', { class: 'mc-strip', role: 'group', 'aria-label': 'Key values' });
   const runs = pl.runs.length > 1 ? h('div', { class: 'mc-runs', role: 'radiogroup', 'aria-label': 'Run shown in the scene' },
-    pl.runs.map((r, i) => h('button', { type: 'button', role: 'radio', class: 'mc-run', 'aria-checked': String(i === pl.active), dataset: { run: String(i) }, onclick: () => ctx.setActive(i) },
-      h('span', { class: 'pl-swatch', style: { background: r.colour } }), r.label))) : null;
+    pl.runs.map((r, i) => h('button', { type: 'button', role: 'radio', class: 'mc-run', 'aria-checked': String(i === pl.active), dataset: { run: String(i) }, title: ctx.runName ? ctx.runName(r) : r.label, onclick: () => ctx.setActive(i) },
+      h('span', { class: 'pl-swatch', style: { background: r.colour } }), r.label, ctx.runId ? h('span', { class: 'mc-run-id mono small' }, ` · ${ctx.runId(r)}`) : null))) : null;
   evidenceIsOpen = ctx.evidenceOpen || (() => false);
   const tl = buildTimeline(pl, (ev) => select(ev));
 
@@ -181,7 +181,7 @@ export function buildControl(pl, ctx) {
     const out = [
       h('section', { class: 'mc-group', dataset: { group: 'requirements' } }, h('h2', { class: 'mc-h' }, 'Mission requirements'), h('ul', { class: 'mc-vlist' }, reqs.filter((q) => q.category !== 'invariant').map(verdictLine)),
         h('p', { class: 'mc-note' }, 'Judged at their decisive instant, usually contact; pending until then.')),
-      h('section', { class: 'mc-group', dataset: { group: 'invariants' } }, h('h2', { class: 'mc-h' }, 'Safety invariants'), h('ul', { class: 'mc-vlist' }, reqs.filter((q) => q.category === 'invariant').map(verdictLine)),
+      h('section', { class: 'mc-group', dataset: { group: 'invariants' } }, h('h2', { class: 'mc-h' }, 'Safety rules'), h('ul', { class: 'mc-vlist' }, reqs.filter((q) => q.category === 'invariant').map(verdictLine)),
         h('p', { class: 'mc-note' }, 'Judged on the true state throughout the run.')),
       h('section', { class: 'mc-group', dataset: { group: 'events' } }, h('h2', { class: 'mc-h' }, 'Events'),
         allEvents.length ? h('ol', { class: 'mc-evlist' }, allEvents.map((e) => {

@@ -81,7 +81,7 @@ class DisplayArguments(unittest.TestCase):
 
     def test_the_largest_seed_is_accepted_and_bidi_overrides_are_removed_not_refused(self):
         self.assertEqual(self.run_with("--seed", "9" * 18).returncode, 0)
-        out = subprocess.run([self.godot, "--headless", "--path", PROJECT, "--", "--run", RUN, "--policy-dump", "--run-label", "a\u202eb\u2066c", "--vehicle", "x\u202ey", "--seed", "42"],
+        out = subprocess.run([self.godot, "--headless", "--path", PROJECT, "--", "--run", RUN, "--policy-dump", "--run-label", "a\u202eb\u2066c", "--vehicle", "x\u202ey", "--conditions", "GPS noise 1 mm \u202e\u00b7 radius", "--seed", "42"],
                              capture_output=True, text=True, timeout=120, encoding="utf-8", errors="replace")
         self.assertEqual(out.returncode, 0, out.stderr[-500:])
         line = next(ln for ln in out.stdout.splitlines() if ln.startswith("POLICY "))
@@ -89,6 +89,12 @@ class DisplayArguments(unittest.TestCase):
         self.assertEqual(shown["run_label"], "abc")
         self.assertEqual(shown["vehicle"], "xy")
         self.assertEqual(shown["seed"], 42)
+        self.assertEqual(shown["conditions"], "GPS noise 1 mm \u00b7 radius")
+
+    def test_conditions_are_text_up_to_200_characters(self):
+        self.assertEqual(self.run_with("--conditions", "x" * 200).returncode, 0)
+        self.assertEqual(self.run_with("--conditions", "x" * 201).returncode, 2)
+        self.assertEqual(self.run_with("--conditions", "a	b").returncode, 2)
 
     def test_the_seed_is_a_non_negative_integer(self):
         self.assertEqual(self.run_with("--seed", "-1").returncode, 2)

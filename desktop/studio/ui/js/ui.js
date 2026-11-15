@@ -21,10 +21,16 @@ export function toast(message, kind = 'info', ms = 4200) {
 }
 
 let lastFocus = null;
+let removeDocKey = null; // takes the document-level key handler of the open dialog away
 
-/** A modal dialog built from DOM nodes. Returns {close}. Escape and the backdrop close it. */
+/**
+ * A modal dialog built from DOM nodes. Returns {close}. Escape and the backdrop close it. Focus moves into the
+ * dialog when it opens, and Escape is handled at the document while it is open, so it closes the dialog even if
+ * focus has gone elsewhere (a button behind it, the page); Tab brings focus back into the dialog.
+ */
 export function modal({ title, body, actions, label, wide }) {
   const host = document.getElementById('modal-root');
+  if (removeDocKey) removeDocKey();
   lastFocus = document.activeElement;
   clear(host);
   const titleId = 'modal-title';
@@ -36,8 +42,17 @@ export function modal({ title, body, actions, label, wide }) {
   const backdrop = h('div', { class: 'backdrop', onclick: (e) => { if (e.target === backdrop) close(); } }, box);
   host.appendChild(backdrop);
   host.hidden = false;
+  const focusFirst = () => {
+    const first = box.querySelector('input, textarea, select') || box.querySelector('.modal-foot .btn-primary') || box.querySelector('button');
+    if (first) first.focus();
+  };
+  const docKey = (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); }
+    else if (e.key === 'Tab' && !box.contains(document.activeElement)) { e.preventDefault(); focusFirst(); }
+  };
+  document.addEventListener('keydown', docKey, true);
+  removeDocKey = () => { document.removeEventListener('keydown', docKey, true); removeDocKey = null; };
   const onKey = (e) => {
-    if (e.key === 'Escape') { e.preventDefault(); close(); }
     if (e.key === 'Tab') {
       const f = [...box.querySelectorAll('button, input, select, textarea, [tabindex]:not([tabindex="-1"])')].filter((x) => !x.disabled && x.offsetParent !== null);
       if (!f.length) return;
@@ -47,14 +62,13 @@ export function modal({ title, body, actions, label, wide }) {
   };
   box.addEventListener('keydown', onKey);
   function close() {
+    if (removeDocKey) removeDocKey();
     host.hidden = true;
     clear(host);
     if (lastFocus && lastFocus.focus) lastFocus.focus();
   }
-  setTimeout(() => {
-    const first = box.querySelector('input, textarea, select') || box.querySelector('.modal-foot .btn-primary') || box.querySelector('button');
-    if (first) first.focus();
-  }, 0);
+  focusFirst();
+  setTimeout(focusFirst, 0);
   return { close, box };
 }
 
