@@ -4,7 +4,7 @@
 
 import { h, clear, icon, prose, timeText, words } from '../dom.js';
 import { state, domainById, loadRecord, emit } from '../store.js';
-import { modelOf, requestText, displayRunLabel } from '../model.js';
+import { modelOf, requestText, displayRunLabel, conditionsName } from '../model.js';
 import { TimeCursor } from '../cursor.js';
 import { Telemetry } from '../charts.js';
 import { Timeline } from '../timeline.js';
@@ -97,7 +97,8 @@ function build() {
   const head = h('header', { class: 'run-head' },
     h('div', { class: 'run-id' },
       h('h1', null, displayRunLabel(record, cat, ws.meta && ws.meta.label, ws.meta && ws.meta.tags) || `${rt.controller} on ${rt.scenario}`),
-      h('span', { class: 'ident' }, `Scenario: ${rt.scenario} · `, h('b', null, rt.controller), ` · seed ${rt.seed} · ${rt.faults}`),
+      h('span', { class: 'ident' }, `Scenario: ${rt.scenario} · `, h('b', null, rt.controller), ` · seed ${rt.seed}`),
+      h('span', { class: 'ident run-cond-line', dataset: { conditions: conditionsName(record.request, cat) } }, `Conditions: ${conditionsName(record.request, cat)}`),
       devNote ? h('span', { class: 'tag tag-dev', title: devNote }, 'development') : null,
       h('span', { class: 'mono dim small' }, `${d ? d.manifest.name : record.domain.id} · run ${ws.runId}`)),
     h('div', { class: 'run-actions' },

@@ -8,7 +8,9 @@ import path from 'node:path';
 // fileURLToPath keeps a path with spaces or '&' (for example "v&v lab") intact.
 const here = path.dirname(fileURLToPath(import.meta.url));
 const mod = await import(pathToFileURL(path.join(here, '..', 'desktop', 'studio', 'ui', 'js', 'requirements.js')).href);
-const { safetyWording, reqView, failureSentence, plainName, headlineChange, indexNumbers, shortText, SAFETY_NOTE } = mod;
+const { safetyWording, reqView, failureSentence, plainName, headlineChange, indexNumbers, shortText, SAFETY_NOTE, requirementWording, statusLine } = mod;
+const model = await import(pathToFileURL(path.join(here, '..', 'desktop', 'studio', 'ui', 'js', 'model.js')).href);
+const { conditionsName, conditionsShared, displayRunLabel } = model;
 
 const inv = (id, status) => ({ id, label: `Rule ${id}`, category: 'invariant', status, expected: '<= 1 m', observed: '0.5 m' });
 const req = (id, status, label = `Req ${id}`) => ({ id, label, category: 'requirement', status, expected: '<= 3 m/s', observed: '1.654537 m/s' });
@@ -111,5 +113,101 @@ test('the headline names the largest change with its numbers', () => {
   assert.match(h.text, /Vertical speed at contact 1\.655 → 60\.08 m\/s \(limit <= 3 m\/s\)/);
   assert.equal(h.flip, true);
 });
+
+const decl = (id, status) => ({ id, label: `Declaration ${id}`, category: 'declaration', status, expected: 'x', observed: 'y' });
+
+test('requirementWording says all met only when every mission row passes', () => {
+  assert.equal(requirementWording(rec('safe', null, [req('R1', 'pass'), req('R2', 'pass')])), 'all 2 requirements met');
+  assert.equal(requirementWording(rec('safe', null, [inv('S1', 'pass')])), '');
+});
+
+test('requirementWording puts failures first and counts every status', () => {
+  assert.equal(requirementWording(rec('safe', null, [req('R1', 'fail'), req('R2', 'pass'), req('R3', 'not_evaluated')])), '1 of 3 requirements failed, 1 not evaluated, 1 met');
+  assert.equal(requirementWording(rec('safe', null, [req('R1', 'fail'), req('R2', 'fail'), req('R3', 'pass')])), '2 of 3 requirements failed');
+});
+
+test('requirementWording never calls unevaluated rows met', () => {
+  assert.equal(requirementWording(rec('safe', null, [req('R1', 'pass'), req('R2', 'not_evaluated')])), '1 of 2 requirements met, 1 not evaluated');
+  assert.equal(requirementWording(rec('safe', null, [req('R1', 'not_evaluated')])), '0 of 1 requirements met, 1 not evaluated');
+});
+
+test('requirementWording leaves declaration rows out of the count', () => {
+  const r = rec('safe', null, [req('R1', 'pass'), decl('D1', 'fail'), decl('D2', 'not_evaluated')]);
+  assert.equal(requirementWording(r), 'all 1 requirements met');
+  assert.equal(failureSentence(r), 'All 1 mission requirements met.');
+  assert.equal(failureSentence(rec('safe', null, [req('R1', 'pass'), req('R2', 'not_evaluated')])), '');
+});
+
+test('statusLine joins the requirement and safety wording, failures first, without a bare status', () => {
+  const line = statusLine(rec('unsafe', null, [req('R1', 'fail'), req('R2', 'pass'), inv('S1', 'fail'), inv('S2', 'pass')]));
+  assert.equal(line, '1 of 2 requirements failed · 1 of 2 safety rules broken');
+  assert.equal(statusLine(rec('safe', null, [req('R1', 'pass'), inv('S1', 'pass'), inv('S2', 'pass')])), 'all 1 requirements met · 2 of 2 safety rules held');
+  assert.doesNotMatch(statusLine(rec('safe', null, [inv('S1', 'pass')])), /\bsafe\b/i);
+});
+
+test('heldText counts only evaluated rules and names the unevaluated', () => {
+  assert.equal(safetyWording(rec('safe', null, [inv('S1', 'pass'), inv('S2', 'not_evaluated')])).heldText, '1 of 2 safety rules held (1 not evaluated)');
+  assert.equal(safetyWording(rec('safe', null, [inv('S1', 'not_evaluated')])).heldText, 'safety not evaluated');
+  assert.equal(safetyWording(rec('unsafe', null, [inv('S1', 'fail'), inv('S2', 'pass')])).heldText, '1 of 2 safety rules broken');
+});
+
+test('shortText leaves digits inside ids and tokens alone and short decimals as written', () => {
+  assert.equal(shortText('R1_vertical_speed 9e6edb2e v1.2.3'), 'R1_vertical_speed 9e6edb2e v1.2.3');
+  assert.equal(shortText('limit 3.5 m/s, 0.25 s, seed 1337'), 'limit 3.5 m/s, 0.25 s, seed 1337');
+  assert.equal(shortText('observed 60.077734 m/s'), 'observed 60.08 m/s');
+});
+
+test('marginDerived marks a margin Studio worked out and not one the domain published', () => {
+  const r = req('R1', 'pass');
+  assert.equal(reqView(r).marginDerived, true);
+  const record = { requirements: [r], metrics: [{ id: 'requirement_observed.R1', value: 1.6, unit: 'm/s' }, { id: 'requirement_limit.R1', value: 3, unit: 'm/s' }, { id: 'requirement_margin.R1', value: 1.4, unit: 'm/s' }] };
+  indexNumbers(record);
+  assert.equal(reqView(r).marginDerived, false);
+});
+
+test('headlineChange returns null when nothing moved', () => {
+  const a = rec('safe', null, [req('R1', 'pass')]);
+  assert.equal(headlineChange(a, rec('safe', null, [req('R1', 'pass')])), null);
+});
+
+const CATALOG = {
+  scenarios: [], controllers: [], time: { unit: 's' },
+  parameters: [
+    { id: 'gps_noise_mm', label: 'GPS noise', default: 0, unit: 'mm' },
+    { id: 'arrival_radius_mm', label: 'Arrival radius', default: 500, unit: 'mm' },
+  ],
+  faults: [{ kind: 'gps_dropout', label: 'GPS dropout' }],
+};
+const request = (parameters, faults = []) => ({ scenario: 's', controller: 'c', seed: 1, faults, parameters });
+
+test('conditionsName lists every non-default parameter and fault, and says default conditions otherwise', () => {
+  assert.equal(conditionsName(request({}), CATALOG), 'default conditions');
+  assert.equal(conditionsName(request({ gps_noise_mm: 0, arrival_radius_mm: 500 }), CATALOG), 'default conditions');
+  assert.equal(conditionsName(request({ gps_noise_mm: 1, arrival_radius_mm: 250 }), CATALOG), 'GPS noise 1 mm · Arrival radius 250 mm');
+  assert.match(conditionsName(request({ gps_noise_mm: 1 }, [{ kind: 'gps_dropout', magnitude: null, start: 1, end: 2 }]), CATALOG), /^GPS noise 1 mm · GPS dropout/);
+  assert.doesNotMatch(conditionsName(request({ gps_noise_mm: 1 }), CATALOG), /no injected fault/);
+});
+
+test('the same request always gets the same name, and different requests never share one', () => {
+  const reqs = [request({}), request({ gps_noise_mm: 1 }), request({ gps_noise_mm: 1, arrival_radius_mm: 250 })];
+  const names = reqs.map((r) => conditionsName(r, CATALOG));
+  assert.equal(new Set(names).size, 3);
+  assert.deepEqual(names, reqs.map((r) => conditionsName(JSON.parse(JSON.stringify(r)), CATALOG)));
+});
+
+test('conditionsShared says what both runs share and what they differ in', () => {
+  const s = conditionsShared([request({ gps_noise_mm: 1 }), request({ gps_noise_mm: 1, arrival_radius_mm: 250 })], CATALOG);
+  assert.equal(s.text, 'Both runs: GPS noise 1 mm; they differ only in Arrival radius');
+  const t = conditionsShared([request({ gps_noise_mm: 1 }), request({ gps_noise_mm: 2 })], CATALOG);
+  assert.equal(t.text, 'Both runs: default conditions; they differ only in GPS noise');
+});
+
+test('displayRunLabel keeps a stored label and names an Experiment run by its parameters', () => {
+  const record = { request: request({ arrival_radius_mm: 250 }) };
+  assert.equal(displayRunLabel(record, CATALOG, 'My run'), 'My run');
+  assert.match(displayRunLabel(record, CATALOG, 'Experiment from 9e6edb2e1234', ['from:9e6edb2e1234']), /Arrival radius 250 mm.*\(from 9e6edb2e12\)/);
+  assert.equal(displayRunLabel({ request: request({}) }, CATALOG, 'Experiment from abc'), 'Experiment from abc');
+});
+
 
 console.log(`${n} tests passed`);

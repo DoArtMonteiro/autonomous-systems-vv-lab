@@ -5,7 +5,7 @@
 import uPlot from '../../vendor/uplot/uPlot.esm.js';
 import { h, clear, icon, num, prose, timeText, lowerIndex, nextId } from '../dom.js';
 import { state, domainById, loadRecord, pref, setPref } from '../store.js';
-import { modelOf, distinguishingLabels, requestText, verdictOfOutcome, verdictOfRequirement, RUN_COLOURS, runDash, runSwatch, CATEGORY_TITLE, STATUS_TEXT } from '../model.js';
+import { modelOf, distinguishingLabels, conditionsName, conditionsShared, requestText, verdictOfOutcome, verdictOfRequirement, RUN_COLOURS, runDash, runSwatch, CATEGORY_TITLE, STATUS_TEXT } from '../model.js';
 import { verdictGlyph } from '../verification.js';
 import { axisStyle, cursorLine, cssVar } from '../charts.js';
 import { sceneFor, sceneKind } from '../scenes/registry.js';
@@ -67,7 +67,11 @@ async function open(runIds, errors, demo, name, given) {
   const cat = domainIds.length === 1 && domainById(domainIds[0]) ? domainById(domainIds[0]).catalog : null;
   // One label per run: the one the caller names it by (the player and the Lab say Baseline and what changed),
   // else the parameters that tell the runs apart.
-  const labels = given && given.length === records.length ? given.slice() : distinguishingLabels(records.map((r) => r.record.request), cat);
+  // Runs the caller does not name are named by their conditions (the one shared naming function); if two
+  // runs would get the same name, the parameters that tell them apart name them instead.
+  const byConditions = records.map((r) => conditionsName(r.record.request, cat));
+  const labels = given && given.length === records.length ? given.slice()
+    : new Set(byConditions).size === byConditions.length ? byConditions : distinguishingLabels(records.map((r) => r.record.request), cat);
   const t0 = Math.min(...models.map((m) => m.t0));
   const t1 = Math.max(...models.map((m) => m.t1));
   const unit = cat ? cat.time.unit : 's';
@@ -100,9 +104,11 @@ function build() {
         h('span', { class: 'key-verdicts' },
           h('span', { class: ['mini', `v-${ov}`], title: prose(rec.outcome.explanation) }, verdictGlyph(ov), rec.outcome.label),
           h('span', { class: ['mini', `v-${sw.verdict}`], title: `${prose(rec.safety.explanation)}\n${SAFETY_NOTE}` }, verdictGlyph(sw.verdict), sw.text)),
+        h('span', { class: 'key-cond small', dataset: { conditions: conditionsName(rec.request, cat) } }, `Conditions: ${conditionsName(rec.request, cat)}`),
         h('span', { class: 'key-count' }, failureCount(rec)),
-        h('span', { class: 'key-sub', title: `${rt.controller} · seed ${rt.seed} · ${rt.faults} · ${r.id}` }, `${rt.controller} · seed ${rt.seed} · ${rt.faults} · ${r.id}`));
+        h('span', { class: 'key-sub', title: `${rt.controller} · seed ${rt.seed} · ${r.id}` }, `${rt.controller} · seed ${rt.seed} · ${r.id}`));
     })),
+    h('p', { class: 'cmp-shared', dataset: { shared: '1' } }, conditionsShared(records.map((r) => r.record.request), cat).text + '.'),
     headlines(),
     h('p', { class: 'small dim cmp-safety-note' }, SAFETY_NOTE),
     cmp.errors.length ? h('div', { class: 'cmp-errors', role: 'alert' }, h('strong', null, `${cmp.errors.length} run${cmp.errors.length > 1 ? 's' : ''} could not be included`),

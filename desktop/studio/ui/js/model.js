@@ -102,8 +102,55 @@ export function requestText(req, catalog) {
     scenario: sc ? sc.label : req.scenario,
     controller: ct ? ct.label : req.controller,
     seed: String(req.seed),
-    faults: req.faults.length ? req.faults.map((f) => faultText(f, catalog)).join(' + ') : 'no injected fault',
+    // Every non-default parameter and every injected fault; never "no injected fault" while a noise or a limit is set.
+    faults: conditionsName(req, catalog),
   };
+}
+
+const paramNumber = (v) => (typeof v === 'number' && Number.isFinite(v) ? String(Number(v.toPrecision(6))) : String(v));
+
+/** The conditions of a run that differ from the catalog defaults: [{key, label, text}], parameters first, then faults. */
+export function conditionParts(req, catalog) {
+  const specs = new Map(((catalog && catalog.parameters) || []).map((p) => [p.id, p]));
+  const parts = [];
+  for (const [id, v] of Object.entries(req.parameters || {})) {
+    const spec = specs.get(id);
+    if (spec && v === spec.default) continue;
+    parts.push({ key: `p:${id}`, label: spec ? spec.label : words(id), text: `${spec ? spec.label : words(id)} ${paramNumber(v)}${spec && spec.unit ? ` ${spec.unit}` : ''}` });
+  }
+  for (const f of req.faults || []) parts.push({ key: `f:${JSON.stringify(f)}`, label: faultText(f, catalog), text: faultText(f, catalog) });
+  return parts;
+}
+
+/** The one display name of a run's conditions, from the shared parts: "GPS noise 1 mm · Arrival radius 250 mm", or "default conditions". */
+export function conditionsName(req, catalog) {
+  const parts = conditionParts(req, catalog);
+  return parts.length ? parts.map((p) => p.text).join(' · ') : 'default conditions';
+}
+
+/** What the runs share and what tells them apart: {shared: [text], differ: [label], text}. */
+export function conditionsShared(requests, catalog) {
+  const lists = requests.map((r) => conditionParts(r, catalog));
+  const keys = [...new Set(lists.flatMap((l) => l.map((p) => p.key)))];
+  const shared = [];
+  const differ = [];
+  for (const k of keys) {
+    const have = lists.map((l) => l.find((p) => p.key === k));
+    if (have.every(Boolean) && have.every((x) => x.text === have[0].text)) { shared.push(have[0].text); continue; }
+    // A parameter set in some runs and left at its default in others differs by that parameter.
+    const label = (have.find(Boolean) || {}).label;
+    if (label && !differ.includes(label)) differ.push(label);
+  }
+  // The same parameter with two values is one difference, named once.
+  const byParam = (arr) => arr.map((t) => t);
+  const seeds = new Set(requests.map((r) => r.seed));
+  const controllers = new Set(requests.map((r) => r.controller));
+  if (controllers.size > 1) differ.push('controller');
+  if (seeds.size > 1) differ.push('seed');
+  const n = requests.length;
+  const who = n === 2 ? 'Both runs' : `All ${n} runs`;
+  const text = `${who}: ${shared.length ? shared.join(' · ') : 'default conditions'}; ${differ.length ? `they differ only in ${byParam(differ).join(', ')}` : 'nothing in their conditions differs'}`;
+  return { shared, differ, text };
 }
 
 export function faultText(f, catalog) {

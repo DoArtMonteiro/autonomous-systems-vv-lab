@@ -42,6 +42,51 @@ var speed_word := "speed"
 var _block_slider := false
 
 
+# The labels of the mission requirements that failed, from the record's own rows (never the ids).
+static func _failed_requirements(record) -> PackedStringArray:
+	var out := PackedStringArray()
+	for q in record.data.get("requirements", []):
+		if typeof(q) == TYPE_DICTIONARY and str(q.get("category", "")) == "requirement" and str(q.get("status", "")) == "fail":
+			out.append(str(q.get("label", q.get("id", ""))))
+	return out
+
+
+# "Safety rules: none broken (5 checked, S1 to S5), judged on the true state; this does not mean the
+# vehicle is safe." / "Safety rules: 1 of 4 broken (name)." / "Safety rules: not evaluated." Only
+# evaluated rules are counted, and a broken rule is looked at first. Mirrors safetyWording in
+# desktop/studio/ui/js/requirements.js and safety_phrase in desktop/platform/src/evidence.rs.
+static func safety_phrase(record) -> String:
+	var rules: Array = []
+	for q in record.data.get("requirements", []):
+		if typeof(q) == TYPE_DICTIONARY and str(q.get("category", "")) == "invariant":
+			rules.append(q)
+	var judged: Array = []
+	var broken: Array = []
+	for q in rules:
+		if str(q.get("status", "")) != "not_evaluated":
+			judged.append(q)
+		if str(q.get("status", "")) == "fail":
+			broken.append(str(q.get("label", q.get("id", ""))))
+	var s: Dictionary = record.safety()
+	if str(s.get("status", "")) == "unsafe" or broken.size() > 0:
+		if broken.size() > 0:
+			return "Safety rules: %d of %d broken (%s)." % [broken.size(), judged.size(), ", ".join(PackedStringArray(broken))]
+		return "Safety rules: a rule was broken."
+	if (str(s.get("status", "")) == "safe" and str(s.get("class", "")) == "not_evaluated") or (rules.size() > 0 and judged.size() == 0):
+		return "Safety rules: not evaluated."
+	if rules.size() == 0:
+		return "Safety rules: none broken."
+	var range_text := ""
+	var plain := true
+	for q in rules:
+		if str(q.get("id", "")).contains("."):
+			plain = false
+	if plain and judged.size() > 1:
+		range_text = ", %s to %s" % [str(judged[0].get("id", "")).get_slice("_", 0), str(judged[judged.size() - 1].get("id", "")).get_slice("_", 0)]
+	var counted := "%d checked" % judged.size() if judged.size() == rules.size() else "%d of %d checked; %d not evaluated" % [judged.size(), rules.size(), rules.size() - judged.size()]
+	return "Safety rules: none broken (%s%s), judged on the true state; this does not mean the vehicle is safe." % [counted, range_text]
+
+
 static func _panel(alpha := 0.55) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.04, 0.05, 0.07, alpha)
@@ -134,7 +179,11 @@ func build(root: Node, record, pack, t0: float, t1: float, profiles: Array, came
 	verdict.custom_minimum_size = Vector2(340, 0)
 	var o: Dictionary = record.outcome()
 	var s: Dictionary = record.safety()
-	verdict_text = "From the record, shown as written and not re-verified here.\nOutcome: %s. %s\nSafety: %s. %s" % [str(o.get("label", o.get("code", "n/a"))), str(o.get("explanation", "")), str(s.get("status", "n/a")), str(s.get("explanation", ""))]
+	# The safety line says how many safety rules were checked and broken (the words of the Studio and of
+	# the evidence README), never the bare status; the domain's own sentence is quoted under it.
+	var failed := _failed_requirements(record)
+	var failed_line := ("\nRequirements failed: %s." % ", ".join(failed)) if failed.size() > 0 else ""
+	verdict_text = "From the record, shown as written and not re-verified here.\nOutcome: %s. %s%s\n%s\nThe record says: \"%s\"" % [str(o.get("label", o.get("code", "n/a"))), str(o.get("explanation", "")), failed_line, safety_phrase(record), str(s.get("explanation", ""))]
 	vr.add_child(verdict)
 	_show_verdict(false)
 	layer.add_child(vr)

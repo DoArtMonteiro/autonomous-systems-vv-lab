@@ -6,7 +6,7 @@ import { api } from '../api.js';
 import { state, domainById, on, emit, loadRecord } from '../store.js';
 import { verdictOfOutcome, verdictOfSafety } from '../model.js';
 import { SAFETY_NOTE } from '../requirements.js';
-import { displayRunLabel } from '../model.js';
+import { displayRunLabel, conditionsName } from '../model.js';
 import { verdictGlyph } from '../verification.js';
 import { toast, errorText } from '../ui.js';
 import { openSaved, openRequest } from './prepare.js';
@@ -130,20 +130,33 @@ function categoryOf(domainId, id) {
   return q ? q.category : null;
 }
 
-/** "k of N safety rules broken" from the failed ids and the catalog's safety rules; without both, "A rule broken". */
-function safetyBrokenText(s) {
-  const d = domainById(s.domain);
-  const rules = d && d.catalog ? (d.catalog.requirements || []).filter((x) => x.category === 'invariant') : [];
-  const broken = s.failed.filter((id) => categoryOf(s.domain, id) === 'invariant');
-  return broken.length && rules.length >= broken.length ? `${broken.length} of ${rules.length} safety rules broken` : 'A rule broken';
+/** The category of a failed id: the catalog's, else the stored record's row, else null (never guessed). */
+function kindOf(s, id, rec) {
+  const c = categoryOf(s.domain, id);
+  if (c) return c;
+  const q = rec && (rec.requirements || []).find((x) => x.id === id);
+  return q ? q.category : null;
 }
 
-/** The failed names in two lines: the safety rules, then the requirements. */
-function failedCell(s) {
-  const rules = s.failed.filter((id) => categoryOf(s.domain, id) === 'invariant');
-  const reqs = s.failed.filter((id) => categoryOf(s.domain, id) !== 'invariant');
-  const line = (head, ids) => (ids.length ? h('div', null, h('span', { class: 'dim' }, `${head}: `), ids.map((id) => failedName(s.domain, id)).join(', ')) : null);
-  return [line('Safety', rules), line('Requirements', reqs)];
+/** "k safety rules broken": the summary has no evaluated count, so none is written. */
+function safetyBrokenText(s, rec) {
+  const broken = s.failed.filter((id) => kindOf(s, id, rec) === 'invariant');
+  return broken.length ? `${broken.length} safety rule${broken.length === 1 ? '' : 's'} broken` : 'A rule broken';
+}
+
+/** The failed names by kind: safety rules, requirements, declarations, and (only if no catalog and no record says) a neutral line. */
+function failedCell(s, m) {
+  const box = h('div', null);
+  const draw = (rec) => {
+    const line = (head, ids) => (ids.length ? h('div', null, h('span', { class: 'dim' }, `${head}: `), ids.map((id) => failedName(s.domain, id)).join(', ')) : null);
+    const kinds = new Map(s.failed.map((id) => [id, kindOf(s, id, rec)]));
+    const of = (k) => s.failed.filter((id) => kinds.get(id) === k);
+    clear(box).append(...[line('Safety rules', of('invariant')), line('Requirements', of('requirement')), line('Declarations', of('declaration')), line('Failed', s.failed.filter((id) => !kinds.get(id)))].filter(Boolean));
+    return [...kinds.values()].some((k) => !k);
+  };
+  // A failed id the catalog does not list is classified by the stored record, read once.
+  if (draw(null) && m) loadRecord(m.run_id).then((rec) => { draw(rec); const cell = box.closest('tr') && box.closest('tr').querySelector('[data-safety-cell]'); if (cell) cell.textContent = safetyBrokenText(s, rec); }).catch(() => {});
+  return box;
 }
 
 function failedName(domainId, id) {
@@ -157,6 +170,7 @@ function failedName(domainId, id) {
 /** The stored label, or for an "Experiment from ..." run the label the player gives a new run (computed, never stored). */
 function runLabelNode(m) {
   const node = h('div', { class: 'run-label', title: m.label }, m.label);
+  node.dataset.stored = '1';
   if (/^Experiment from /.test(m.label)) {
     loadRecord(m.run_id).then((rec) => {
       const d = domainById(m.summary.domain);
@@ -165,6 +179,17 @@ function runLabelNode(m) {
 Stored label: ${m.label}`; }
     }).catch(() => {});
   }
+  return node;
+}
+
+/** The conditions of the run, from the one shared naming function, for every row (the record is read once and kept). */
+function conditionsNode(m) {
+  const node = h('div', { class: 'run-cond small dim', dataset: { run: m.run_id } }, 'Conditions: …');
+  loadRecord(m.run_id).then((rec) => {
+    const d = domainById(m.summary.domain);
+    node.textContent = `Conditions: ${conditionsName(rec.request, d && d.catalog)}`;
+    node.dataset.conditions = conditionsName(rec.request, d && d.catalog);
+  }).catch(() => { node.textContent = ''; });
   return node;
 }
 
@@ -197,15 +222,15 @@ function drawRows() {
       onclick: () => select(m.run_id), ondblclick: () => navigate('run', { runId: m.run_id, meta: m }),
       onkeydown: (e) => { if (e.key === 'Enter') navigate('run', { runId: m.run_id, meta: m }); else if (e.key === ' ') { e.preventDefault(); select(m.run_id); } } },
     h('td', null, cb),
-    h('td', null, m.label ? runLabelNode(m) : null, h('div', { class: 'mono dim small' }, m.run_id), m.tags.length ? h('div', { class: 'small' }, m.tags.map((t) => h('span', { class: 'tag' }, t))) : null),
+    h('td', null, m.label ? runLabelNode(m) : null, conditionsNode(m), h('div', { class: 'mono dim small' }, m.run_id), m.tags.length ? h('div', { class: 'small' }, m.tags.map((t) => h('span', { class: 'tag' }, t))) : null),
     h('td', null, domainName(s.domain)),
     h('td', null, scenarioLabel(m)),
     h('td', null, controllerLabel(m)),
     h('td', { class: 'mono' }, String(s.seed)),
     h('td', { class: 'small' }, s.faults.length ? s.faults.map(words).join(', ') : h('span', { class: 'dim' }, 'none')),
     h('td', null, h('span', { class: ['cell', `v-${ov}`] }, verdictGlyph(ov), s.outcome_label)),
-    h('td', null, h('span', { class: ['cell', `v-${sv}`], title: SAFETY_NOTE }, verdictGlyph(sv), unjudged ? 'Not evaluated' : s.safety_status === 'safe' ? 'None broken' : h('b', null, safetyBrokenText(s)), s.safety_class && !unjudged ? h('span', { class: ['class-badge', `class-${s.safety_class}`] }, s.safety_class) : null)),
-    h('td', { class: 'failed', title: s.failed.join(' ') }, failedCell(s)),
+    h('td', null, h('span', { class: ['cell', `v-${sv}`], title: SAFETY_NOTE }, verdictGlyph(sv), unjudged ? 'Not evaluated' : s.safety_status === 'safe' ? 'None broken' : h('b', { dataset: { safetyCell: '1' } }, safetyBrokenText(s)), s.safety_class && !unjudged ? h('span', { class: ['class-badge', `class-${s.safety_class}`] }, s.safety_class) : null)),
+    h('td', { class: 'failed', title: s.failed.join(' ') }, failedCell(s, m)),
     h('td', { class: 'mono dim small' }, m.created_utc.replace('T', ' ').replace('Z', '')));
     tbody.append(tr);
   }

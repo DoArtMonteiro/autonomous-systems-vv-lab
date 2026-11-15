@@ -685,3 +685,17 @@ td.failed { min-width: 0; overflow-wrap: anywhere; }
   .lib-head { flex-wrap: wrap; }
   .lib-head .lib-path { display: none; }
 }
+
+/* Analyse on a narrow window: the scene above, the tabs under it, then the telemetry, each with the
+   width of the window, so the telemetry header never sits on top of the scene controls. */
+@media (max-width: 900px) {
+  .run { height: auto; min-height: 100%; grid-template-rows: auto auto auto; }
+  .run-body { grid-template-columns: minmax(0, 1fr); }
+  .run-left { grid-template-rows: minmax(360px, 56vh) auto; border-right: 0; border-bottom: 1px solid var(--rule); }
+  .run-left.no-scene { grid-template-rows: auto; }
+  .tele { height: 520px; }
+}
+
+/* The conditions of a compared run take the card's text column, under its name and verdicts. */
+.run-key .key-cond { grid-column: 2 / -1; color: var(--fg-2); overflow-wrap: anywhere; }
+.cmp-shared { margin: 6px 0 0; font-size: 13px; color: var(--fg-1); max-width: 110ch; }

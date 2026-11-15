@@ -28,7 +28,8 @@ import { buildControl } from './control.js';
 import { sourcesInfo } from '../sources-info.js';
 import { openCatalogue } from '../env-catalogue.js';
 import { cinematicButton } from '../cinematic.js';
-import { reqView, safetyWording, SAFETY_NOTE, failureSentence, indexNumbers, statusLine } from '../requirements.js';
+import { reqView, safetyWording, SAFETY_NOTE, failureSentence, indexNumbers, statusLine, requirementWording } from '../requirements.js';
+import { conditionsName } from '../model.js';
 
 let root;
 let navigate = () => {};
@@ -638,6 +639,18 @@ function drawBand() {
     seen.add(key);
     mark(`sev-${e.severity}`, e.t, `${timeText(e.t, pl.unit)}: ${prose(e.label)}`, true);
   }
+  // A broken safety rule is drawn for every run, not only the shown one, so a run that is not on screen
+  // still shows where its rule broke; its marker names the run.
+  pl.runs.forEach((other, i) => {
+    if (i === pl.active) return;
+    for (const e of other.model.events || []) {
+      if (e.severity !== 'violation' || !Number.isFinite(e.t)) continue;
+      const key = `${i}:violation@${e.t}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      mark('sev-violation', e.t, `${other.label}, ${timeText(e.t, pl.unit)}: ${prose(e.label)}`, true);
+    }
+  });
   for (const f of run.record.request.faults || []) mark('sev-onset', f.start, `${timeText(f.start, pl.unit)}: injected fault ${f.kind} starts`);
   for (let i = 1; i < pl.div.length; i++) {
     const d = pl.div[i];
@@ -720,6 +733,15 @@ function fillRunPills() {
   for (const span of pl.dom.runBar.querySelectorAll('.pl-run-v')) {
     const rec = pl.runs[Number(span.dataset.v)].record;
     span.textContent = ` · ${statusLine(rec)}`;
+    // A run with a broken safety rule is marked on its pill, with the warning icon and the failure colours.
+    const pill = span.closest('.pl-run');
+    const broken = safetyWording(rec).verdict === 'unsafe';
+    if (pill) {
+      pill.classList.toggle('is-unsafe', broken);
+      const old = pill.querySelector('.pl-run-warn');
+      if (old) old.remove();
+      if (broken) pill.insertBefore(h('span', { class: 'pl-run-warn', title: 'A safety rule was broken in this run' }, icon('warn')), pill.firstChild);
+    }
   }
 }
 
@@ -755,14 +777,15 @@ function runResult(run) {
   const missionReqs = reqs.filter((q) => q.category !== 'invariant');
   const metFail = missionReqs.filter((q) => q.status === 'fail');
   const metrics = pl.kind === 'rocket-3d' ? ROCKET_METRICS.map((id) => rec.metrics.find((m) => m.id === id)).filter(Boolean) : [];
-  const missionText = metFail.length ? `${metFail.length} of ${missionReqs.length} requirements failed` : `all ${missionReqs.length} requirements met`;
+  const missionText = requirementWording(rec) || 'no mission requirement listed';
   const safetyText = safetyWording(rec).text;
   return h('div', { class: 'pl-run-result', dataset: { outcome: rec.outcome.code, safety: rec.safety.status } },
     h('p', { class: 'pl-run-name' }, h('span', { class: 'pl-swatch', style: { background: run.colour } }), run.label),
+    h('p', { class: 'pl-run-cond small dim', dataset: { run: run.runId, conditions: conditionsName(rec.request, (domainById(rec.request.domain) || {}).catalog) } }, `Conditions: ${conditionsName(rec.request, (domainById(rec.request.domain) || {}).catalog)}`),
     h('p', { class: 'pl-run-head' }, rec.outcome.label),
     h('div', { class: 'pl-verdicts' },
-      verdictChip(missionText, metFail.length ? 'fail' : 'pass', 'Mission'),
-      verdictChip(safetyText, rec.safety.status, 'Safety', SAFETY_NOTE)),
+      verdictChip(missionText, metFail.length ? 'fail' : /not evaluated/.test(missionText) ? 'neutral' : 'pass', 'Mission'),
+      verdictChip(safetyText, rec.safety.status, 'Safety rules', SAFETY_NOTE)),
     metrics.length ? h('dl', { class: 'pl-metrics' }, metrics.map((m) => h('div', null, h('dt', null, m.label), h('dd', { class: 'mono' }, m.value === null ? '—' : `${hudNum(m.value)} ${m.unit}`)))) : null,
     failed.length ? h('ul', { class: 'pl-failed' }, failed.map((q) => h('li', null,
       h('button', { type: 'button', class: 'link', title: 'Move the playback to the decisive instant', onclick: () => { if (Number.isFinite(q.t)) { pl.cursor.pause(); pl.cursor.set(q.t); } } }, q.label),
@@ -798,7 +821,7 @@ function fillResult() {
   const heading = h('h2', { id: 'pl-result-h', tabindex: '-1' }, 'Result');
   pl.dom.resultHeading = heading;
   clear(live).append(h('section', { class: 'pl-card pl-result', 'aria-labelledby': 'pl-result-h' }, heading, pl.runs.map((r) => runResult(r)),
-    reqOnly ? h('p', { class: 'pl-fine' }, 'Mission requirements judge the landing or the goal; safety rules are judged on the true state throughout the run. A hard or off-target landing fails a requirement without breaking a safety rule.') : null));
+    reqOnly ? h('p', { class: 'pl-fine' }, 'A requirement can fail without any safety rule being broken. Mission requirements judge the landing or the goal; safety rules are judged on the true state throughout the run, so a hard or off-target landing can fail a requirement and still break no safety rule.') : null));
 }
 
 /** What follows the result: where the runs part and why it happened. Empty until the result is shown. */

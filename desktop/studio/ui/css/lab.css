@@ -105,7 +105,9 @@
 .lab-cell-v, .lab-cell-m { white-space: nowrap; }
 .lab-table td:first-child { white-space: normal; }
 @media (max-width: 1180px) { .lab-grid { grid-template-columns: minmax(0, 1fr); } }
-.lab-table td:last-child { white-space: nowrap; }
+/* The margin column never breaks a number; a cell that spans the row (the footnote, a composite requirement) wraps. */
+.lab-table td:last-child:not([colspan]) { white-space: nowrap; }
+.lab-table td[colspan] { white-space: normal; overflow-wrap: anywhere; }
 .lab-table td.lab-lim:not(.is-long) { white-space: nowrap; }
 
 /* A composite requirement takes a row of its own; the controller name is not cut. */
@@ -117,3 +119,10 @@
 .lab-separate { margin: 0; max-width: 90ch; }
 .lab-table tfoot td { white-space: normal; padding-top: 8px; }
 .lab-cell-m .kind { margin-right: 2px; }
+
+/* One column (below 1180 px): the table has the window's width, so its cells give up a little padding and the
+   first column a little width, and the margin column stays in view with its unit. */
+@media (max-width: 1180px) {
+  .lab-table th, .lab-table td { padding-left: 5px; padding-right: 5px; }
+  .lab-table td:first-child { min-width: 110px; }
+}

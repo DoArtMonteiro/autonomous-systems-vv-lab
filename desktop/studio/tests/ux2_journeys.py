@@ -206,6 +206,9 @@ def player_checks(s, ids):
         s.resize(1440, 900)
     s.page.click(".pl-views [data-view='engineering']")
     time.sleep(0.5)
+    o = s.js(ux1.OVERLAP_JS, [[".pl-cams", ".pl-hud"], [".pl-cams", ".pl-runs"], [".pl-scene-note", ".pl-cams"], [".pl-scene-note", ".pl-runs"]])
+    check("Player 1440x900 (end state): pills, caption and camera buttons do not overlap one another or the readout card", not o["clash"] and not o["unseen"], json.dumps(o))
+    check_pills(s, "Engineering 1440x900 (end state)")
     s.shot("ux2-player-end-dark")
     s.page.click(".pl-views [data-view='geospatial']")
     s.wait("window.__studio.player().renderer === 'geospatial'", 90, "geospatial")
@@ -234,10 +237,19 @@ def capture_sizes(s):
         s.resize(w, h)
         go(s, "lab")
         s.js("document.querySelector('.lab-result') && document.querySelector('.lab-result').scrollIntoView()")
+        lab_t = s.js("""() => { const wrap = document.querySelector('.lab-table-wrap'); if (!wrap) return null; const th = [...wrap.querySelectorAll('thead th')].find((e) => /Margin change/.test(e.textContent)); const foot = wrap.querySelector('tfoot td'); const r = th ? th.getBoundingClientRect() : null; const wr = wrap.getBoundingClientRect();
+          return { over: wrap.scrollWidth - wrap.clientWidth, marginIn: !!r && r.right <= wr.right + 1 && r.left >= wr.left - 1, footCut: foot ? foot.scrollWidth - foot.clientWidth : 0 }; }""")
+        if w != 1024:
+            check(f"Lab {w}x{h}: Margin change is in view without sideways scrolling and the footnote is not clipped", bool(lab_t) and lab_t["over"] <= 1 and lab_t["marginIn"] and lab_t["footCut"] <= 1, json.dumps(lab_t))
         s.shot(f"ux3-lab-{w}x{h}-dark")
         go(s, "compare")
         s.shot(f"ux3-compare-{w}x{h}-dark")
         go(s, "run")
+        if w <= 900:
+            st = s.js("""() => { const a = document.querySelector('.scene-pane'); const b = document.querySelector('.tele'); if (!a || !b) return null; const ra = a.getBoundingClientRect(); const rb = b.getBoundingClientRect(); return { sceneBottom: Math.round(ra.bottom + scrollY), teleTop: Math.round(rb.top + scrollY), sameColumn: Math.abs(ra.left - rb.left) < 2 }; }""")
+            check(f"Analyse {w}x{h}: the scene is above the telemetry and the two do not overlap", bool(st) and st["sameColumn"] and st["teleTop"] >= st["sceneBottom"] - 1, json.dumps(st))
+            o = s.js(ux1.OVERLAP_JS, [[".scene-pane", ".tele"], [".scene-bar", ".tele-head"]])
+            check(f"Analyse {w}x{h}: no overlap between the scene controls and the telemetry header", not o["clash"], json.dumps(o))
         s.shot(f"ux3-analyse-{w}x{h}-dark")
         go(s, "library")
         s.shot(f"ux3-runs-{w}x{h}-dark")
@@ -259,25 +271,25 @@ def unsafe_case(s):
     time.sleep(0.6)
     chips = s.js("[...document.querySelectorAll('.pl-run-result .vchip')].map((e) => [e.className, e.innerText.replace(/\\s+/g, ' ').trim()]).filter((x) => /SAFETY/i.test(x[1]))")
     texts = [c[1] for c in chips]
-    bad = [c for c in chips if "safety rules broken" in c[1] or "A safety rule was broken" in c[1]]
+    bad = [c for c in chips if re.search(r"\d+ of \d+ safety rules broken", c[1]) or "A safety rule was broken" in c[1]]
     good = [c for c in chips if "No safety rule broken" in c[1]]
     check("Unsafe case: a run with a broken safety rule says how many were broken and is drawn as unsafe", bool(bad) and all("v-bad" in c[0] for c in bad), json.dumps(texts))
     check("Unsafe case: the safe runs of the same mission still say No safety rule broken", bool(good), json.dumps(texts))
     s.nav("library")
     s.wait("document.querySelectorAll('tbody tr[data-run]').length >= 3", 30, "runs")
     col = s.js("[...document.querySelectorAll('tbody tr[data-run]')].map((tr) => tr.innerText.replace(/\\s+/g, ' ')).filter((x) => /Corridor|corridor/.test(x))")
-    check("Unsafe case: the Runs page says how many safety rules were broken, in bold", any(re.search(r"\d of \d+ safety rules broken", x) for x in col), json.dumps(col)[:240])
+    check("Unsafe case: the Runs page says how many safety rules were broken (no total the summary does not carry)", any(re.search(r"\d+ safety rules? broken", x) and not re.search(r"\d+ of \d+ safety rules broken", x) for x in col), json.dumps(col)[:240])
     # The count must be the record's own: read the unsafe run's record and compare.
-    row = s.js("""(() => { const tr = [...document.querySelectorAll('tbody tr[data-run]')].find((e) => /safety rules broken/.test(e.innerText)); return tr ? { id: tr.dataset.run, text: tr.innerText.replace(/\\s+/g, ' ') } : null; })()""")
+    row = s.js("""(() => { const tr = [...document.querySelectorAll('tbody tr[data-run]')].find((e) => /safety rules? broken/.test(e.innerText)); return tr ? { id: tr.dataset.run, text: tr.innerText.replace(/\\s+/g, ' ') } : null; })()""")
     if row:
         rec = m18.record(s, row["id"])
         inv = [q for q in rec["requirements"] if q["category"] == "invariant"]
         broken = [q for q in inv if q["status"] == "fail"]
         judged = [q for q in inv if q["status"] != "not_evaluated"]
-        m = re.search(r"(\d+) of (\d+) safety rules broken", row["text"])
-        check("Unsafe case: the Runs page count equals the record's broken and evaluated safety rules", bool(m) and (int(m.group(1)), int(m.group(2))) == (len(broken), len(judged)), f"{row['text'][:120]} vs {len(broken)} of {len(judged)}")
+        m = re.search(r"(\d+) safety rules? broken", row["text"])
+        check("Unsafe case: the Runs page count equals the record's broken safety rules", bool(m) and int(m.group(1)) == len(broken), f"{row['text'][:120]} vs {len(broken)} broken")
         split = s.js(f"(() => {{ const td = document.querySelector(\"tbody tr[data-run='{row['id']}'] td.failed\"); return td ? td.innerText.replace(/\\s+/g, ' ') : ''; }})()")
-        check("Unsafe case: the Failed cell separates Safety from Requirements", "Safety:" in split, split[:200])
+        check("Unsafe case: the Failed cell separates Safety rules from Requirements", "Safety rules:" in split and "Requirements:" in split, split[:200])
         s.shot("ux3-runs-unsafe-dark")
         s.page.dblclick(f"tbody tr[data-run='{row['id']}']")
         s.wait("window.__studio.view() === 'run' && document.querySelector('.verdict')", 30, "analyse")
@@ -296,6 +308,95 @@ def unsafe_case(s):
         over = s.js("(() => { const w = document.querySelector('.cmp-matrix'); return w.scrollWidth - w.clientWidth; })()")
         check("Compare (unsafe case): the table fits its pane, every run column is in view", over <= 1, str(over))
         s.shot("ux3-compare-unsafe-dark")
+
+
+BARE_SAFE_JS = """() => {
+  const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  const bad = [];
+  for (let n = w.nextNode(); n; n = w.nextNode()) {
+    const e = n.parentElement;
+    if (!e || e.offsetParent === null) continue;
+    if (/^\\s*safe\\s*$/i.test(n.textContent)) bad.push(e.className + ':' + n.textContent.trim());
+  }
+  return bad;
+}"""
+
+
+def identity_checks(s):
+    """One display name per run id on every surface (Runs, Compare, Analyse, player), runs with different
+    requests never share a visible label, and no visible text node is a bare "safe" or "Safe" verdict."""
+    s.resize(1440, 900)
+    s.nav("library")
+    s.wait("document.querySelectorAll('tbody tr[data-run]').length >= 3", 30, "runs")
+    s.wait("[...document.querySelectorAll('.run-cond')].every((e) => e.dataset.conditions)", 30, "conditions")
+    rows = s.js("[...document.querySelectorAll('tbody tr[data-run]')].map((tr) => ({ id: tr.dataset.run, cond: (tr.querySelector('.run-cond') || {}).dataset ? tr.querySelector('.run-cond').dataset.conditions : '', text: tr.innerText.replace(/\\s+/g, ' ') }))")
+    names = {r["id"]: r["cond"] for r in rows}
+    check("Identity: every run on the Runs page shows its conditions", bool(rows) and all(r["cond"] for r in rows), json.dumps([r["cond"] for r in rows])[:300])
+    # The catalog defaults, read from the Studio's own store: a parameter at its default is not a condition.
+    defaults = s.js("""async () => { const m = await import('./js/store.js'); const out = {}; for (const d of m.state.domains) out[d.manifest.id] = Object.fromEntries((((d.catalog || {}).parameters) || []).map((p) => [p.id, p.default])); return out; }""")
+    configured = []
+    for r in rows:
+        req = m18.record(s, r["id"])["request"]
+        has = bool(req.get("faults")) or any(v != defaults.get(req["domain"], {}).get(k) for k, v in (req.get("parameters") or {}).items())
+        configured.append((r["id"], req, has))
+    wrong = [(i, names[i]) for i, req, has in configured if has and names[i] in ("default conditions", "no injected fault")]
+    check("Identity: a run with a configured parameter or fault never reads as default conditions", not wrong, json.dumps(wrong)[:300])
+    bad = s.js(BARE_SAFE_JS)
+    check("Identity: the Runs page has no visible text that is a bare safe or Safe verdict", not bad, json.dumps(bad))
+    # Same mission, controller and seed but different conditions must not share a name.
+    groups = {}
+    for i, req, _ in configured:
+        groups.setdefault((req["scenario"], req["controller"], req["seed"]), []).append((i, json.dumps([req.get("parameters"), req.get("faults")], sort_keys=True)))
+    clash = []
+    for key, items in groups.items():
+        by_name = {}
+        for i, canon in items:
+            by_name.setdefault(names[i], set()).add(canon)
+        clash += [n for n, c in by_name.items() if len(c) > 1]
+    check("Identity: two runs with different requests never share a visible name on the Runs page", not clash, json.dumps(clash)[:300])
+    # Compare: the corridor runs, names distinct, the shared line present, every name equal to the Runs page name.
+    ground = [r["id"] for r in rows if re.search("Corridor", r["text"])]
+    if len(ground) >= 2:
+        for rid in ground[:3]:
+            s.page.check(f"tbody tr[data-run='{rid}'] input[type=checkbox]")
+        s.page.click("#lib-compare")
+        s.wait("window.__studio.view() === 'compare' && document.querySelector('.matrix')", 30, "compare")
+        time.sleep(1.5)
+        keys = s.js("[...document.querySelectorAll('.run-key')].map((k) => ({ id: k.dataset.run, label: (k.querySelector('.key-label') || {}).textContent, cond: (k.querySelector('.key-cond') || {}).dataset ? k.querySelector('.key-cond').dataset.conditions : '' }))")
+        shared = s.js("(document.querySelector('.cmp-shared') || {}).textContent")
+        check("Compare: each run has the same conditions as on the Runs page", bool(keys) and all(k["cond"] == names.get(k["id"]) for k in keys), json.dumps(keys)[:400])
+        reqs = {k["id"]: json.dumps(m18.record(s, k["id"])["request"], sort_keys=True) for k in keys}
+        labels = [k["label"] for k in keys]
+        distinct = len(set(reqs.values())) == len(reqs)
+        check("Compare: runs with different requests never share a visible label", not distinct or len(set(labels)) == len(labels), json.dumps(labels))
+        check("Compare: the line says what the runs share and where they differ", bool(shared) and re.match(r"(Both runs|All \d+ runs): .+; (they differ only in .+|nothing in their conditions differs)\.$", shared), str(shared))
+        bad = s.js(BARE_SAFE_JS)
+        check("Identity: Compare has no visible text that is a bare safe or Safe verdict", not bad, json.dumps(bad))
+        s.shot("ux4-compare-identity-dark")
+        # Analyse of the first of them, then the player: the same name for the same id.
+        rid = keys[0]["id"]
+        s.nav("library")
+        s.wait("document.querySelectorAll('tbody tr[data-run]').length >= 3", 30, "runs")
+        s.page.dblclick(f"tbody tr[data-run='{rid}']")
+        s.wait("window.__studio.view() === 'run' && document.querySelector('.verdict')", 30, "analyse")
+        time.sleep(0.8)
+        cond = s.js("(document.querySelector('.run-cond-line') || {}).dataset ? document.querySelector('.run-cond-line').dataset.conditions : ''")
+        check("Analyse: the run has the same conditions as on the Runs page", cond == names[rid], f"{cond} vs {names[rid]}")
+        bad = s.js(BARE_SAFE_JS)
+        check("Identity: Analyse has no visible text that is a bare safe or Safe verdict", not bad, json.dumps(bad))
+    # Player: the Lab runs (baseline and experiment) carry the same names as on the Runs page.
+    s.nav("lab")
+    if s.js("!!document.querySelector('#lab-watch')"):
+        s.page.click("#lab-watch")
+        s.wait("(() => { const p = window.__studio.player(); return p && p.experience.startsWith('runs:') && document.querySelector('.pl-hud dl'); })()", 120, "player")
+        time.sleep(1.0)
+        if s.js("!!document.querySelector(\"[data-action='reveal']\")"):
+            s.page.click("[data-action='reveal']")
+        s.wait("document.querySelector('.pl-run-cond')", 10, "player conditions")
+        pc = s.js("[...document.querySelectorAll('.pl-run-cond')].map((e) => ({ id: e.dataset.run, cond: e.dataset.conditions }))")
+        check("Player: each run has the same conditions as on the Runs page", bool(pc) and all(c["cond"] == names.get(c["id"]) for c in pc if c["id"] in names), json.dumps(pc)[:300] + " vs " + json.dumps({c["id"]: names.get(c["id"]) for c in pc})[:300])
+        bad = s.js(BARE_SAFE_JS)
+        check("Identity: the player has no visible text that is a bare safe or Safe verdict", not bad, json.dumps(bad))
 
 
 def light_theme(s):
@@ -365,7 +466,7 @@ def main():
             except Exception as e:  # noqa: BLE001
                 check("lab, compare, runs, analyse and player completed", False, repr(e)[:400])
                 s.shot("ux2-failure")
-            for name, fn in (("capture", capture_sizes), ("unsafe", unsafe_case), ("light", light_theme)):
+            for name, fn in (("capture", capture_sizes), ("unsafe", unsafe_case), ("identity", identity_checks), ("light", light_theme)):
                 try:
                     fn(s)
                 except Exception as e:  # noqa: BLE001

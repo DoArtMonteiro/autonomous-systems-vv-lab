@@ -8,7 +8,7 @@ import { h, clear, prose } from '../dom.js';
 import { api } from '../api.js';
 import { domainById, visibleDomains, emit, loadRecord } from '../store.js';
 import { toast, errorText, askConfirm } from '../ui.js';
-import { verdictOfOutcome, faultText, distinguishingLabels } from '../model.js';
+import { verdictOfOutcome, faultText, distinguishingLabels, conditionsName } from '../model.js';
 import { verdictGlyph } from '../verification.js';
 import { indexNumbers, limitOf, marginOf, unitOf, reqView, reqLabel, safetyWording, SAFETY_NOTE, headlineChange, fmtSig, statusLine, DERIVED_NOTE } from '../requirements.js';
 
@@ -340,7 +340,7 @@ function verdictPill(record) {
 function runLine(req) {
   const cat = catalog();
   const ctl = (cat.controllers.find((c) => c.id === req.controller) || { label: req.controller }).label;
-  const faults = req.faults.map((f) => faultText(f, cat)).join(' + ') || 'no fault';
+  const faults = conditionsName(req, cat);
   const sc = (cat.scenarios.find((s) => s.id === req.scenario) || { label: req.scenario }).label;
   return `${sc} · ${ctl} controller · seed ${req.seed} · ${faults}`;
 }

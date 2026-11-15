@@ -11,9 +11,12 @@ export const fmtSig = (v, d = SIG) => (v === null || v === undefined || !Number.
 
 /** Every number in a recorded text, cut to four significant figures ("1.654537 m/s" -> "1.655 m/s"). */
 export function shortText(text) {
-  return String(text ?? '').replace(/-?\d+\.?\d*(?:e[-+]?\d+)?/gi, (n) => {
+  // A decimal number on its own (not part of an id or token such as R1_x, 9e6edb2e or v1.2.3) with five or
+  // more significant digits is cut to four; everything else is left as it was written.
+  return String(text ?? '').replace(/(?<![\w.])-?\d+\.\d+(?:e[-+]?\d+)?(?![\w.])/gi, (n) => {
+    const digits = n.replace(/e.*$/i, '').replace(/[^0-9]/g, '').replace(/^0+/, '');
     const v = Number(n);
-    return Number.isFinite(v) ? Number(v.toPrecision(SIG)).toString() : n;
+    return digits.length >= 5 && Number.isFinite(v) ? Number(v.toPrecision(SIG)).toString() : n;
   });
 }
 
@@ -160,10 +163,15 @@ export function safetyWording(record) {
 
 /** "2 of 6 requirements failed" or "all 6 requirements met"; nothing when the record lists no mission requirement. */
 export function requirementWording(record) {
-  const m = (record.requirements || []).filter((q) => q.category !== 'invariant');
+  // Mission requirements only: a controller declaration is judged against the truth but is not a requirement.
+  const m = (record.requirements || []).filter((q) => q.category === 'requirement');
   if (!m.length) return '';
-  const nf = m.filter((q) => q.status === 'fail').length;
-  return nf ? `${nf} of ${m.length} requirements failed` : `all ${m.length} requirements met`;
+  const failed = m.filter((q) => q.status === 'fail').length;
+  const met = m.filter((q) => q.status === 'pass').length;
+  const unknown = m.length - failed - met;
+  if (!failed && !unknown) return `all ${m.length} requirements met`;
+  if (!failed) return `${met} of ${m.length} requirements met, ${unknown} not evaluated`;
+  return `${failed} of ${m.length} requirements failed${unknown ? `, ${unknown} not evaluated, ${met} met` : ''}`;
 }
 
 /** The combined status, failure first, with the two kinds of verdict kept apart: "2 of 6 requirements failed · 5 of 5 safety rules held". */
@@ -184,9 +192,9 @@ export function plainName(q) {
 /** "2 mission requirements failed: Vertical speed at contact, Horizontal speed at contact." and its safety twin, from the record's rows. */
 export function failureSentence(record) {
   const reqs = record.requirements || [];
-  const mission = reqs.filter((q) => q.category !== 'invariant');
+  const mission = reqs.filter((q) => q.category === 'requirement');
   const failed = mission.filter((q) => q.status === 'fail');
-  if (!failed.length) return mission.length ? `All ${mission.length} mission requirements met.` : '';
+  if (!failed.length) return mission.length && mission.every((q) => q.status === 'pass') ? `All ${mission.length} mission requirements met.` : '';
   const n = failed.length;
   return `${n} mission requirement${n === 1 ? '' : 's'} failed: ${failed.map(plainName).join(', ')}.`;
 }
