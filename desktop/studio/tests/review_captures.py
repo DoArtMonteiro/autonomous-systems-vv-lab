@@ -65,7 +65,7 @@ def at_sizes(s, tag, rebuild, pairs, reopen):
     s.resize(1440, 900)
 
 
-def studio_panel(s, proc, tag, shots, expect):
+def studio_panel(s, proc, tag, shots, expect, at="100"):
     """Opens the Cinematic View from the player, as a person does, reads the command line the Studio gave the module,
     stops that window, and draws the end of the run with the same arguments (--t late, --shot): the panel carries the
     identity the player shows. `expect` is {label, conditions, exploratory}."""
@@ -89,7 +89,7 @@ def studio_panel(s, proc, tag, shots, expect):
     exe = cmd.split('"')[1] if cmd.startswith('"') else cmd.split()[0]
     console = os.path.join(os.path.dirname(exe), "Godot_v4.7.2-stable_win64_console.exe")
     out = os.path.join(shots, f"cinematic-panel-{tag}.png")
-    r = subprocess.run([console] + args + ["--t", "100", "--shot", out], capture_output=True, text=True, timeout=300)
+    r = subprocess.run([console] + args + ["--t", at, "--shot", out], capture_output=True, text=True, timeout=300)
     check(f"Cinematic {tag}: the module's own --shot drew the panel of this run", os.path.isfile(out) and os.path.getsize(out) > 10000, f"{os.path.isfile(out) and os.path.getsize(out)} bytes, exit {r.returncode}")
 
 
@@ -196,6 +196,17 @@ def main():
                 check("Threshold landing: the end chip names the failed requirement and the broken safety rule", bool(chip2) and chip2.startswith("Not met: Vertical speed at contact") and "; safety rule broken: Climb under power; impact not modelled" in chip2, str(chip2))
                 info_t = s.js("(() => { const r = document.querySelector('.pl-run[aria-checked=\"true\"]'); return { label: r.querySelector('.pl-run-l').textContent, id: (r.querySelector('.pl-run-id').title || '').replace('Run ', '') }; })()")
                 studio_panel(s, proc, "broken-rule-landing", a.shots, {"label": info_t["label"], "conditions": s.js("(id) => document.querySelector(`.pl-run-cond[data-run='${id}']`).dataset.conditions", info_t["id"]), "exploratory": None})
+
+                # The launch ascent (a second kind of record): its panel too, from the Studio-launched process.
+                open_mission(s, "to-orbit")
+                if s.js("!!document.querySelector(\"[data-action='reveal']\")"):
+                    s.page.click("[data-action='reveal']")
+                s.wait("document.querySelector('.pl-result')", 120, "result")
+                info_a = s.js("(() => { const c = document.querySelector('.pl-run-cond'); const n = c && c.parentElement.querySelector('.pl-run-name'); return c ? { label: n.textContent.trim(), conditions: c.dataset.conditions } : null; })()")
+                if info_a:
+                    studio_panel(s, proc, "ascent-launch", a.shots, {"label": info_a["label"], "conditions": info_a["conditions"], "exploratory": None}, at="99999")
+                else:
+                    check("Launch ascent: the result shows the run's conditions line", False, "no conditions line")
             except Exception as e:  # noqa: BLE001
                 check("captures completed", False, repr(e)[:300])
             check("No page error or console error", not errors, "; ".join(errors)[:300])

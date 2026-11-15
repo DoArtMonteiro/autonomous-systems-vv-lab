@@ -7,10 +7,12 @@
 # the playback reaches the end of the run (V shows them earlier).
 extends RefCounted
 
-const ILLUSTRATIVE := "Drawn for illustration, not data: the vehicle shapes (42 m), landing pad, lights and masts, ground textures and boulders near the pad, plant textures (their positions and sizes come from the environment pack), the sky image, plume and exhaust, glow and dust, tree crowns, scrub colour, building walls and roofs, haze, water and the ground beyond the pack."
-const ILLUSTRATIVE_ASCENT := "Drawn for illustration, not data: the vehicle shapes (from the record's visual block), the body axis drawn along the recorded velocity (tail first while an engine burns in a steep descent; no attitude is recorded or simulated), the direction east (the record has no heading), the upper stage drawn offset from the first stage's recorded point, plume and exhaust, glow and dust, landing pad and lights, and the Earth beyond the pack as a plain sphere with no geography, atmosphere, sky or haze."
-const DATA_ASCENT := "Recorded data: each vehicle's position, altitude, inertial speed (as the record defines it) and throttle (percent of the maximum), interpolated between its samples for display; a vehicle exists from its first to its last sample; terrain and imagery of the pad's surroundings come from the environment pack. Nothing here is simulated."
-const DATA := "Recorded data: the vehicle's position and orientation (interpolated for display), throttle (percent of the maximum), speed (the length of the recorded velocity vector) and the results; terrain, imagery, building footprints and heights and plant positions come from the environment pack. Nothing here is simulated."
+const ILLUSTRATIVE := "Drawn for illustration, not data: the vehicle shapes (42 m), landing pad, lights and masts, ground textures and boulders near the pad, plant textures (their positions and sizes come from the environment pack), the sky image, plume and exhaust, glow and dust, tree crowns, scrub colour, building walls and roofs, haze, water and the ground beyond the pack. Backdrop only, not the run's: terrain, imagery, building footprints and heights and plant positions come from the environment pack."
+const ILLUSTRATIVE_ASCENT := "Drawn for illustration, not data: the vehicle shapes (from the record's visual block), the body axis drawn along the recorded velocity (tail first while an engine burns in a steep descent; no attitude is recorded or simulated), the direction east (the record has no heading), the upper stage drawn offset from the first stage's recorded point, plume and exhaust, glow and dust, landing pad and lights, and the Earth beyond the pack as a plain sphere with no geography, atmosphere, sky or haze. Backdrop only, not the run's: the terrain and imagery of the pad's surroundings come from the environment pack."
+const DATA_ASCENT := "Recorded data: each vehicle's position, altitude, inertial speed (as the record defines it) and throttle (percent of the maximum), interpolated between its samples for display; a vehicle exists from its first to its last sample. Nothing here is simulated."
+const EXPLORATORY := "Exploratory: an idealised model, not a real vehicle, not validated against flight data."
+const QUALIFIER := "idealised model, not a real vehicle"
+const DATA := "Recorded data: the vehicle's position and orientation (interpolated for display), throttle (percent of the maximum), speed (the length of the recorded velocity vector) and the results. Nothing here is simulated."
 const MARGIN := 18
 
 var layer: CanvasLayer
@@ -40,6 +42,20 @@ var run_line: Label
 var sample_line: Label
 var speed_word := "speed"
 var _block_slider := false
+
+
+# The text of the result panel. Every run is an exploratory model, whatever the vehicle, and says so first; the
+# safety line counts rules (the words of the Studio and of the evidence README), never the bare status, and the
+# domain's own sentence is quoted under it. A landing record has a ground contact: the stage is drawn whole
+# whatever the contact speed.
+static func verdict_text_for(record) -> String:
+	var o: Dictionary = record.outcome()
+	var s: Dictionary = record.safety()
+	var failed := _failed_requirements(record)
+	var failed_line := ("\nRequirements failed: %s." % ", ".join(failed)) if failed.size() > 0 else ""
+	var sc = record.data.get("scene", {})
+	var contact_line := "\nImpact is not modelled: the stage is drawn intact whatever the contact speed." if (typeof(sc) == TYPE_DICTIONARY and sc.get("touchdown") != null) else ""
+	return "From the record, shown as written and not re-verified here.\n%s\nOutcome: %s. %s%s%s\n%s\nThe record says: \"%s\"" % [EXPLORATORY, str(o.get("label", o.get("code", "n/a"))), str(o.get("explanation", "")), failed_line, contact_line, safety_phrase(record), str(s.get("explanation", ""))]
 
 
 # The labels of the mission requirements that failed, from the record's own rows (never the ids).
@@ -154,7 +170,7 @@ func build(root: Node, record, pack, t0: float, t1: float, profiles: Array, came
 	vb.add_theme_constant_override("separation", 1)
 	top.add_child(vb)
 	var title := _label(12, Color(0.82, 0.86, 0.9))
-	title.text = "Cinematic View: this view computes nothing. It draws the recorded run  |  %s" % str(pack.m.get("name", pack.m.get("id", "")))
+	title.text = title_text(str(pack.m.get("name", pack.m.get("id", ""))))
 	vb.add_child(title)
 	# Which run this is: the Studio's label for it, its identifier, the vehicle and the seed.
 	run_line = _label(13, Color(0.97, 0.98, 1.0))
@@ -177,16 +193,7 @@ func build(root: Node, record, pack, t0: float, t1: float, profiles: Array, came
 	verdict = _label(12)
 	verdict.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	verdict.custom_minimum_size = Vector2(340, 0)
-	var o: Dictionary = record.outcome()
-	var s: Dictionary = record.safety()
-	# The safety line says how many safety rules were checked and broken (the words of the Studio and of
-	# the evidence README), never the bare status; the domain's own sentence is quoted under it.
-	var failed := _failed_requirements(record)
-	var failed_line := ("\nRequirements failed: %s." % ", ".join(failed)) if failed.size() > 0 else ""
-	# A landing record has a ground contact: the stage is drawn whole whatever the contact speed.
-	var sc = record.data.get("scene", {})
-	var contact_line := "\nImpact is not modelled: the stage is drawn intact whatever the contact speed." if (typeof(sc) == TYPE_DICTIONARY and sc.get("touchdown") != null) else ""
-	verdict_text = "From the record, shown as written and not re-verified here.\nOutcome: %s. %s%s%s\n%s\nThe record says: \"%s\"" % [str(o.get("label", o.get("code", "n/a"))), str(o.get("explanation", "")), failed_line, contact_line, safety_phrase(record), str(s.get("explanation", ""))]
+	verdict_text = verdict_text_for(record)
 	vr.add_child(verdict)
 	_show_verdict(false)
 	layer.add_child(vr)
@@ -344,9 +351,22 @@ static func presentation_line(record) -> String:
 	return line
 
 
+# The first line of the header: the place is the backdrop of the replay, not where the run happened.
+static func title_text(place: String) -> String:
+	return "Cinematic View: this view computes nothing. It draws the recorded run  |  %s (backdrop only)" % place
+
+
 # Which run is on screen. Values are the Studio's display arguments or, when the module is started on
 # its own, what the record itself says (the seed of its request, the identifier of its folder).
 func set_run_info(label: String, vehicle: String, exploratory: bool, seed: int, run_id: String, record, conditions := "") -> void:
+	run_line.text = run_line_text(label, vehicle, seed, run_id, record, conditions)
+	speed_word = "inertial speed" if is_v2 else "speed"
+
+
+# The run line. Every run carries the exploratory qualifier, whatever the vehicle or the Studio's flag:
+# "Threshold 3 m (7efed40d)  |  seed 5017  |  22 t landing stage (idealised model, not a real vehicle)  |  exploratory
+# |  conditions: GNSS bias 9.72 m".
+static func run_line_text(label: String, vehicle: String, seed: int, run_id: String, record, conditions := "") -> String:
 	var parts := PackedStringArray()
 	var name := label
 	if name == "":
@@ -365,14 +385,11 @@ func set_run_info(label: String, vehicle: String, exploratory: bool, seed: int, 
 				sd = int(f)
 	if sd >= 0:
 		parts.append("seed %d" % sd)
-	if vehicle != "":
-		parts.append("%s%s" % [vehicle, " (exploratory, not a real vehicle)" if exploratory else ""])
-	elif exploratory:
-		parts.append("exploratory, not a real vehicle")
+	parts.append("%s (%s)" % [vehicle, QUALIFIER] if vehicle != "" else QUALIFIER)
+	parts.append("exploratory")
 	if conditions != "":
 		parts.append("conditions: %s" % conditions)
-	run_line.text = "  |  ".join(parts)
-	speed_word = "inertial speed" if is_v2 else "speed"
+	return "  |  ".join(parts)
 
 
 func set_presentation(on: bool, record = null) -> void:

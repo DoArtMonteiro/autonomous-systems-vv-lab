@@ -372,3 +372,5 @@
 .mc-bottom .mc-legend { padding-right: 176px; }
 .mc .mc-badges .hg-ev { background: var(--glass-strong); backdrop-filter: blur(var(--glass-blur)); }
 .mc-run-id { color: var(--fg-3); }
+
+.mc-phase.ph-end-neutral { color: var(--fg-1); text-transform: none; letter-spacing: .02em; }

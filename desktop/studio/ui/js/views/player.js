@@ -28,7 +28,7 @@ import { buildControl } from './control.js';
 import { sourcesInfo } from '../sources-info.js';
 import { openCatalogue } from '../env-catalogue.js';
 import { cinematicButton } from '../cinematic.js';
-import { reqView, safetyWording, SAFETY_NOTE, failureSentence, indexNumbers, statusLine, requirementWording } from '../requirements.js';
+import { reqView, safetyWording, SAFETY_NOTE, failureSentence, indexNumbers, statusLine, requirementWording, endChip } from '../requirements.js';
 import { conditionsName } from '../model.js';
 
 let root;
@@ -297,52 +297,8 @@ function phaseAt(t) {
   const ph = phases.find((p) => t >= p.t0 && t < p.t1) || phases[phases.length - 1];
   const end = t >= run.model.t1 - 1e-9;
   const td = run.record.scene && run.record.scene.touchdown;
-  const met = run.record.outcome.status === 'success';
-  if (end) return endState(run, td, met);
+  if (end) return endChip(run.record, !!td);
   return { text: ph ? ph.label : '', kind: ph ? ph.kind : '', end: false };
-}
-
-/** The labels of the safety rules the record says were broken (its own rows, never the ids). */
-function brokenRules(record) {
-  return (record.requirements || []).filter((q) => q.category === 'invariant' && q.status === 'fail').map((q) => q.label || q.id);
-}
-
-/**
- * The chip at the end of the run. A landing names the failed requirement with its value and limit
- * and, when a safety rule was broken, that rule too, then says the impact is not drawn ("Not met:
- * Vertical speed at contact 24.23 m/s (limit <= 3 m/s); safety rule broken: Climb under power; impact
- * not modelled"). A scene without a ground contact says how the run ended, the requirements that were
- * not met and the rules that were broken, never only "End of run".
- */
-function endState(run, td, met) {
-  const rec = run.record;
-  const rules = brokenRules(rec);
-  const ruleText = rules.length ? `safety rule${rules.length > 1 ? 's' : ''} broken: ${rules.join(', ')}` : '';
-  const bad = !met || rules.length > 0;
-  if (td) {
-    const parts = [met ? 'Touchdown' : failedContactText(rec)];
-    if (ruleText) parts.push(ruleText);
-    if (bad) parts.push('impact not modelled');
-    return { text: parts.join('; '), kind: bad ? 'end-bad' : 'end', end: true };
-  }
-  const failed = (rec.requirements || []).filter((q) => q.category === 'requirement' && q.status === 'fail').map((q) => q.label || q.id);
-  const parts = [`End of run: ${rec.outcome.label}`];
-  if (failed.length) parts.push(`requirement${failed.length > 1 ? 's' : ''} not met: ${failed.join(', ')}`);
-  if (ruleText) parts.push(ruleText);
-  return { text: parts.join('; '), kind: bad ? 'end-bad' : 'end', end: true };
-}
-
-/** "Not met: <requirement> <value> (limit <limit>)": the failed mission requirement that is furthest past its limit. */
-function failedContactText(record) {
-  indexNumbers(record);
-  const failed = (record.requirements || []).filter((q) => q.status === 'fail' && q.category === 'requirement');
-  if (!failed.length) return 'Reached the ground';
-  const views = failed.map((q) => ({ q, v: reqView(q) }));
-  const past = (x) => (x.v.numeric && Number.isFinite(x.v.margin) ? -x.v.margin / Math.max(Math.abs(x.v.limit), 1e-9) : 0);
-  views.sort((x, y) => past(y) - past(x));
-  const top = views[0];
-  const more = views.length > 1 ? `, and ${views.length - 1} more not met` : '';
-  return `Not met: ${top.q.label} ${top.v.obsText} (limit ${top.v.limitText})${more}`;
 }
 
 /** The run's non-default parameters and faults, in the Studio's words (the one naming function). */
@@ -359,6 +315,11 @@ function runFullName(run) {
 }
 
 const shortId = (run) => String(run.runId).slice(0, 8);
+
+/** An entry of the Run list: the label, the short id, then the conditions, so a narrow list cuts the conditions and never the id. */
+function runListName(run) {
+  return `${run.label} · ${shortId(run)}${runFullName(run) !== run.label ? ` · ${runConditions(run)}` : ''}`;
+}
 
 /**
  * What the Cinematic View shows about the run it opens: the player's label for the run, the vehicle
@@ -485,7 +446,7 @@ function build() {
 
   // With two runs held, the person chooses which one the Cinematic View opens; it starts on the shown run.
   const cinRunSel = runs.length > 1 ? h('select', { class: 'select select-sm pl-cin-run', id: 'pl-cin-run', 'aria-label': 'Run to open in the Cinematic View', title: 'Which of the held runs the Cinematic View opens', dataset: { action: 'cinematic-run' } },
-    runs.map((r, i) => h('option', { value: String(i), selected: i === pl.active }, `${runFullName(r)} · ${shortId(r)}`))) : null;
+    runs.map((r, i) => h('option', { value: String(i), selected: i === pl.active }, runListName(r)))) : null;
   const cinRun = cinRunSel;
   const cinRunBox = cinRunSel ? h('label', { class: 'pl-cin-run-box', for: 'pl-cin-run' }, h('span', { class: 'dim small' }, 'Run:'), cinRunSel) : null;
   const cinIndex = () => (cinRun ? Number(cinRun.value) : pl.active);
@@ -630,7 +591,7 @@ function onTime(t) {
   pl.dom.hud.hidden = !rocket && pl.kind !== 'ground-2d';
   if (pl.dom.hud.hidden) { updateTransport(t); return; }
   pl.dom.hud.replaceChildren(
-    h('p', { class: 'pl-hud-h' }, h('span', { class: 'pl-swatch', style: { background: run.colour } }), run.label, ph.end && td ? h('span', { class: 'pl-hud-at' }, 'at contact') : null),
+    h('p', { class: 'pl-hud-h' }, h('span', { class: 'pl-swatch', style: { background: run.colour } }), runFullName(run), ph.end && td ? h('span', { class: 'pl-hud-at' }, 'at contact') : null),
     h('dl', null, readouts(run, t, rocket).map(([k, v, u, kind, title]) => h('div', { class: 'pl-hud-row', title },
       h('dt', null, h('abbr', { class: `kind kind-${kind}`, title: KIND_WORD[kind] }, kind), k),
       h('dd', { class: 'mono' }, v === null ? '—' : typeof v === 'string' ? v : `${hudNum(v)}${u ? ` ${u}` : ''}`)))),

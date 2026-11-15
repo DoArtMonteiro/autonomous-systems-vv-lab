@@ -239,3 +239,52 @@ export function headlineChange(a, b) {
     : `${reqLabel(t.qb)}: ${t.qa.status === 'pass' ? 'passes' : t.qa.status === 'fail' ? 'fails' : 'not evaluated'} → ${t.qb.status === 'pass' ? 'passes' : t.qb.status === 'fail' ? 'fails' : 'not evaluated'}`;
   return { text, flip: t.flip, id: t.qa.id, from: t.qa.status, to: t.qb.status };
 }
+
+// ----------------------------------------------------------------------------- the chip at the end of a run
+
+/** The labels of the safety rules the record says were broken (its own rows, never the ids). */
+export function brokenRules(record) {
+  return (record.requirements || []).filter((q) => q.category === 'invariant' && q.status === 'fail').map((q) => q.label || q.id);
+}
+
+/** "Not met: <requirement> <value> (limit <limit>)": the failed mission requirement that is furthest past its limit. */
+export function failedContactText(record) {
+  indexNumbers(record);
+  const failed = (record.requirements || []).filter((q) => q.status === 'fail' && q.category === 'requirement');
+  if (!failed.length) return 'Reached the ground';
+  const views = failed.map((q) => ({ q, v: reqView(q) }));
+  const past = (x) => (x.v.numeric && Number.isFinite(x.v.margin) ? -x.v.margin / Math.max(Math.abs(x.v.limit), 1e-9) : 0);
+  views.sort((x, y) => past(y) - past(x));
+  const top = views[0];
+  const more = views.length > 1 ? `, and ${views.length - 1} more not met` : '';
+  return `Not met: ${top.q.label} ${top.v.obsText} (limit ${top.v.limitText})${more}`;
+}
+
+/**
+ * The chip at the end of the run: {text, kind, end}. The safety part is the one reading of safetyWording, never a
+ * green word the record did not earn: broken rules are named; a run whose rules were never judged says "safety not
+ * evaluated" and is neutral (not green); a run the record marks unsafe without a failing row says a safety rule was
+ * broken and is bad. A landing names the failed requirement with its value and limit and says the impact is not drawn.
+ * A scene without a ground contact says how the run ended and what failed.
+ */
+export function endChip(record, hasContact) {
+  const met = record.outcome.status === 'success';
+  const sw = safetyWording(record);
+  const rules = brokenRules(record);
+  const ruleText = rules.length ? `safety rule${rules.length > 1 ? 's' : ''} broken: ${rules.join(', ')}`
+    : sw.verdict === 'unsafe' ? 'a safety rule was broken'
+      : sw.verdict === 'neutral' ? 'safety not evaluated' : '';
+  const bad = !met || sw.verdict === 'unsafe';
+  const kind = bad ? 'end-bad' : sw.verdict === 'neutral' ? 'end-neutral' : 'end';
+  if (hasContact) {
+    const parts = [met ? 'Touchdown' : failedContactText(record)];
+    if (ruleText) parts.push(ruleText);
+    if (bad) parts.push('impact not modelled');
+    return { text: parts.join('; '), kind, end: true };
+  }
+  const failed = (record.requirements || []).filter((q) => q.category === 'requirement' && q.status === 'fail').map((q) => q.label || q.id);
+  const parts = [`End of run: ${record.outcome.label}`];
+  if (failed.length) parts.push(`requirement${failed.length > 1 ? 's' : ''} not met: ${failed.join(', ')}`);
+  if (ruleText) parts.push(ruleText);
+  return { text: parts.join('; '), kind, end: true };
+}

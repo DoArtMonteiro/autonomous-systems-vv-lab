@@ -8,7 +8,7 @@ import path from 'node:path';
 // fileURLToPath keeps a path with spaces or '&' (for example "v&v lab") intact.
 const here = path.dirname(fileURLToPath(import.meta.url));
 const mod = await import(pathToFileURL(path.join(here, '..', 'desktop', 'studio', 'ui', 'js', 'requirements.js')).href);
-const { safetyWording, reqView, failureSentence, plainName, headlineChange, indexNumbers, shortText, SAFETY_NOTE, requirementWording, statusLine } = mod;
+const { safetyWording, reqView, failureSentence, plainName, headlineChange, indexNumbers, shortText, SAFETY_NOTE, requirementWording, statusLine, endChip } = mod;
 const model = await import(pathToFileURL(path.join(here, '..', 'desktop', 'studio', 'ui', 'js', 'model.js')).href);
 const { conditionsName, conditionsShared, displayRunLabel } = model;
 
@@ -209,6 +209,37 @@ test('displayRunLabel keeps a stored label and names an Experiment run by its pa
   assert.equal(displayRunLabel(record, CATALOG, 'My run'), 'My run');
   assert.match(displayRunLabel(record, CATALOG, 'Experiment from 9e6edb2e1234', ['from:9e6edb2e1234']), /Arrival radius 250 mm.*\(from 9e6edb2e12\)/);
   assert.equal(displayRunLabel({ request: request({}) }, CATALOG, 'Experiment from abc'), 'Experiment from abc');
+});
+
+
+const withOutcome = (status, label, r) => ({ ...r, outcome: { status, label, code: status } });
+
+test('the end chip is green only when the rules were judged and none broke', () => {
+  const r = withOutcome('success', 'Landed', rec('safe', null, [req('R1', 'pass'), inv('S1', 'pass')]));
+  assert.deepEqual(endChip(r, true), { text: 'Touchdown', kind: 'end', end: true });
+});
+
+test('the end chip is neutral and says safety not evaluated when the rules were not judged', () => {
+  const classed = withOutcome('success', 'Landed', rec('safe', 'not_evaluated', [req('R1', 'pass'), inv('S1', 'pass')]));
+  assert.deepEqual(endChip(classed, true), { text: 'Touchdown; safety not evaluated', kind: 'end-neutral', end: true });
+  const rows = withOutcome('success', 'Landed', rec('safe', null, [req('R1', 'pass'), inv('S1', 'not_evaluated'), inv('S2', 'not_evaluated')]));
+  assert.equal(endChip(rows, true).kind, 'end-neutral');
+  assert.doesNotMatch(endChip(rows, true).text, /^Touchdown$/);
+  // without a ground contact too
+  assert.equal(endChip(withOutcome('success', 'Mission completed', rec('safe', 'not_evaluated', [inv('S1', 'pass')])), false).text, 'End of run: Mission completed; safety not evaluated');
+});
+
+test('the end chip is bad when the record says unsafe even with no failing row', () => {
+  const r = withOutcome('success', 'Landed', rec('unsafe', null, [req('R1', 'pass'), inv('S1', 'pass')]));
+  assert.deepEqual(endChip(r, true), { text: 'Touchdown; a safety rule was broken; impact not modelled', kind: 'end-bad', end: true });
+  assert.equal(endChip(r, false).kind, 'end-bad');
+});
+
+test('the end chip names the failed requirement and the broken rule', () => {
+  const r = withOutcome('failure', 'Reached the ground', rec('unsafe', null, [{ ...req('R1', 'fail', 'Vertical speed at contact'), observed: '24.229379 m/s', expected: '<= 3 m/s' }, { ...inv('S5', 'fail'), label: 'Climb under power' }]));
+  const chip = endChip(r, true);
+  assert.equal(chip.kind, 'end-bad');
+  assert.match(chip.text, /^Not met: Vertical speed at contact 24\.23 m\/s \(limit <= 3 m\/s\); safety rule broken: Climb under power; impact not modelled$/);
 });
 
 

@@ -96,6 +96,44 @@ class DisplayArguments(unittest.TestCase):
         self.assertEqual(self.run_with("--conditions", "x" * 201).returncode, 2)
         self.assertEqual(self.run_with("--conditions", "a	b").returncode, 2)
 
+    def policy(self, *extra):
+        out = subprocess.run([self.godot, "--headless", "--path", PROJECT, "--", "--run", RUN, "--policy-dump", *extra],
+                             capture_output=True, text=True, timeout=120, encoding="utf-8", errors="replace")
+        self.assertEqual(out.returncode, 0, out.stderr[-500:])
+        line = next(ln for ln in out.stdout.splitlines() if ln.startswith("POLICY "))
+        return json.loads(line[len("POLICY "):])
+
+    def test_every_run_line_carries_the_exploratory_qualifier_and_the_conditions(self):
+        qualifier = "idealised model, not a real vehicle"
+        # Whatever the vehicle and whether or not the Studio says the case is exploratory (no --exploratory here).
+        shown = self.policy("--run-label", "Engine thrust 0.7 x", "--vehicle", "22 t landing stage", "--conditions", "GNSS bias 9.72 m", "--seed", "5017")["run_line"]
+        self.assertIn("22 t landing stage (" + qualifier + ")", shown)
+        self.assertIn("  |  exploratory", shown)
+        self.assertIn("conditions: GNSS bias 9.72 m", shown)
+        self.assertIn("seed 5017", shown)
+        bare = self.policy()["run_line"]
+        self.assertIn(qualifier, bare)
+        self.assertTrue(bare.endswith("exploratory") or "  |  exploratory" in bare, bare)
+        self.assertNotIn("conditions:", bare)
+        # With the flag too, the qualifier is the same single one.
+        flagged = self.policy("--vehicle", "x", "--exploratory")["run_line"]
+        self.assertEqual(flagged.count("exploratory"), 1 + flagged.count("exploratory,"), flagged)
+
+    def test_the_result_panel_says_exploratory_and_that_the_impact_is_not_modelled(self):
+        d = self.policy()
+        self.assertIn("Exploratory: an idealised model, not a real vehicle, not validated against flight data.", d["verdict"])
+        self.assertIn("Impact is not modelled: the stage is drawn intact whatever the contact speed.", d["verdict"])
+        self.assertIn("Safety rules:", d["verdict"])
+        self.assertNotIn("Safety: ", d["verdict"])
+
+    def test_the_place_is_a_backdrop_and_the_pack_terrain_is_not_recorded_data(self):
+        d = self.policy()
+        self.assertTrue(d["title"].endswith("Place name (backdrop only)"), d["title"])
+        self.assertNotIn("terrain", d["legend_data"].lower())
+        self.assertNotIn("environment pack", d["legend_data"])
+        self.assertIn("Backdrop only", d["legend_illustrative"])
+        self.assertIn("terrain", d["legend_illustrative"])
+
     def test_the_seed_is_a_non_negative_integer(self):
         self.assertEqual(self.run_with("--seed", "-1").returncode, 2)
         self.assertEqual(self.run_with("--seed", "five").returncode, 2)

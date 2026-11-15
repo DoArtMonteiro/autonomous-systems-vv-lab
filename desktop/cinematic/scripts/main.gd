@@ -143,6 +143,13 @@ func _policy_dump() -> void:
 		"presentation_line": Hud.presentation_line(record),
 		# The display arguments as the module will show them (bidi controls removed), for the tests.
 		"display": {"run_label": cli.run_label, "vehicle": cli.vehicle, "exploratory": cli.exploratory, "seed": cli.seed, "conditions": cli.conditions},
+		# The texts the screen shows, from the same functions the interface uses: the run line, the result panel
+		# and the legend, so the tests can read the exploratory qualifier, the conditions and the impact sentence.
+		"run_line": Hud.run_line_text(cli.run_label, cli.vehicle, cli.seed, cli.run_dir.rstrip("/\\").get_file(), record, cli.conditions),
+		"verdict": Hud.verdict_text_for(record),
+		"title": Hud.title_text("Place name"),
+		"legend_data": Hud.DATA_ASCENT if record.is_v2 else Hud.DATA,
+		"legend_illustrative": Hud.ILLUSTRATIVE_ASCENT if record.is_v2 else Hud.ILLUSTRATIVE,
 	}
 	print("POLICY " + JSON.stringify(out, "", true, true))
 	get_tree().quit(0)

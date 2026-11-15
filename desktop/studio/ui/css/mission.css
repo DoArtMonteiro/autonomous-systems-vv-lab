@@ -323,7 +323,7 @@
   #view-mission { overflow-y: auto; }
   .pl:not(.pl-control) { height: auto; min-height: 100%; grid-template-rows: auto auto auto; }
   .pl:not(.pl-control) .pl-body { grid-template-rows: auto auto; }
-  .pl:not(.pl-control) .pl-stage { min-height: clamp(390px, calc(100vh - 227px), 520px); }
+  .pl:not(.pl-control) .pl-stage { min-height: clamp(390px, calc(100vh - 227px), 560px); }
   .pl:not(.pl-control) .pl-side { overflow: visible; max-height: none; }
   .pl:not(.pl-control) .pl-transport { position: sticky; bottom: 0; z-index: 3; }
   .pl:not(.pl-control) .pl-legend { grid-column: 1 / -1; }
@@ -340,12 +340,16 @@
   .pl:not(.pl-control):not(.pl-geo) .pl-run { flex: 0 1 auto; min-width: 0; }
   .pl:not(.pl-control):not(.pl-geo) .pl-run[aria-checked="true"] { flex: 1 1 auto; }
   .pl:not(.pl-control):not(.pl-geo) .pl-run[aria-checked="false"] { flex-shrink: 0; white-space: nowrap; }
-  .pl:not(.pl-control):not(.pl-geo) .pl-run[aria-checked="false"] .pl-run-c,
-  .pl:not(.pl-control):not(.pl-geo) .pl-run[aria-checked="false"] .pl-run-id,
+  /* A pill that is not the shown run keeps its conditions (cut short) and its short id; only the status is left out. */
   .pl:not(.pl-control):not(.pl-geo) .pl-run[aria-checked="false"] .pl-run-v { display: none; }
+  .pl:not(.pl-control):not(.pl-geo) .pl-run[aria-checked="false"] .pl-run-l,
+  .pl:not(.pl-control):not(.pl-geo) .pl-run[aria-checked="false"] .pl-run-c { display: inline-block; vertical-align: bottom; max-width: 13ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pl:not(.pl-control):not(.pl-geo) .pl-run[aria-checked="false"] .pl-run-c { max-width: 18ch; }
 }
 /* The player page scrolls up and down only; nothing in it may push it sideways. */
 #view-mission { overflow-x: hidden; }
 /* On an 820 px window the Run list (its entries now carry the conditions and the short id) is narrower, so the five controls of the
    header fit on one row instead of pushing the first of them out of the window. */
 @media (max-width: 900px) { .pl-cin-run { max-width: 200px; } }
+
+.pl-phase-name.ph-end-neutral { color: var(--fg-1); border-color: var(--rule-strong); }
