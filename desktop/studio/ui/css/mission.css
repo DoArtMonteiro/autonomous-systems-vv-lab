@@ -297,3 +297,10 @@
 /* A verdict chip with a long sentence wraps inside its own border instead of running over it. */
 .vchip { height: auto; min-height: 24px; padding-top: 2px; padding-bottom: 2px; line-height: 1.35; border-radius: 14px; }
 .vchip-k { flex: none; }
+
+/* A flat (2D) scene shrinks with the stage instead of running under the run pills, and a tall narrow window
+   gives the stage more room, so the axis labels stay in view above the pills. */
+.pl-viewport.is-2d .scene-canvas { min-height: 0; }
+@media (max-width: 1100px) and (min-height: 800px) {
+  .pl-body { grid-template-rows: minmax(430px, 1fr) minmax(0, 34%); }
+}

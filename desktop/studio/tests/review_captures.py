@@ -35,7 +35,7 @@ PILLS_JS = """() => {
 UNSAFE_PILL = "[...document.querySelectorAll('.pl-run')].findIndex((e) => e.classList.contains('is-unsafe'))"
 
 
-def at_sizes(s, tag, rebuild, pairs):
+def at_sizes(s, tag, rebuild, pairs, reopen):
     """The player (already showing its end state) at each size: rebuilt for the size, result shown, checked, captured."""
     for w, h in SIZES:
         s.resize(w, h)
@@ -49,9 +49,11 @@ def at_sizes(s, tag, rebuild, pairs):
         r = s.js(PILLS_JS)
         check(f"{tag} {w}x{h}: no run pill is clipped", not r["bad"], json.dumps(r))
         s.shot(f"ux4-{tag}-{w}x{h}-dark")
+    # The light theme: the theme switch goes through Settings, so the player is opened again afterwards.
     s.resize(1440, 900)
     s.theme("light")
-    time.sleep(0.8)
+    reopen()
+    time.sleep(1.0)
     s.shot(f"ux4-{tag}-1440x900-light")
     s.theme("dark")
     s.resize(1440, 900)
@@ -97,8 +99,20 @@ def main():
                 time.sleep(1.0)
                 chip = s.js("document.querySelector('.pl-phase-name') && document.querySelector('.pl-phase-name').textContent")
                 check("The 60 m/s run at its end: the chip names the failing requirement", bool(chip) and "Vertical speed at contact 60.08" in chip, str(chip))
+                def reopen_60():
+                    s.nav("lab")
+                    s.wait("document.querySelector('#lab-watch')", 30, "lab result")
+                    s.page.click("#lab-watch")
+                    s.wait("(() => { const p = window.__studio.player(); return p && p.experience.startsWith('runs:') && document.querySelector('.pl-hud dl'); })()", 120, "player")
+                    s.page.click(".pl-views [data-view='engineering']")
+                    s.wait("(() => { const p = window.__studio.player(); return p && p.view === 'engineering'; })()", 60, "engineering")
+                    s.page.click(".pl-run[data-run='1']")
+                    if s.js("!!document.querySelector(\"[data-action='reveal']\")"):
+                        s.page.click("[data-action='reveal']")
+                    s.wait("document.querySelector('.pl-result')", 10, "result")
+
                 at_sizes(s, "end-state-60ms-run", to_engineering,
-                         [[".pl-cams", ".pl-hud"], [".pl-cams", ".pl-runs"], [".pl-scene-note", ".pl-cams"], [".pl-scene-note", ".pl-runs"]])
+                         [[".pl-cams", ".pl-hud"], [".pl-cams", ".pl-runs"], [".pl-scene-note", ".pl-cams"], [".pl-scene-note", ".pl-runs"]], reopen_60)
 
                 open_mission(s, "corridor")
                 s.page.click("[data-action='reveal']")
@@ -120,8 +134,15 @@ def main():
                     if idx is not None and idx >= 0:
                         s.page.click(f".pl-run[data-run='{idx}']")
 
+                def reopen_corridor():
+                    open_mission(s, "corridor")
+                    if s.js("!!document.querySelector(\"[data-action='reveal']\")"):
+                        s.page.click("[data-action='reveal']")
+                    s.wait("document.querySelector('.pl-result')", 30, "result")
+                    rebuild_corridor()
+
                 at_sizes(s, "corridor-broken-rule-run", rebuild_corridor,
-                         [[".pl-cams", ".pl-hud"], [".pl-cams", ".pl-runs"], [".pl-scene-note", ".pl-runs"]])
+                         [[".pl-cams", ".pl-hud"], [".pl-cams", ".pl-runs"], [".pl-scene-note", ".pl-runs"]], reopen_corridor)
 
                 # A rocket landing with a broken safety rule: its record is kept in the scratch library so
                 # that the Cinematic View panel can be captured from it (the corridor is a ground vehicle,
