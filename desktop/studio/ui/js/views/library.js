@@ -44,7 +44,7 @@ function render() {
   const tabs = [['runs', `Runs`, runs.length], ['scenarios', 'Saved scenarios', scenarios.length], ['comparisons', 'Saved comparisons', comparisons.length]];
   const tabBar = h('div', { class: 'tabs', role: 'tablist', 'aria-label': 'Library sections', style: { borderBottom: 0, padding: 0 } },
     tabs.map(([id, text, n]) => h('button', { type: 'button', role: 'tab', class: 'tab', 'aria-selected': String(tab === id), onclick: () => { tab = id; render(); } }, text, h('span', { class: 'count' }, String(n)))));
-  const head = h('div', { class: 'lib-head' }, h('h1', null, 'Library'), tabBar, h('div', { class: 'spacer' }),
+  const head = h('div', { class: 'lib-head' }, h('h1', null, 'Runs'), tabBar, h('div', { class: 'spacer' }),
     h('span', { class: 'dim small mono lib-path', title: state.info ? state.info.library : '' }, state.info ? state.info.library : ''),
     h('button', { type: 'button', class: 'btn', onclick: () => api.reveal(null).catch((e) => toast(errorText(e), 'error')) }, icon('folder'), 'Open library folder'));
   if (tab === 'runs') root.append(h('div', { class: 'lib' }, head, filters(), runTable()));
@@ -111,13 +111,22 @@ function runTable() {
   const table = h('table', { class: 'lib-table' },
     h('thead', null, h('tr', null,
       h('th', { scope: 'col' }, h('span', { class: 'sr-only' }, 'Select for comparison')),
-      ['Run', 'Domain', 'Scenario', 'Controller', 'Seed', 'Faults', 'Outcome', 'Safety', 'Failed', 'Created (UTC)'].map((t) => h('th', { scope: 'col' }, t)))),
+      ['Run', 'Domain', 'Scenario', 'Controller', 'Seed', 'Faults', 'Outcome', 'Safety rules', 'Failed', 'Created (UTC)'].map((t) => h('th', { scope: 'col' }, t)))),
     tbody);
   detailHost = h('aside', { class: 'lib-detail', 'aria-label': 'Selected run' });
   mainEl = h('div', { class: ['lib-main', selected ? '' : 'no-detail'] }, h('div', { class: 'lib-table-wrap' }, table), detailHost);
   drawRows();
   drawDetail();
   return mainEl;
+}
+
+/** The plain name of a failed requirement for the Failed column: the catalog's label, else the id read as words. */
+function failedName(domainId, id) {
+  const d = domainById(domainId);
+  const q = d && d.catalog && (d.catalog.requirements || []).find((x) => x.id === id);
+  if (q && q.label) return q.label;
+  const words = String(id).replace(/^[a-z_]+\./, '').replace(/^[A-Za-z]\d+_/, '').replace(/_/g, ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 function drawRows() {
@@ -156,8 +165,8 @@ function drawRows() {
     h('td', { class: 'mono' }, String(s.seed)),
     h('td', { class: 'small' }, s.faults.length ? s.faults.map(words).join(', ') : h('span', { class: 'dim' }, 'none')),
     h('td', null, h('span', { class: ['cell', `v-${ov}`] }, verdictGlyph(ov), s.outcome_label)),
-    h('td', null, h('span', { class: ['cell', `v-${sv}`], title: 'Safety rules are judged on the true state throughout the run. Contact speed and position are mission requirements, judged separately.' }, verdictGlyph(sv), unjudged ? 'not evaluated' : s.safety_status === 'safe' ? 'No safety rule broken' : 'A safety rule broken', s.safety_class && !unjudged ? h('span', { class: ['class-badge', `class-${s.safety_class}`] }, s.safety_class) : null)),
-    h('td', { class: 'failed' }, s.failed.join(' ')),
+    h('td', null, h('span', { class: ['cell', `v-${sv}`], title: 'Safety rules are judged on the true state throughout the run. Contact speed and position are mission requirements, judged separately.' }, verdictGlyph(sv), unjudged ? 'Not evaluated' : s.safety_status === 'safe' ? 'None broken' : 'A rule broken', s.safety_class && !unjudged ? h('span', { class: ['class-badge', `class-${s.safety_class}`] }, s.safety_class) : null)),
+    h('td', { class: 'failed', title: s.failed.join(' ') }, s.failed.map((id) => failedName(s.domain, id)).join(', ')),
     h('td', { class: 'mono dim small' }, m.created_utc.replace('T', ' ').replace('Z', '')));
     tbody.append(tr);
   }

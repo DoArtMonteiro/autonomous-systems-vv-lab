@@ -264,3 +264,23 @@
 .pl-clock { white-space: nowrap; }
 .pl-phase-name { white-space: normal; line-height: 1.35; }
 .pl-phase-name.ph-end-bad { text-transform: none; letter-spacing: .02em; font-size: 13px; }
+
+/* The objective folds on a short window; its heading is the summary. */
+.pl-brief > summary { cursor: pointer; list-style: none; }
+.pl-brief > summary::-webkit-details-marker { display: none; }
+.pl-brief > summary h2 { display: inline; }
+.pl-brief > summary::after { content: " (show)"; color: var(--fg-3); font-size: 12px; }
+.pl-brief[open] > summary::after { content: " (hide)"; }
+.pl-run-v { white-space: normal; color: var(--fg-2); }
+/* On a narrow window the camera row sits on the left above the run pills, clear of the readout card. */
+@media (max-width: 1100px) {
+  .pl:not(.pl-geo):not(.pl-control) .pl-cams { right: auto; left: 16px; bottom: 124px; }
+  /* Below 900 px the run pills wrap onto two lines, so the camera row rises above both. */
+}
+@media (max-width: 900px) {
+  .pl:not(.pl-geo):not(.pl-control) .pl-cams { bottom: 160px; }
+  .pl:not(.pl-geo):not(.pl-control) .pl-hud { max-height: calc(100% - 150px); overflow-y: auto; scrollbar-width: thin; }
+}
+@media (max-height: 700px) {
+  .pl:not(.pl-geo) .pl-hud { max-height: calc(100% - 150px); overflow-y: auto; scrollbar-width: thin; }
+}

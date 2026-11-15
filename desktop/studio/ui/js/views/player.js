@@ -28,7 +28,7 @@ import { buildControl } from './control.js';
 import { sourcesInfo } from '../sources-info.js';
 import { openCatalogue } from '../env-catalogue.js';
 import { cinematicButton } from '../cinematic.js';
-import { reqView, safetyWording, SAFETY_NOTE } from '../requirements.js';
+import { reqView, safetyWording, SAFETY_NOTE, failureSentence, indexNumbers } from '../requirements.js';
 
 let root;
 let navigate = () => {};
@@ -123,7 +123,7 @@ function renderEmpty() {
     h('p', { class: 'eyebrow' }, 'Mission player'),
     h('h1', null, 'No mission is playing'),
     h('p', { class: 'dim' }, 'Choose a mission in the library. It runs on this machine and plays back here.'),
-    h('button', { type: 'button', class: 'btn btn-primary', onclick: () => navigate('missions') }, 'Open the mission library')));
+    h('button', { type: 'button', class: 'btn btn-primary', onclick: () => navigate('missions') }, 'Open the missions')));
 }
 
 function dispose() {
@@ -308,6 +308,7 @@ function phaseAt(t) {
 
 /** "Not met: <requirement> <value> (limit <limit>)": the failed mission requirement that is furthest past its limit. */
 function failedContactText(record) {
+  indexNumbers(record);
   const failed = (record.requirements || []).filter((q) => q.status === 'fail' && q.category !== 'invariant');
   if (!failed.length) return 'Reached the ground; impact not modelled';
   const views = failed.map((q) => ({ q, v: reqView(q) }));
@@ -418,13 +419,15 @@ function build() {
   const phaseTag = h('div', { class: 'pl-phase', 'aria-hidden': 'true' });
   const runBar = runs.length > 1 ? h('div', { class: 'pl-runs', role: 'radiogroup', 'aria-label': 'Run shown in the scene' },
     runs.map((r, i) => h('button', { type: 'button', role: 'radio', class: 'pl-run', 'aria-checked': String(i === pl.active), dataset: { run: String(i) }, onclick: () => setActive(i) },
-      h('span', { class: 'pl-swatch', style: { background: r.colour } }), r.label))) : null;
+      h('span', { class: 'pl-swatch', style: { background: r.colour } }), r.label, h('span', { class: 'pl-run-v small', dataset: { v: String(i) } })))) : null;
   const note = sceneNote();
   stage.append(...[viewport, phaseTag, hud, runBar, cameraButtons(), note].filter(Boolean));
 
   // With two runs held, the person chooses which one the Cinematic View opens; it starts on the shown run.
-  const cinRun = runs.length > 1 ? h('select', { class: 'select select-sm pl-cin-run', 'aria-label': 'Run to open in the Cinematic View', title: 'Which of the held runs the Cinematic View opens', dataset: { action: 'cinematic-run' } },
+  const cinRunSel = runs.length > 1 ? h('select', { class: 'select select-sm pl-cin-run', id: 'pl-cin-run', 'aria-label': 'Run to open in the Cinematic View', title: 'Which of the held runs the Cinematic View opens', dataset: { action: 'cinematic-run' } },
     runs.map((r, i) => h('option', { value: String(i), selected: i === pl.active }, r.label))) : null;
+  const cinRun = cinRunSel;
+  const cinRunBox = cinRunSel ? h('label', { class: 'pl-cin-run-box', for: 'pl-cin-run' }, h('span', { class: 'dim small' }, 'Run:'), cinRunSel) : null;
   const cinIndex = () => (cinRun ? Number(cinRun.value) : pl.active);
   const head = h('header', { class: 'pl-head' },
     h('button', { type: 'button', class: 'pl-back', onclick: () => navigate('missions') }, h('span', { 'aria-hidden': 'true' }, '←'), ' Missions'),
@@ -438,8 +441,8 @@ function build() {
     h('div', { class: 'pl-viewtools' }, viewSwitch(), pl.view === 'geospatial' ? envSelect() : null),
     h('div', { class: 'pl-head-actions', role: 'group', 'aria-label': 'Actions for the shown run' },
       h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'analyse' }, title: 'Open the shown run with every channel, requirement and its provenance', onclick: () => navigate('run', { runId: pl.runs[pl.active].runId, t: pl.cursor.t }) }, 'Analyse'),
-      runs.length > 1 ? h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'compare' }, onclick: () => navigate('compare', { runIds: runs.map((r) => r.runId), demo: pl.demo }) }, 'Compare in detail') : null,
-      cinRun,
+      runs.length > 1 ? h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'compare' }, onclick: () => navigate('compare', { runIds: runs.map((r) => r.runId), demo: pl.demo, labels: runs.map((r) => r.label) }) }, 'Compare in detail') : null,
+      cinRunBox,
       cinematicButton(() => pl.runs[cinIndex()].runId, () => pl.envId || (pl.envs.length ? defaultEnv(pl.envs) : null), pl.kind === 'rocket-3d' || pl.kind === 'ascent', () => cinematicInfo(pl.runs[cinIndex()])),
       h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'configure' }, title: 'Open the shown run in the Experiment Lab: change its conditions, run a new simulation and compare', onclick: () => navigate('lab', { runId: pl.runs[pl.active].runId }) }, 'Open in Experiment Lab'))));
 
@@ -447,6 +450,7 @@ function build() {
   const transport = buildTransport();
   root.append(h('div', { class: ['pl', pl.view === 'geospatial' ? 'pl-geo' : ''] }, head, h('div', { class: 'pl-body' }, stage, side), transport));
   pl.dom = { viewport, hud, phaseTag, side, runBar, note, cinRun };
+  fillRunPills();
   mountScene();
   renderSide();
   drawBand();
@@ -673,8 +677,8 @@ function setAnalysis(on) {
 /** The analysis-mode switch, shared by the player and the Flight console. */
 export function analysisToggle() {
   return h('button', { type: 'button', class: 'btn btn-quiet btn-sm pl-analysis', dataset: { action: 'analysis' }, 'aria-pressed': String(!!(pl && pl.analysis)),
-    title: 'Analysis mode: show every finding and the result now, including those later in the run. Ordinary playback shows them only when it reaches them.',
-    onclick: () => setAnalysis(!(pl && pl.analysis)) }, 'Analysis mode');
+    title: 'Show every finding and the result now, including those later in the run. Ordinary playback shows them only when it reaches them.',
+    onclick: () => setAnalysis(!(pl && pl.analysis)) }, 'Show all findings now');
 }
 
 function updateTransport(t) {
@@ -709,9 +713,21 @@ function revealNow() {
   reveal();
 }
 
+/** After the result is shown, each run pill carries its mission and safety verdicts, so they are in view without scrolling. */
+function fillRunPills() {
+  if (!pl || !pl.dom || !pl.dom.runBar || !pl.revealed) return;
+  for (const span of pl.dom.runBar.querySelectorAll('.pl-run-v')) {
+    const rec = pl.runs[Number(span.dataset.v)].record;
+    const failed = (rec.requirements || []).filter((q) => q.category !== 'invariant');
+    const nf = failed.filter((q) => q.status === 'fail').length;
+    span.textContent = ` · ${nf ? `${nf} of ${failed.length} requirements failed` : `all ${failed.length} requirements met`} · ${safetyWording(rec).text}`;
+  }
+}
+
 function reveal() {
   if (!pl || pl.revealed) return;
   pl.revealed = true;
+  fillRunPills();
   // The button that asks for the result is replaced by the result itself. Wherever the reveal
   // comes from (that button, the end of the playback, analysis mode), if focus was on it, focus
   // moves to the Result heading instead of falling to the page. The live region and the cards
@@ -751,7 +767,7 @@ function runResult(run) {
     metrics.length ? h('dl', { class: 'pl-metrics' }, metrics.map((m) => h('div', null, h('dt', null, m.label), h('dd', { class: 'mono' }, m.value === null ? '—' : `${hudNum(m.value)} ${m.unit}`)))) : null,
     failed.length ? h('ul', { class: 'pl-failed' }, failed.map((q) => h('li', null,
       h('button', { type: 'button', class: 'link', title: 'Move the playback to the decisive instant', onclick: () => { if (Number.isFinite(q.t)) { pl.cursor.pause(); pl.cursor.set(q.t); } } }, q.label),
-      h('span', { class: 'small dim' }, ` ${q.category === 'invariant' ? 'safety invariant' : 'requirement'}: expected ${q.expected}, observed ${q.observed}`)))) : h('p', { class: 'small ok-text' }, 'Every requirement and safety invariant met.'));
+      (() => { const rv = reqView(q); return h('span', { class: 'small dim', title: rv.full }, ` ${q.category === 'invariant' ? 'safety rule' : 'requirement'}: limit ${rv.limitText}, observed ${rv.obsText}`); })()))) : h('p', { class: 'small ok-text' }, 'Every requirement and safety rule met.'));
 }
 
 function changeSummary() {
@@ -805,8 +821,9 @@ function renderSide() {
   pl.dom.live = h('div', { class: 'pl-live', 'aria-live': 'polite' });
   pl.dom.after = h('div', { class: 'pl-after' });
   side.append(
-    h('section', { class: 'pl-card pl-brief' },
-      h('h2', null, 'Objective'), h('p', null, exp.objective),
+    // On a short window the objective starts folded, so the result is not pushed below the scene.
+    h('details', { class: 'pl-card pl-brief', open: window.innerHeight > 760 },
+      h('summary', null, h('h2', null, 'Objective')), h('p', null, exp.objective),
       h('h3', null, 'Watch for'), h('ul', { class: 'pl-list' }, exp.watch.map((w) => h('li', null, w)))),
     pl.dom.live, pl.dom.after);
   fillResult();

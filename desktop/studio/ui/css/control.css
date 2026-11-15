@@ -325,7 +325,7 @@
 .si-credit, .pl-credit, .mc .pl-credit { background: color-mix(in srgb, var(--bg-1) 94%, transparent); color: var(--fg-1); }
 .mc .pl-scene-note.is-geo { max-width: min(760px, calc(100% - 520px)); }
 @media (max-width: 1100px) {
-  .pl:not(.pl-geo) .pl-runs, .pl:not(.pl-geo) .pl-cams { bottom: 68px; }
+  .pl:not(.pl-geo):not(.pl-control) .pl-runs { bottom: 68px; }
 }
 
 /* The end chip of a failed contact is a sentence (requirement, value, limit): in the Flight console
@@ -333,3 +333,10 @@
 .mc-time { max-width: min(28vw, 360px); text-align: center; }
 .mc-phase { white-space: normal; line-height: 1.35; }
 .mc-phase.ph-end-bad { text-transform: none; letter-spacing: .02em; font-size: 13px; }
+
+/* Flight console: the end sentence of a failed contact sits on a backing, readable over the scene. */
+.mc-phase.ph-end-bad { display: inline-block; opacity: 1; padding: 4px 12px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--fail) 55%, transparent); background: var(--glass-strong); color: var(--fail); }
+/* On a short window the camera row moves up out of the timeline. */
+@media (max-height: 700px) { .pl-control .mc-cams { bottom: 200px; } }
+/* With the end sentence under the clock, the run pills move below it. */
+.mc:has(.mc-phase.ph-end-bad) .mc-runs { top: 184px; }

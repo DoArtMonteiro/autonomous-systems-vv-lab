@@ -1031,10 +1031,19 @@ pub struct Display {
 }
 
 const LABEL_MAX_CHARS: usize = 80;
+/// The largest seed the module accepts (18 digits); a larger one is left out of the display.
+const SEED_MAX: u64 = 999_999_999_999_999_999;
+
+/// Unicode bidirectional overrides and isolates: they can make text read in another order than it is
+/// written, so they are removed from every label.
+fn is_bidi_control(c: char) -> bool {
+    matches!(c, '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}')
+}
 
 fn clean_label(s: &str) -> Option<String> {
     let t: String = s
         .chars()
+        .filter(|c| !is_bidi_control(*c))
         .map(|c| if c.is_control() { ' ' } else { c })
         .take(LABEL_MAX_CHARS)
         .collect();
@@ -1054,7 +1063,7 @@ impl Display {
         if self.exploratory {
             args.push("--exploratory".to_string());
         }
-        if let Some(s) = self.seed {
+        if let Some(s) = self.seed.filter(|s| *s <= SEED_MAX) {
             args.extend(["--seed".to_string(), s.to_string()]);
         }
     }
@@ -1383,6 +1392,22 @@ mod tests {
                 "5000"
             ]
         );
+        // A seed with more than 18 digits and bidi overrides are left out or removed.
+        let mut odd = Vec::new();
+        Display {
+            run_label: Some("a\u{202E}b\u{2066}c".to_string()),
+            seed: Some(SEED_MAX + 1),
+            ..Display::default()
+        }
+        .append_to(&mut odd);
+        assert_eq!(odd, ["--run-label", "abc"]);
+        let mut top = Vec::new();
+        Display {
+            seed: Some(SEED_MAX),
+            ..Display::default()
+        }
+        .append_to(&mut top);
+        assert_eq!(top, ["--seed", "999999999999999999"]);
         let mut none = Vec::new();
         Display {
             run_label: Some("   ".to_string()),

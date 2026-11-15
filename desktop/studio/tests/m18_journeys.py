@@ -163,7 +163,7 @@ def compare(s, base_id, exp_id):
     labels = s.js("[...document.querySelectorAll('.run-legend .key-label')].map((e) => ({ text: e.textContent.trim(), cut: e.scrollWidth > e.clientWidth + 1 }))")
     texts = [x["text"] for x in labels]
     check("Compare: the two runs have different labels", len(texts) == 2 and texts[0] != texts[1], json.dumps(texts))
-    check("Compare: the labels name the changed parameter and its value, not the whole configuration", len(texts) == 2 and all("thrust" in t.lower() for t in texts) and "0.7" in texts[1] and "0.7" not in texts[0], json.dumps(texts))
+    check("Compare: the labels are the ones the Lab uses for the runs: Baseline, and the changed parameter with its value", len(texts) == 2 and texts[0] == "Baseline" and "thrust" in texts[1].lower() and "0.7" in texts[1], json.dumps(texts))
     check("Compare: no label is truncated", len(labels) == 2 and not any(x["cut"] for x in labels), json.dumps(labels))
     s.shot("m18-compare-dark")
     s.nav("lab")
@@ -269,7 +269,7 @@ def player_header(s):
         r = header_overlaps(s)
         NUMBERS[f"player_header_{w}x{hgt}"] = r
         check(f"Player header {w}x{hgt}: the window has the size asked for", abs(got[0] - w) <= 1 and abs(got[1] - hgt) <= 1, json.dumps(got))
-        check(f"Player header {w}x{hgt}: Analyse, Compare in detail, Cinematic view and Open in Experiment Lab are all there", r["actions"] == ["Analyse", "Compare in detail", "Cinematic view", "Open in Experiment Lab"], json.dumps(r["actions"]))
+        check(f"Player header {w}x{hgt}: Analyse, Compare in detail, Open Cinematic View and Open in Experiment Lab are all there", r["actions"] == ["Analyse", "Compare in detail", "Open Cinematic View", "Open in Experiment Lab"], json.dumps(r["actions"]))
         check(f"Player header {w}x{hgt}: no two controls overlap", not r["clash"], "; ".join(r["clash"])[:300])
         check(f"Player header {w}x{hgt}: every control is inside the window", not r["outside"], ", ".join(r["outside"]))
         check(f"Player header {w}x{hgt}: the header stays compact", r["headHeight"] <= 150, f"{r['headHeight']} px")

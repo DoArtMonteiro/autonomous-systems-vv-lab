@@ -175,3 +175,14 @@
 .hm-disclaimer, .hg-disclaimer { margin: 0; max-width: 76ch; padding: 8px 12px; border: 1px solid color-mix(in srgb, var(--grade-explore) 45%, transparent); border-left-width: 3px; border-radius: 4px; background: color-mix(in srgb, var(--grade-explore) 8%, transparent); color: var(--fg-1); font-size: 13px; line-height: 1.5; }
 .hm-disclaimer { margin-top: 14px; }
 .at-ctx { position: absolute; left: 10px; bottom: 10px; font: 600 12px/1 var(--sans); padding: 5px 8px; border-radius: 999px; background: var(--glass-strong); border: 1px solid var(--rule-strong); color: var(--fg-1); }
+
+/* Home statistics: four cells that wrap as a block, never one label over another. */
+.hm-stats { grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 1px; background: var(--rule); overflow: hidden; }
+.hm-stats > div, .hm-stats > div:nth-child(n) { border: 0; background: var(--bg-1); min-width: 0; }
+.hm-stats dt { overflow-wrap: anywhere; letter-spacing: .08em; }
+/* The reference case is a neutral fact, not a pass: it does not borrow the pass colour. */
+.hg-ev-ref { color: var(--fg-1); border-color: var(--fg-3); }
+.at-img { width: 100%; height: 100%; object-fit: cover; }
+#view-library { background: var(--bg-0); }
+/* Runs page: the names of failed requirements are words, not code. */
+td.failed { font-family: var(--sans); font-size: 12px; min-width: 190px; }

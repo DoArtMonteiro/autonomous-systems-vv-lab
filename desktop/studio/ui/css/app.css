@@ -274,11 +274,11 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width
 .verdict-v { display: flex; align-items: center; gap: 8px; font: 600 16px/1.2 var(--display); }
 .verdict-v .glyph { width: 20px; height: 20px; }
 .verdict-s { font-size: 12px; font-weight: 500; color: var(--fg-3); text-transform: lowercase; }
-.verdict-x { margin: 3px 0 0; color: var(--fg-2); font-size: 12px; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.verdict-x { margin: 3px 0 0; color: var(--fg-2); font-size: 12px; overflow-wrap: anywhere; }
 .verdict-x:hover, .verdict:focus-within .verdict-x { -webkit-line-clamp: unset; }
 .verdict:focus-visible { outline-offset: -2px; }
-.validity-strip { grid-column: 1 / -1; display: flex; gap: 10px; align-items: baseline; font-size: 12px; color: var(--fg-3); min-width: 0; }
-.validity-strip .vtext { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+.validity-strip { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; font-size: 12px; color: var(--fg-3); min-width: 0; }
+.validity-strip .vtext { white-space: normal; overflow-wrap: anywhere; min-width: 0; flex: 1 1 320px; }
 .validity-strip b { color: var(--fg-2); font-weight: 600; }
 .demo-banner { grid-column: 1 / -1; background: var(--bg-1); border-radius: var(--r); padding: 6px 10px; display: grid; gap: 3px; font-size: 12px; color: var(--fg-2); }
 .demo-banner .look { display: flex; flex-wrap: wrap; gap: 2px 12px; align-items: baseline; }
@@ -414,7 +414,7 @@ span.req-t { border-color: transparent; color: var(--fg-3); cursor: default; }
 .chart-head h3 { font-size: 12px; }
 .readouts { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 0 14px; margin: 4px 0 2px; }
 .ro { display: grid; grid-template-columns: 12px 15px minmax(0, 1fr) auto auto; gap: 6px; align-items: center; font-size: 12px; color: var(--fg-2); min-width: 0; padding: 1px 0; }
-.ro-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ro-label { white-space: normal; overflow-wrap: anywhere; line-height: 1.25; }
 .cmp .ro-label { white-space: normal; overflow-wrap: anywhere; line-height: 1.25; }
 .ro-val { color: var(--fg-1); text-align: right; min-width: 64px; }
 .ro-unit { font-size: 12px; min-width: 22px; }
@@ -599,7 +599,6 @@ span.req-t { border-color: transparent; color: var(--fg-3); cursor: default; }
   .form-sec { grid-template-columns: minmax(0, 1fr); gap: 8px; }
   .seed-row { grid-template-columns: 150px minmax(0, 1fr); }
   .run-body { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-  .verdict-x { -webkit-line-clamp: 1; }
   .cmp-body { grid-template-columns: minmax(0, 1fr); height: auto; }
   .cmp-scene { height: 380px; }
   .cmp-matrix { max-height: 460px; order: -1; border-bottom: 1px solid var(--rule); }
@@ -660,3 +659,7 @@ span.req-t { border-color: transparent; color: var(--fg-3); cursor: default; }
 .matrix tbody th { white-space: normal; max-width: 280px; }
 .run-key .key-sub { white-space: normal; overflow-wrap: anywhere; }
 .run-key .key-label { white-space: normal; overflow-wrap: anywhere; }
+
+/* Comparison run cards: how many requirements failed. */
+.run-key .key-count { grid-column: 2 / -1; font-size: 12px; color: var(--fg-2); }
+.pl-cin-run-box { display: inline-flex; align-items: center; gap: 4px; }

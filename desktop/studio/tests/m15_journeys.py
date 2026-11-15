@@ -145,7 +145,7 @@ def explorer(s):
     res = s.results()
     check("Explorer: baseline lands hard, robust lands", res == [["hard_landing", "safe"], ["landed", "safe"]], json.dumps(res))
     check("Explorer: the difference is located in time", s.js("/departs from/.test(document.querySelector('.pl-side').innerText)") and s.js("!!document.querySelector('.pl-mark.sev-diverge')"))
-    check("Explorer: a failed requirement names expected and observed", s.js("/expected .* observed /.test(document.querySelector('.pl-failed').innerText)"))
+    check("Explorer: a failed requirement names expected and observed", s.js("/(expected|limit) .* observed /.test(document.querySelector('.pl-failed').innerText)"))
     s.shot("m15-player-lying-altimeter-result-dark")
 
 

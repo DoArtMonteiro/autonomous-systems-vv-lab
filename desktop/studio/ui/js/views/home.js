@@ -117,9 +117,9 @@ export function showHome() {
       h('div', { class: 'hm-path-body' },
         h('p', { class: 'hm-path-k mono' }, '01'),
         h('h2', null, 'Launch and explore a mission'),
-        h('p', null, 'Ascent to orbit with staging, powered landings, sensor faults. Each mission runs the real simulator and plays back what happened, with the verdicts at the end.'),
+        h('p', null, 'Ascent to orbit with staging, powered landings, sensor faults. Each mission runs the simulator again and plays back that run, not a stored animation; the verdicts come at the end.'),
         h('div', { class: 'hm-quicks' }, quick('to-orbit'), quick('first-landing')),
-        h('button', { type: 'button', class: 'btn btn-primary', dataset: { action: 'missions' }, onclick: () => navigate('missions') }, 'Open the mission library'))),
+        h('button', { type: 'button', class: 'btn btn-primary', dataset: { action: 'missions' }, onclick: () => navigate('missions') }, 'Open the missions'))),
     h('article', { class: 'hm-path', dataset: { path: 'vehicle' } },
       vehicleArt(),
       h('span', { class: 'hm-art-note' }, 'Illustration, not to scale'),
@@ -135,7 +135,7 @@ export function showHome() {
       h('div', { class: 'hm-path-body' },
         h('p', { class: 'hm-path-k mono' }, '03'),
         h('h2', null, 'Explore environments and cinematic replays'),
-        h('p', null, 'Real launch sites and landscapes from open geographic data, integrity-checked offline. Fly a mission over one, or replay a recorded landing in the Cinematic View.'),
+        h('p', null, 'Real launch sites and landscapes from open geographic data, integrity-checked offline. Play a mission against one as a backdrop (terrain is context only), or open a recorded landing in the Cinematic View.'),
         envNames,
         h('button', { type: 'button', class: 'btn btn-primary', dataset: { action: 'environments' }, onclick: () => navigate('environments') }, 'Open the environments'))));
 

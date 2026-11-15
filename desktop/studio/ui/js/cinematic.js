@@ -36,7 +36,7 @@ const mbText = (b) => `${(b / 1048576).toFixed(0)} MB`;
 export function cinematicButton(runId, envId, replayable, info) {
   const reasonId = `cin-why-${++cinSeq}`;
   const why = h('span', { class: 'sr-only', id: reasonId });
-  const b = h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'cinematic' }, 'aria-disabled': 'true', 'aria-describedby': reasonId, title: 'Checking the Cinematic View module…' }, 'Cinematic view');
+  const b = h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'cinematic' }, 'aria-disabled': 'true', 'aria-describedby': reasonId, title: 'Checking the Cinematic View module…' }, 'Open Cinematic View');
   const wrap = h('span', { class: 'cin-wrap' }, b, why);
   why.textContent = 'Checking the Cinematic View module…';
   const off = (text) => { b.setAttribute('aria-disabled', 'true'); b.title = text; why.textContent = text; };

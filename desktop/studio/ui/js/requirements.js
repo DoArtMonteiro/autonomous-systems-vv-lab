@@ -134,19 +134,43 @@ export function reqLabel(r) {
 
 /**
  * The safety verdict in the words of the mission player: how many safety rules were checked and how
- * many broke, never a bare "safe". `verdict` is the glyph class (pass, unsafe or neutral).
+ * many broke, never a bare "safe". Only evaluated invariants are counted (a rule the run never judged
+ * is neither checked nor passed), a broken rule is looked at before anything else so it never reads as
+ * neutral, and no count is written that the record's own rows do not give. `verdict` is the glyph
+ * class (pass, unsafe or neutral).
  */
 export function safetyWording(record) {
   const inv = (record.requirements || []).filter((q) => q.category === 'invariant');
-  const broken = inv.filter((q) => q.status === 'fail').length;
-  const unjudged = record.safety.status === 'safe' && record.safety.class === 'not_evaluated';
-  if (unjudged) return { text: 'Safety not evaluated', verdict: 'neutral', n: inv.length, broken: 0, unjudged: true };
-  // A count is shown only when the records' own invariant rows give it; an unsafe verdict with none says so without a number.
-  if (record.safety.status === 'unsafe' || broken) return { text: broken ? `${broken} of ${inv.length} safety rules broken` : 'A safety rule was broken', verdict: 'unsafe', n: inv.length, broken, unjudged: false };
-  return { text: inv.length ? `No safety rule broken (${inv.length} checked)` : 'No safety rule broken', verdict: 'pass', n: inv.length, broken: 0, unjudged: false };
+  const judged = inv.filter((q) => q.status !== 'not_evaluated');
+  const notEvaluated = inv.length - judged.length;
+  const broken = judged.filter((q) => q.status === 'fail').length;
+  const base = { n: inv.length, checked: judged.length, notEvaluated, broken };
+  if (record.safety.status === 'unsafe' || broken) {
+    return { ...base, text: broken ? `${broken} of ${judged.length} safety rules broken` : 'A safety rule was broken', verdict: 'unsafe', unjudged: false };
+  }
+  const unjudged = (record.safety.status === 'safe' && record.safety.class === 'not_evaluated') || (inv.length > 0 && judged.length === 0);
+  if (unjudged) return { ...base, text: 'Safety not evaluated', verdict: 'neutral', unjudged: true };
+  if (!inv.length) return { ...base, text: 'No safety rule broken', verdict: 'pass', unjudged: false };
+  const count = notEvaluated ? `${judged.length} of ${inv.length} checked; ${notEvaluated} not evaluated` : `${judged.length} checked`;
+  return { ...base, text: `No safety rule broken (${count})`, verdict: 'pass', unjudged: false };
 }
 
-export const SAFETY_NOTE = 'Safety rules are judged on the true state throughout the run. Contact speed and position are mission requirements, judged separately: a hard landing fails a requirement without breaking a safety rule.';
+export const SAFETY_NOTE = 'Safety rules are judged on the true state throughout the run. Mission requirements are judged separately: a requirement can fail without any safety rule being broken.';
+
+/** The name of a requirement for people: the label, never the id ("R1_vertical_speed"). */
+export function plainName(q) {
+  return q.label || String(q.id || '').replace(/^[a-z_]+\./, '').replace(/^[A-Z]\d+_/, '').replace(/_/g, ' ');
+}
+
+/** "2 mission requirements failed: Vertical speed at contact, Horizontal speed at contact." and its safety twin, from the record's rows. */
+export function failureSentence(record) {
+  const reqs = record.requirements || [];
+  const mission = reqs.filter((q) => q.category !== 'invariant');
+  const failed = mission.filter((q) => q.status === 'fail');
+  if (!failed.length) return mission.length ? `All ${mission.length} mission requirements met.` : '';
+  const n = failed.length;
+  return `${n} mission requirement${n === 1 ? '' : 's'} failed: ${failed.map(plainName).join(', ')}.`;
+}
 
 // ----------------------------------------------------------------------------- headline change
 

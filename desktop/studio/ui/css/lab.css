@@ -97,3 +97,13 @@
 .lab-table td, .lab-table th { vertical-align: top; }
 .lab-table td:first-child { min-width: 150px; overflow-wrap: anywhere; }
 #lab-run-why { font-weight: 600; color: var(--fg-1); }
+
+/* The result column is the widest; a number is never broken, and a value and its unit stay together. */
+.lab-grid { grid-template-columns: minmax(220px, 260px) minmax(280px, 0.8fr) minmax(560px, 1.9fr); }
+.lab-table td, .lab-table th { overflow-wrap: normal; word-break: normal; }
+.lab-table td:first-child { overflow-wrap: break-word; }
+.lab-cell-v, .lab-cell-m { white-space: nowrap; }
+.lab-table td:first-child { white-space: normal; }
+@media (max-width: 1180px) { .lab-grid { grid-template-columns: minmax(0, 1fr); } }
+.lab-table td:last-child { white-space: nowrap; }
+.lab-table td.lab-lim:not(.is-long) { white-space: nowrap; }

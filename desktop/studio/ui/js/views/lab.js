@@ -558,7 +558,7 @@ function renderComparison(el) {
       const cell = (x, v) => (x ? h('td', { class: ['mono', 'small', `st-${x.status}`], title: v.full }, h('span', { class: 'lab-cell-v' }, `${x.status === 'pass' ? '✓' : x.status === 'fail' ? '✕' : '·'} ${v.obsText}`), v.marginText ? h('span', { class: 'lab-cell-m dim' }, `margin ${v.marginText}`) : null) : h('td', null, '–'));
       return h('tr', { class: ra && rb && ra.status !== rb.status ? 'is-flip' : '', dataset: { req: r.id } },
         h('td', { title: (vb || va).full }, reqLabel(r)),
-        h('td', { class: 'mono small' }, (vb || va).limitText),
+        h('td', { class: ['mono', 'small', 'lab-lim', (vb || va).limitText.length > 28 ? 'is-long' : ''] }, (vb || va).limitText),
         cell(ra, va), cell(rb, vb),
         h('td', { class: ['mono', 'small', delta === null ? '' : delta > 1e-12 ? 'is-better' : delta < -1e-12 ? 'is-worse' : ''] }, delta === null ? '–' : Math.abs(delta) < 1e-12 ? `0 ${(vb || va).unit}` : `${delta > 0 ? '+' : '-'}${fmtSig(Math.abs(delta))} ${(vb || va).unit}`));
     })))),
@@ -566,7 +566,7 @@ function renderComparison(el) {
   h('p', { class: 'small dim' }, `One run on seed ${b.request.seed}. A change that helps one seed may not help another: check it across seeds below.`),
   h('div', { class: 'row' },
     h('button', { type: 'button', class: 'btn btn-primary', id: 'lab-watch', title: 'Play both runs from their records in the mission player: engineering scene, geospatial view, Flight console and, when installed, the Cinematic View', onclick: () => watchRuns() }, 'Watch both runs'),
-    h('button', { type: 'button', class: 'btn', onclick: () => navigate('compare', { runIds: [lab.base.id, lab.exp.id] }) }, 'Compare signals in detail'),
+    h('button', { type: 'button', class: 'btn', onclick: () => navigate('compare', { runIds: [lab.base.id, lab.exp.id], labels: ['Baseline', distinguishingLabels([lab.base.record.request, lab.exp.record.request], catalog())[1]] }) }, 'Compare signals in detail'),
     h('button', { type: 'button', class: 'btn btn-quiet', onclick: () => navigate('run', { runId: lab.exp.id }) }, 'Analyse the experiment'),
     h('button', { type: 'button', class: 'btn btn-quiet', title: 'Make this run the new baseline and keep experimenting from it', onclick: () => { const e = lab.exp; startFrom(e.id, e.record); render(); } }, 'Use as new baseline')));
 }
