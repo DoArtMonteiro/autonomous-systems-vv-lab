@@ -359,7 +359,7 @@ function renderMain() {
     changed();
   } }, 'Add fault');
   formEl.append(section('Faults', `Up to ${cat.max_faults}; windows in ${cat.time.label.toLowerCase()}`, [
-    form.faults.length ? faultRows : h('p', { class: 'dim' }, 'No injected fault: a nominal run.'),
+    form.faults.length ? faultRows : h('p', { class: 'dim' }, 'No injected fault.'),
     full ? h('p', { class: 'dim small' }, `The domain accepts at most ${cat.max_faults} faults per run.`) : h('div', { class: 'add-fault' }, addSel, addBtn),
   ]));
 

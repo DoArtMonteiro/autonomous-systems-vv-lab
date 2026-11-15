@@ -65,6 +65,22 @@ class VerdictWording(unittest.TestCase):
                         break
         self.assertEqual(bad, [], "a bare safe or Safe string:\n" + "\n".join(bad))
 
+    def test_no_whole_word_safe_in_visible_studio_text(self):
+        """Case-insensitive: any whole word "safe" in the Studio's code must be an internal comparison or a filter option
+        (the shared wording says "no safety rule broken"; mission titles and prose say the same)."""
+        word = re.compile(r"(?<![\w-])safe(?![\w-])", re.IGNORECASE)
+        bad = []
+        for path in js_files():
+            for i, line in enumerate(read(path).splitlines(), 1):
+                if line.lstrip().startswith(("*", "/*", "//")):
+                    continue
+                code = line.split("//")[0]
+                code = COMPARISON.sub("", code)
+                code = BARE_ALLOWED.sub("", code)
+                if word.search(code):
+                    bad.append(f"{os.path.relpath(path, REPO)}:{i}: {line.strip()[:120]}")
+        self.assertEqual(bad, [], "a whole word safe in visible text:\n" + "\n".join(bad))
+
     def test_cinematic_panel_uses_the_rule_count_phrase(self):
         text = read(os.path.join(CINEMATIC, "hud.gd"))
         self.assertNotRegex(text, r"Safety: %s", "the panel must not print the raw safety status")
