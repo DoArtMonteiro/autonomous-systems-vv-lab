@@ -7,10 +7,10 @@
 # the playback reaches the end of the run (V shows them earlier).
 extends RefCounted
 
-const ILLUSTRATIVE := "Illustrative, not data: stage geometry (42 m), landing pad, lights and masts, ground texture and boulders near the pad, scanned plants (their positions and sizes are the pack's), HDRI sky, plume and exhaust, glow and dust, crown shapes, scrub colour and foliage cards, building walls and roofs, sky, haze, water finish, ground beyond the pack."
-const ILLUSTRATIVE_ASCENT := "Illustrative, not data: vehicle shapes (from the record's visual block), body axis drawn along the recorded velocity, reversed (tail first) while an engine burns in a steep descent (no attitude is recorded or simulated), the direction east (the record has no heading), the upper stage drawn offset from the first stage's recorded point, plume and exhaust, glow and dust, landing pad and lights, the Earth beyond the pack as a plain sphere with no geography, atmosphere, sky and haze."
-const DATA_ASCENT := "Data: each entity's position, altitude, inertial speed (as the record defines it) and throttle (percent of the maximum) from the record (interpolated between its samples for display); an entity exists from its first to its last sample; terrain and imagery of the pad's surroundings from the validated pack. Nothing here is simulated."
-const DATA := "Data: stage pose from the record (interpolated for display), throttle (percent of the maximum), speed |v| (the length of the recorded velocity vector), verdicts; terrain, imagery, footprints, heights, plant positions from the validated pack. Nothing here is simulated."
+const ILLUSTRATIVE := "Drawn for illustration, not data: the vehicle shapes (42 m), landing pad, lights and masts, ground textures and boulders near the pad, plant textures (their positions and sizes come from the environment pack), the sky image, plume and exhaust, glow and dust, tree crowns, scrub colour, building walls and roofs, haze, water and the ground beyond the pack."
+const ILLUSTRATIVE_ASCENT := "Drawn for illustration, not data: the vehicle shapes (from the record's visual block), the body axis drawn along the recorded velocity (tail first while an engine burns in a steep descent; no attitude is recorded or simulated), the direction east (the record has no heading), the upper stage drawn offset from the first stage's recorded point, plume and exhaust, glow and dust, landing pad and lights, and the Earth beyond the pack as a plain sphere with no geography, atmosphere, sky or haze."
+const DATA_ASCENT := "Recorded data: each vehicle's position, altitude, inertial speed (as the record defines it) and throttle (percent of the maximum), interpolated between its samples for display; a vehicle exists from its first to its last sample; terrain and imagery of the pad's surroundings come from the environment pack. Nothing here is simulated."
+const DATA := "Recorded data: the vehicle's position and orientation (interpolated for display), throttle (percent of the maximum), speed (the length of the recorded velocity vector) and the results; terrain, imagery, building footprints and heights and plant positions come from the environment pack. Nothing here is simulated."
 const MARGIN := 18
 
 var layer: CanvasLayer
@@ -27,6 +27,8 @@ var play_btn: Button
 var cam_buttons := {}
 var profile_menu: OptionButton
 var speed_menu: OptionButton
+var quality_label: Label
+var result_btn: Button
 var note: Label
 var bar: PanelContainer
 var rows: Array = []
@@ -60,11 +62,37 @@ static func _label(size: int, colour := Color(0.93, 0.95, 0.97)) -> Label:
 	return l
 
 
+static func _small(text: String) -> Label:
+	var l := _label(12, Color(0.82, 0.86, 0.9))
+	l.text = text
+	l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	return l
+
+
+# The quality control's label says whether the profile was chosen by the automatic policy; the reason
+# is its tooltip. One control, one place: the profile menu next to it names the profile.
+func set_quality_note(auto: bool, tip: String) -> void:
+	quality_label.text = "Quality (auto)" if auto else "Quality"
+	quality_label.tooltip_text = tip
+	quality_label.mouse_filter = Control.MOUSE_FILTER_STOP
+	profile_menu.tooltip_text = tip
+
+
 static func _anchor(c: Control, left: float, top: float, right: float, bottom: float) -> void:
 	c.anchor_left = left
 	c.anchor_top = top
 	c.anchor_right = right
 	c.anchor_bottom = bottom
+
+
+# " (10 m)" from the record's own requirement row ("<= 10 m"), or nothing when the row is absent.
+static func _limit_text(record, id: String) -> String:
+	for q in record.data.get("requirements", []):
+		if typeof(q) == TYPE_DICTIONARY and str(q.get("id", "")) == id:
+			var parts: PackedStringArray = str(q.get("expected", "")).split(" ", false)
+			if parts.size() >= 3 and parts[1].is_valid_float():
+				return " (%s %s)" % [parts[1], parts[2]]
+	return ""
 
 
 func build(root: Node, record, pack, t0: float, t1: float, profiles: Array, cameras: Array) -> void:
@@ -114,7 +142,7 @@ func build(root: Node, record, pack, t0: float, t1: float, profiles: Array, came
 	if is_v2:
 		status.text = ILLUSTRATIVE_ASCENT + "\n" + DATA_ASCENT + "\nColoured lines (record): the recorded path of each entity."
 	else:
-		status.text = ILLUSTRATIVE + "\n" + DATA + "\nRings (record): green R5 landing radius, red S2 keep-out. White line: nozzle track on the ground."
+		status.text = ILLUSTRATIVE + "\n" + DATA + "\nRings: green is the landing radius%s, red is the keep-out radius%s, both from the run record's limits. White line: the engine nozzle's path over the ground." % [_limit_text(record, "R5_position"), _limit_text(record, "S2_keep_out")]
 	var sp := PanelContainer.new()
 	sp.add_theme_stylebox_override("panel", _panel(0.92))
 	_anchor(sp, 0, 1, 0, 1)
@@ -143,7 +171,7 @@ func build(root: Node, record, pack, t0: float, t1: float, profiles: Array, came
 	cp.offset_top = -MARGIN
 	credit_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	credit_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	credit_line.custom_minimum_size = Vector2(360, 0)
+	credit_line.custom_minimum_size = Vector2(300, 0)
 	credit_panel = cp
 	cp.add_child(credit_line)
 	layer.add_child(cp)
@@ -165,36 +193,47 @@ func build(root: Node, record, pack, t0: float, t1: float, profiles: Array, came
 	bar.add_theme_stylebox_override("panel", _panel(0.6))
 	_anchor(bar, 0, 1, 1, 1)
 	bar.offset_left = MARGIN + 580
-	bar.offset_right = -MARGIN - 400
-	bar.offset_top = -MARGIN - 88
-	bar.offset_bottom = -MARGIN - 4
+	bar.offset_right = -MARGIN - 340
+	bar.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	bar.offset_top = -MARGIN - 20
+	bar.offset_bottom = -MARGIN
 	var col := VBoxContainer.new()
 	bar.add_child(col)
-	var row := HBoxContainer.new()
+	var row := HFlowContainer.new()
 	col.add_child(row)
 	play_btn = Button.new()
 	play_btn.text = "Play"
 	row.add_child(play_btn)
+	row.add_child(_small("Speed"))
 	speed_menu = OptionButton.new()
 	for sp2 in ["0.25x", "0.5x", "1x", "2x"]:
 		speed_menu.add_item(sp2)
 	speed_menu.select(2)
 	row.add_child(speed_menu)
+	row.add_child(_small("Time"))
 	slider = HSlider.new()
 	slider.min_value = t0
 	slider.max_value = t1
 	slider.step = 0.0
-	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slider.custom_minimum_size = Vector2(110, 0)
 	slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(slider)
+	quality_label = _small("Quality")
+	row.add_child(quality_label)
 	profile_menu = OptionButton.new()
 	for p in profiles:
 		profile_menu.add_item(p.capitalize())
 	row.add_child(profile_menu)
-	var row2 := HBoxContainer.new()
+	result_btn = Button.new()
+	result_btn.text = "Show result"
+	result_btn.tooltip_text = "Show the record's verdicts now (V)"
+	row.add_child(result_btn)
+	var row2 := HFlowContainer.new()
 	col.add_child(row2)
 	rows = [row, row2]
-	var names := {"director": "Auto", "follow": "Follow", "pad": "Ground", "closeup": "Pad", "wide": "Wide", "overhead": "Top", "lowwide": "Low"}
+	row2.add_child(_small("Camera"))
+	# The same names the Studio's player uses for the same cameras.
+	var names := {"director": "Auto", "follow": "Follow", "pad": "From the ground", "closeup": "At the pad", "wide": "Whole descent", "overhead": "Overhead", "lowwide": "Low angle"}
 	if is_v2:
 		names["pad"] = "Pad view"
 		names["wide"] = "Trajectory"
@@ -207,9 +246,10 @@ func build(root: Node, record, pack, t0: float, t1: float, profiles: Array, came
 		cam_buttons[c] = b
 	if is_v2:
 		# Entity of the follow camera: Auto follows the most relevant one by the recorded state.
-		var ent_row := HBoxContainer.new()
+		var ent_row := HFlowContainer.new()
 		col.add_child(ent_row)
 		rows.append(ent_row)
+		ent_row.add_child(_small("Follow"))
 		var ea := Button.new()
 		ea.text = "Entity: Auto"
 		ea.toggle_mode = true
@@ -223,10 +263,9 @@ func build(root: Node, record, pack, t0: float, t1: float, profiles: Array, came
 			eb.add_theme_font_size_override("font_size", 12)
 			ent_row.add_child(eb)
 			entity_buttons[en["id"]] = eb
+	# The graphics note became the label of the one quality control (see set_quality_note).
 	note = _label(12, Color(1.0, 0.9, 0.62))
-	note.clip_text = true
-	note.mouse_filter = Control.MOUSE_FILTER_STOP
-	note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	note.visible = false
 	row2.add_child(note)
 	layer.add_child(bar)
 
@@ -254,9 +293,13 @@ func set_run_info(label: String, vehicle: String, exploratory: bool, seed: int, 
 	parts.append(name)
 	var sd := seed
 	if sd < 0 and record != null:
+		# Read from the record's JSON, where a number is a float: only a seed that is exactly an integer
+		# below 2^53 is shown, never a rounded one.
 		var rq = record.data.get("request", {})
-		if typeof(rq) == TYPE_DICTIONARY and rq.get("seed") != null:
-			sd = int(rq["seed"])
+		if typeof(rq) == TYPE_DICTIONARY and (typeof(rq.get("seed")) == TYPE_FLOAT or typeof(rq.get("seed")) == TYPE_INT):
+			var f := float(rq["seed"])
+			if f >= 0.0 and f < 9.0e15 and f == floorf(f):
+				sd = int(f)
 	if sd >= 0:
 		parts.append("seed %d" % sd)
 	if vehicle != "":
@@ -264,7 +307,7 @@ func set_run_info(label: String, vehicle: String, exploratory: bool, seed: int, 
 	elif exploratory:
 		parts.append("exploratory, not a real vehicle")
 	run_line.text = "  |  ".join(parts)
-	speed_word = "inertial speed" if is_v2 else "speed |v|"
+	speed_word = "inertial speed" if is_v2 else "speed"
 
 
 func set_presentation(on: bool, record = null) -> void:
@@ -298,7 +341,7 @@ func toggle_credits() -> void:
 # The record's verdicts are shown only when the playback reaches the end of the run (the rule of
 # the technical view), or when the viewer asks for them with V.
 func _show_verdict(on: bool) -> void:
-	verdict.text = verdict_text if on else "Result: shown when the playback reaches the end of the run. Press V to show it now."
+	verdict.text = verdict_text if on else "Result: shown when the playback reaches the end of the run. Press V or use Show result to see it now."
 
 
 func reveal() -> void:

@@ -35,6 +35,16 @@ var camera_pose: PackedFloat64Array = PackedFloat64Array()  # east, north, up of
 var error := ""
 
 
+static func _strip_bidi(s: String) -> String:
+	var out := ""
+	for ch in s:
+		var u: int = ch.unicode_at(0)
+		if (u >= 0x202A and u <= 0x202E) or (u >= 0x2066 and u <= 0x2069):
+			continue
+		out += ch
+	return out
+
+
 static func usage() -> String:
 	return "usage: -- --run <run dir> [--env <pack dir>] [--pose-dump t1,t2,...] [--profile auto|performance|balanced|high|ultra|custom] [--custom key=value,...] [--vram-bytes N] [--camera director|follow|pad|closeup|wide|overhead|lowwide] [--t seconds] [--play] [--controls shown|hidden] [--presentation] [--policy-dump] [--entity auto|<entity id>] [--run-label text] [--vehicle text] [--exploratory] [--seed N] [--camera-pose ex,ey,ez,tx,ty,tz,fov] [--shot out.png] [--bench out.json --bench-seconds S --bench-from T --bench-to T]"
 
@@ -110,7 +120,9 @@ static func parse(args: PackedStringArray) -> RefCounted:
 			"--policy-dump":
 				c.has_policy_dump = true
 			"--run-label", "--vehicle":
-				# Text for the screen only. Anything that is too long or holds a control character is refused.
+				# Text for the screen only. Bidirectional overrides and isolates are removed; anything that is
+				# then too long or holds a control character is refused.
+				v = _strip_bidi(v)
 				var okt := v.length() >= 1 and v.length() <= LABEL_MAX
 				for ch in v:
 					okt = okt and ch.unicode_at(0) >= 32 and ch.unicode_at(0) != 127

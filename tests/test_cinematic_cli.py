@@ -78,6 +78,10 @@ class DisplayArguments(unittest.TestCase):
     def test_control_characters_are_refused(self):
         self.assertEqual(self.run_with("--vehicle", "a	b").returncode, 2)
 
+    def test_the_largest_seed_is_accepted_and_bidi_overrides_are_removed_not_refused(self):
+        self.assertEqual(self.run_with("--seed", "9" * 18).returncode, 0)
+        self.assertEqual(self.run_with("--run-label", "a‮b⁦c").returncode, 0)
+
     def test_the_seed_is_a_non_negative_integer(self):
         self.assertEqual(self.run_with("--seed", "-1").returncode, 2)
         self.assertEqual(self.run_with("--seed", "five").returncode, 2)
