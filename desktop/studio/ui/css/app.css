@@ -702,10 +702,14 @@ td.failed { min-width: 0; overflow-wrap: anywhere; }
 
 /* Runs with the detail panel open on a narrow window (820 px): the date column goes (it is in the run's metadata), the cells give up
    a little padding and the Failed column wraps narrower, so Outcome, Safety rules and Failed stay in view without a sideways scroll. */
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .lib-main:not(.no-detail) table th:nth-child(11), .lib-main:not(.no-detail) table td:nth-child(11) { display: none; }
+}
+@media (max-width: 900px) {
   .lib-main:not(.no-detail) table th, .lib-main:not(.no-detail) table td { padding-left: 6px; padding-right: 6px; }
-  .lib-main:not(.no-detail) td.failed { max-width: 150px; }
+  /* Words may break inside the Outcome, Failed and Run cells; a number (the seed) never does. */
+  .lib-main:not(.no-detail) td.failed { max-width: 140px; }
   .lib-main:not(.no-detail) .cell { white-space: normal; }
-  .lib-main:not(.no-detail) table td { overflow-wrap: anywhere; }
+  .lib-main:not(.no-detail) td.failed, .lib-main:not(.no-detail) td .cell, .lib-main:not(.no-detail) td .run-label { overflow-wrap: anywhere; }
+  .lib-main:not(.no-detail) td.mono { white-space: nowrap; }
 }

@@ -273,6 +273,8 @@ def capture_sizes(s):
         time.sleep(0.6)
         cols = s.js("""() => [...document.querySelectorAll('thead th')].filter((e) => e.offsetParent !== null && /Outcome|Safety rules|Failed/.test(e.textContent)).map((e) => { const r = e.getBoundingClientRect(); return { name: e.textContent.trim(), left: Math.round(r.left), right: Math.round(r.right), inside: r.left >= 0 && r.right <= innerWidth + 1 }; })""")
         check(f"Runs {w}x{h} with the detail panel open: Outcome, Safety rules and Failed are in view", len(cols) == 3 and all(c["inside"] for c in cols), json.dumps(cols))
+        seeds = s.js("[...document.querySelectorAll('tbody tr[data-run] td.mono')].filter((e) => e.offsetParent !== null).map((e) => { const r = document.createRange(); r.selectNodeContents(e); return [e.textContent.trim(), r.getClientRects().length]; })")
+        check(f"Runs {w}x{h} with the detail panel open: a number (the seed) is never broken over two lines", bool(seeds) and all(x[1] <= 1 for x in seeds), json.dumps(seeds))
         s.shot(f"ux3-runs-{w}x{h}-dark")
         check(f"Layout {w}x{h}: the Lab, Compare, Analyse and Runs pages have no horizontal page scroll", s.no_hscroll())
     s.resize(1440, 900)
