@@ -47,7 +47,7 @@
    ]
   },
   "base_outcome": "Orbit",
-  "base_run": "e41f71c23324683f",
+  "base_run": "0a13305558a55dd1",
   "exp": {
    "booster.R2_propellant_margin": [
     "pass",
@@ -95,18 +95,18 @@
    ]
   },
   "exp_outcome": "Suborbital",
-  "exp_run": "29f1ca5e32273f37"
+  "exp_run": "808650d2c6ec11cc"
  },
  "cinematic_button": {
   "described": true,
   "disabled": false,
   "focusable": true,
-  "title": "Open this run (landing or launch ascent) in the Cinematic View 0.2.5 (a separate window; read-only replay of the record)"
+  "title": "Open this run (landing or launch ascent) in the Cinematic View 0.2.6 (a separate window; read-only replay of the record)"
  },
  "cinematic_status": {
   "installed": true,
   "verified": true,
-  "version": "0.2.5"
+  "version": "0.2.6"
  },
  "landing_thrust_0_7": {
   "base": {
@@ -156,7 +156,7 @@
    ]
   },
   "base_outcome": "Reached the ground, requirements not met",
-  "base_run": "cad03fec2ff1582d",
+  "base_run": "bd19998592dc1e7e",
   "base_safety": "safe",
   "exp": {
    "R1_vertical_speed": [
@@ -205,7 +205,7 @@
    ]
   },
   "exp_outcome": "Reached the ground, requirements not met",
-  "exp_run": "9e6edb2ebcf3bbba",
+  "exp_run": "d3c2d223f3a36e95",
   "exp_safety": "safe",
   "seed": 5000
  },

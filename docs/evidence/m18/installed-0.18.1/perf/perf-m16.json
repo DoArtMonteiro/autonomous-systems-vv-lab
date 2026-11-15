@@ -6,42 +6,42 @@
     "os": "Windows-11-10.0.26300-SP0",
     "python": "3.14.6"
   },
-  "cold_start_to_ready_s": 0.98,
+  "cold_start_to_ready_s": 0.99,
   "idle_memory": {
     "processes": 7,
-    "working_set_mb": 429.4,
-    "private_mb": 299.6,
+    "working_set_mb": 424.9,
+    "private_mb": 292.7,
     "by_name": [
       "msedgewebview2.exe",
       "vv-studio.exe"
     ]
   },
   "idle_frames": {
-    "frames": 112,
-    "mean_ms": 17.94,
-    "p50_ms": 17.8,
-    "p95_ms": 18.4,
-    "p99_ms": 18.5,
-    "max_ms": 25.1,
+    "frames": 111,
+    "mean_ms": 18.14,
+    "p50_ms": 18,
+    "p95_ms": 18.7,
+    "p99_ms": 18.9,
+    "max_ms": 29.1,
     "over_33ms": 0
   },
   "clicks_to_landing": 1,
-  "click_to_landing_on_screen_s": 0.27,
-  "machine_time_to_landing_s": 1.25,
+  "click_to_landing_on_screen_s": 0.28,
+  "machine_time_to_landing_s": 1.27,
   "playback_detected": true,
   "playback_frames": {
-    "frames": 280,
-    "mean_ms": 17.85,
-    "p50_ms": 17.8,
+    "frames": 281,
+    "mean_ms": 17.78,
+    "p50_ms": 17.6,
     "p95_ms": 18.5,
     "p99_ms": 18.9,
-    "max_ms": 19,
+    "max_ms": 19.1,
     "over_33ms": 0
   },
   "playback_memory": {
     "processes": 7,
-    "working_set_mb": 484.4,
-    "private_mb": 365.8,
+    "working_set_mb": 478.4,
+    "private_mb": 359.0,
     "by_name": [
       "msedgewebview2.exe",
       "vv-studio.exe"
@@ -53,37 +53,37 @@
     900,
     1
   ],
-  "engineering_playback_cpu_percent_of_one_core": 23.3,
+  "engineering_playback_cpu_percent_of_one_core": 27.5,
   "engineering_gpu": {
     "gpu_dedicated_mb": 137.8,
     "gpu_3d_utilisation_percent": 1.6
   },
-  "geo_switch_to_terrain_on_gpu_s": 0.465,
+  "geo_switch_to_terrain_on_gpu_s": 0.466,
   "geo_playback_frames": {
-    "frames": 280,
-    "mean_ms": 17.86,
-    "p50_ms": 17.8,
-    "p95_ms": 18.5,
-    "p99_ms": 18.9,
-    "max_ms": 19.1,
+    "frames": 282,
+    "mean_ms": 17.74,
+    "p50_ms": 17.6,
+    "p95_ms": 18.4,
+    "p99_ms": 18.8,
+    "max_ms": 18.9,
     "over_33ms": 0
   },
-  "geo_playback_cpu_percent_of_one_core": 39.9,
+  "geo_playback_cpu_percent_of_one_core": 35.7,
   "geo_playback_memory": {
     "processes": 7,
-    "working_set_mb": 869.8,
-    "private_mb": 1068.5,
+    "working_set_mb": 868.1,
+    "private_mb": 1062.4,
     "by_name": [
       "msedgewebview2.exe",
       "vv-studio.exe"
     ]
   },
   "geo_gpu": {
-    "gpu_dedicated_mb": 465.3,
+    "gpu_dedicated_mb": 461.6,
     "gpu_3d_utilisation_percent": 24.6
   },
   "geo_scene": {
-    "renders": 497,
+    "renders": 498,
     "triangles": 4489118,
     "geometries": 50,
     "textures": 10,
@@ -92,12 +92,12 @@
       "position": [
         88,
         -163.3,
-        43.4
+        44
       ],
       "target": [
         -0.5,
         3.2,
-        20.3
+        20.8
       ],
       "fov": 30,
       "distance": 190,
@@ -120,21 +120,21 @@
       ]
     }
   },
-  "switch_to_control_s": 0.455,
+  "switch_to_control_s": 0.485,
   "control_playback_frames": {
-    "frames": 280,
-    "mean_ms": 17.88,
-    "p50_ms": 17.8,
-    "p95_ms": 18.5,
-    "p99_ms": 18.8,
-    "max_ms": 19.1,
+    "frames": 278,
+    "mean_ms": 18.08,
+    "p50_ms": 18,
+    "p95_ms": 18.7,
+    "p99_ms": 19.2,
+    "max_ms": 29.9,
     "over_33ms": 0
   },
-  "control_playback_cpu_percent_of_one_core": 3.5,
+  "control_playback_cpu_percent_of_one_core": 5.0,
   "control_memory": {
     "processes": 7,
-    "working_set_mb": 933.4,
-    "private_mb": 1145.5,
+    "working_set_mb": 913.9,
+    "private_mb": 1121.8,
     "by_name": [
       "msedgewebview2.exe",
       "vv-studio.exe"
@@ -142,8 +142,8 @@
   },
   "after_leaving_memory": {
     "processes": 7,
-    "working_set_mb": 653.2,
-    "private_mb": 598.1,
+    "working_set_mb": 638.5,
+    "private_mb": 578.8,
     "by_name": [
       "msedgewebview2.exe",
       "vv-studio.exe"
@@ -155,8 +155,8 @@
   },
   "long_session_start_memory": {
     "processes": 7,
-    "working_set_mb": 1013.5,
-    "private_mb": 1558.4,
+    "working_set_mb": 978.5,
+    "private_mb": 1291.3,
     "by_name": [
       "msedgewebview2.exe",
       "vv-studio.exe"
@@ -164,29 +164,29 @@
   },
   "long_session_s": 180,
   "long_session_p99_ms_samples": [
-    18.7,
-    18.8,
-    19.1,
-    18.8,
-    18.8,
-    18.9,
-    18.9,
+    19,
     19,
     18.9,
     18.6,
-    18.7,
-    18.9,
+    18.8,
     19.1,
     18.9,
+    19,
+    18.7,
+    18.7,
+    19,
+    18.7,
+    18.7,
     18.9,
     18.7,
     18.9,
-    18.8
+    18.6,
+    18.5
   ],
   "long_session_end_memory": {
     "processes": 7,
-    "working_set_mb": 882.6,
-    "private_mb": 1169.3,
+    "working_set_mb": 875.5,
+    "private_mb": 1160.0,
     "by_name": [
       "msedgewebview2.exe",
       "vv-studio.exe"

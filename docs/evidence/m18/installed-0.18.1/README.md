@@ -1,8 +1,8 @@
 # Studio 0.18.1 instalado: verificação no Windows
 
-Esta pasta guarda a verificação do V&V Lab Studio 0.18.1 **instalado** (instalador NSIS, execução silenciosa por cima do 0.17.0), não do executável da pasta de compilação. Os percursos correram contra `%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe`, com o módulo Cinematic 0.2.5 instalado pelo código de instalação do próprio Studio. Nenhuma captura do ambiente de trabalho foi guardada: as imagens da pasta `cinematic/` foram desenhadas pelo módulo (`--shot`) ou são a janela do próprio módulo (`boot-splash-window.png`, da 0.2.1; a imagem de arranque não mudou), e só contêm a cena ou a imagem de arranque.
+Esta pasta guarda a verificação do V&V Lab Studio 0.18.1 **instalado** (instalador NSIS, execução silenciosa por cima do 0.17.0), não do executável da pasta de compilação. Os percursos correram contra `%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe`, com o módulo Cinematic 0.2.6 instalado pelo código de instalação do próprio Studio. Nenhuma captura do ambiente de trabalho foi guardada: as imagens da pasta `cinematic/` foram desenhadas pelo módulo (`--shot`) ou são a janela do próprio módulo (`boot-splash-window.png`, da 0.2.1; a imagem de arranque não mudou), e só contêm a cena ou a imagem de arranque.
 
-Em relação ao `main` (`66b30ca`) a versão 0.18.1 muda o número de versão do Studio, acrescenta o estado «Opening the Cinematic View...» e, depois da revisão independente das capturas do 0.18.1, uma passagem de correções de interface (secção «Passagem de correções de interface»). O módulo passa de 0.2.0 a 0.2.5. Os testes mudaram: `m17_cinematic_journey.py` espera pelo primeiro frame e verifica o estado novo, `installed_spotcheck.py` automatiza o percurso de utilizador e `ux_journeys.py` verifica as correções.
+Em relação ao `main` (`66b30ca`) a versão 0.18.1 muda o número de versão do Studio, acrescenta o estado «Opening the Cinematic View...» e, depois da revisão independente das capturas do 0.18.1, passagens de correções de interface (secções «Passagem de correções de interface», «Segunda passagem», «Terceira passagem» e «Quarta passagem»). O módulo passa de 0.2.0 a 0.2.6. Os testes mudaram: `m17_cinematic_journey.py` espera pelo primeiro frame e verifica o estado novo, `installed_spotcheck.py` automatiza o percurso de utilizador e `ux_journeys.py` verifica as correções.
 
 ## Máquina
 
@@ -12,20 +12,20 @@ AMD Ryzen 7 7800X3D (8 núcleos, 16 fios), 31,7 GB de RAM, AMD Radeon RX 7700 XT
 
 | Artefacto | Tamanho | SHA-256 |
 | --- | --- | --- |
-| `VV Lab Studio_0.18.1_x64-setup.exe` (o instalado e verificado) | 42 441 737 bytes | `29a4d131430be7440f8d90212f821c9920286486fcb0cd3220e9a8ab163a2c46` |
-| `vv-cinematic-0.2.5.zip` (78 ficheiros, 449 766 891 bytes em disco) | 345 001 192 bytes | `6a191c64c50b83ad280e294052771dfa1f1882eef6a7da29940f677d9b176050` |
+| `VV Lab Studio_0.18.1_x64-setup.exe` (o instalado e verificado) | 42 454 010 bytes | `d54b8e194eafe81349973fa86ebed0f0c42aeab8aeeb95a9693111ea2aa455c4` |
+| `vv-cinematic-0.2.6.zip` (78 ficheiros, 449 769 695 bytes em disco) | 345 001 982 bytes | `bed8aedfdffccd8a0e9eef777bbcbe19e486750f2b70f598a6808fce5721140f` |
 
-O instalador foi construído com `desktop/build.ps1` (compilação de lançamento completa): **código de saída 0**, capturado pelo invólucro que o executou (`BUILD EXIT 0`). Como o 0.18.1 ainda não foi publicado fora deste PC, o número de versão ficou e os instaladores anteriores deste número foram guardados na pasta de recuperação com nomes que dizem o que são: `...-setup-prebuild.exe` (a primeira versão), `...-setup-before-ux-pass.exe` (com o estado «Opening...», sem correções de interface), `...-setup-ux-pass-1.exe` a `-ux-pass-3.exe` (as três iterações da primeira passagem de interface), `...-setup-ux-round-1.exe` (o instalador final da primeira passagem, `e57f0af4...`, que a revisão de código e de interface avaliou) `...-setup-ux-round-2.exe` (a primeira iteração da segunda passagem, `c879688c...`, que ainda falhava a verificação a 820 px), `...-setup-ux-round-3.exe` (o instalador final da segunda passagem, `75eb3236...`, que a terceira revisão avaliou) e `...-setup-ux-round-3b.exe` (a primeira iteração da terceira passagem, `b9927fb4...`, que ainda deixava a página Runs com deslocamento horizontal a 820 px). `SHA256SUMS.txt` (esta pasta) resume os hashes relevantes; a lista completa está na pasta de recuperação do proprietário, e os quinze ficheiros ali foram verificados contra ela.
+O instalador foi construído com `desktop/build.ps1` (compilação de lançamento completa): **código de saída 0**, capturado pelo invólucro que o executou (`BUILD EXIT 0`). Como o 0.18.1 ainda não foi publicado fora deste PC, o número de versão ficou e os instaladores anteriores deste número foram guardados na pasta de recuperação com nomes que dizem o que são: `...-setup-prebuild.exe` (a primeira versão), `...-setup-before-ux-pass.exe` (com o estado «Opening...», sem correções de interface), `...-setup-ux-pass-1.exe` a `-ux-pass-3.exe` (as três iterações da primeira passagem de interface), `...-setup-ux-round-1.exe` (o instalador final da primeira passagem, `e57f0af4...`, que a revisão de código e de interface avaliou) `...-setup-ux-round-2.exe` (a primeira iteração da segunda passagem, `c879688c...`, que ainda falhava a verificação a 820 px), `...-setup-ux-round-3.exe` (o instalador final da segunda passagem, `75eb3236...`, que a terceira revisão avaliou), `...-setup-ux-round-3b.exe` (a primeira iteração da terceira passagem, `b9927fb4...`, que ainda deixava a página Runs com deslocamento horizontal a 820 px), `...-setup-ux-round-4.exe` (o instalador final da terceira passagem, `29a4d131...`, que a quarta revisão avaliou) e `...-setup-ux-round-4b.exe` (a primeira iteração da quarta passagem, `9d4cb6c6...`, em que o gráfico 2D do corredor ainda ficava por baixo das pílulas a 1024x640 e 820 px). `SHA256SUMS.txt` (esta pasta) resume os hashes relevantes; a lista completa está na pasta de recuperação do proprietário, e os dezassete ficheiros ali foram verificados contra ela.
 
 ## Instalação
 
 - Antes da primeira instalação, o hash do instalador de recuperação 0.17.0 foi confirmado contra o `SHA256SUMS.txt`.
-- O 0.18.1 foi instalado por cima do 0.17.0 e, depois, várias vezes por cima de si próprio à medida que o instalador mudou (dez instaladores até ao final), sempre com `/S`: código de saída 0; a chave `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\VV Lab Studio` ficou com `DisplayVersion` 0.18.1 e o executável instalado declara a versão 0.18.1.
-- Biblioteca do utilizador (`Documentos\VV Lab Library`): 11 corridas antes e depois de todas as instalações e de todos os percursos, mesma lista de identificadores, e o SHA-256 da lista ordenada dos 89 ficheiros da biblioteca é idêntico ao de antes da primeira instalação.
-- Módulo Cinematic: instalado pelo teste opcional `real_module_zip_installs_when_given` de `desktop/studio/src/modules.rs` (`VV_CINEMATIC_ZIP`, `VV_CINEMATIC_INSTALL_TO` a apontar para a pasta real de módulos), porque o diálogo nativo não é automatizável. Substituiu as versões anteriores; o Studio instalado lê `installed: true, verified: true, version: 0.2.5`.
-- O percurso `m17_cinematic_journey.py` desinstala o módulo no fim; por isso o módulo é reinstalado da mesma forma depois dele. No fim de tudo, o módulo 0.2.5 está instalado e verificado e não ficou nenhum processo do Studio nem do Godot.
+- O 0.18.1 foi instalado por cima do 0.17.0 e, depois, várias vezes por cima de si próprio à medida que o instalador mudou (doze instaladores até ao final), sempre com `/S`: código de saída 0; a chave `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\VV Lab Studio` ficou com `DisplayVersion` 0.18.1 e o executável instalado declara a versão 0.18.1.
+- Biblioteca do utilizador (`Documentos\VV Lab Library`): 11 corridas antes e depois de todas as instalações e de todos os percursos, mesma lista de identificadores, e o SHA-256 da lista ordenada dos 89 ficheiros da biblioteca é idêntico ao de antes da primeira instalação. Na quarta passagem o mesmo cálculo (SHA-256 da lista ordenada de «hash do ficheiro e caminho relativo» dos 89 ficheiros) deu `9b40386432e7786c681b274f7667b2db26bfbe58e9add8e6d798ecdefc6539c1` antes da primeira instalação da passagem e o mesmo valor depois da última instalação e de todos os percursos, com 11 corridas.
+- Módulo Cinematic: instalado pelo teste opcional `real_module_zip_installs_when_given` de `desktop/studio/src/modules.rs` (`VV_CINEMATIC_ZIP`, `VV_CINEMATIC_INSTALL_TO` a apontar para a pasta real de módulos), porque o diálogo nativo não é automatizável. Substituiu as versões anteriores; o Studio instalado lê `installed: true, verified: true, version: 0.2.6`.
+- O percurso `m17_cinematic_journey.py` desinstala o módulo no fim; por isso o módulo é reinstalado da mesma forma depois dele. No fim de tudo, o módulo 0.2.6 está instalado e verificado e não ficou nenhum processo do Studio nem do Godot.
 
-## Percursos contra o executável instalado (instalador final, módulo 0.2.5)
+## Percursos contra o executável instalado (instalador final, módulo 0.2.6)
 
 | Percurso | Resultado | Registo |
 | --- | --- | --- |
@@ -36,9 +36,10 @@ O instalador foi construído com `desktop/build.ps1` (compilação de lançament
 | `m18_journeys.py` | 72/72 | `m18-journeys.txt`, `m18-numbers.json` |
 | `installed_spotcheck.py` | 44/44 | `installed-spotcheck.txt`, `installed-spotcheck-facts.json` |
 | `ux_journeys.py` (primeira passagem) | 81/81 | `ux-journeys.txt`, `ux-facts.json` |
-| `ux2_journeys.py` (segunda e terceira passagens) | 52/52 | `ux2-journeys.txt`, `ux2-facts.json` |
+| `ux2_journeys.py` (segunda, terceira e quarta passagens) | 71/71 | `ux2-journeys.txt`, `ux2-facts.json` |
+| `review_captures.py` (quarta passagem, novo) | 16/16 | `review-captures.txt` |
 
-Todos usam bibliotecas e configuração temporárias (`VVLAB_LIBRARY`, `VVLAB_CONFIG`), por isso não tocam na biblioteca do utilizador. Os caminhos temporários aparecem nos registos como `<temporary folder>`. Os oito correram numa só execução no instalador final; o guião reinstala o módulo no início e no fim (o percurso `m17_cinematic` desinstala-o). As execuções anteriores da segunda passagem tiveram falhas verdadeiras que levaram a duas reconstruções (ver «Segunda passagem»).
+Todos usam bibliotecas e configuração temporárias (`VVLAB_LIBRARY`, `VVLAB_CONFIG`), por isso não tocam na biblioteca do utilizador. Os caminhos temporários aparecem nos registos como `<temporary folder>`. Os nove correram numa só execução no instalador final; o guião reinstala o módulo no início e no fim (o percurso `m17_cinematic` desinstala-o). As execuções anteriores da segunda passagem tiveram falhas verdadeiras que levaram a duas reconstruções (ver «Segunda passagem»).
 
 **Uma falha encontrada e corrigida (teste, não produto).** Na primeira execução com o módulo 0.2.0, `m17_cinematic_journey.py` deu 8/9: a verificação «o módulo desenhou o primeiro frame» falhou porque o percurso lia o registo do Godot após uma espera fixa de 12 s e o primeiro frame chega 12 a 16 s depois do clique. O processo estava a arrancar com Direct3D 12 sem erros; o percurso passou a esperar pela linha `FIRST_FRAME` (até 90 s) e a ignorar registos anteriores ao clique.
 
@@ -109,6 +110,67 @@ Uma revisão de código independente e uma segunda revisão das capturas (veredi
 
 **Capturas.** `D:\vvwt\shots-0.18.1-ux3\review\` (não no repositório; README próprio): Lab, Compare, Analyse e Runs a 1440x900, 1024x640 e 820x900; leitor de engenharia (1440 «end», 1024, 820), geoespacial e consola de voo nos três tamanhos; o estado final da corrida de 60 m/s; a missão «corridor» no leitor (uma regra de segurança quebrada), em Runs, em Analyse e em Compare; o painel de resultado da Cinematic View (da corrida de referência registada, com argumentos «Reference landing / 22 t landing stage» escritos para a captura); tema claro do leitor, de Analyse, de Ambientes, Home, hangar, Runs, Compare e Lab.
 
+## Quarta passagem (honestidade das palavras e disposição)
+
+A revisão da terceira passagem encontrou dois bloqueios de honestidade e um defeito de código. O painel de resultado do módulo Cinematic escrevia «Safety: safe» para uma corrida cujos requisitos falharam; a identidade de uma corrida dizia «no injected fault» com ruído de GPS configurado; e a contagem «all N requirements met» não olhava para as linhas não avaliadas. Em vez de corrigir cada frase, a passagem corrigiu as classes: uma só maneira de dizer a segurança, uma só função que dá nome a uma corrida, uma só leitura da contagem de requisitos, e um teste que falha se uma delas for contornada. Nenhum código de simulação, de domínio, de sementes ou de dados de corridas mudou; a única alteração na plataforma é `desktop/platform/src/evidence.rs` (o README do pacote de evidência), autorizada para esta passagem, sem tocar no esquema do registo, em `RunMeta` nem em `RunSummary`.
+
+**Obrigatório (feito, com verificação no instalador).**
+
+- **B1, identidade de uma corrida.** `conditionsName` (`ui/js/model.js`) lista todos os parâmetros que não são os por omissão do catálogo e todas as falhas injetadas («GPS noise 1 mm · Arrival radius 250 mm»; «default conditions» só quando não há nenhum). Passou a ser usada nas páginas Runs (uma linha «Conditions» por corrida, lida do pedido do registo, em carregamento tardio), Compare (cartões e etiquetas), Analyse, leitor (uma linha por corrida), Lab, cartões de demonstração da página Prepare e etiqueta de procura da paleta de comandos (que não mostra «no fault» quando o resumo não traz parâmetros). O Compare diz o que as corridas partilham e em que só diferem («Both runs: GPS noise 1 mm; they differ only in Arrival radius.»; quando as corridas não têm nenhuma condição comum, «no non-default condition in common»). A identidade vem do pedido do registo, não de um campo novo do resumo.
+- **B2, o painel do módulo.** O painel do Cinematic (módulo 0.2.6) já não escreve «Safety: safe»: «Safety rules: none broken (5 checked, S1 to S5), judged on the true state; this does not mean the vehicle is safe.», ou «Safety rules: 1 of 5 broken (Climb under power).», com os requisitos que falharam antes («Requirements failed: ...») e a frase do próprio domínio citada por baixo («The record says: ...»). Está nas imagens `cinematic-panel-60ms-run.png` e `cinematic-panel-broken-rule-landing.png`, desenhadas pelo módulo instalado. A corrida do corredor é de um veículo terrestre, que o módulo não desenha; o painel da corrida com regra quebrada vem da missão `threshold-trade-off` (aterragem com S5 quebrada).
+- **R1** `requirementWording` conta as três situações: «all N requirements met» só quando todas as linhas passam; senão «k of N requirements failed, n not evaluated, m met», com as falhas primeiro; as linhas de declaração do controlador não contam. `failureSentence` e o chip de missão do leitor seguem a mesma regra.
+- **R2** A página Runs diz «k safety rules broken» e só escreve «de N» quando o resumo traz o número de regras avaliadas (não traz); um identificador desconhecido nunca é classificado como requisito (as linhas «Failed» agrupam «Safety rules:», «Requirements:», «Declarations:», pela categoria do próprio registo, lida em carregamento tardio).
+- **R3** O teste Node tem 27 casos (eram 14): `requirementWording` (todos cumpridos, alguns falhados, alguns não avaliados, declarações), `statusLine`, `heldText`, `displayRunLabel`, `conditionsName`/`conditionsShared`, `marginDerived`, `headlineChange`, `shortText`.
+- **R4** `shortText` só arredonda decimais com cinco ou mais algarismos significativos e nunca mexe em algarismos dentro de identificadores («R1_vertical_speed», «9e6edb2e», «v1.2.3»).
+
+**Por classe (adenda da revisão estratégica).**
+
+- O README do pacote de evidência (`evidence.rs`) já não escreve «Safety: safe»: «Safety rules: no safety rule broken (5 checked), judged on the true state.» e a linha do pedido lista todos os parâmetros e falhas do pedido. Limitação: a plataforma não conhece os valores por omissão do catálogo, por isso a linha lista todos os parâmetros do pedido e não só os que mudaram. Nenhum hash, ficheiro de referência nem teste dependia do texto do README; os testes `the_safety_phrase_counts_rules_and_never_writes_a_bare_status` e `the_request_line_lists_parameters_and_faults` fixam a frase.
+- `tests/test_honesty_wording.py` (quatro testes, no `unittest` do repositório) lê `ui/js`, os scripts do módulo e `evidence.rs`: falha se `safety.status`, `safety_status` ou a classe de segurança forem escritos como texto fora das palavras partilhadas de `requirements.js` (comparações internas como `=== 'safe'` são permitidas), ou se aparecer uma cadeia «Safe»/«safe» como veredicto. Foi verificado com uma mutação: acrescentar `h('b', null, record.safety.status)` e `h('b', null, 'Safe')` a `player.js` fez falhar os dois testes de interface.
+- `ux2_journeys.py` afirma no ecrã que nenhum nó de texto visível é «safe»/«Safe» (Runs, Compare, Analyse, leitor), que a mesma corrida tem as mesmas «Conditions» na página Runs, no Compare, em Analyse e no leitor, e que duas corridas com pedidos diferentes nunca partilham a etiqueta visível (Runs e Compare).
+- As frases «Expected: ...» das demonstrações dos domínios dizem «safe»/«unsafe» nas palavras do domínio (por exemplo `desktop/domain-rocket/src/demos.rs`). Ficam como estão e aparecem rotuladas «Expected, stated by the domain» (Compare, Prepare e Analyse); não são um veredicto do Studio.
+
+**Opcional (M1 a M7).**
+
+- **M1 feito.** Leitor de engenharia a 1440x900 no estado final: as pílulas das corridas, a legenda e os botões de câmara ficam em zonas que não se sobrepõem (as pílulas e a câmara estão na mesma faixa, uma à esquerda e outra à direita, acima da legenda); verificado por sobreposição e por «nenhuma pílula cortada» em `ux2_journeys.py` e `review_captures.py`.
+- **M2 feito.** Analyse a 820 px: a cena fica por cima da telemetria, cada uma com a largura da janela (acima de 900 px mantém-se a disposição em duas colunas); verificado por posições e por sobreposição.
+- **M3 em parte.** O chip passou a «SAFETY RULES» e a nota diz «a requirement can fail without any safety rule being broken». O texto do chip final da aterragem falhada não mudou («Not met: Vertical speed at contact 60.08 m/s (limit <= 3 m/s), and 1 more not met; impact not modelled»): já nomeia o valor do pior requisito falhado e o limite.
+- **M4 sem alteração, por falta do dado.** O registo `mission_completion` da corrida do corredor diz «incomplete; 1 of 1 waypoint(s) reached; 0 mm from the goal at the end», com o esperado «all 1 waypoint(s) reached, confirmed on the true position, with no stall of 8 ticks». O registo não diz qual das cláusulas falhou (o objetivo foi alcançado e a distância é 0 mm), por isso o Studio mostra as duas frases tal como estão e não inventa uma razão. A lacuna é do registo do domínio (ver «Decisões em aberto»).
+- **M5 feito.** A corrida com uma regra de segurança quebrada tem a pílula com o ícone de aviso e as cores de falha; a linha do tempo mostra o marcador de violação de todas as corridas (não só da que está no ecrã, com o nome da corrida); a área do gráfico 2D acaba por cima das pílulas, por isso os rótulos do eixo não ficam tapados (verificado por sobreposição entre `.pl-viewport.is-2d` e `.pl-runs`, e nas capturas). Limitação: a 1024x640 as três pílulas do corredor deixam ao gráfico 2D cerca de 90 px de altura; fica legível nos eixos mas pequeno. A 820x900 a cena ganhou altura (a janela alta e estreita dá ao palco pelo menos 430 px), e o gráfico tem cerca de 170 px.
+- **M6 feito.** Consola de voo: os chips «Your experiment» e «Exploratory» estão sobre o vidro forte, com contraste total; a pílula ativa tem fundo opaco e texto a negrito; «Show all findings now» tem o seu espaço no fim da legenda e não a cobre.
+- **M7 feito.** Lab a 1440 e 820 px: «Margin change» fica à vista sem deslocamento lateral e a nota de rodapé quebra linha em vez de alargar a tabela (verificado por medição da tabela e do cabeçalho); a página Runs com o painel de detalhe a 1440x900 não corta «Safety rules» nem «Failed» (vista na captura).
+- Extra: os chips de veredicto quebram dentro do próprio contorno; a cor do chip de segurança vem da mesma leitura que as palavras (uma regra quebrada nunca é verde; uma corrida sem avaliação nunca é «pass»); o chip de missão só conta os requisitos de missão.
+
+**Verificação.** `ux2_journeys.py`: 71/71; `review_captures.py`: 16/16 (o 60 m/s e o corredor como corrida ativa a 1440x900, 1024x640 e 820x900, sem pílulas cortadas nem sobreposições). Na árvore desta passagem: `cargo fmt --check`, `clippy -D warnings`, `cargo test` na raiz e em `desktop/`, `unittest` (com `VV_GODOT`), teste Node (27 casos) e `node --check` de todos os ficheiros de `ui/js`.
+
+**Inventário das superfícies que mostram segurança, resultado, contagens ou identidade de uma corrida.**
+
+| Superfície | Onde está o texto | Verificada por |
+| --- | --- | --- |
+| Chips de resultado do leitor (missão, regras de segurança) | `views/player.js` (`runResult`) | `ux4-end-state-60ms-run-*`, `ux4-corridor-broken-rule-run-*`; `ux2_journeys.py` («Unsafe case: ...») |
+| Pílulas das corridas do leitor (estado combinado, ícone de aviso) | `views/player.js` (`fillRunPills`) | mesmas capturas; `review_captures.py` (pílula de aviso, sem corte, sem sobreposição) |
+| Chip do fim da corrida (requisito falhado, valor, limite) | `views/player.js` (`failedContactText`) | `ux4-end-state-60ms-run-*`; `review_captures.py` («the chip names the failing requirement») |
+| Consola de voo (requisitos, regras «held», chips) | `views/player.js`, `views/control.js` | `ux3-flight-console-*`; `ux2_journeys.py` |
+| Marcadores da linha do tempo | `views/player.js` (`drawBand`) | `review_captures.py` («a violation marker is on the timeline») |
+| Linha «Conditions» do leitor | `views/player.js` | `ux2_journeys.py` («Player: each run has the same conditions...») |
+| Painel de resultado do Cinematic | `desktop/cinematic/scripts/hud.gd` | `cinematic-panel-60ms-run.png`, `cinematic-panel-broken-rule-landing.png`; `tests/test_honesty_wording.py` |
+| Analyse: veredictos, separador de verificação, linha «Conditions» | `views/run.js`, `verification.js` | `ux3-analyse-*`, `ux3-analyse-unsafe-dark`; `ux2_journeys.py` |
+| Compare: cartões, legenda, matriz, mudanças de veredicto, linha «Both runs» | `views/compare.js` | `ux3-compare-*`, `ux3-compare-unsafe-dark`, `ux4-compare-identity-dark`, `ux4-compare-two-runs-dark`; `ux2_journeys.py` |
+| Runs: coluna de segurança, célula «Failed», linha «Conditions» | `views/library.js` | `ux3-runs-*`, `ux3-runs-unsafe-dark`; `ux2_journeys.py` (a contagem contra o registo) |
+| Lab: pílulas, estado combinado, tabela, margem | `views/lab.js` | `ux3-lab-*`; `ux2_journeys.py` (margem à vista) |
+| Estatísticas da página inicial | `views/home.js` | `ux2_journeys.py` (`home_stats`) |
+| Paleta de comandos (dica da corrida) | `main.js` | `tests/test_honesty_wording.py` (sem captura) |
+| Cartões de demonstração da página Prepare | `views/prepare.js` (`demoCard`) | `conditionsName` no teste Node (sem captura nem percurso) |
+| README do pacote de evidência | `desktop/platform/src/evidence.rs` | testes Rust `name_tests`; `tests/test_honesty_wording.py` |
+| Frases «Expected» dos domínios | texto do domínio, rotulado «stated by the domain» | não mudaram |
+
+**Decisões em aberto.**
+
+- A etiqueta de cabeçalho de uma corrida continua a não ser uma só: o leitor usa as etiquetas das próprias missões («Exact GPS», «1 mm of GPS noise»), o Compare usa o nome das condições («GPS noise 1 mm»). O que é igual em todas as superfícies é a linha «Conditions», e é isso que o percurso verifica; não se afirma uma só etiqueta de cabeçalho.
+- O registo do domínio do veículo terrestre devia dizer qual cláusula de `mission_completion` falhou quando o resultado é «incomplete» com o objetivo alcançado (M4).
+- A linha do pedido do README do pacote de evidência lista todos os parâmetros do pedido porque a plataforma não tem os valores por omissão do catálogo; se se quiser só os alterados, é preciso levar o catálogo para a plataforma.
+- `ui_smoke.py`: três falhas anteriores a esta passagem (ver «O que não foi verificado»).
+
 ## A espera pelo primeiro frame
 
 O módulo descodifica os ativos CC0 ao arrancar, por isso passam 12 a 16 s entre o clique em «Cinematic view» e o primeiro frame (15,6 s na aterragem e 13,7 s na subida no percurso de utilizador final). Duas mudanças:
@@ -158,36 +220,36 @@ Na vista da Cinematic View (módulo 0.2.5, `cinematic/cinematic-hud-experiment.p
 
 ## Desempenho (Direct3D 12 / WebView2)
 
-Medido fora da simulação, no instalador final e no módulo 0.2.5, uma execução de cada.
+Medido fora da simulação, no instalador final e no módulo 0.2.6, uma execução de cada (repetido na quarta passagem; os números das passagens anteriores não são comparáveis entre dias, ver o controlo abaixo).
 
 Vista geoespacial e leitor, `python desktop/studio/tests/perf_probe.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --flow m16` (janela 1440x900, biblioteca temporária; `perf/perf-m16.json`):
 
 | Medida | Valor |
 | --- | --- |
-| Arranque a frio até ao ecrã pronto | 0,98 s |
-| Clique até à aterragem no ecrã | 0,27 s |
+| Arranque a frio até ao ecrã pronto | 0,99 s |
+| Clique até à aterragem no ecrã | 0,28 s |
 | Passagem à vista geoespacial até ao terreno na GPU | 0,465 s |
-| Frames em reprodução (engenharia / geoespacial / Flight console) | p50 17,8 / 17,8 / 17,8 ms; p99 18,9 / 18,9 / 18,8 ms; nenhum acima de 33 ms |
-| CPU em reprodução (de um núcleo) | 23 % / 40 % / 4 % |
-| Memória (working set) em reprodução geoespacial | 870 MB; 653 MB depois de sair do leitor |
-| Sessão de 180 s, p99 dos frames | 18,6 a 19,1 ms; working set de 1014 para 883 MB |
-| GPU dedicada, utilização 3D na vista geoespacial | 465 MB, 24,6 % |
+| Frames em reprodução (engenharia / geoespacial / Flight console) | p50 17,6 / 17,6 / 18,0 ms; p99 18,9 / 18,8 / 19,2 ms; nenhum acima de 33 ms |
+| CPU em reprodução (de um núcleo) | 28 % / 36 % / 5 % |
+| Memória (working set) em reprodução geoespacial | 868 MB; 639 MB depois de sair do leitor |
+| Sessão de 180 s, p99 dos frames | 18,5 a 19,1 ms; working set de 979 para 876 MB |
+| GPU dedicada, utilização 3D na vista geoespacial | 462 MB, 24,6 % |
 | Pedidos da WebView a fora da máquina | nenhum |
 
-**A cadência dos frames é de cerca de 18 ms (55 Hz), contra 8 ms (125 Hz) na verificação de 12 de novembro, e o Studio não é a causa.** O controlo `perf/raf-control.json` mede `requestAnimationFrame` na mesma janela do Studio: na página inicial parada p50 18,0 ms (p99 19,3) e numa página em branco (`data:text/html`) p50 18,1 ms (p99 19,2). Uma página vazia tem o mesmo ritmo, por isso o ritmo é o da janela ou do compositor nesta sessão; o controlador continua a indicar 165 Hz. Não foi investigado e as séries de dias diferentes não são comparáveis entre si.
+**A cadência dos frames é de cerca de 18 ms (55 Hz), contra 8 ms (125 Hz) na verificação de 12 de novembro, e o Studio não é a causa.** O controlo `perf/raf-control.json` mede `requestAnimationFrame` na mesma janela do Studio: na página inicial parada p50 18,1 ms (p99 19,0) e numa página em branco (`data:text/html`) p50 18,1 ms (p99 19,2). Uma página vazia tem o mesmo ritmo, por isso o ritmo é o da janela ou do compositor nesta sessão; o controlador continua a indicar 165 Hz. Não foi investigado e as séries de dias diferentes não são comparáveis entre si.
 
 Cinematic View, módulo instalado, `python scripts/cinematic/bench.py --godot <Godot_v4.7.2-stable_win64_console.exe do módulo> --project <project do módulo> --run tests/fixtures/cinematic/landing-run --env <environments/cape-canaveral instalado> --out <pasta> --profiles auto,balanced --seconds 12 --driver d3d12` (1440x900, sem sincronização vertical, câmara Auto; `perf/bench-*.json`, `perf/summary.json`):
 
 | Perfil | Arranque até ao primeiro frame | Frame p50 | Frame p99 | Memória de vídeo | Working set (pico) | Bytes privados (pico) |
 | --- | --- | --- | --- | --- | --- | --- |
-| Auto (escolheu High) | 13,5 s | 3,20 ms | 13,57 ms | 2386 MB | 747 MB | 3066 MB |
-| Balanced | 11,4 s | 1,90 ms | 5,36 ms | 1336 MB | 715 MB | 1872 MB |
+| Auto (escolheu High) | 13,5 s | 3,16 ms | 13,66 ms | 2386 MB | 747 MB | 3066 MB |
+| Balanced | 11,4 s | 1,92 ms | 5,37 ms | 1336 MB | 717 MB | 1872 MB |
 
 Os dois ficam dentro do orçamento de 16,7 ms (60 Hz) no p99.
 
 ## Verificação do repositório
 
-Ver `verification.txt`: lista do `AGENTS.md` na raiz e em `desktop/`, testes Python com `VV_GODOT` definido (434 testes, 6 ignorados por dependências opcionais; o teste Node corre e não é ignorado, também numa cópia em «v&v lab») e a campanha `--seeds 42,1337,2026`. Na árvore da terceira passagem (e da segunda) correram `cargo fmt --check`, `clippy -D warnings` e `cargo test` na raiz e em `desktop/` (37 suites, 304 testes) e o `unittest` (434 testes, OK). A campanha e a compilação de lançamento da raiz não foram repetidas porque a raiz não mudou desde a verificação anterior. As edições de `ui_smoke.py` (o texto de segurança da vista de execução) **não foram executadas**: esse teste só corre no CI com o instalador e continua informativo lá.
+Ver `verification.txt`: lista do `AGENTS.md` na raiz e em `desktop/`, testes Python com `VV_GODOT` definido (438 testes, 6 ignorados por dependências opcionais; o teste Node corre e não é ignorado, também numa cópia em «v&v lab») e a campanha `--seeds 42,1337,2026`. Na árvore da quarta passagem (e da terceira e da segunda) correram `cargo fmt --check`, `clippy -D warnings` e `cargo test` na raiz e em `desktop/` (37 suites, 306 testes na quarta) e o `unittest` (438 testes, OK, na quarta). A campanha e a compilação de lançamento da raiz não foram repetidas porque a raiz não mudou desde a verificação anterior. `ui_smoke.py` correu na quarta passagem (ver «O que não foi verificado»); o passo do CI continua informativo.
 
 Comandos do README: `cargo run -- run ...` falhava porque o pacote da raiz tem três binários. Acrescentar `default-run = "vv-lab"` ao `Cargo.toml` da raiz resolve-o, mas muda o `source_sha256` do `vv-lab` (calculado a partir do `Cargo.toml`) e a paridade do problema D1 do benchmark M14 deixa de passar. Por isso os comandos do README, de `docs/reproducibility.md` e de `docs/m2-results.md` passaram a `cargo run --bin vv-lab -- ...` e o `Cargo.toml` ficou como estava.
 
@@ -199,9 +261,9 @@ Comandos do README: `cargo run -- run ...` falhava porque o pacote da raiz tem t
 - A subida só foi medida no arranque; `bench.py` correu só sobre o registo de aterragem.
 - A diferença de ambiente que a primeira revisão viu na Cinematic View não foi reproduzida (ver acima).
 - O contraste de texto sobre imagens, a dica do rótulo de qualidade do módulo e o uso com tecnologia de apoio não foram verificados.
-- O contrato de `ui_smoke.py` foi atualizado mas não executado.
+- `ui_smoke.py` correu na quarta passagem contra o executável de lançamento e contra o instalado da terceira passagem, com o mesmo resultado (44 de 47): três falhas anteriores a esta passagem (o teste espera três domínios e há quatro, procura «Verified» e o ecrã escreve «VERIFIED», e espera que `#modal-root` esconda depois da ajuda de atalhos). Não foram corrigidas aqui; o passo do CI é informativo (`continue-on-error`).
 - O aspeto do novo painel de reprodução do módulo (rótulos, linhas que quebram) só foi visto a 1440x900 e 1100x700 com uma captura de cada, sem as regiões de erro de janelas muito estreitas.
-- O módulo é 0.2.5: cada passagem do módulo pedia uma versão nova (0.2.2 e 0.2.3 foram intermédios).
+- O módulo é 0.2.6: cada passagem do módulo pedia uma versão nova (0.2.2 e 0.2.3 foram intermédios).
 - Itens da lista de revisão marcados «não feito» na secção da segunda passagem.
 
 ## Recuperação (rollback)
@@ -219,6 +281,8 @@ Instaladores e hashes (os mesmos de `SHA256SUMS.txt`):
 | 0.18.1, segunda passagem, 1.ª iteração | `VV Lab Studio_0.18.1_x64-setup-ux-round-2.exe` | `c879688c3798461d4b7258f0a7beb1cfffa1ed73eb37ace5368584e635d33406` |
 | 0.18.1, final da segunda passagem | `VV Lab Studio_0.18.1_x64-setup-ux-round-3.exe` | `75eb323618c6f7992cfe5595a99178b23a1cd914936a5dc39114cbb279fdde2f` |
 | 0.18.1, terceira passagem, 1.ª iteração | `VV Lab Studio_0.18.1_x64-setup-ux-round-3b.exe` | `b9927fb468e4fff870f7a6840fbab721f60357a96c24cbc292c54fb7cd696e7d` |
-| 0.18.1 (instalado) | `VV Lab Studio_0.18.1_x64-setup.exe` | `29a4d131430be7440f8d90212f821c9920286486fcb0cd3220e9a8ab163a2c46` |
+| 0.18.1, final da terceira passagem | `VV Lab Studio_0.18.1_x64-setup-ux-round-4.exe` | `29a4d131430be7440f8d90212f821c9920286486fcb0cd3220e9a8ab163a2c46` |
+| 0.18.1, quarta passagem, 1.ª iteração | `VV Lab Studio_0.18.1_x64-setup-ux-round-4b.exe` | `9d4cb6c64102e461d72e6e37b9720c48b1979cc393e68f506858af7d590e1e08` |
+| 0.18.1 (instalado) | `VV Lab Studio_0.18.1_x64-setup.exe` | `d54b8e194eafe81349973fa86ebed0f0c42aeab8aeeb95a9693111ea2aa455c4` |
 
 Para voltar ao 0.17.0: confirmar o hash com `Get-FileHash "<pasta de recuperação>\VV Lab Studio_0.17.0_x64-setup.exe" -Algorithm SHA256`, fechar o Studio e executar o instalador com `/S`. A biblioteca em `Documentos\VV Lab Library` e o módulo em `%LOCALAPPDATA%\org.vvlab.studio\modules\cinematic` não pertencem ao instalador e ficam como estão.

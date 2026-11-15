@@ -1,0 +1,19 @@
+scratch library: <temporary folder>
+PASS The 60 m/s run at its end: the chip names the failing requirement  [Not met: Vertical speed at contact 60.08 m/s (limit <= 3 m/s), and 1 more not met; impact not modelled]
+PASS end-state-60ms-run 1440x900: pills, caption and camera buttons do not overlap one another or the readout card (nor the 2D plot with its axis labels)  [{"clash": [], "seen": 4, "per": {".pl-cams x .pl-hud": 1, ".pl-cams x .pl-runs": 1, ".pl-scene-note x .pl-cams": 1, ".pl-scene-note x .pl-runs": 1}, "unseen": []}]
+PASS end-state-60ms-run 1440x900: no run pill is clipped  [{"n": 2, "bad": []}]
+PASS end-state-60ms-run 1024x640: pills, caption and camera buttons do not overlap one another or the readout card (nor the 2D plot with its axis labels)  [{"clash": [], "seen": 4, "per": {".pl-cams x .pl-hud": 1, ".pl-cams x .pl-runs": 1, ".pl-scene-note x .pl-cams": 1, ".pl-scene-note x .pl-runs": 1}, "unseen": []}]
+PASS end-state-60ms-run 1024x640: no run pill is clipped  [{"n": 2, "bad": []}]
+PASS end-state-60ms-run 820x900: pills, caption and camera buttons do not overlap one another or the readout card (nor the 2D plot with its axis labels)  [{"clash": [], "seen": 4, "per": {".pl-cams x .pl-hud": 1, ".pl-cams x .pl-runs": 1, ".pl-scene-note x .pl-cams": 1, ".pl-scene-note x .pl-runs": 1}, "unseen": []}]
+PASS end-state-60ms-run 820x900: no run pill is clipped  [{"n": 2, "bad": []}]
+PASS Corridor: the run with a broken safety rule has the warning pill  [1]
+PASS Corridor: a violation marker is on the timeline  [["tick 21: Invariant violated: Truth stays outside the restricted zone"]]
+PASS corridor-broken-rule-run 1440x900: pills, caption and camera buttons do not overlap one another or the readout card (nor the 2D plot with its axis labels)  [{"clash": [], "seen": 2, "per": {".pl-cams x .pl-hud": 0, ".pl-cams x .pl-runs": 0, ".pl-scene-note x .pl-runs": 1, ".pl-viewport.is-2d x .pl-runs": 1}, "unseen": [".pl-cams x .pl-hud", ".pl-cams x .pl-runs"]}]
+PASS corridor-broken-rule-run 1440x900: no run pill is clipped  [{"n": 3, "bad": []}]
+PASS corridor-broken-rule-run 1024x640: pills, caption and camera buttons do not overlap one another or the readout card (nor the 2D plot with its axis labels)  [{"clash": [], "seen": 2, "per": {".pl-cams x .pl-hud": 0, ".pl-cams x .pl-runs": 0, ".pl-scene-note x .pl-runs": 1, ".pl-viewport.is-2d x .pl-runs": 1}, "unseen": [".pl-cams x .pl-hud", ".pl-cams x .pl-runs"]}]
+PASS corridor-broken-rule-run 1024x640: no run pill is clipped  [{"n": 3, "bad": []}]
+PASS corridor-broken-rule-run 820x900: pills, caption and camera buttons do not overlap one another or the readout card (nor the 2D plot with its axis labels)  [{"clash": [], "seen": 2, "per": {".pl-cams x .pl-hud": 0, ".pl-cams x .pl-runs": 0, ".pl-scene-note x .pl-runs": 1, ".pl-viewport.is-2d x .pl-runs": 1}, "unseen": [".pl-cams x .pl-hud", ".pl-cams x .pl-runs"]}]
+PASS corridor-broken-rule-run 820x900: no run pill is clipped  [{"n": 3, "bad": []}]
+PASS No page error or console error
+
+16/16 checks passed

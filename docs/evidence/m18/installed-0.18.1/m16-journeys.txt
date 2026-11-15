@@ -1,7 +1,7 @@
 PASS Settings: the installed environments are listed with sources and size  [adventdalen-svalbard,cape-canaveral,el-arenosillo,goms-alpine-valley,mahia-peninsula,santa-maria-azores,spaceport-america,wallops-island]
 PASS Settings: Studio says it makes no network request
 PASS Geo: the player offers Engineering, Geospatial and Flight console
-PASS Geo: the geospatial view loads from the local pack  [0.36 s]
+PASS Geo: the geospatial view loads from the local pack  [0.37 s]
 PASS Geo: an environment is selected  [cape-canaveral]
 PASS Geo: switching view keeps the same runs
 PASS Sources: the short credit of every source that asks for one stays on the map (Copernicus, Sentinel, OpenStreetMap); public-domain sources that ask for none (NGA) are in the panel only  [i Sources Terrain is context only  Copernicus WorldDEM-30 ┬® DLR e.V. 2010-2014, ┬® Airbus 2014-2018 ┬À Contains modified Copernicus Sentinel data 2025 ┬À USDA NAIP 2023 ┬À ┬® OpenStreetMap contributors]
@@ -26,7 +26,7 @@ PASS Sources: a second tap closes it
 PASS World: the Cape pack draws OSM buildings and lidar vegetation  [{"buildings": 687, "lidar_structures": 8, "structures": 39, "trees": 8248, "shrubs": 97479, "tiles": 47, "vegetation_in_range": 0, "vegetation_tiers": [0, 0, 105727]}]
 PASS World: vegetation near the pad camera is drawn in full detail  [[55069, 50658, 0]]
 PASS Auto camera: the camera picks a shot from the playback state  [follow]
-PASS Geo to Flight console keeps the playback time  [10.720600000000045 -> 10.720600000000045]
+PASS Geo to Flight console keeps the playback time  [10.746800000000045 -> 10.746800000000045]
 PASS Flight console keeps the landscape
 PASS Flight console to Engineering keeps the playback time
 PASS Geo: placing the run on a landscape changes no record

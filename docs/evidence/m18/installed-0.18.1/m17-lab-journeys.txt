@@ -4,7 +4,7 @@ PASS Off the pad: no requirement limit is suggested as a fix
 PASS Off the pad: the new run lands on the pad  [Landed, R5 2.911575 m]
 PASS Off the pad: the new run is a different, recomputed record
 PASS Off the pad: the fix is checked on 8 seeds and reported as counts  [{"n": 8, "base": 0, "exp": 7}]
-PASS Open in Experiment Lab opens the shown run as the Lab baseline  [e8c2b76d60e00cc8 vs e8c2b76d60e00cc8]
+PASS Open in Experiment Lab opens the shown run as the Lab baseline  [d4b769837f6e3f13 vs d4b769837f6e3f13]
 PASS The baseline lists its failed requirements with margins  [Vertical speed at contact, Horizontal speed at contact]
 PASS Parameters the domain lists for the failure are highlighted  [vehicle_dry_mass_scale, vehicle_propellant_scale, vehicle_thrust_scale, ignition_fraction, throttle_gain, cutoff_altitude_m, altimeter_residual_threshold_m, initial_altitude_m, initial_vertical_velocity_mps, altimeter_sigma_m]
 PASS Run experiment is disabled until something changes

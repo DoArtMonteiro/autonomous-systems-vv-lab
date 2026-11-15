@@ -15,7 +15,7 @@ PASS Hangar: one label for the way into the Lab  [["Open in Experiment Lab"]]
 PASS Text size: nothing on the hangar is below 12 px
 PASS Environments: every description is shown in full (nothing clipped)  [0 clipped]
 PASS Environments: every card says Terrain is context only  [["Terrain is context only", "Terrain is context only", "Terrain is context only", "Terrain is context only", "Terrain is]
-PASS Environments: the module status resolves (it does not stay at Checking)  [0.3 s: Installed: version 0.2.5; every file matches its manifest.]
+PASS Environments: the module status resolves (it does not stay at Checking)  [0.3 s: Installed: version 0.2.6; every file matches its manifest.]
 PASS Environments: no text says validated offline
 PASS Text size: nothing on Environments is below 12 px
 PASS Lab: Run experiment is visible from the start and says why it is off  [{"disabled": true, "why": "Change one condition first", "describedby": "lab-run-why", "visible": true, "overflow": "visible", "maxHeight": "none"}]
@@ -35,27 +35,27 @@ PASS Compare: the headline reads Vertical speed at contact 1.658 -> 60.08 m/s (l
 PASS Compare: each cell shows the observed value and the margin, not only Pass or Fail  [["Vertical speed at contact limit <= 3 m/s \u00b7 R1_vertical_speed (differs)", "Pass \u00b7 1.658 m/s D margin +1.342 m/s", "Fail \u00b7 60.08 m/s D margin -57.08 m/s"]]
 PASS Compare: the count of differing rows is grammatical  [9 rows differ between the runs (marked), 1 in its verdict, the others in a value.]
 PASS Text size: nothing on the comparison is below 12 px
-PASS Library: the Safety rules column says None broken, never a bare safe  [[" Engine thrust 0.7 \u00d7 (from cad03fec2f) 9e6edb2ebcf3bbba experimentfrom:cad03fec2ff1582d Rocket powered landing Heavy return stage (exploratory) Robust 5000 none Reached the ground, requirements]
+PASS Library: the Safety rules column says None broken, never a bare safe  [[" Conditions: default conditions bd19998592dc1e7e Rocket powered landing Heavy return stage (exploratory) Robust 5000 none Reached the ground, requirements not met None broken Requirements: Horizonta]
 PASS Run view: the safety verdict says No safety rule broken (5 checked)  [No safety rule broken (5 checked)]
 PASS Text size: nothing on the run view is below 12 px
 PASS Player: the registered first landing carries the Reference case chip  [[["ref", "Reference case"]]]
 PASS Player: the run chips say Reference case or Exploratory for each held run  [["Exploratory"]]
 PASS Player: the baseline's end chip names the failing requirement with its value and limit  [Not met: Horizontal speed at contact 1.584 m/s (limit <= 1 m/s); impact not modelled]
 PASS Player: the experiment's end chip names Vertical speed at contact 60.08 m/s, limit 3  [Not met: Vertical speed at contact 60.08 m/s (limit <= 3 m/s), and 1 more not met; impact not modelled]
-PASS Player: the result chips say No safety rule broken (5 checked)  [["MISSION 1 of 6 requirements failed", "SAFETY No safety rule broken (5 checked)", "MISSION 2 of 6 requirements failed", "SAFETY No safety rule broken (5 checked)"]]
+PASS Player: the result chips say No safety rule broken (5 checked)  [["MISSION 1 of 6 requirements failed", "SAFETY RULES No safety rule broken (5 checked)", "MISSION 2 of 6 requirements failed", "SAFETY RULES No safety rule broken (5 checked)"]]
 PASS Player: the player holds the environment chosen in Environments  [wallops-island]
 PASS Text size: nothing on the player is below 12 px
 PASS Cinematic: with two runs held the person chooses which one opens  [["Baseline", "Engine thrust 0.7 \u00d7"]]
 PASS Cinematic (experiment): the module started
-PASS Cinematic (experiment): it opens the run that was chosen  [9e6edb2ebcf3bbba]
+PASS Cinematic (experiment): it opens the run that was chosen  [d3c2d223f3a36e95]
 PASS Cinematic (experiment): it uses the player's environment (Wallops Island)  [wallops-island]
 PASS Cinematic (experiment): it is given the run label, the vehicle, the seed and the exploratory flag  [{"--run-label": "Engine thrust 0.7 \u00d7", "--vehicle": "41 t heavy return stage", "--seed": "5000"}]
 PASS Cinematic (experiment): the vehicle is named and the seed is the run's  [{"--vehicle": "41 t heavy return stage", "--seed": "5000"}]
 PASS Cinematic (experiment): the exploratory flag is passed
 PASS Cinematic (experiment): the first frame was drawn and Direct3D 12 is the renderer  [13.6 s]
-PASS Cinematic (experiment): the module's own --shot wrote the picture with those arguments  [609735 bytes]
+PASS Cinematic (experiment): the module's own --shot wrote the picture with those arguments  [609432 bytes]
 PASS Cinematic (baseline): the module started
-PASS Cinematic (baseline): it opens the run that was chosen  [cad03fec2ff1582d]
+PASS Cinematic (baseline): it opens the run that was chosen  [bd19998592dc1e7e]
 PASS Cinematic (baseline): it uses the player's environment (Wallops Island)  [wallops-island]
 PASS Cinematic (baseline): it is given the run label, the vehicle, the seed and the exploratory flag  [{"--run-label": "Baseline", "--vehicle": "41 t heavy return stage", "--seed": "5000"}]
 PASS Cinematic (baseline): the vehicle is named and the seed is the run's  [{"--vehicle": "41 t heavy return stage", "--seed": "5000"}]
@@ -68,9 +68,9 @@ PASS Player 820x900 (engineering, two runs): the scene note does not overlap the
 PASS Player 1024x640: the attribution does not overlap the camera bar  [{"clash": [], "credits": 2, "bars": 2}]
 PASS Text size: nothing on the 1024x640 player is below 12 px
 PASS Lab: starting another vehicle asks before replacing an experiment in progress  [Replace the experiment in progress?]
-PASS Lab: keeping it leaves the heavy-stage baseline in place  [cad03fec2ff1582d cad03fec2ff1582d]
+PASS Lab: keeping it leaves the heavy-stage baseline in place  [bd19998592dc1e7e bd19998592dc1e7e]
 PASS Lab: the baseline in progress is announced as a status
-PASS Lab: replacing it starts the new vehicle's baseline  [e41f71c23324683f]
+PASS Lab: replacing it starts the new vehicle's baseline  [0a13305558a55dd1]
 PASS Ascent: 600 kg payload changes which requirements pass  [upper.R4_periapsis, upper.R6_propellant_margin, mission.R8_orbit_insertion]
 PASS Ascent: the record publishes a numeric margin for the single-bound requirements  [requirement_margin.booster.R2_propellant_margin, requirement_margin.booster.R3_recovery_zone, requirement_margin.stack.S1_max_dynamic_pressure, requirement_margin.stack.S2_axial_acceleration, requirement_margin.upper.R4_periapsis, requirement_margin.upper.R5_apoapsis, requirement_margin.upper.R6_propellant_margin, requirement_margin.upper.S2_axial_acceleration]
 PASS Ascent: composite requirements publish none
