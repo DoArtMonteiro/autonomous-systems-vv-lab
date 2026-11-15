@@ -53,7 +53,7 @@ Outras verificações, todas no Studio 0.18.0 compilado ou no repositório nesta
 
 ## Studio 0.18.1 instalado
 
-O instalador NSIS do 0.18.1 foi instalado em silêncio por cima do 0.17.0 (a biblioteca do utilizador ficou idêntica) e o módulo Cinematic 0.2.3 foi instalado pelo código de instalação do Studio. Contra o executável instalado: M15 48/48, M16 78/78, M17 Lab 34/34, M17 Cinematic 11/11, M18 72/72, o percurso de utilizador `installed_spotcheck.py` 44/44 e `ux_journeys.py` 81/81 (Mission Control, hangar, «Open in Experiment Lab», Compare, leitor e Cinematic View para uma aterragem e uma subida, com Direct3D 12). Desempenho, hashes, o que não foi verificado e as instruções de recuperação estão em [docs/evidence/m18/installed-0.18.1/README.md](evidence/m18/installed-0.18.1/README.md).
+O instalador NSIS do 0.18.1 foi instalado em silêncio por cima do 0.17.0 (a biblioteca do utilizador ficou idêntica) e o módulo Cinematic 0.2.4 foi instalado pelo código de instalação do Studio. Contra o executável instalado: M15 48/48, M16 78/78, M17 Lab 34/34, M17 Cinematic 11/11, M18 72/72, o percurso de utilizador `installed_spotcheck.py` 44/44, `ux_journeys.py` 81/81 e `ux2_journeys.py` 29/29 (Mission Control, hangar, «Open in Experiment Lab», Compare, leitor e Cinematic View para uma aterragem e uma subida, com Direct3D 12). Desempenho, hashes, o que não foi verificado e as instruções de recuperação estão em [docs/evidence/m18/installed-0.18.1/README.md](evidence/m18/installed-0.18.1/README.md).
 
 ### Revisão de interface do 0.18.1 e correções
 
@@ -69,6 +69,8 @@ Uma revisão independente das capturas do 0.18.1 instalado concluiu «boa, com l
 8. **Ambientes**: descrição completa, «Terrain is context only» em cada cartão e o estado do módulo diz que a primeira verificação lê todos os ficheiros (e continua a dizer se demorar).
 9. Uma só cor para «Exploratory»; «Reference case» no leitor quando o veículo é o caso pré-registado.
 10. Nenhum texto abaixo de 12 px nas vistas verificadas (o percurso mede o tamanho calculado); o cinzento de apoio do tema escuro (`--fg-3`) passou de 4,5:1 (sobre o fundo mais claro) a 5,7:1 ou mais sobre os fundos dos painéis (razões de luminância calculadas dos próprios tokens; as sobreposições sobre imagens não foram medidas); os nomes dos requisitos quebram linha em vez de serem cortados.
+
+Uma segunda revisão (de código e de interface) levou a mais uma passagem: contagem de segurança só das regras avaliadas, teste de unidade em Node, `indexNumbers` na carga do registo, etiquetas únicas por corrida em Compare, cabeçalhos de colunas com o rótulo da corrida, página «Runs», frases de falha em palavras simples em Analyse, inclinação em graus, tabela do Lab sem quebras dentro dos números, a frase de fim sem transparência na consola de voo, a fila de câmaras fora do caminho a 1024x640 e a 820 px, e o módulo 0.2.4 com legendas e controlos em palavras simples. O que não foi feito e porquê está em [docs/evidence/m18/installed-0.18.1/README.md](evidence/m18/installed-0.18.1/README.md), secção «Segunda passagem».
 
 O percurso `desktop/studio/tests/ux_journeys.py` verifica os pontos 1 a 8 e 10 no executável instalado; o resultado e as capturas de revisão estão em [docs/evidence/m18/installed-0.18.1/README.md](evidence/m18/installed-0.18.1/README.md).
 

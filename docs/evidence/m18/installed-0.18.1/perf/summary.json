@@ -7,21 +7,21 @@
  "rows": [
   {
    "profile": "auto",
-   "first_frame_s": 13.689,
-   "p50_ms": 3.19,
-   "p99_ms": 13.57,
-   "frames": 2604,
-   "vram_used_mb": 2385,
-   "working_set_mb": 745,
-   "private_mb": 3063
+   "first_frame_s": 13.473,
+   "p50_ms": 3.18,
+   "p99_ms": 13.54,
+   "frames": 2605,
+   "vram_used_mb": 2381,
+   "working_set_mb": 746,
+   "private_mb": 3065
   },
   {
    "profile": "balanced",
-   "first_frame_s": 11.481,
-   "p50_ms": 1.91,
-   "p99_ms": 5.36,
-   "frames": 5181,
-   "vram_used_mb": 1335,
+   "first_frame_s": 11.328,
+   "p50_ms": 1.9,
+   "p99_ms": 5.41,
+   "frames": 5192,
+   "vram_used_mb": 1331,
    "working_set_mb": 714,
    "private_mb": 1871
   }

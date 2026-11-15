@@ -36,3 +36,8 @@ A campanha e a compilação de lançamento da raiz não foram repetidas (a raiz 
 
 Depois das últimas alterações (CSS, requirements.js, testes de percurso, módulo 0.2.3): python -m unittest com VV_GODOT: Ran 432 tests, OK (skipped=6);
 cargo fmt --check em desktop/: exit 0; node --check em requirements.js: sem erros. O contrato de ui_smoke.py foi atualizado e não foi executado.
+
+Segunda passagem (2026-11-15), mesmos comandos, VV_GODOT definido: cargo fmt --check, clippy -D warnings e cargo test na raiz e em desktop/ exit 0
+(37 suites, 304 testes); python -m unittest discover -s tests: Ran 434 tests, OK (skipped=6; inclui o teste Node de safetyWording e os testes novos dos
+argumentos de apresentação); node --check em todos os ficheiros de desktop/studio/ui/js sem erros; build.ps1 exit 0, instalador
+75eb323618c6f7992cfe5595a99178b23a1cd914936a5dc39114cbb279fdde2f; módulo 0.2.4 (62d7ace945d517434b1137230129f1abae689fdee8ad9a40af8be1c31bc443f0).

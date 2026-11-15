@@ -101,12 +101,12 @@
   "described": true,
   "disabled": false,
   "focusable": true,
-  "title": "Open this run (landing or launch ascent) in the Cinematic View 0.2.3 (a separate window; read-only replay of the record)"
+  "title": "Open this run (landing or launch ascent) in the Cinematic View 0.2.4 (a separate window; read-only replay of the record)"
  },
  "cinematic_status": {
   "installed": true,
   "verified": true,
-  "version": "0.2.3"
+  "version": "0.2.4"
  },
  "landing_thrust_0_7": {
   "base": {
@@ -213,7 +213,7 @@
   "actions": [
    "Analyse",
    "Compare in detail",
-   "Cinematic view",
+   "Open Cinematic View",
    "Open in Experiment Lab"
   ],
   "clash": [],
@@ -225,7 +225,7 @@
   "actions": [
    "Analyse",
    "Compare in detail",
-   "Cinematic view",
+   "Open Cinematic View",
    "Open in Experiment Lab"
   ],
   "clash": [],
@@ -237,7 +237,7 @@
   "actions": [
    "Analyse",
    "Compare in detail",
-   "Cinematic view",
+   "Open Cinematic View",
    "Open in Experiment Lab"
   ],
   "clash": [],

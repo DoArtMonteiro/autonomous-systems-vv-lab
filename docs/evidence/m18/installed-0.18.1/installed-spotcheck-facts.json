@@ -2,10 +2,10 @@
  "facts": {
   "ascent": {
    "driver_in_command_line": true,
-   "module_log_scene_line": "cinematic: scene built in 10156 ms (profile high: Auto: 12.9 GB of video memory (registry qwMemorySize); automatic choice stops at High)",
-   "seconds_click_to_first_frame": 12.1,
-   "shot_bytes": 251863,
-   "shot_line": "SHOT {\"adapter\":\"AMD Radeon RX 7700 XT\",\"buffer_mem_used_bytes\":91464442,\"camera\":\"director\",\"camera_dir_enu\":[0.0,0.844701051712036,-0.53523850440979],\"camera_eye_enu\":[0.0,-2339972.0,1482705.625],\"camera_fov\":40.0,\"draw_calls_in_frame\":325,\"driver\":\"d3d12\",\"file\":\"cinematic-ascent.png\",\"primitives_in_frame\":18632344,\"profile\":\"high\",\"profile_reason\":\"Auto: 12.9 GB of video memory (registry qwMem",
+   "module_log_scene_line": "cinematic: scene built in 10595 ms (profile high: Auto: 12.9 GB of video memory (registry qwMemorySize); automatic choice stops at High)",
+   "seconds_click_to_first_frame": 12.6,
+   "shot_bytes": 259739,
+   "shot_line": "SHOT {\"adapter\":\"AMD Radeon RX 7700 XT\",\"buffer_mem_used_bytes\":91467586,\"camera\":\"director\",\"camera_dir_enu\":[0.0,0.844701051712036,-0.53523850440979],\"camera_eye_enu\":[0.0,-2339972.0,1482705.625],\"camera_fov\":40.0,\"draw_calls_in_frame\":335,\"driver\":\"d3d12\",\"file\":\"cinematic-ascent.png\",\"primitives_in_frame\":18632686,\"profile\":\"high\",\"profile_reason\":\"Auto: 12.9 GB of video memory (registry qwMem",
    "shot_run": "e41f71c23324683f"
   },
   "ascent_player": {
@@ -17,10 +17,10 @@
   },
   "landing": {
    "driver_in_command_line": true,
-   "module_log_scene_line": "cinematic: scene built in 12068 ms (profile high: Auto: 12.9 GB of video memory (registry qwMemorySize); automatic choice stops at High)",
-   "seconds_click_to_first_frame": 14.2,
-   "shot_bytes": 674459,
-   "shot_line": "SHOT {\"adapter\":\"AMD Radeon RX 7700 XT\",\"buffer_mem_used_bytes\":85644774,\"camera\":\"director\",\"camera_dir_enu\":[-0.586674630641937,0.796551644802094,-0.146008253097534],\"camera_eye_enu\":[91.7643051147461,-163.039031982422,659.981811523438],\"camera_fov\":29.8628349304199,\"draw_calls_in_frame\":147,\"driver\":\"d3d12\",\"file\":\"cinematic-landing.png\",\"primitives_in_frame\":6419903,\"profile\":\"high\",\"profile_r",
+   "module_log_scene_line": "cinematic: scene built in 11946 ms (profile high: Auto: 12.9 GB of video memory (registry qwMemorySize); automatic choice stops at High)",
+   "seconds_click_to_first_frame": 14.1,
+   "shot_bytes": 686254,
+   "shot_line": "SHOT {\"adapter\":\"AMD Radeon RX 7700 XT\",\"buffer_mem_used_bytes\":85647918,\"camera\":\"director\",\"camera_dir_enu\":[-0.586674630641937,0.796551644802094,-0.146008253097534],\"camera_eye_enu\":[91.7643051147461,-163.039031982422,659.981811523438],\"camera_fov\":29.8628349304199,\"draw_calls_in_frame\":157,\"driver\":\"d3d12\",\"file\":\"cinematic-landing.png\",\"primitives_in_frame\":6420833,\"profile\":\"high\",\"profile_r",
    "shot_run": "cad03fec2ff1582d"
   },
   "landing_player": {
