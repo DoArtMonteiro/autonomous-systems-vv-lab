@@ -14,7 +14,7 @@ PASS Runs page: the Failed column uses plain names, not ids  [["Requirements: Ve
 PASS Runs: with the detail panel open there is no horizontal scroll  [{"table": 0, "page": 0}]
 PASS Analyse: the outcome sentence names the failed requirements in plain words  [2 mission requirements failed: Vertical speed at contact, Horizontal speed at contact. The stage reached the ground at 23.53 s but did not meet the mission requirements: Vertical speed at contact 60.0]
 PASS Analyse: the outcome, the safety line and the model validity wrap and are not cut  [0 cut]
-PASS Analyse: the tilt rows are in degrees, with the recorded cosine in parentheses  [limit <= 30 ┬░ (>= 0.8660254038 cos) worst 11.47 ┬░ (0.980019 cos)]
+PASS Analyse: the tilt rows are in degrees, with the recorded cosine in parentheses  [limit <= 30 ° (>= 0.8660254038 cos) worst 11.47 ° (0.980019 cos)]
 PASS Player: before the result is shown the run pills carry no verdict  [["", ""]]
 PASS Player: the controls say what they do: Show all findings now, Open Cinematic View, Run:  [{"toggle": "Show all findings now", "cine": "Open Cinematic View", "run": "Run:\nBaseline \u00b7 default conditions \u00b7 bd199985\nEngine thrust 0.7 \u00d7 \u00b7 d3c2d223"}]
 PASS Player 1024x640: the objective starts folded on a short window  [False]
@@ -32,7 +32,7 @@ PASS Flight console 1024x640: the header does not crowd, the run pills sit under
 PASS Flight console 1024x640: the Your experiment and Exploratory chips are shown under the title  [["Your experiment", "Exploratory"]]
 PASS Player 820x900: after the result each run pill carries its mission and safety verdicts (the shown run in full on a short window), in view without scrolling  [{"pills": ["\u00b7 1 of 6 requirements failed \u00b7 5 of 5 safety rules held", "\u00b7 2 of 6 requirements failed \u00b7 5 of 5 safety rules held"], "shown": [{"active": true, "visible": true, "hasId": true}, {"active": false, "visible": true, "hasId": true}], "inView": true}]
 PASS Player 820x900: each run pill and each Run option carries the run's conditions and its short id  [{"pills": [{"id": "bd19998592dc1e7e", "text": "baseline \u00b7 default conditions \u00b7 bd199985 \u00b7 1 of 6 requirements failed \u00b7 5 of 5 safety rules held", "cond": "default conditions"}, {"id": "d3c2d223f3a36e95", "text": "engine thrust 0.7 \u00d7 \u00b7 d3c2d223 \u00b7 2 of 6 requirements failed \u00b7 5 of 5 safety rules held", "cond": "engine thrust 0.7 \u00d7"}], "opts": ["baseline \]
-PASS Player 820x900: the scene is at least 200 px tall  [[430]]
+PASS Player 820x900: the scene is at least 200 px tall  [[520]]
 PASS Player 820x900: the camera row does not cover the readout card, the run pills or the note  [{"clash": [], "seen": 3, "per": {".pl-cams x .pl-hud": 1, ".pl-cams x .pl-runs": 1, ".pl-scene-note x .pl-cams": 1}, "unseen": []}]
 PASS Engineering 820x900: no run pill is clipped  [{"n": 2, "bad": []}]
 PASS Geospatial 820x900: no run pill is clipped  [{"n": 2, "bad": []}]
@@ -47,15 +47,18 @@ PASS Engineering 1440x900 (end state): no run pill is clipped  [{"n": 2, "bad": 
 PASS Player: the failed rows give limit and observed value to four figures, no raw 1.583657  [["Horizontal speed at contact requirement: limit <= 1 m/s, observed 1.584 m/s", "Vertical speed at contact requirement: limit <= 3 m/s, observed 60.08 m/s", "Horizontal speed at contact requirement: limit <= 1 m/s, observed 4.823 m/s"]]
 PASS Lab 1440x900: Margin change is in view without sideways scrolling and the footnote is not clipped  [{"over": 0, "marginIn": true, "footCut": 0}]
 PASS Runs 1440x900 with the detail panel open: Outcome, Safety rules and Failed are in view  [[{"name": "Outcome", "left": 425, "right": 691, "inside": true}, {"name": "Safety rules", "left": 691, "right": 797, "inside": true}, {"name": "Failed", "left": 797, "right": 1022, "inside": true}]]
+PASS Runs 1440x900 with the detail panel open: a number (the seed) is never broken over two lines  [[["5000", 1], ["5000", 1]]]
 PASS Layout 1440x900: the Lab, Compare, Analyse and Runs pages have no horizontal page scroll
 PASS Analyse 1024x640: every plot of the scene (3D, profile, top view) is at least 200 px tall  [[296, 273, 273, 256, 256]]
-PASS Runs 1024x640 with the detail panel open: Outcome, Safety rules and Failed are in view  [[{"name": "Outcome", "left": 404, "right": 670, "inside": true}, {"name": "Safety rules", "left": 670, "right": 776, "inside": true}, {"name": "Failed", "left": 776, "right": 966, "inside": true}]]
+PASS Runs 1024x640 with the detail panel open: Outcome, Safety rules and Failed are in view  [[{"name": "Outcome", "left": 426, "right": 691, "inside": true}, {"name": "Safety rules", "left": 691, "right": 798, "inside": true}, {"name": "Failed", "left": 798, "right": 1024, "inside": true}]]
+PASS Runs 1024x640 with the detail panel open: a number (the seed) is never broken over two lines  [[["5000", 1], ["5000", 1]]]
 PASS Layout 1024x640: the Lab, Compare, Analyse and Runs pages have no horizontal page scroll
 PASS Lab 820x900: Margin change is in view without sideways scrolling and the footnote is not clipped  [{"over": 0, "marginIn": true, "footCut": 0}]
 PASS Analyse 820x900: every plot of the scene (3D, profile, top view) is at least 200 px tall  [[434, 394, 394, 394, 394]]
 PASS Analyse 820x900: the scene is above the telemetry and the two do not overlap  [{"sceneBottom": 924, "teleTop": 2081, "sameColumn": true}]
 PASS Analyse 820x900: no overlap between the scene controls and the telemetry header  [{"clash": [], "seen": 2, "per": {".scene-pane x .tele": 1, ".scene-bar x .tele-head": 1}, "unseen": []}]
-PASS Runs 820x900 with the detail panel open: Outcome, Safety rules and Failed are in view  [[{"name": "Outcome", "left": 424, "right": 546, "inside": true}, {"name": "Safety rules", "left": 546, "right": 630, "inside": true}, {"name": "Failed", "left": 630, "right": 820, "inside": true}]]
+PASS Runs 820x900 with the detail panel open: Outcome, Safety rules and Failed are in view  [[{"name": "Outcome", "left": 433, "right": 548, "inside": true}, {"name": "Safety rules", "left": 548, "right": 630, "inside": true}, {"name": "Failed", "left": 630, "right": 820, "inside": true}]]
+PASS Runs 820x900 with the detail panel open: a number (the seed) is never broken over two lines  [[["5000", 1], ["5000", 1]]]
 PASS Layout 820x900: the Lab, Compare, Analyse and Runs pages have no horizontal page scroll
 PASS Unsafe case: a run with a broken safety rule says how many were broken and is drawn as unsafe  [["SAFETY RULES No safety rule broken (4 checked)", "SAFETY RULES 1 of 4 safety rules broken", "SAFETY RULES No safety rule broken (4 checked)"]]
 PASS Unsafe case: the safe runs of the same mission still say No safety rule broken  [["SAFETY RULES No safety rule broken (4 checked)", "SAFETY RULES 1 of 4 safety rules broken", "SAFETY RULES No safety rule broken (4 checked)"]]
@@ -80,4 +83,4 @@ PASS Player: each run has the same conditions as on the Runs page  [[{"id": "bd1
 PASS Identity: the player has no visible text that is a bare safe or Safe verdict  [[]]
 PASS No page error or console error
 
-81/81 checks passed
+84/84 checks passed

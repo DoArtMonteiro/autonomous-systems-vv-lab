@@ -23,7 +23,7 @@ PASS Player landing: plays both records of the Lab
 PASS Player landing: Engineering view shows the scene  [{"view": "engineering", "renderer": "engineering"}]
 PASS Cinematic landing: the module process started
 PASS Cinematic landing: Godot was started with --rendering-driver d3d12  ["%USERPROFILE%\AppData\Local\org.vvlab.studio\modules\cinematic\0.2.7\godot/Godot_v4.7.2-stable_win64.exe" --rendering-driver d3d12 --path]
-PASS Cinematic landing: the first frame was drawn  [14.1 s after the click]
+PASS Cinematic landing: the first frame was drawn  [13.6 s after the click]
 PASS Cinematic landing: Direct3D 12 is the renderer in the module's own log  [D3D12 12_0 - Forward+ - Using Device #0: AMD - AMD Radeon RX 7700 XT]
 PASS Cinematic landing: the module's own --shot wrote a picture of this run  [693036 bytes at t = 16.3 s]
 PASS Lab: starting another vehicle asks before replacing an experiment in progress  [Replace the experiment in progress?]

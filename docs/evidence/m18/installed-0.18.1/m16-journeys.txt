@@ -26,7 +26,7 @@ PASS Sources: a second tap closes it
 PASS World: the Cape pack draws OSM buildings and lidar vegetation  [{"buildings": 687, "lidar_structures": 8, "structures": 39, "trees": 8248, "shrubs": 97479, "tiles": 47, "vegetation_in_range": 0, "vegetation_tiers": [0, 0, 105727]}]
 PASS World: vegetation near the pad camera is drawn in full detail  [[55069, 50658, 0]]
 PASS Auto camera: the camera picks a shot from the playback state  [follow]
-PASS Geo to Flight console keeps the playback time  [10.772100000000034 -> 10.772100000000034]
+PASS Geo to Flight console keeps the playback time  [10.786600000000018 -> 10.786600000000018]
 PASS Flight console keeps the landscape
 PASS Flight console to Engineering keeps the playback time
 PASS Geo: placing the run on a landscape changes no record

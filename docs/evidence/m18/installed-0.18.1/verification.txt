@@ -55,5 +55,5 @@ ui_smoke.py correu contra o executável de lançamento e contra o instalado da t
 
 Quinta passagem (2026-11-15), mesmos comandos, VV_GODOT definido: fmt, clippy -D warnings e cargo test na raiz e em desktop/ exit 0
 (37 suites, 306 testes); python -m unittest discover -s tests: Ran 441 tests, OK (skipped=6; inclui tests/test_honesty_wording.py, seis testes, e o teste
-Node de 27 casos); node --check em todos os ficheiros de desktop/studio/ui/js sem erros (corrido à mão); build.ps1 exit 0, instalador e928851928a58556a56e7e803b41ba72f795e0c190526b010f4d6e64b25dcf80;
+Node de 27 casos); node --check em todos os ficheiros de desktop/studio/ui/js sem erros (corrido à mão); build.ps1 exit 0, instalador 9ccb649818882decb77636c0961bb0857bc1f2035605738dd2b9e8b7f2a7b3c2;
 módulo 0.2.7 4d0a0715a15fadba5eda364a6ab5a56c6da9aebff443cfc59538031d0b1d3afe. ui_smoke.py contra o instalado: 80/80.
