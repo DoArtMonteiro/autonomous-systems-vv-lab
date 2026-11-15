@@ -62,3 +62,8 @@ Sexta passagem (2026-11-15), mesmos comandos, VV_GODOT definido: fmt, clippy -D 
 (37 suites, 306 testes); python -m unittest discover -s tests: Ran 442 tests, OK (skipped=6; inclui tests/test_honesty_wording.py, quatro testes, e o teste
 Node de 31 casos); node --check em todos os ficheiros de desktop/studio/ui/js sem erros (corrido à mão); os 16 mutantes do revisor falham o teste de guarda
 (16 de 16, numa cópia de trabalho); build.ps1 exit 0, instalador 0e37bbcf7228b7170ab392966b0cdc79b2e7446280e801cc9912c16bb0ebd0e1; módulo 0.2.8 a8608a2da3da61567520a4e927dbd25c8f5a13b29a0eb37223d2d6d7f90c3df8. ui_smoke.py contra o instalado: 80/80.
+
+Fecho da sexta passagem (só testes e documentação, 2026-11-15): python -m unittest discover -s tests: Ran 443 tests, OK (skipped=6); node --test
+tests/ui_requirements.test.mjs: 31 casos; mutantes do teste de guarda em cópias de trabalho: 16 de 16 (conjunto anterior) e, no conjunto novo, apanhados
+A B C E F G H J K L M O P S U V W, por apanhar (documentados) D I N Q R, controlo T sem falha. Nenhum ficheiro Rust nem de produto mudou: fmt e clippy não foram repetidos.
+

@@ -180,8 +180,8 @@ def player_checks(s, ids):
           const opts = [...document.querySelectorAll('.pl-cin-run option')].map((o) => o.textContent.toLowerCase());
           return { pills, opts };
         }""")
-        hexid = s.js("[...document.querySelectorAll('.pl-run')].map((b) => /[0-9a-f]{8}/.test(b.innerText))")
-        check(f"Player {w}x{h}: the visible text of every run pill, shown or not, contains an 8-hex id", len(hexid) == 2 and all(hexid), json.dumps(hexid))
+        hexid = s.js("(() => { const ids = window.__studio.player().runs; return [...document.querySelectorAll('.pl-run')].map((b) => b.innerText.includes(ids[Number(b.dataset.run)].slice(0, 8))); })()")
+        check(f"Player {w}x{h}: the visible text of every run pill, shown or not, contains the first 8 characters of its own run id", len(hexid) == 2 and all(hexid), json.dumps(hexid))
         check(f"Player {w}x{h}: each run pill and each Run option carries the run's conditions and its short id", len(ident["pills"]) == 2 and all(p["cond"] and p["cond"] in p["text"] and p["id"][:8] in p["text"] for p in ident["pills"]) and all(p["id"][:8] in o and p["cond"] in o for p, o in zip(ident["pills"], ident["opts"])), json.dumps(ident)[:400])
         area = s.js("(() => { const c = [...document.querySelectorAll('.pl-viewport canvas')].filter((e) => e.offsetParent !== null).map((e) => Math.round(e.getBoundingClientRect().height)); return c; })()")
         check(f"Player {w}x{h}: the scene is at least 200 px tall", bool(area) and max(area) >= 200, json.dumps(area))
@@ -307,11 +307,11 @@ def unsafe_case(s):
         time.sleep(1.2)
         r = s.js("""() => ({
           plot: [...document.querySelectorAll('.pl-viewport canvas')].filter((e) => e.offsetParent !== null).map((e) => Math.round(e.getBoundingClientRect().height)),
-          pills: [...document.querySelectorAll('.pl-run')].map((b) => ({ id: /[0-9a-f]{8}/.test(b.innerText), cond: /GPS noise|Arrival radius|default conditions/.test(b.innerText) })),
+          pills: [...document.querySelectorAll('.pl-run')].map((b) => ({ id: b.innerText.includes(window.__studio.player().runs[Number(b.dataset.run)].slice(0, 8)), cond: /GPS noise|Arrival radius|default conditions/.test(b.innerText) })),
         })""")
         need = 220 if w == 820 else 200
         check(f"Corridor player {w}x{h}: the 2D plot is at least {need} px tall", bool(r["plot"]) and max(r["plot"]) >= need, json.dumps(r["plot"]))
-        check(f"Corridor player {w}x{h}: every run pill, shown or not, keeps its conditions and an 8-hex id", len(r["pills"]) >= 2 and all(x["id"] and x["cond"] for x in r["pills"]), json.dumps(r["pills"]))
+        check(f"Corridor player {w}x{h}: every run pill, shown or not, keeps its conditions and the first 8 characters of its own run id", len(r["pills"]) >= 2 and all(x["id"] and x["cond"] for x in r["pills"]), json.dumps(r["pills"]))
     s.resize(1440, 900)
     time.sleep(0.5)
     s.nav("library")

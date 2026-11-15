@@ -1,26 +1,37 @@
-"""A guard on the wording of verdicts.
+"""A tripwire on the wording of verdicts. It is not a proof.
 
 The safety verdict reaches a person only as the shared phrase that counts rules (safetyWording in
 desktop/studio/ui/js/requirements.js; mirrored by safety_phrase in desktop/cinematic/scripts/hud.gd and
 by safety_phrase in desktop/platform/src/evidence.rs). This test reads the user-facing sources and fails
-if the safety status or class is read in any way but a comparison with a literal, unless that exact
-expression is on an explicit allowlist with its reason, or if a bare "safe" or "Safe" is written as a verdict.
+if the safety status or class is read in any way but a comparison with a literal, unless that exact line is on
+an explicit allowlist with its reason, or if a bare "safe" or "Safe" is written as a verdict. A person who wants
+to get round it can (see "What it cannot see"); it catches the ways code is usually written by accident or in a
+hurry, and a review is still needed.
 
 How the scan of the Studio works (whole files, so a statement split over several lines is seen too):
-  1. comments are removed (a tokenizer that knows strings, template literals and regular expressions, so a
-     "//" inside a string is not a comment);
+  1. comments are removed (a tokenizer that knows strings, template literals and regular expressions, also a
+     regular expression after `return`, `typeof`, `case` and the other keywords, so a "//" inside one is not a comment);
   2. comparisons with a literal (`x.safety.status === 'safe'`, `'unsafe' !== y`) are removed, because they decide
      something and print nothing;
   3. whatever still reads the status or class is a violation: `safety_status`, `safety_class`, `safety.status`,
-     `.safety['status']`, `{ status } = x.safety`, `{ safety } = x`, `{ safety: { status } }`, `.safety` kept in a
-     variable, and a "Safety: " literal (a verdict prefix);
+     `.safety['status']`, `['safety'].status`, `['safety']` or `.safety` kept in a variable, a computed key
+     `.safety[k]`, `{ status } = x.safety`, `{ safety } = x`, `{ safety: { status } }`, and a "Safety: " literal (a
+     verdict prefix);
   4. a bare 'safe' or 'Safe' string, and any whole word "safe" in the code, is a violation.
-An allowlist entry names the file, the exact read and the exact expression it may appear in, with the reason; an
-entry that matches nothing fails the test. requirements.js is scanned too, except inside the functions of the
-shared wording itself. The Cinematic View's hud.gd is scanned for the same reads (`get("status")`, `%s` formatting of a
-status) and for a "Safety: " literal.
-`test_the_scan_catches_the_mutants` proves it on a set of snippets, each of which must be caught, and on clean
-snippets that must not be.
+An allowlist entry names the file, the exact read and the whole stripped line it may appear on (the line must be equal
+to the entry, so extending an allowlisted line makes it fail), with the reason; an entry that matches nothing fails the
+test. requirements.js is scanned too, except inside the functions of the shared wording itself. The Cinematic View's
+hud.gd is scanned for `get("status")` and `get("class")`, for `["status"]` and `["class"]` subscripts, for `.status`
+and `.class` read off a safety value, for `%s` formatting of a status, and for a "Safety: " literal.
+
+Policy on the bare word "unsafe": a text node that says "unsafe" is not flagged. The word names a status that is only
+ever compared here, and a run that broke a rule is allowed to be called unsafe; what is not allowed is a green word
+the record did not earn, and "safe" is the word that scan watches for.
+
+What it cannot see: a word built from pieces ('sa' + 'fe', `${'Sa'}fe`), a key built in a variable in GDScript
+(`s.get(k)`), the word "safe" inside a longer hyphenated word ('safe-to-land'), and any meaning that is not spelled in the
+source. `test_the_scan_catches_the_mutants` runs the scan over snippets that must each be caught, and over clean snippets
+that must not be.
 """
 
 import os
@@ -40,7 +51,7 @@ def read(path):
 
 def js_files():
     for root, _dirs, names in os.walk(UI):
-        if "vendor" in root:
+        if "vendor" in os.path.relpath(root, UI).replace(os.sep, "/").split("/"):
             continue
         for n in names:
             if n.endswith(".js"):
@@ -83,19 +94,23 @@ def _skip_template(text, i):
     return len(text) - 1
 
 
+# After these words a "/" starts a regular expression, not a division.
+REGEX_AFTER = {"return", "typeof", "case", "in", "of", "delete", "void", "throw", "new", "else", "do", "yield", "await"}
+
+
 def strip_js(text):
     """The code without its comments (line numbers kept); strings, templates and regular expressions are kept whole."""
-    out, i, n, prev = [], 0, len(text), ""
+    out, i, n, prev, word = [], 0, len(text), "", ""
     while i < n:
         c = text[i]
         if c in "'\"":
             j = _skip_string(text, i)
             out.append(text[i:j + 1])
-            i, prev = j + 1, c
+            i, prev, word = j + 1, c, ""
         elif c == "`":
             j = _skip_template(text, i)
             out.append(text[i:j + 1])
-            i, prev = j + 1, c
+            i, prev, word = j + 1, c, ""
         elif c == "/" and text.startswith("//", i):
             while i < n and text[i] != "\n":
                 i += 1
@@ -104,7 +119,7 @@ def strip_js(text):
             j = n if j < 0 else j + 2
             out.append("\n" * text.count("\n", i, j))
             i = j
-        elif c == "/" and (prev == "" or prev in "(,=:[!&|?{};+-*%<>~^"):
+        elif c == "/" and (prev == "" or prev in "(,=:[!&|?{};+-*%<>~^" or word in REGEX_AFTER):
             j, in_class = i + 1, False
             while j < n and text[j] != "\n":
                 if text[j] == "\\":
@@ -118,11 +133,14 @@ def strip_js(text):
                     break
                 j += 1
             out.append(text[i:j + 1])
-            i, prev = j + 1, "/"
+            i, prev, word = j + 1, "/", ""
         else:
             out.append(c)
-            if not c.isspace():
+            if c.isalnum() or c in "_$":
+                word = word + c if (word or c.isalpha() or c in "_$") else ""
                 prev = c
+            elif not c.isspace():
+                word, prev = "", c
             i += 1
     return "".join(out)
 
@@ -160,8 +178,11 @@ JS_READS = [
     re.compile(r"\bsafety_status\b"),
     re.compile(r"\bsafety_class\b"),
     re.compile(r"\bsafety\s*\??\s*\.\s*(?:status|class)\b"),                       # safety.status, rec.safety?.class
+    re.compile(rf"""['"]safety['"]\s*\]\s*\??\s*\.\s*(?:status|class)\b"""),        # rec['safety'].status
     re.compile(rf"""['"]safety['"]\s*\]\s*\??\.?\s*\[\s*{KEY}\s*\]"""),             # rec['safety']['status']
     re.compile(rf"\bsafety\s*\??\.?\s*\[\s*{KEY}\s*\]"),                             # rec.safety?.['status']
+    re.compile(r"""\bsafety\s*\??\.?\s*\[(?!\s*['"]explanation['"]\s*\])"""),       # rec.safety[k]: a computed key
+    re.compile(r"""\[\s*['"]safety['"]\s*\](?!\s*\??\s*\.\s*explanation\b)"""),     # const s = rec['safety']; s.status
     re.compile(r"\{[^{}]*\b(?:status|class)\b[^{}]*\}\s*=(?![=>])[^;]*?\bsafety\b", re.S),   # const { status } = rec.safety
     re.compile(r"\{[^{}]*\bsafety\b[^{}]*\}\s*=(?![=>])"),                           # const { safety } = rec
     re.compile(r"\bsafety\s*:\s*\{[^{}]*\b(?:status|class)\b[^{}]*\}"),             # ({ safety: { status } }) =>
@@ -169,24 +190,24 @@ JS_READS = [
     re.compile(r"""['"`]\s*Safety\s*:"""),                                           # a "Safety: " verdict prefix
 ]
 
-# Where a read is allowed without being shown as a verdict: file, the exact read, the exact expression it sits in, why.
+# Where a read is allowed without being shown as a verdict: file, the exact read, the whole line (stripped of comments
+# and of spaces at its ends), and why. The line must be equal to the entry, so a line that is extended no longer matches.
 ALLOW = {
     "verification.js": [
-        (r"^safety\.class$", r"const cls = record\.safety\.class;", "the safety class letter, drawn as a class badge and not as a verdict"),
+        (r"^safety\.class$", "const cls = record.safety.class;", "the safety class letter, drawn as a class badge and not as a verdict"),
     ],
     "views/library.js": [
-        (r"^safety_status$", r"s\.safety_status !== filter\.safety", "the filter compares the summary with the option the person picked; nothing is printed"),
-        (r"^\.safety$", r"filter\.safety && s\.safety_status !== filter\.safety", "the filter's own option (filter.safety), not a record"),
-        (r"^safety_status$", r"const hay = \[m\.run_id, m\.label,.*s\.safety_status, s\.safety_class \|\| ''", "the text the search box matches against, never displayed"),
-        (r"^safety_class$", r"const hay = \[m\.run_id, m\.label,.*s\.safety_status, s\.safety_class \|\| ''", "the same search text"),
-        (r"^safety_status$", r"verdictOfSafety\(s\.safety_status\)", "picks the glyph (a symbol); the words come from safetyBrokenText"),
-        (r"^safety_class$", r"s\.safety_class && !unjudged \? h\('span', \{ class: \['class-badge', `class-\$\{s\.safety_class\}`\] \}, s\.safety_class\) : null", "the safety class letter as a class badge, not a verdict"),
+        (r"^safety_status$", "if (filter.safety && s.safety_status !== filter.safety) return false;", "the filter compares the summary with the option the person picked; nothing is printed"),
+        (r"^\.safety$", "if (filter.safety && s.safety_status !== filter.safety) return false;", "the filter's own option (filter.safety), not a record"),
+        (r"^safety_(status|class)$", "const hay = [m.run_id, m.label, m.notes, m.tags.join(' '), s.domain, s.scenario, scenarioLabel(m), s.controller, controllerLabel(m), String(s.seed), s.faults.join(' '), s.outcome_label, s.outcome_code, s.safety_status, s.safety_class || '', s.failed.join(' ')].join(' ').toLowerCase();", "the text the search box matches against, never displayed"),
+        (r"^safety_status$", "const sv = unjudged ? 'neutral' : verdictOfSafety(s.safety_status);", "picks the glyph (a symbol); the words come from safetyBrokenText"),
+        (r"^safety_class$", "h('td', null, h('span', { class: ['cell', `v-${sv}`], title: SAFETY_NOTE }, verdictGlyph(sv), unjudged ? 'Not evaluated' : s.safety_status === 'safe' ? 'None broken' : h('b', { dataset: { safetyCell: '1' } }, safetyBrokenText(s)), s.safety_class && !unjudged ? h('span', { class: ['class-badge', `class-${s.safety_class}`] }, s.safety_class) : null)),", "the safety class letter as a class badge, not a verdict"),
     ],
     "views/compare.js": [
-        (r"^safety\.(status|class)$", r"key: `\$\{r\.record\.safety\.status\}\$\{r\.record\.safety\.class\}\$\{sw\.broken\}`", "a grouping key that decides which cells look alike; never displayed"),
+        (r"^safety\.(status|class)$", "return { v: sw.verdict, text: sw.text, key: `${r.record.safety.status}${r.record.safety.class}${sw.broken}`, title: `${prose(r.record.safety.explanation)}\\n${SAFETY_NOTE}` };", "a grouping key that decides which cells look alike; never displayed"),
     ],
     "views/player.js": [
-        (r"^safety\.status$", r"dataset: \{ outcome: rec\.outcome\.code, safety: rec\.safety\.status \}", "a data attribute read by the journeys; not text"),
+        (r"^safety\.status$", "return h('div', { class: 'pl-run-result', dataset: { outcome: rec.outcome.code, safety: rec.safety.status } },", "a data attribute read by the journeys; not text"),
     ],
 }
 # requirements.js is scanned; reads are allowed only inside these functions (the shared wording).
@@ -215,8 +236,10 @@ def _family_lines(code):
 
 def scan_js(text, rel, used=None):
     """[(line, why)] of every place of the JavaScript `text` that reads the safety status or class, prints a bare safe,
-    or prefixes a verdict with "Safety: ", other than a comparison with a literal and the allowlisted expressions."""
-    code = strip_js(text)
+    or prefixes a verdict with "Safety: ", other than a comparison with a literal and the allowlisted lines."""
+    plain = strip_js(text)
+    plain_lines = plain.split("\n")
+    code = plain
     for rx in COMPARISONS:
         code = rx.sub(lambda m: " " * len(m.group(0)), code)
     lines = code.split("\n")
@@ -230,7 +253,7 @@ def scan_js(text, rel, used=None):
             read = re.sub(r"\s+", "", m.group(0))
             ok = False
             for entry in ALLOW.get(rel, []):
-                if re.search(entry[0], read) and re.search(entry[1], lines[n]):
+                if re.search(entry[0], read) and plain_lines[n].strip() == entry[1]:
                     ok = True
                     if used is not None:
                         used.add((rel, entry[0], entry[1]))
@@ -254,6 +277,8 @@ GD_READS = [
     re.compile(r"""["'][^"'\n]*\bSafety\s*:[^"'\n]*["']"""),                                                    # "Safety: ..." text
     re.compile(r"""str\(\s*[\w.]+\.get\(\s*"(?:status|class)"[^)\n]*\)\s*\)"""),                                # str(x.get("status", ""))
     re.compile(r"""[\w.]+\.get\(\s*"(?:status|class)"[^)\n]*\)"""),                                              # x.get("status")
+    re.compile(r"""\[\s*"(?:status|class)"\s*\]"""),                                                             # s["status"], data["safety"]["class"]
+    re.compile(r"""\bsafety\w*(?:\(\s*\))?\s*\.\s*(?:status|class)\b"""),                                         # record.safety().status, safety.class
     re.compile(r""""[^"\n]*%s[^"\n]*"\s*%\s*(?:\[[^\]\n]*\bstatus\b[^\]\n]*\]|status\b)"""),                  # "...%s" % status
 ]
 GD_COMPARISON = re.compile(r"""(?:str\(\s*)?[\w.]+\.get\(\s*"(?:status|class)"[^)\n]*\)\s*\)?\s*(?:==|!=)\s*"[^"\n]*\"""")
@@ -303,16 +328,35 @@ MUTANTS = [
     ("optional chaining", "views/new.js", "h('b', null, rec?.safety?.status)"),
     ("the object kept in a variable", "views/new.js", "const s = rec.safety; h('b', null, s.status);"),
     ("a '//' inside a string hiding the rest of the line", "views/new.js", "h('a', { href: 'https://x' }, 'a'); h('b', null, rec.safety.status);"),
+    ("a quoted key then a dot", "views/new.js", "h('b', null, rec['safety'].status);"),
+    ("a computed key", "views/new.js", "const k = 'sta' + 'tus'; h('b', null, rec.safety[k]);"),
+    ("the quoted object kept in a variable", "views/new.js", "const s = rec['safety']; h('b', null, s.status);"),
+    ("a regular expression after return that holds '//'", "views/new.js", "function q(x) { return /a|\\//.test(x); } h('b', null, rec.safety.status);"),
+    ("a regular expression after typeof/case/in/of/void/throw/new/else/do", "views/new.js", "if (x) {} else /'/.test(y); const f = () => { throw /\\//; }; h('b', null, rec.safety.status);"),
+    ("an allowlisted line extended", "verification.js", "const cls = record.safety.class; h('b', null, record.safety.class);"),
+    ("hud.gd subscripts a status", HUD, "func _n1(s):\n\tvar t = \"Result \" + str(s[\"status\"])\n"),
+    ("hud.gd reads .status off a safety value", HUD, "func _n2(record):\n\tvar t = \"Result %s\" % record.safety().status\n"),
+    ("hud.gd subscripts the record's safety", HUD, "func _n4(record):\n\tvar st = record.data[\"safety\"][\"status\"]\n\tvar t = \"Result \" + st\n"),
 ]
 CLEAN = [
     ("the domain's explanation", "views/new.js", "h('p', null, prose(rec.safety.explanation))"),
+    ("the domain's explanation by key", "views/new.js", "h('p', null, prose(rec.safety['explanation']))"),
     ("a comparison that decides and prints nothing", "views/new.js", "const ok = rec.safety.status === 'safe' && rec.safety.class === 'not_evaluated';"),
     ("a reversed comparison", "views/new.js", "if ('unsafe' === s.safety_status) mark();"),
     ("comments", "views/new.js", "// rec.safety.status is read in requirements.js only\nconst a = 1; /* s.safety_status 'safe' */"),
     ("a URL in a string and a comment", "views/new.js", "const u = 'https://example.org/a'; // rec.safety.status"),
+    ("a division and a regular expression", "views/new.js", "const r = (a + b) / 2; const m = /x\\/y/.test(s); const n = a / b / c;"),
     ("the shared wording in requirements.js", "requirements.js", "export function safetyWording(record) {\n  const x = record.safety.status;\n  return x;\n}\n"),
     ("hud.gd comparing a status", HUD, "func f(s):\n\tif str(s.get(\"status\", \"\")) == \"unsafe\" or str(s.get(\"class\", \"\")) != \"x\":\n\t\treturn 1\n"),
     ("hud.gd comment", HUD, "# \"Safety: %s\" % status in a comment\nvar a = 1\n"),
+]
+# Known to stay missed and documented above ("What it cannot see"): 'sa' + 'fe', `${'Sa'}fe`, s.get(k) in GDScript, 'safe-to-land'.
+KNOWN_MISSES = [
+    ("a word built from pieces", "views/new.js", "h('b', null, 'sa' + 'fe');"),
+    ("a word built in a template", "views/new.js", "h('b', null, `${'Sa'}fe to land`);"),
+    ("a hyphenated word", "views/new.js", "h('b', null, 'safe-to-land');"),
+    ("a bare unsafe text node (policy: allowed)", "views/new.js", "h('b', null, 'unsafe');"),
+    ("hud.gd key built in a variable", HUD, "func _n3(s):\n\tvar k = \"sta\" + \"tus\"\n\tvar t = \"Result %s\" % s.get(k)\n"),
 ]
 
 
@@ -322,6 +366,11 @@ class VerdictWording(unittest.TestCase):
         self.assertEqual(missed, [], "the guard misses: " + ", ".join(missed))
         wrongly = [(name, violations(src, rel)) for name, rel, src in CLEAN if violations(src, rel)]
         self.assertEqual(wrongly, [], "the guard flags clean code")
+
+    def test_what_the_scan_cannot_see_is_what_the_docstring_says(self):
+        """If one of these is ever caught, the docstring's "What it cannot see" is out of date."""
+        caught = [name for name, rel, src in KNOWN_MISSES if violations(src, rel)]
+        self.assertEqual(caught, [], "now caught: update the docstring and move it to MUTANTS")
 
     def test_studio_reads_the_safety_status_only_through_the_shared_wording(self):
         bad, used = [], set()
