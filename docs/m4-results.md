@@ -2,7 +2,7 @@
 
 ## Proveniência e orçamento
 
-A campanha foi executada a partir do commit `34223003c8fa16547a5a993a96f6b3d78ecd820a`, numa PR de rascunho baseada em `main` no commit `a22db7dee082e54bfccdabb171e39ae514ec6437`. O [workflow 38229072330](https://github.com/WhiteBlindness/autonomous-systems-vv-lab/actions/runs/38229072330) passou em Linux, Windows e na comparação canónica entre plataformas. O SHA-256 do código usado nos manifestos M4 foi `38039c255f6f60c8b1a5d50332c2280665df469a1a00ad43b06f5df47bf643cb`. Os resultados e artefactos completos estão associados a essa execução.
+A campanha foi executada a partir do commit `34223003c8fa16547a5a993a96f6b3d78ecd820a`, numa PR de rascunho baseada em `main` no commit `a22db7dee082e54bfccdabb171e39ae514ec6437`. O [workflow 38229072330](https://github.com/DoArtMonteiro/autonomous-systems-vv-lab/actions/runs/38229072330) passou em Linux, Windows e na comparação canónica entre plataformas. O SHA-256 do código usado nos manifestos M4 foi `38039c255f6f60c8b1a5d50332c2280665df469a1a00ad43b06f5df47bf643cb`. Os resultados e artefactos completos estão associados a essa execução.
 
 A matriz tem quatro cenários e as sementes 42, 1337 e 2026. Cada par executou duas políticas, repetiu ambas e reproduziu ambas de forma independente. A campanha validou o orçamento antes de iniciar os processos.
 
