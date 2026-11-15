@@ -65,11 +65,11 @@ export function buildControl(pl, ctx) {
   const clock = h('span', { class: 'mc-clock mono' });
   const phase = h('span', { class: 'mc-phase' });
   const densitySeg = h('div', { class: 'seg mc-density', role: 'radiogroup', 'aria-label': 'Density' },
-    [['cinematic', 'Cinematic'], ['technical', 'Technical']].map(([d, text]) => h('button', { type: 'button', role: 'radio', class: 'seg-btn', 'aria-checked': String(d === density), dataset: { density: d }, onclick: () => setDensity(d) }, text)));
+    [['cinematic', 'Clean'], ['technical', 'Technical']].map(([d, text]) => h('button', { type: 'button', role: 'radio', class: 'seg-btn', 'aria-checked': String(d === density), dataset: { density: d }, onclick: () => setDensity(d) }, text)));
   const top = h('header', { class: 'mc-top' },
     h('div', { class: 'mc-id' },
       h('button', { type: 'button', class: 'mc-back', title: 'Back to the mission player', onclick: () => ctx.setView(pl.lastView && pl.lastView !== 'control' ? pl.lastView : 'engineering') }, h('span', { 'aria-hidden': 'true' }, '←'), ' Player'),
-      h('div', { class: 'mc-id-t' }, h('p', { class: 'mc-eyebrow' }, `Flight console · ${ctx.domainName}`), h('h1', { class: 'mc-title' }, pl.exp.title))),
+      h('div', { class: 'mc-id-t' }, h('p', { class: 'mc-eyebrow' }, `Flight console · ${ctx.domainName}`), h('h1', { class: 'mc-title' }, pl.exp.title), ctx.badges ? ctx.badges() : null)),
     h('div', { class: 'mc-time' }, h('span', { class: 'mc-eyebrow' }, pl.unit === 'tick' ? 'Mission tick' : 'Mission elapsed time'), clock, phase),
     h('div', { class: 'mc-tools' }, ctx.viewSwitch(), ctx.envSelect(), densitySeg));
   const left = h('aside', { class: 'mc-left', 'aria-label': 'Telemetry at the playback time' });
@@ -261,7 +261,7 @@ export function buildControl(pl, ctx) {
 
   function buildLegend() {
     const tags = ['T', 'E', 'O', 'C', 'D', ...(ctx.geoActive() && pl.track ? ['G'] : [])];
-    legend.replaceChildren(...tags.map((k) => h('span', { title: TAG_WORD[k] }, h('abbr', { class: `kind kind-${k}` }, k), ` ${TAG_WORD[k].split(',')[0]}`)));
+    legend.replaceChildren(...tags.map((k) => h('span', { title: TAG_WORD[k] }, h('abbr', { class: `kind kind-${k}` }, k), ` ${TAG_WORD[k].split(',')[0]}`)), h('span', { class: 'mc-badge-note', title: 'The small number on a timeline mark counts the findings recorded at that instant.' }, h('abbr', { class: 'kind' }, '#'), ' number = findings at this instant'));
   }
 
   // Values change only from one recorded sample to the next: refresh them then, not every frame.

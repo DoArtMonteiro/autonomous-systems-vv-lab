@@ -104,7 +104,7 @@ export function reqView(r) {
     const m = lim.op.startsWith('>') ? l - o : o - l;
     return {
       numeric: true, obs: o, limit: l, op: flipped, unit: '°', margin: m,
-      obsText: `${fmtSig(o)} °`, limitText: `${flipped} ${fmtSig(l)} °`, marginText: `${m >= 0 ? '+' : '-'}${fmtSig(Math.abs(m))} °`,
+      obsText: `${fmtSig(o)} °`, limitText: `${flipped} ${fmtSig(l)} °`, marginText: `${m >= 0 ? '+' : '-'}${fmtSig(Math.abs(m))} °`, marginDerived: true,
       full: `${full} (shown as an angle: arccos of the recorded cosine)`,
     };
   }
@@ -113,11 +113,11 @@ export function reqView(r) {
     return {
       numeric: true, obs, limit: lim.value, op: lim.op, unit, margin,
       obsText: `${fmtSig(obs)}${u}`, limitText: `${lim.op ? `${lim.op} ` : ''}${fmtSig(lim.value)}${u}`,
-      marginText: margin === null ? '' : `${margin >= 0 ? '+' : '-'}${fmtSig(Math.abs(margin))}${u}`,
+      marginText: margin === null ? '' : `${margin >= 0 ? '+' : '-'}${fmtSig(Math.abs(margin))}${u}`, marginDerived: !NUMBERS.has(r),
       full,
     };
   }
-  return { numeric: false, obs: null, limit: null, op: '', unit, margin: null, obsText: shortText(r.observed), limitText: shortText(r.expected), marginText: '', full };
+  return { numeric: false, obs: null, limit: null, op: '', unit, margin: null, obsText: shortText(r.observed), limitText: shortText(r.expected), marginText: '', marginDerived: false, full };
 }
 
 const STAGES = { booster: 'Booster', upper: 'Upper stage', stack: 'Stack' };
@@ -145,15 +145,34 @@ export function safetyWording(record) {
   const notEvaluated = inv.length - judged.length;
   const broken = judged.filter((q) => q.status === 'fail').length;
   const base = { n: inv.length, checked: judged.length, notEvaluated, broken };
+  // The same counts for a status line: "5 of 5 safety rules held" (held = evaluated and not broken).
+  const held = `${judged.length - broken} of ${inv.length} safety rules held${notEvaluated ? ` (${notEvaluated} not evaluated)` : ''}`;
   if (record.safety.status === 'unsafe' || broken) {
-    return { ...base, text: broken ? `${broken} of ${judged.length} safety rules broken` : 'A safety rule was broken', verdict: 'unsafe', unjudged: false };
+    const text = broken ? `${broken} of ${judged.length} safety rules broken` : 'A safety rule was broken';
+    return { ...base, text, heldText: text, verdict: 'unsafe', unjudged: false };
   }
   const unjudged = (record.safety.status === 'safe' && record.safety.class === 'not_evaluated') || (inv.length > 0 && judged.length === 0);
-  if (unjudged) return { ...base, text: 'Safety not evaluated', verdict: 'neutral', unjudged: true };
-  if (!inv.length) return { ...base, text: 'No safety rule broken', verdict: 'pass', unjudged: false };
+  if (unjudged) return { ...base, text: 'Safety not evaluated', heldText: 'safety not evaluated', verdict: 'neutral', unjudged: true };
+  if (!inv.length) return { ...base, text: 'No safety rule broken', heldText: 'no safety rule broken', verdict: 'pass', unjudged: false };
   const count = notEvaluated ? `${judged.length} of ${inv.length} checked; ${notEvaluated} not evaluated` : `${judged.length} checked`;
-  return { ...base, text: `No safety rule broken (${count})`, verdict: 'pass', unjudged: false };
+  return { ...base, text: `No safety rule broken (${count})`, heldText: held, verdict: 'pass', unjudged: false };
 }
+
+/** "2 of 6 requirements failed" or "all 6 requirements met"; nothing when the record lists no mission requirement. */
+export function requirementWording(record) {
+  const m = (record.requirements || []).filter((q) => q.category !== 'invariant');
+  if (!m.length) return '';
+  const nf = m.filter((q) => q.status === 'fail').length;
+  return nf ? `${nf} of ${m.length} requirements failed` : `all ${m.length} requirements met`;
+}
+
+/** The combined status, failure first, with the two kinds of verdict kept apart: "2 of 6 requirements failed · 5 of 5 safety rules held". */
+export function statusLine(record) {
+  return [requirementWording(record), safetyWording(record).heldText].filter(Boolean).join(' · ');
+}
+
+/** The footnote that explains the D badge on a margin Studio worked out itself. */
+export const DERIVED_NOTE = 'D: derived by Studio from the recorded values (the limit minus the observed value, or a cosine shown as an angle). A margin without D is the one the domain publishes.';
 
 export const SAFETY_NOTE = 'Safety rules are judged on the true state throughout the run. Mission requirements are judged separately: a requirement can fail without any safety rule being broken.';
 
@@ -199,6 +218,6 @@ export function headlineChange(a, b) {
   const t = rows[0];
   const text = t.va.numeric && t.vb.numeric
     ? `${reqLabel(t.qb)} ${fmtSig(t.va.obs)} → ${t.vb.obsText} (limit ${t.vb.limitText})`
-    : `${reqLabel(t.qb)} ${t.va.obsText} → ${t.vb.obsText} (limit ${t.vb.limitText})`;
+    : `${reqLabel(t.qb)}: ${t.qa.status === 'pass' ? 'passes' : t.qa.status === 'fail' ? 'fails' : 'not evaluated'} → ${t.qb.status === 'pass' ? 'passes' : t.qb.status === 'fail' ? 'fails' : 'not evaluated'}`;
   return { text, flip: t.flip, id: t.qa.id, from: t.qa.status, to: t.qb.status };
 }

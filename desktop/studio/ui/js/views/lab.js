@@ -10,7 +10,7 @@ import { domainById, visibleDomains, emit, loadRecord } from '../store.js';
 import { toast, errorText, askConfirm } from '../ui.js';
 import { verdictOfOutcome, faultText, distinguishingLabels } from '../model.js';
 import { verdictGlyph } from '../verification.js';
-import { indexNumbers, limitOf, marginOf, unitOf, reqView, reqLabel, safetyWording, SAFETY_NOTE, headlineChange, fmtSig } from '../requirements.js';
+import { indexNumbers, limitOf, marginOf, unitOf, reqView, reqLabel, safetyWording, SAFETY_NOTE, headlineChange, fmtSig, statusLine, DERIVED_NOTE } from '../requirements.js';
 
 const REQUEST_SCHEMA = 'vv-run-request.v1';
 const BATCH = 8; // the platform's MAX_COMPARE
@@ -333,7 +333,8 @@ function verdictPill(record) {
   const sw = safetyWording(record);
   return h('div', { class: 'lab-verdicts' },
     h('span', { class: ['mini', `v-${ov}`], title: prose(record.outcome.explanation) }, verdictGlyph(ov), record.outcome.label),
-    h('span', { class: ['mini', `v-${sw.verdict}`], title: `${prose(record.safety.explanation)}\n${SAFETY_NOTE}` }, verdictGlyph(sw.verdict), sw.text));
+    h('span', { class: ['mini', `v-${sw.verdict}`], title: `${prose(record.safety.explanation)}\n${SAFETY_NOTE}` }, verdictGlyph(sw.verdict), sw.text),
+    h('span', { class: 'lab-status small dim' }, statusLine(record)));
 }
 
 function runLine(req) {
@@ -543,6 +544,7 @@ function renderComparison(el) {
     h('span', { class: 'lab-arrow', 'aria-hidden': 'true' }, '→'),
     h('div', null, h('p', { class: 'lab-h2' }, 'Experiment'), verdictPill(b))),
   headlineLine(a, b),
+  h('p', { class: 'small dim lab-separate' }, SAFETY_NOTE),
   h('p', { class: 'lab-why' }, summary.length ? `The experiment ${summary.join(' and ')}.` : 'The same requirements pass and fail as in the baseline; the margins below show how far each moved.',
     judgingOnly ? ' Only a requirement limit changed: the flight is identical and only the judgement moved.' : ''),
   lab.exp.reused ? h('p', { class: 'small dim' }, 'An identical request was already in the library, so its stored run is shown; it was computed by the same simulator.') : null,
@@ -555,13 +557,21 @@ function renderComparison(el) {
       const vb = rb ? reqView(rb) : null;
       const delta = va && vb && va.numeric && vb.numeric ? vb.margin - va.margin : null;
       // Each cell: the verdict, the observed value and its margin to the limit, not only Pass or Fail.
-      const cell = (x, v) => (x ? h('td', { class: ['mono', 'small', `st-${x.status}`], title: v.full }, h('span', { class: 'lab-cell-v' }, `${x.status === 'pass' ? '✓' : x.status === 'fail' ? '✕' : '·'} ${v.obsText}`), v.marginText ? h('span', { class: 'lab-cell-m dim' }, `margin ${v.marginText}`) : null) : h('td', null, '–'));
+      const cell = (x, v) => (x ? h('td', { class: ['mono', 'small', `st-${x.status}`], title: v.full }, h('span', { class: 'lab-cell-v' }, `${x.status === 'pass' ? '✓' : x.status === 'fail' ? '✕' : '·'} ${v.obsText}`), v.marginText ? h('span', { class: 'lab-cell-m dim' }, v.marginDerived ? h('abbr', { class: 'kind kind-D', title: DERIVED_NOTE }, 'D') : null, v.marginDerived ? ' ' : null, `margin ${v.marginText}`) : null) : h('td', null, '–'));
+      // A requirement made of several quantities has a sentence, not a number: it takes a row of its own.
+      if (va && vb && !va.numeric && !vb.numeric) {
+        const mark = (x) => (x.status === 'pass' ? '✓' : x.status === 'fail' ? '✕' : '·');
+        return [h('tr', { class: ['lab-composite', ra && rb && ra.status !== rb.status ? 'is-flip' : ''], dataset: { req: r.id } }, h('td', { colspan: '5', title: vb.full },
+          h('b', null, reqLabel(r)), h('span', { class: 'dim small' }, ` · ${vb.limitText}`),
+          h('div', { class: ['lab-comp-line', `st-${ra.status}`] }, h('span', { class: 'dim small' }, 'Baseline '), `${mark(ra)} ${va.obsText}`),
+          h('div', { class: ['lab-comp-line', `st-${rb.status}`] }, h('span', { class: 'dim small' }, 'Experiment '), `${mark(rb)} ${vb.obsText}`)))];
+      }
       return h('tr', { class: ra && rb && ra.status !== rb.status ? 'is-flip' : '', dataset: { req: r.id } },
         h('td', { title: (vb || va).full }, reqLabel(r)),
         h('td', { class: ['mono', 'small', 'lab-lim', (vb || va).limitText.length > 28 ? 'is-long' : ''] }, (vb || va).limitText),
         cell(ra, va), cell(rb, vb),
         h('td', { class: ['mono', 'small', delta === null ? '' : delta > 1e-12 ? 'is-better' : delta < -1e-12 ? 'is-worse' : ''] }, delta === null ? '–' : Math.abs(delta) < 1e-12 ? `0 ${(vb || va).unit}` : `${delta > 0 ? '+' : '-'}${fmtSig(Math.abs(delta))} ${(vb || va).unit}`));
-    })))),
+    })), h('tfoot', null, h('tr', null, h('td', { colspan: '5', class: 'dim small' }, DERIVED_NOTE))))),
   eventDeltas(a, b),
   h('p', { class: 'small dim' }, `One run on seed ${b.request.seed}. A change that helps one seed may not help another: check it across seeds below.`),
   h('div', { class: 'row' },

@@ -2,10 +2,11 @@
 // (desktop/studio/ui/js/requirements.js has no imports, so it runs under plain Node).
 // Run through tests/test_ui_requirements.py, or: node tests/ui_requirements.test.mjs
 import assert from 'node:assert/strict';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 
-const here = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'));
+// fileURLToPath keeps a path with spaces or '&' (for example "v&v lab") intact.
+const here = path.dirname(fileURLToPath(import.meta.url));
 const mod = await import(pathToFileURL(path.join(here, '..', 'desktop', 'studio', 'ui', 'js', 'requirements.js')).href);
 const { safetyWording, reqView, failureSentence, plainName, headlineChange, indexNumbers, shortText, SAFETY_NOTE } = mod;
 

@@ -12,7 +12,7 @@ import { sceneFor, sceneKind } from '../scenes/registry.js';
 import { TimeCursor } from '../cursor.js';
 import { api } from '../api.js';
 import { toast, errorText, askName } from '../ui.js';
-import { indexNumbers, reqView, reqLabel, safetyWording, SAFETY_NOTE, headlineChange } from '../requirements.js';
+import { indexNumbers, reqView, reqLabel, safetyWording, SAFETY_NOTE, headlineChange, statusLine, DERIVED_NOTE } from '../requirements.js';
 
 const MAX = 8;
 let root;
@@ -34,8 +34,8 @@ export async function showCompare(opts) {
   } else if (!cmp) {
     clear(root).append(h('div', { class: 'settings' },
       h('h1', null, 'Nothing to compare yet'),
-      h('p', { class: 'dim' }, 'Tick several controllers in Configure, run a multi-run mission or demonstration, or select up to eight runs in Records.'),
-      h('div', { class: 'row' }, h('button', { type: 'button', class: 'btn btn-primary', onclick: () => navigate('prepare') }, 'Configure'), h('button', { type: 'button', class: 'btn', onclick: () => navigate('library') }, 'Records'))));
+      h('p', { class: 'dim' }, 'Tick several controllers in Configure, run a multi-run mission or demonstration, or select up to eight runs in Runs.'),
+      h('div', { class: 'row' }, h('button', { type: 'button', class: 'btn btn-primary', onclick: () => navigate('prepare') }, 'Configure'), h('button', { type: 'button', class: 'btn', onclick: () => navigate('library') }, 'Runs'))));
   } else {
     requestAnimationFrame(() => resizeCharts());
   }
@@ -133,9 +133,7 @@ function build() {
 
 /** "2 of 6 requirements failed" or "all 6 requirements met", from the record's mission requirement rows. */
 function failureCount(rec) {
-  const m = (rec.requirements || []).filter((q) => q.category !== 'invariant');
-  const nf = m.filter((q) => q.status === 'fail').length;
-  return nf ? `${nf} of ${m.length} requirements failed` : `all ${m.length} requirements met`;
+  return statusLine(rec);
 }
 
 /** One sentence per run after the first: the requirement that moved most, with its numbers and limit. */
@@ -192,7 +190,7 @@ function matrix() {
       if (onlyDiff && !differs) return;
       tb.append(h('tr', { class: differs ? 'differs' : '', dataset: { row: extra || name } },
         h('th', { scope: 'row' }, typeof name === 'string' ? name : name, differs ? h('span', { class: 'sr-only' }, ' (differs)') : null),
-        cells.map((c) => h('td', { title: c.title || '' }, h('span', { class: ['cell', `v-${c.v}`] }, verdictGlyph(c.v), h('span', { class: ['cell-text', `v-${c.v}-text`] }, c.text), c.sub ? h('span', { class: 'cell-sub dim small' }, c.sub) : null)))));
+        cells.map((c) => h('td', { title: c.title || '' }, h('span', { class: ['cell', `v-${c.v}`] }, verdictGlyph(c.v), h('span', { class: ['cell-text', `v-${c.v}-text`] }, c.text), c.sub ? h('span', { class: 'cell-sub dim small' }, c.derived ? h('abbr', { class: 'kind kind-D', title: DERIVED_NOTE }, 'D') : null, c.derived ? ' ' : null, c.sub) : null)))));
     };
     for (const [name, cells] of rows) emitRow(name, cells);
     // Rows whose verdict changes between the runs come first, in a group of their own.
@@ -203,23 +201,29 @@ function matrix() {
       if (!q) return { v: 'neutral', text: 'absent', key: 'absent', title: 'This run does not report this id.' };
       const v = verdictOfRequirement(q);
       const rv = reqView(q);
-      return { v, text: `${STATUS_TEXT[q.status] || q.status} · ${rv.obsText}`, sub: rv.marginText ? `margin ${rv.marginText}` : '', key: `${q.status}|${rv.numeric ? fmtKey(rv.obs, rv.limit) : q.observed}`, status: q.status, title: `${rv.full}${q.t !== null ? `\nat ${timeText(q.t, cmp.unit)}` : ''}` };
+      return { v, text: `${STATUS_TEXT[q.status] || q.status} · ${rv.obsText}`, sub: rv.marginText ? `margin ${rv.marginText}` : '', derived: rv.marginDerived, key: `${q.status}|${rv.numeric ? fmtKey(rv.obs, rv.limit) : q.observed}`, status: q.status, title: `${rv.full}${q.t !== null ? `\nat ${timeText(q.t, cmp.unit)}` : ''}` };
     });
     const reqRow = (id) => {
       const firstReq = records.map((r) => (r.record.requirements || []).find((x) => x.id === id)).find(Boolean) || {};
-      emitRow(h('span', { class: 'req-name' }, h('span', { class: 'req-label' }, reqLabel(firstReq)), h('span', { class: 'dim small' }, `limit ${reqView(firstReq).limitText} · `, h('span', { class: 'mono' }, id))), buildCells(id), id);
+      emitRow(h('span', { class: 'req-name' }, h('span', { class: 'req-label' }, reqLabel(firstReq)), h('span', { class: 'dim small', title: reqView(firstReq).limitText }, reqView(firstReq).numeric ? `limit ${reqView(firstReq).limitText} · ` : '', h('span', { class: 'mono' }, id))), buildCells(id), id);
     };
     if (flips.length) {
       tb.append(h('tr', { class: 'sep' }, h('th', { colspan: String(records.length + 1) }, 'Verdict changes between the runs')));
       for (const id of flips) reqRow(id);
     }
+    const failedBoth = ids.filter((id) => !flips.includes(id) && records.every((r) => statusOf(r, id) === 'fail'));
+    if (failedBoth.length) {
+      tb.append(h('tr', { class: 'sep' }, h('th', { colspan: String(records.length + 1) }, 'Failed in every run')));
+      for (const id of failedBoth) reqRow(id);
+    }
     const order = ['invariant', 'requirement', 'declaration'];
-    const catList = [...new Set(ids.filter((id) => !flips.includes(id)).map((id) => cats.get(id)))].sort((a, b) => (order.indexOf(a) + 1 || 9) - (order.indexOf(b) + 1 || 9));
+    const catList = [...new Set(ids.filter((id) => !flips.includes(id) && !failedBoth.includes(id)).map((id) => cats.get(id)))].sort((a, b) => (order.indexOf(a) + 1 || 9) - (order.indexOf(b) + 1 || 9));
     for (const cat of catList) {
       tb.append(h('tr', { class: 'sep' }, h('th', { colspan: String(records.length + 1) }, CATEGORY_TITLE[cat] || cat)));
-      for (const id of ids.filter((x) => cats.get(x) === cat && !flips.includes(x))) reqRow(id);
+      for (const id of ids.filter((x) => cats.get(x) === cat && !flips.includes(x) && !failedBoth.includes(x))) reqRow(id);
     }
     table.append(tb);
+    table.append(h('tfoot', null, h('tr', null, h('td', { colspan: String(records.length + 1), class: 'dim small' }, DERIVED_NOTE))));
     summary.textContent = !diffCount ? 'All runs agree on every verdict and value.'
       : `${diffCount === 1 ? '1 row differs' : `${diffCount} rows differ`} between the runs (marked), ${verdictDiff === 1 ? '1 in its verdict' : `${verdictDiff} in their verdict`}, the others in a value.`;
   };

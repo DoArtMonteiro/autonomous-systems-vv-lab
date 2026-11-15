@@ -300,15 +300,18 @@ OVERLAP_JS = """(pairs) => {
   const vis = (e) => e.offsetParent !== null || getComputedStyle(e).position === 'fixed';
   const clash = [];
   let seen = 0;
+  const per = {};
   for (const [aSel, bSel] of pairs) {
+    per[aSel + ' x ' + bSel] = 0;
     for (const a of [...document.querySelectorAll(aSel)].filter(vis)) for (const b of [...document.querySelectorAll(bSel)].filter(vis)) {
       seen += 1;
+      per[aSel + ' x ' + bSel] += 1;
       const x = box(a); const y = box(b);
       const w = Math.min(x.r, y.r) - Math.max(x.l, y.l); const h = Math.min(x.b, y.b) - Math.max(x.t, y.t);
       if (w > 1 && h > 1) clash.push(aSel + ' x ' + bSel);
     }
   }
-  return { clash, seen };
+  return { clash, seen, per, unseen: Object.keys(per).filter((k) => per[k] === 0) };
 }"""
 
 
@@ -320,17 +323,17 @@ def narrow_player(s):
         s.wait("(() => { const p = window.__studio.player(); return p && p.view === 'engineering'; })()", 60, "engineering")
         time.sleep(1.0)
         r = s.js(OVERLAP_JS, [[".pl-scene-note", ".pl-cams"], [".pl-scene-note", ".pl-runs"], [".pl-cams", ".pl-runs"]])
-        check(f"Player {w}x{h} (engineering, two runs): the scene note does not overlap the camera bar or the run pills", not r["clash"] and r["seen"] >= 2, json.dumps(r))
+        check(f"Player {w}x{h} (engineering, two runs): the scene note does not overlap the camera bar or the run pills", not r["clash"] and not r["unseen"], json.dumps(r))
         s.shot(f"ux-player-engineering-{w}x{h}-dark")
         if w == 1024:
             s.page.click(".pl-views [data-view='control']")
             s.wait("document.querySelector('.mc')", 30, "flight console")
             time.sleep(2.5)
-            r = s.js(OVERLAP_JS, [[".si-credit", ".mc-cams"], [".mc .pl-scene-note", ".mc-cams"], [".mc .pl-scene-note", ".mc-strip"]])
-            check("Flight console 1024x640: the attribution does not overlap the camera bar", not r["clash"], json.dumps(r))
+            r = s.js(OVERLAP_JS, [[".si-credit", ".mc-cams"], [".mc .pl-scene-note", ".mc-cams"]])
+            check("Flight console 1024x640: the attribution does not overlap the camera bar", not r["clash"] and not r["unseen"], json.dumps(r))
             r = s.js(OVERLAP_JS, [[".mc-id", ".mc-time"], [".mc-time", ".mc-tools"], [".mc-id", ".mc-tools"]])
             edge = s.js("(() => { const e = document.querySelector('.mc-tools'); return Math.round([...e.children].map((c) => c.getBoundingClientRect().right).reduce((a, b) => Math.max(a, b), 0)) - innerWidth; })()")
-            check("Flight console 1024x640: the end chip does not crowd the title or push the tools out of the window", not r["clash"] and edge <= 0, json.dumps(r) + f" tools edge {edge}")
+            check("Flight console 1024x640: the end chip does not crowd the title or push the tools out of the window", not r["clash"] and not r["unseen"] and edge <= 0, json.dumps(r) + f" tools edge {edge}")
             names = s.js("[...document.querySelectorAll('.mc-v-l')].filter((e) => e.scrollWidth > e.clientWidth + 1).length")
             check("Flight console 1024x640: requirement names wrap instead of being cut", names == 0, f"{names} cut")
             s.shot("ux-flight-console-1024x640-dark")
@@ -359,7 +362,7 @@ def geo_1024(s):
       for (const x of a) for (const y of c) { const w = Math.min(x.r, y.r) - Math.max(x.l, y.l); const h = Math.min(x.b, y.b) - Math.max(x.t, y.t); if (w > 1 && h > 1) clash.push(x.n + ' x ' + y.n); }
       return { clash, credits: a.length, bars: c.length };
     }""")
-    check("Player 1024x640: the attribution does not overlap the camera bar", not r["clash"] and r["credits"] > 0, json.dumps(r))
+    check("Player 1024x640: the attribution does not overlap the camera bar", not r["clash"] and r["credits"] > 0 and r["bars"] > 0, json.dumps(r))
     s.shot("ux-player-geo-1024x640-dark")
     small_text(s, "the 1024x640 player")
     s.resize(1440, 900)

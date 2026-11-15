@@ -186,3 +186,7 @@
 #view-library { background: var(--bg-0); }
 /* Runs page: the names of failed requirements are words, not code. */
 td.failed { font-family: var(--sans); font-size: 12px; min-width: 190px; }
+
+/* The reference chip is not cut; the reference card says what it is. */
+.hg-card-art .hg-ev { white-space: normal; text-align: center; line-height: 1.15; }
+.hg-refnote { margin: 0; color: var(--fg-1); font-weight: 600; }

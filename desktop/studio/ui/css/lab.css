@@ -107,3 +107,13 @@
 @media (max-width: 1180px) { .lab-grid { grid-template-columns: minmax(0, 1fr); } }
 .lab-table td:last-child { white-space: nowrap; }
 .lab-table td.lab-lim:not(.is-long) { white-space: nowrap; }
+
+/* A composite requirement takes a row of its own; the controller name is not cut. */
+.lab-composite td { padding: 6px 4px; }
+.lab-comp-line { margin-top: 2px; white-space: normal; overflow-wrap: anywhere; }
+.lab-status { display: block; flex-basis: 100%; }
+.lab-two { grid-template-columns: minmax(0, 1fr); }
+.lab-two .select, #lab-ctl { width: 100%; }
+.lab-separate { margin: 0; max-width: 90ch; }
+.lab-table tfoot td { white-space: normal; padding-top: 8px; }
+.lab-cell-m .kind { margin-right: 2px; }

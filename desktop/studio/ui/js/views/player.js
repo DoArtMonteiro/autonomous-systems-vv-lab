@@ -28,7 +28,7 @@ import { buildControl } from './control.js';
 import { sourcesInfo } from '../sources-info.js';
 import { openCatalogue } from '../env-catalogue.js';
 import { cinematicButton } from '../cinematic.js';
-import { reqView, safetyWording, SAFETY_NOTE, failureSentence, indexNumbers } from '../requirements.js';
+import { reqView, safetyWording, SAFETY_NOTE, failureSentence, indexNumbers, statusLine } from '../requirements.js';
 
 let root;
 let navigate = () => {};
@@ -399,6 +399,7 @@ function build() {
     const ctx = {
       domainName: DOMAIN_NAMES[exp.domain] || exp.domain,
       setView, setActive, navigate, viewSwitch, envSelect, sceneNote, phaseAt, analysisToggle, evidenceOpen,
+      badges: () => h('div', { class: 'pl-badges mc-badges' }, h('span', { class: `grade grade-${grade.tone}`, title: grade.text }, grade.label), caseChips()),
       geoActive: () => wantGeo(),
       geo: () => (wantGeo() && pl.track ? { track: pl.track } : null),
     };
@@ -718,9 +719,7 @@ function fillRunPills() {
   if (!pl || !pl.dom || !pl.dom.runBar || !pl.revealed) return;
   for (const span of pl.dom.runBar.querySelectorAll('.pl-run-v')) {
     const rec = pl.runs[Number(span.dataset.v)].record;
-    const failed = (rec.requirements || []).filter((q) => q.category !== 'invariant');
-    const nf = failed.filter((q) => q.status === 'fail').length;
-    span.textContent = ` · ${nf ? `${nf} of ${failed.length} requirements failed` : `all ${failed.length} requirements met`} · ${safetyWording(rec).text}`;
+    span.textContent = ` · ${statusLine(rec)}`;
   }
 }
 

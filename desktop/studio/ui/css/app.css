@@ -663,3 +663,25 @@ span.req-t { border-color: transparent; color: var(--fg-3); cursor: default; }
 /* Comparison run cards: how many requirements failed. */
 .run-key .key-count { grid-column: 2 / -1; font-size: 12px; color: var(--fg-2); }
 .pl-cin-run-box { display: inline-flex; align-items: center; gap: 4px; }
+
+/* Comparison: the table keeps at least half of a short window; the footnote and kind badges. */
+.cmp-matrix { min-height: min(50vh, 460px); }
+.matrix tfoot td { padding-top: 8px; white-space: normal; }
+.cell-sub .kind { margin-right: 2px; }
+.rocket-panes figcaption, .cmp-scene-panes figcaption { white-space: normal; overflow: visible; text-overflow: clip; }
+.scene-key .key-text, .scene-key summary { white-space: normal; overflow: visible; text-overflow: clip; }
+/* The comparison table fits its pane: fixed columns, text wraps inside its cell. */
+.matrix { table-layout: fixed; width: 100%; }
+.matrix th:first-child, .matrix tbody th { width: 34%; }
+.matrix .cell-text { white-space: normal; overflow-wrap: anywhere; }
+/* Runs with the detail panel open: the two columns that repeat what the row already says make room. */
+.lib-main:not(.no-detail) table th:nth-child(3), .lib-main:not(.no-detail) table td:nth-child(3),
+.lib-main:not(.no-detail) table th:nth-child(7), .lib-main:not(.no-detail) table td:nth-child(7) { display: none; }
+td.failed { min-width: 0; overflow-wrap: anywhere; }
+/* Runs on a narrow window: the detail panel goes under the table instead of off the right edge. */
+@media (max-width: 1000px) {
+  .lib-main, .lib-main:not(.no-detail) { grid-template-columns: minmax(0, 1fr); }
+  .lib-detail { border-left: 0; border-top: 1px solid var(--rule); }
+  .lib-head { flex-wrap: wrap; }
+  .lib-head .lib-path { display: none; }
+}

@@ -97,6 +97,7 @@ function card(d, v, scale) {
     h('div', { class: 'hg-card-body' },
       h('h3', { class: 'hg-name' }, v.label.replace(/\s*\(exploratory\)/i, '')),
       h('p', { class: 'hg-desc' }, prose(v.description)),
+      ev.tone === 'ref' ? h('p', { class: 'small hg-refnote' }, 'Simulated reference case, not a real vehicle.') : null,
       v.facts && v.facts.length ? h('dl', { class: 'hg-facts' }, v.facts.slice(0, 6).map((f) => h('div', null, h('dt', null, f.label), h('dd', { class: 'mono' }, factText(f))))) : null,
       h('div', { class: 'hg-actions' },
         design ? h('button', { type: 'button', class: 'btn btn-primary btn-sm', dataset: { action: 'design', scenario: design.id },

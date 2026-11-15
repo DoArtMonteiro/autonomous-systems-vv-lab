@@ -284,3 +284,7 @@
 @media (max-height: 700px) {
   .pl:not(.pl-geo) .pl-hud { max-height: calc(100% - 150px); overflow-y: auto; scrollbar-width: thin; }
 }
+
+/* The caption of the scene reads over the picture, so it sits on a backing. */
+.pl-scene-note:not(.is-geo) { background: var(--glass); padding: 4px 8px; border-radius: 4px; width: fit-content; max-width: calc(100% - 32px); }
+.mc-badges { margin-top: 4px; justify-content: flex-start; }

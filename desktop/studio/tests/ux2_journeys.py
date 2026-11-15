@@ -86,9 +86,11 @@ def lab_compare_runs(s):
     heads = s.js("[...document.querySelectorAll('.matrix thead th')].slice(1).map((e) => e.textContent.trim())")
     check("Compare: the column heads are the run labels, not Run 1 and Run 2", len(heads) == 2 and heads[0] == "Baseline" and "thrust" in heads[1].lower(), json.dumps(heads))
     cards = s.js("[...document.querySelectorAll('.run-key .key-count')].map((e) => e.textContent.trim())")
-    check("Compare: each run card says how many requirements failed", cards == ["1 of 6 requirements failed", "2 of 6 requirements failed"], json.dumps(cards))
+    check("Compare: each run card gives the failure count first and the safety rules held after it", cards == ["1 of 6 requirements failed · 5 of 5 safety rules held", "2 of 6 requirements failed · 5 of 5 safety rules held"], json.dumps(cards))
     first = s.js("(() => { const rows = [...document.querySelectorAll('.matrix tbody tr')]; const sep = rows.findIndex((r) => r.classList.contains('sep') && /Verdict changes/.test(r.textContent)); return sep < 0 ? null : { sep, next: rows[sep + 1] && rows[sep + 1].dataset.row, count: rows.filter((r, i) => i > sep && !r.classList.contains('sep')).slice(0, 1).length }; })()")
     check("Compare: the rows whose verdict changes come first, in their own group", bool(first) and first["next"] == "R1_vertical_speed", json.dumps(first))
+    over = s.js("(() => { const w = document.querySelector('.cmp-matrix'); return w.scrollWidth - w.clientWidth; })()")
+    check("Compare: the table fits its pane, every run column is in view", over <= 1, str(over))
     s.shot("ux2-compare-dark")
     # Runs page
     s.nav("library")
@@ -99,6 +101,11 @@ def lab_compare_runs(s):
     check("Runs page: the title is Runs and the column is Safety rules", title == "Runs" and "Safety rules" in heads, f"{title} {heads}")
     check("Runs page: the Failed column uses plain names, not ids", bool(failed) and all(not re.search(r"R\d_", x) for x in failed) and any("Horizontal speed at contact" in x for x in failed), json.dumps(failed))
     s.shot("ux2-runs-dark")
+    s.page.click(f"tbody tr[data-run='{exp}']")
+    time.sleep(0.6)
+    over = s.js("(() => { const w = document.querySelector('.lib-table-wrap'); return { table: w.scrollWidth - w.clientWidth, page: document.documentElement.scrollWidth - innerWidth }; })()")
+    check("Runs: with the detail panel open there is no horizontal scroll", over["table"] <= 1 and over["page"] <= 0, json.dumps(over))
+    s.shot("ux3-runs-detail-dark")
     # Analyse
     s.page.dblclick(f"tbody tr[data-run='{exp}']")
     s.wait("window.__studio.view() === 'run' && document.querySelector('.verdict')", 30, "analyse")
@@ -108,9 +115,27 @@ def lab_compare_runs(s):
     cut = s.js("[...document.querySelectorAll('.verdict-x, .validity-strip .vtext, .verdict-v span')].filter((e) => e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 2).length")
     check("Analyse: the outcome, the safety line and the model validity wrap and are not cut", cut == 0, f"{cut} cut")
     tilt = s.js("(() => { const r = document.querySelector(\".req[data-id='S1_tilt_envelope'] .req-eo\"); return r ? r.innerText.replace(/\\s+/g, ' ') : null; })()")
-    check("Analyse: the tilt rows are in degrees (derived from the stored cosine)", bool(tilt) and "°" in tilt and " cos" not in tilt, str(tilt))
+    check("Analyse: the tilt rows are in degrees, with the recorded cosine in parentheses", bool(tilt) and re.search(r"worst [\d.]+ ° \([\d.]+ cos\)", tilt) is not None, str(tilt))
     s.shot("ux2-analyse-dark")
     return base, exp
+
+
+PILLS_JS = """(sel) => {
+  const pills = [...document.querySelectorAll(sel)].filter((e) => e.offsetParent !== null);
+  const bad = pills.filter((e) => {
+    const c = getComputedStyle(e);
+    const cut = e.scrollHeight > e.clientHeight + 1 || e.scrollWidth > e.clientWidth + 1 || (c.textOverflow === 'ellipsis' && e.scrollWidth > e.clientWidth);
+    const r = e.getBoundingClientRect();
+    return cut || r.left < -0.5 || r.right > innerWidth + 0.5 || r.bottom > innerHeight + 0.5;
+  }).map((e) => e.textContent.trim().slice(0, 60));
+  return { n: pills.length, bad };
+}"""
+
+
+def check_pills(s, where, sel=".pl-run"):
+    """No run pill is cut: its whole text is inside its own box and inside the window."""
+    r = s.js(PILLS_JS, sel)
+    check(f"{where}: no run pill is clipped", r["n"] >= 2 and not r["bad"], json.dumps(r))
 
 
 def player_checks(s, ids):
@@ -144,11 +169,22 @@ def player_checks(s, ids):
           const bar = document.querySelector('.pl-runs').getBoundingClientRect();
           return { pills, inView: bar.top >= 0 && bar.bottom <= innerHeight };
         }""")
-        check(f"Player {w}x{h}: after the result each run pill carries its mission and safety verdicts, in view without scrolling", len(r["pills"]) == 2 and "1 of 6 requirements failed" in r["pills"][0] and "2 of 6 requirements failed" in r["pills"][1] and all("No safety rule broken (5 checked)" in x for x in r["pills"]) and r["inView"], json.dumps(r))
+        check(f"Player {w}x{h}: after the result each run pill carries its mission and safety verdicts, in view without scrolling", len(r["pills"]) == 2 and "1 of 6 requirements failed · 5 of 5 safety rules held" in r["pills"][0] and "2 of 6 requirements failed · 5 of 5 safety rules held" in r["pills"][1] and r["inView"], json.dumps(r))
         o = s.js(ux1.OVERLAP_JS, [[".pl-cams", ".pl-hud"], [".pl-cams", ".pl-runs"], [".pl-scene-note", ".pl-cams"]])
-        check(f"Player {w}x{h}: the camera row does not cover the readout card, the run pills or the note", not o["clash"], json.dumps(o))
+        check(f"Player {w}x{h}: the camera row does not cover the readout card, the run pills or the note", not o["clash"] and not o["unseen"], json.dumps(o))
+        check_pills(s, f"Engineering {w}x{h}")
         s.shot(f"ux2-player-engineering-{w}x{h}-dark")
-        if h < 700:
+        # Geospatial: the same pills, stacked and wrapped, never cut in the middle of a clause.
+        s.page.click(".pl-views [data-view='geospatial']")
+        s.wait("window.__studio.player().renderer === 'geospatial'", 90, "geospatial")
+        time.sleep(1.5)
+        check_pills(s, f"Geospatial {w}x{h}")
+        o = s.js(ux1.OVERLAP_JS, [[".pl-cams", ".pl-runs"]])
+        check(f"Player {w}x{h} (geospatial): the camera row does not cover the run pills", not o["clash"] and not o["unseen"], json.dumps(o))
+        s.shot(f"ux3-player-geospatial-{w}x{h}-dark")
+        s.page.click(".pl-views [data-view='engineering']")
+        s.wait("(() => { const p = window.__studio.player(); return p && p.view === 'engineering'; })()", 60, "engineering")
+        if True:
             s.page.click(".pl-views [data-view='control']")
             s.wait("document.querySelector('.mc')", 30, "flight console")
             time.sleep(2.5)
@@ -156,17 +192,63 @@ def player_checks(s, ids):
             alpha = re.findall(r"[\d.]+", bg["bg"])
             a = float(alpha[3]) if len(alpha) > 3 else 1.0
             check("Flight console: the end sentence sits on a backing and is not dimmed", a >= 0.6 and float(bg["op"]) == 1.0 and bg["text"].startswith("Not met"), json.dumps(bg))
-            o = s.js(ux1.OVERLAP_JS, [[".mc-cams", ".mc-bottom"], [".mc-cams", ".mc-right"], [".mc-cams", ".mc-strip"]])
-            check("Flight console 1024x640: the camera row does not cover the timeline or the panels", not o["clash"], json.dumps(o))
-            s.shot("ux2-flight-console-1024x640-dark")
+            o = s.js(ux1.OVERLAP_JS, [[".mc-cams", ".mc-bottom"], [".mc-cams", ".mc-right"]])
+            check(f"Flight console {w}x{h}: the camera row does not cover the timeline or the panels", not o["clash"] and not o["unseen"], json.dumps(o))
+            check_pills(s, f"Flight console {w}x{h}", sel=".mc-run")
+            o = s.js(ux1.OVERLAP_JS, [[".mc-id", ".mc-time"], [".mc-time", ".mc-tools"], [".mc-runs", ".mc-time"]])
+            edge = s.js("(() => { const e = document.querySelector('.mc-tools'); return Math.round([...e.children].map((c) => c.getBoundingClientRect().right).reduce((a, b) => Math.max(a, b), 0)) - innerWidth; })()")
+            check(f"Flight console {w}x{h}: the header does not crowd, the run pills sit under the end sentence and the tools stay in the window", not o["clash"] and not o["unseen"] and edge <= 0, json.dumps(o) + f" tools edge {edge}")
+            chips = s.js("[...document.querySelectorAll('.mc-badges .grade, .mc-badges .pl-case')].map((e) => e.textContent.trim())")
+            check(f"Flight console {w}x{h}: the Your experiment and Exploratory chips are shown under the title", any("experiment" in c.lower() for c in chips) and any("Exploratory" in c for c in chips), json.dumps(chips))
+            s.shot(f"ux2-flight-console-{w}x{h}-dark")
             s.page.click(".mc-back")
             s.wait("document.querySelector('.pl-head')", 20, "player")
         s.resize(1440, 900)
     s.page.click(".pl-views [data-view='engineering']")
     time.sleep(0.5)
     s.shot("ux2-player-end-dark")
+    s.page.click(".pl-views [data-view='geospatial']")
+    s.wait("window.__studio.player().renderer === 'geospatial'", 90, "geospatial")
+    time.sleep(2.0)
+    s.shot("ux3-player-geospatial-1440x900-dark")
+    s.page.click(".pl-views [data-view='control']")
+    s.wait("document.querySelector('.mc')", 30, "flight console")
+    time.sleep(2.0)
+    s.shot("ux3-flight-console-1440x900-dark")
+    s.page.click(".mc-back")
+    s.wait("document.querySelector('.pl-head')", 20, "player")
     m = s.js("[...document.querySelectorAll('.pl-failed li')].map((e) => e.innerText.replace(/\\s+/g, ' '))")
     check("Player: the failed rows give limit and observed value to four figures, no raw 1.583657", bool(m) and not any(re.search(r"\d\.\d{5,}", x) for x in m), json.dumps(m)[:240])
+
+
+def go(s, view):
+    """Opens a view whatever the window width (the secondary nav buttons are in the More menu when narrow)."""
+    s.js(f"document.querySelector(\".nav-btn[data-view='{view}']\").click()")
+    s.wait(f"window.__studio.view() === '{view}'", 30, view)
+    time.sleep(1.2)
+
+
+def capture_sizes(s):
+    """The same screens at three sizes for the review: Lab, Compare, Analyse and Runs, then the player views."""
+    for w, h in ((1440, 900), (1024, 640), (820, 900)):
+        s.resize(w, h)
+        go(s, "lab")
+        s.js("document.querySelector('.lab-result') && document.querySelector('.lab-result').scrollIntoView()")
+        s.shot(f"ux3-lab-{w}x{h}-dark")
+        go(s, "compare")
+        s.shot(f"ux3-compare-{w}x{h}-dark")
+        go(s, "run")
+        s.shot(f"ux3-analyse-{w}x{h}-dark")
+        go(s, "library")
+        s.shot(f"ux3-runs-{w}x{h}-dark")
+        check(f"Layout {w}x{h}: the Lab, Compare, Analyse and Runs pages have no horizontal page scroll", s.no_hscroll())
+    s.resize(1440, 900)
+    s.js("document.querySelector(\".nav-btn[data-view='missions']\").click()")
+    s.wait("window.__studio.view() === 'missions'", 20, "missions")
+    s.js("window.__studio.player && null")
+    open_mission(s, "first-landing")
+    time.sleep(2)
+    s.shot("ux3-player-first-landing-1440x900-dark")
 
 
 def unsafe_case(s):
@@ -183,8 +265,37 @@ def unsafe_case(s):
     check("Unsafe case: the safe runs of the same mission still say No safety rule broken", bool(good), json.dumps(texts))
     s.nav("library")
     s.wait("document.querySelectorAll('tbody tr[data-run]').length >= 3", 30, "runs")
-    col = s.js("[...document.querySelectorAll('tbody tr[data-run]')].map((tr) => tr.innerText.replace(/\\s+/g, ' ')).filter((x) => /Ground|ground/.test(x))")
-    check("Unsafe case: the Runs page shows A rule broken for it", any("A rule broken" in x for x in col), json.dumps(col)[:200])
+    col = s.js("[...document.querySelectorAll('tbody tr[data-run]')].map((tr) => tr.innerText.replace(/\\s+/g, ' ')).filter((x) => /Corridor|corridor/.test(x))")
+    check("Unsafe case: the Runs page says how many safety rules were broken, in bold", any(re.search(r"\d of \d+ safety rules broken", x) for x in col), json.dumps(col)[:240])
+    # The count must be the record's own: read the unsafe run's record and compare.
+    row = s.js("""(() => { const tr = [...document.querySelectorAll('tbody tr[data-run]')].find((e) => /safety rules broken/.test(e.innerText)); return tr ? { id: tr.dataset.run, text: tr.innerText.replace(/\\s+/g, ' ') } : null; })()""")
+    if row:
+        rec = m18.record(s, row["id"])
+        inv = [q for q in rec["requirements"] if q["category"] == "invariant"]
+        broken = [q for q in inv if q["status"] == "fail"]
+        judged = [q for q in inv if q["status"] != "not_evaluated"]
+        m = re.search(r"(\d+) of (\d+) safety rules broken", row["text"])
+        check("Unsafe case: the Runs page count equals the record's broken and evaluated safety rules", bool(m) and (int(m.group(1)), int(m.group(2))) == (len(broken), len(judged)), f"{row['text'][:120]} vs {len(broken)} of {len(judged)}")
+        split = s.js(f"(() => {{ const td = document.querySelector(\"tbody tr[data-run='{row['id']}'] td.failed\"); return td ? td.innerText.replace(/\\s+/g, ' ') : ''; }})()")
+        check("Unsafe case: the Failed cell separates Safety from Requirements", "Safety:" in split, split[:200])
+        s.shot("ux3-runs-unsafe-dark")
+        s.page.dblclick(f"tbody tr[data-run='{row['id']}']")
+        s.wait("window.__studio.view() === 'run' && document.querySelector('.verdict')", 30, "analyse")
+        time.sleep(1.0)
+        sv = s.js("document.querySelector(\".verdict[aria-label='Safety'] .verdict-v\").innerText.replace(/\\s+/g, ' ')")
+        check("Unsafe case: Analyse says the same count and draws the verdict as unsafe", f"{len(broken)} of {len(judged)} safety rules broken" in sv, sv)
+        s.shot("ux3-analyse-unsafe-dark")
+        s.nav("library")
+        s.wait("document.querySelectorAll('tbody tr[data-run]').length >= 3", 30, "runs")
+        ground = s.js("[...document.querySelectorAll('tbody tr[data-run]')].filter((e) => /Corridor/.test(e.innerText)).map((e) => e.dataset.run)")
+        for rid in ground[:2]:
+            s.page.check(f"tbody tr[data-run='{rid}'] input[type=checkbox]")
+        s.page.click("#lib-compare")
+        s.wait("window.__studio.view() === 'compare' && document.querySelector('.matrix')", 30, "compare")
+        time.sleep(2)
+        over = s.js("(() => { const w = document.querySelector('.cmp-matrix'); return w.scrollWidth - w.clientWidth; })()")
+        check("Compare (unsafe case): the table fits its pane, every run column is in view", over <= 1, str(over))
+        s.shot("ux3-compare-unsafe-dark")
 
 
 def light_theme(s):
@@ -197,6 +308,15 @@ def light_theme(s):
     s.nav("compare")
     time.sleep(1.5)
     s.shot("ux2-compare-light")
+    s.nav("environments")
+    time.sleep(2.0)
+    s.shot("ux3-environments-light")
+    s.nav("run")
+    time.sleep(1.5)
+    s.shot("ux3-analyse-light")
+    open_mission(s, "first-landing")
+    time.sleep(2.5)
+    s.shot("ux3-player-light")
     s.nav("lab")
     time.sleep(1.0)
     s.js("document.querySelector('.lab-result') && document.querySelector('.lab-result').scrollIntoView()")
@@ -245,7 +365,7 @@ def main():
             except Exception as e:  # noqa: BLE001
                 check("lab, compare, runs, analyse and player completed", False, repr(e)[:400])
                 s.shot("ux2-failure")
-            for name, fn in (("unsafe", unsafe_case), ("light", light_theme)):
+            for name, fn in (("capture", capture_sizes), ("unsafe", unsafe_case), ("light", light_theme)):
                 try:
                     fn(s)
                 except Exception as e:  # noqa: BLE001

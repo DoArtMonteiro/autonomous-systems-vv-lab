@@ -3,8 +3,10 @@
 
 import { h, clear, icon, words, nextId } from '../dom.js';
 import { api } from '../api.js';
-import { state, domainById, on, emit } from '../store.js';
+import { state, domainById, on, emit, loadRecord } from '../store.js';
 import { verdictOfOutcome, verdictOfSafety } from '../model.js';
+import { SAFETY_NOTE } from '../requirements.js';
+import { displayRunLabel } from '../model.js';
 import { verdictGlyph } from '../verification.js';
 import { toast, errorText } from '../ui.js';
 import { openSaved, openRequest } from './prepare.js';
@@ -121,12 +123,49 @@ function runTable() {
 }
 
 /** The plain name of a failed requirement for the Failed column: the catalog's label, else the id read as words. */
+/** The catalog's category of a failed requirement id ('invariant' for a safety rule), or null when the catalog does not list it. */
+function categoryOf(domainId, id) {
+  const d = domainById(domainId);
+  const q = d && d.catalog && (d.catalog.requirements || []).find((x) => x.id === id);
+  return q ? q.category : null;
+}
+
+/** "k of N safety rules broken" from the failed ids and the catalog's safety rules; without both, "A rule broken". */
+function safetyBrokenText(s) {
+  const d = domainById(s.domain);
+  const rules = d && d.catalog ? (d.catalog.requirements || []).filter((x) => x.category === 'invariant') : [];
+  const broken = s.failed.filter((id) => categoryOf(s.domain, id) === 'invariant');
+  return broken.length && rules.length >= broken.length ? `${broken.length} of ${rules.length} safety rules broken` : 'A rule broken';
+}
+
+/** The failed names in two lines: the safety rules, then the requirements. */
+function failedCell(s) {
+  const rules = s.failed.filter((id) => categoryOf(s.domain, id) === 'invariant');
+  const reqs = s.failed.filter((id) => categoryOf(s.domain, id) !== 'invariant');
+  const line = (head, ids) => (ids.length ? h('div', null, h('span', { class: 'dim' }, `${head}: `), ids.map((id) => failedName(s.domain, id)).join(', ')) : null);
+  return [line('Safety', rules), line('Requirements', reqs)];
+}
+
 function failedName(domainId, id) {
   const d = domainById(domainId);
   const q = d && d.catalog && (d.catalog.requirements || []).find((x) => x.id === id);
   if (q && q.label) return q.label;
   const words = String(id).replace(/^[a-z_]+\./, '').replace(/^[A-Za-z]\d+_/, '').replace(/_/g, ' ');
   return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** The stored label, or for an "Experiment from ..." run the label the player gives a new run (computed, never stored). */
+function runLabelNode(m) {
+  const node = h('div', { class: 'run-label', title: m.label }, m.label);
+  if (/^Experiment from /.test(m.label)) {
+    loadRecord(m.run_id).then((rec) => {
+      const d = domainById(m.summary.domain);
+      const text = displayRunLabel(rec, d && d.catalog, m.label, m.tags || []);
+      if (text && text !== m.label) { node.textContent = text; node.title = `${text}
+Stored label: ${m.label}`; }
+    }).catch(() => {});
+  }
+  return node;
 }
 
 function drawRows() {
@@ -158,15 +197,15 @@ function drawRows() {
       onclick: () => select(m.run_id), ondblclick: () => navigate('run', { runId: m.run_id, meta: m }),
       onkeydown: (e) => { if (e.key === 'Enter') navigate('run', { runId: m.run_id, meta: m }); else if (e.key === ' ') { e.preventDefault(); select(m.run_id); } } },
     h('td', null, cb),
-    h('td', null, m.label ? h('div', { class: 'run-label' }, m.label) : null, h('div', { class: 'mono dim small' }, m.run_id), m.tags.length ? h('div', { class: 'small' }, m.tags.map((t) => h('span', { class: 'tag' }, t))) : null),
+    h('td', null, m.label ? runLabelNode(m) : null, h('div', { class: 'mono dim small' }, m.run_id), m.tags.length ? h('div', { class: 'small' }, m.tags.map((t) => h('span', { class: 'tag' }, t))) : null),
     h('td', null, domainName(s.domain)),
     h('td', null, scenarioLabel(m)),
     h('td', null, controllerLabel(m)),
     h('td', { class: 'mono' }, String(s.seed)),
     h('td', { class: 'small' }, s.faults.length ? s.faults.map(words).join(', ') : h('span', { class: 'dim' }, 'none')),
     h('td', null, h('span', { class: ['cell', `v-${ov}`] }, verdictGlyph(ov), s.outcome_label)),
-    h('td', null, h('span', { class: ['cell', `v-${sv}`], title: 'Safety rules are judged on the true state throughout the run. Contact speed and position are mission requirements, judged separately.' }, verdictGlyph(sv), unjudged ? 'Not evaluated' : s.safety_status === 'safe' ? 'None broken' : 'A rule broken', s.safety_class && !unjudged ? h('span', { class: ['class-badge', `class-${s.safety_class}`] }, s.safety_class) : null)),
-    h('td', { class: 'failed', title: s.failed.join(' ') }, s.failed.map((id) => failedName(s.domain, id)).join(', ')),
+    h('td', null, h('span', { class: ['cell', `v-${sv}`], title: SAFETY_NOTE }, verdictGlyph(sv), unjudged ? 'Not evaluated' : s.safety_status === 'safe' ? 'None broken' : h('b', null, safetyBrokenText(s)), s.safety_class && !unjudged ? h('span', { class: ['class-badge', `class-${s.safety_class}`] }, s.safety_class) : null)),
+    h('td', { class: 'failed', title: s.failed.join(' ') }, failedCell(s)),
     h('td', { class: 'mono dim small' }, m.created_utc.replace('T', ' ').replace('Z', '')));
     tbody.append(tr);
   }

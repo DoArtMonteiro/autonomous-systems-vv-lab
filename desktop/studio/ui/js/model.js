@@ -6,7 +6,7 @@ import { words, num } from './dom.js';
 export const KINDS = ['truth', 'observation', 'estimate', 'uncertainty', 'command', 'metric', 'limit'];
 export const KIND_LETTER = { truth: 'T', observation: 'O', estimate: 'E', uncertainty: 'U', command: 'C', metric: 'M', limit: 'L' };
 export const SOURCES = ['fault', 'controller', 'verifier', 'truth'];
-export const CATEGORY_TITLE = { requirement: 'Mission requirements', invariant: 'Safety invariants', declaration: 'Controller declarations, judged on truth' };
+export const CATEGORY_TITLE = { requirement: 'Mission requirements', invariant: 'Safety rules', declaration: 'Controller declarations, judged on truth' };
 
 /** Wraps a record with lookups the views need. Computed once per record. */
 export function modelOf(record) {
@@ -157,8 +157,25 @@ export function distinguishingLabels(requests, catalog) {
   return labels.map((l, i) => (labels.indexOf(l) !== labels.lastIndexOf(l) ? `${l} (run ${i + 1})` : l));
 }
 
+/**
+ * The label a run is shown by when its stored label is only "Experiment from <id>": the parameters that
+ * differ from the catalog defaults, as the player and the Lab name a new run, with the run it came from.
+ * A stored label that says something else is kept as it is; nothing stored is rewritten.
+ */
+export function displayRunLabel(record, catalog, stored, tags = []) {
+  if (stored && !/^Experiment from /.test(stored)) return stored;
+  const specs = new Map(((catalog && catalog.parameters) || []).map((p) => [p.id, p]));
+  const params = record.request.parameters || {};
+  const changed = Object.entries(params).some(([k, v]) => specs.has(k) && v !== specs.get(k).default);
+  if (!changed) return stored || null;
+  const label = distinguishingLabels([{ ...record.request, parameters: {} }, record.request], catalog)[1];
+  const from = (tags.find((t) => t.startsWith('from:')) || '').slice(5, 15);
+  return from ? `${label} (from ${from})` : label;
+}
+
 /** One colour per run in a comparison: Okabe-Ito order, safe for the common colour-vision deficiencies. */
-export const RUN_COLOURS = ['#56B4E9', '#E69F00', '#CC79A7', '#009E73', '#0072B2', '#D55E00', '#999999', '#F0E442'];
+// Amber is the colour of a failed requirement, so the second run is not amber.
+export const RUN_COLOURS = ['#56B4E9', '#CC79A7', '#009E73', '#0072B2', '#D55E00', '#999999', '#F0E442', '#E69F00'];
 
 /** One line dash per run (cycled), so compared runs differ by more than colour. */
 const RUN_DASH_TABLE = [[], [6, 3], [2, 3], [8, 3, 2, 3]];
