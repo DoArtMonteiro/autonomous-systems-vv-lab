@@ -109,7 +109,7 @@ export function readouts(run, t, rocket) {
     ['North', v('truth_y_mm'), 'mm', 'T', 'True position'],
     ['GPS north', v('gps_y_mm'), 'mm', 'O', 'GPS sample, empty when no sample arrived'],
     ['To goal', v('goal_distance_mm'), 'mm', 'D', 'Manhattan distance to the goal'],
-    ['Confidence', v('confidence_permille'), '‰', 'E', 'Confidence in the last accepted fix'],
+    ['Confidence', v('confidence_permille'), 'permille', 'E', 'Confidence in the last accepted fix'],
     ['Mode', fb === null ? null : fb === 1 ? 'fallback' : 'normal', '', 'D', 'Safety fallback of the controller'],
   ];
 }
@@ -201,7 +201,7 @@ export function telemetry(run, t, rocket, geo) {
       run.model.byId.get('fallback') ? { id: 'fallback', label: 'Mode', value: fb === null ? null : fb === 1 ? 'fallback' : 'normal', unit: '', tag: 'D', title: 'Safety fallback of the controller (derived channel fallback)' } : null,
     ] });
     groups.push({ id: 'navigation', title: 'Perception', rows: [
-      r('held_x_mm', 'Believed east'), r('held_y_mm', 'Believed north'), r('confidence_permille', 'Confidence', { unit: '‰' }),
+      r('held_x_mm', 'Believed east'), r('held_y_mm', 'Believed north'), r('confidence_permille', 'Confidence', { unit: 'permille' }),
     ] });
     groups.push({ id: 'sensors', title: 'Sensors', rows: [
       r('gps_x_mm', 'GPS east', { note: 'empty when no sample arrived' }), r('gps_y_mm', 'GPS north'), r('fix_age_ticks', 'Fix age'),

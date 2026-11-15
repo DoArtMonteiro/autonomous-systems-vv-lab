@@ -28,6 +28,8 @@ import { buildControl } from './control.js';
 import { sourcesInfo } from '../sources-info.js';
 import { openCatalogue } from '../env-catalogue.js';
 import { cinematicButton } from '../cinematic.js';
+import { reqView, safetyWording, SAFETY_NOTE, failureSentence, indexNumbers, statusLine, requirementWording, endChip } from '../requirements.js';
+import { conditionsName } from '../model.js';
 
 let root;
 let navigate = () => {};
@@ -122,7 +124,7 @@ function renderEmpty() {
     h('p', { class: 'eyebrow' }, 'Mission player'),
     h('h1', null, 'No mission is playing'),
     h('p', { class: 'dim' }, 'Choose a mission in the library. It runs on this machine and plays back here.'),
-    h('button', { type: 'button', class: 'btn btn-primary', onclick: () => navigate('missions') }, 'Open the mission library')));
+    h('button', { type: 'button', class: 'btn btn-primary', onclick: () => navigate('missions') }, 'Open the missions')));
 }
 
 function dispose() {
@@ -295,14 +297,59 @@ function phaseAt(t) {
   const ph = phases.find((p) => t >= p.t0 && t < p.t1) || phases[phases.length - 1];
   const end = t >= run.model.t1 - 1e-9;
   const td = run.record.scene && run.record.scene.touchdown;
-  const met = run.record.outcome.status === 'success';
-  if (end) {
-    // A failed contact says how hard it was and that the impact itself is not drawn.
-    const vz = td && !met ? metricValue(run, 'touchdown_vertical_speed') : null;
-    const bad = vz !== null && Number.isFinite(vz) ? `Contact at ${Math.abs(vz).toFixed(1)} m/s, requirements not met; impact not modelled` : 'Reached the ground, requirements not met';
-    return { text: td ? (met ? 'Touchdown' : bad) : 'End of run', kind: met ? 'end' : 'end-bad', end: true };
-  }
+  if (end) return endChip(run.record, !!td);
   return { text: ph ? ph.label : '', kind: ph ? ph.kind : '', end: false };
+}
+
+/** The run's non-default parameters and faults, in the Studio's words (the one naming function). */
+function runConditions(run) {
+  const rec = run.record;
+  const d = domainById(rec.request.domain);
+  return conditionsName(rec.request, d && d.catalog);
+}
+
+/** The curated mission label with the conditions after it ("Threshold 3 m (default threshold) · GNSS bias 9.72 m"); not repeated when the label already says them. */
+function runFullName(run) {
+  const c = runConditions(run);
+  return run.label.toLowerCase().includes(c.toLowerCase()) ? run.label : `${run.label} · ${c}`;
+}
+
+const shortId = (run) => String(run.runId).slice(0, 8);
+
+/** An entry of the Run list: the label, the short id, then the conditions, so a narrow list cuts the conditions and never the id. */
+function runListName(run) {
+  return `${run.label} · ${shortId(run)}${runFullName(run) !== run.label ? ` · ${runConditions(run)}` : ''}`;
+}
+
+/**
+ * What the Cinematic View shows about the run it opens: the player's label for the run, the vehicle
+ * (named in the domain's catalog, marked exploratory unless the catalog calls it a reference case or
+ * the record says the case was changed) and the seed. All of it comes from the record and the catalog.
+ */
+function cinematicInfo(run) {
+  const rec = run.record;
+  const d = domainById(rec.request.domain);
+  const sc = d && d.catalog ? d.catalog.scenarios.find((s) => s.id === rec.request.scenario) : null;
+  const v = sc && d.catalog.vehicles ? d.catalog.vehicles.find((x) => x.id === sc.vehicle) : null;
+  const exploratory = (v ? v.evidence !== 'reference' : true) || (rec.notes || []).some((n) => n.startsWith('Exploratory case'));
+  return { runLabel: run.label, vehicle: v ? v.label.replace(/\s*\(exploratory\)/i, '') : null, exploratory, seed: rec.request.seed, conditions: runConditions(run) };
+}
+
+/** Reference case or exploratory, from the catalog and the record, for each distinct level among the held runs. */
+function caseChips() {
+  const levels = new Map();
+  for (const r of pl.runs) {
+    const info = cinematicInfo(r);
+    if (!info.vehicle) continue;
+    const key = info.exploratory ? 'explore' : 'ref';
+    levels.set(key, [...(levels.get(key) || []), r.label]);
+  }
+  if (!levels.size) return null;
+  const several = levels.size > 1;
+  return h('span', { class: 'pl-cases' }, [...levels].map(([key, who]) => h('span', {
+    class: ['hg-ev', key === 'ref' ? 'hg-ev-ref' : 'hg-ev-explore', 'pl-case'], dataset: { case: key },
+    title: key === 'ref' ? 'The frozen, pre-registered case the platform’s verification results rest on. Recomputed model behaviour, not validated against flight data.' : 'Illustrative values of the right order of magnitude, or a case you changed. Not evidence for any pre-registered claim.',
+  }, key === 'ref' ? 'Reference case' : 'Exploratory', several ? `: ${who.join(', ')}` : '')));
 }
 
 function sceneNote() {
@@ -320,6 +367,7 @@ function sceneNote() {
         : 'True paths and GPS samples, one sample per tick. Top view, x east, y north.'));
     if (pl.geoError) note.append(h('p', { class: 'pl-geo-warn' }, `Geospatial view unavailable: ${pl.geoError} The engineering scene is shown instead.`));
   }
+  note.title = note.textContent; // the whole text, when a short window shows one line of it
   return note;
 }
 
@@ -354,6 +402,8 @@ function build() {
     const ctx = {
       domainName: DOMAIN_NAMES[exp.domain] || exp.domain,
       setView, setActive, navigate, viewSwitch, envSelect, sceneNote, phaseAt, analysisToggle, evidenceOpen,
+      runName: (r) => `${runFullName(r)} · ${shortId(r)}`, runId: shortId,
+      badges: () => h('div', { class: 'pl-badges mc-badges' }, h('span', { class: `grade grade-${grade.tone}`, title: grade.text }, grade.label), caseChips()),
       geoActive: () => wantGeo(),
       geo: () => (wantGeo() && pl.track ? { track: pl.track } : null),
     };
@@ -371,33 +421,57 @@ function build() {
   const stage = h('div', { class: 'pl-stage', id: 'pl-stage' });
   const viewport = h('div', { class: ['pl-viewport', rocket ? 'is-3d' : 'is-2d'], id: 'pl-viewport' });
   const hud = h('div', { class: 'pl-hud', role: 'group', 'aria-label': 'Readouts at the playback time' });
-  const phaseTag = h('div', { class: 'pl-phase', 'aria-hidden': 'true' });
+  const phaseTag = h('div', { class: ['pl-phase', rocket ? '' : 'is-2d'], 'aria-hidden': 'true' });
   const runBar = runs.length > 1 ? h('div', { class: 'pl-runs', role: 'radiogroup', 'aria-label': 'Run shown in the scene' },
     runs.map((r, i) => h('button', { type: 'button', role: 'radio', class: 'pl-run', 'aria-checked': String(i === pl.active), dataset: { run: String(i) }, onclick: () => setActive(i) },
-      h('span', { class: 'pl-swatch', style: { background: r.colour } }), r.label))) : null;
+      h('span', { class: 'pl-swatch', style: { background: r.colour } }),
+      h('span', { class: 'pl-run-t' },
+        h('span', { class: 'pl-run-l' }, r.label),
+        runFullName(r) !== r.label ? h('span', { class: 'pl-run-c small' }, ` · ${runConditions(r)}`) : null,
+        h('span', { class: 'pl-run-id mono small', title: `Run ${r.runId}` }, ` · ${shortId(r)}`),
+        h('span', { class: 'pl-run-v small', dataset: { v: String(i) } }))))) : null;
   const note = sceneNote();
   stage.append(...[viewport, phaseTag, hud, runBar, cameraButtons(), note].filter(Boolean));
+  // A flat (2D) scene stops above the run pills, whatever number of lines they take, and below the clock and the end chip
+  // (which can take two lines), so neither covers its axis labels or its path; both grow when their text changes, so the
+  // gaps follow their size.
+  if (!rocket) {
+    const fit2d = () => {
+      if (runBar) viewport.style.bottom = `${Math.ceil(parseFloat(getComputedStyle(runBar).bottom) + runBar.offsetHeight + 8)}px`;
+      viewport.style.top = `${Math.max(48, Math.ceil(phaseTag.offsetTop + phaseTag.offsetHeight + 6))}px`;
+    };
+    fit2d();
+    if (typeof ResizeObserver === 'function') { const ro = new ResizeObserver(fit2d); if (runBar) ro.observe(runBar); ro.observe(phaseTag); }
+  }
 
+  // With two runs held, the person chooses which one the Cinematic View opens; it starts on the shown run.
+  const cinRunSel = runs.length > 1 ? h('select', { class: 'select select-sm pl-cin-run', id: 'pl-cin-run', 'aria-label': 'Run to open in the Cinematic View', title: 'Which of the held runs the Cinematic View opens', dataset: { action: 'cinematic-run' } },
+    runs.map((r, i) => h('option', { value: String(i), selected: i === pl.active }, runListName(r)))) : null;
+  const cinRun = cinRunSel;
+  const cinRunBox = cinRunSel ? h('label', { class: 'pl-cin-run-box', for: 'pl-cin-run' }, h('span', { class: 'dim small' }, 'Run:'), cinRunSel) : null;
+  const cinIndex = () => (cinRun ? Number(cinRun.value) : pl.active);
   const head = h('header', { class: 'pl-head' },
     h('button', { type: 'button', class: 'pl-back', onclick: () => navigate('missions') }, h('span', { 'aria-hidden': 'true' }, '←'), ' Missions'),
     h('div', { class: 'pl-title' },
       h('p', { class: 'eyebrow' }, `${DOMAIN_NAMES[exp.domain] || exp.domain} · ${exp.kicker}`),
       h('h1', null, exp.title)),
-    h('span', { class: `grade grade-${grade.tone}`, title: grade.text }, grade.label),
+    h('div', { class: 'pl-badges' }, h('span', { class: `grade grade-${grade.tone}`, title: grade.text }, grade.label), caseChips()),
     // Second row: what the player shows on the left, what to do with the run on the right. Each
     // group wraps inside its own row, so no control can sit on top of another at any width.
     h('div', { class: 'pl-toolbar' },
     h('div', { class: 'pl-viewtools' }, viewSwitch(), pl.view === 'geospatial' ? envSelect() : null),
     h('div', { class: 'pl-head-actions', role: 'group', 'aria-label': 'Actions for the shown run' },
       h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'analyse' }, title: 'Open the shown run with every channel, requirement and its provenance', onclick: () => navigate('run', { runId: pl.runs[pl.active].runId, t: pl.cursor.t }) }, 'Analyse'),
-      runs.length > 1 ? h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'compare' }, onclick: () => navigate('compare', { runIds: runs.map((r) => r.runId), demo: pl.demo }) }, 'Compare in detail') : null,
-      cinematicButton(() => pl.runs[pl.active].runId, () => pl.envId || (pl.envs.length ? defaultEnv(pl.envs) : null), pl.kind === 'rocket-3d' || pl.kind === 'ascent'),
-      h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'configure' }, title: 'Open the shown run in the Experiment Lab: change its conditions, run a new simulation and compare', onclick: () => navigate('lab', { runId: pl.runs[pl.active].runId }) }, 'Change the conditions'))));
+      runs.length > 1 ? h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'compare' }, onclick: () => navigate('compare', { runIds: runs.map((r) => r.runId), demo: pl.demo, labels: runs.map((r) => r.label) }) }, 'Compare in detail') : null,
+      cinRunBox,
+      cinematicButton(() => pl.runs[cinIndex()].runId, () => pl.envId || (pl.envs.length ? defaultEnv(pl.envs) : null), pl.kind === 'rocket-3d' || pl.kind === 'ascent', () => cinematicInfo(pl.runs[cinIndex()])),
+      h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'configure' }, title: 'Open the shown run in the Experiment Lab: change its conditions, run a new simulation and compare', onclick: () => navigate('lab', { runId: pl.runs[pl.active].runId }) }, 'Open in Experiment Lab'))));
 
   const side = h('aside', { class: 'pl-side', 'aria-label': 'Mission briefing and result' });
   const transport = buildTransport();
   root.append(h('div', { class: ['pl', pl.view === 'geospatial' ? 'pl-geo' : ''] }, head, h('div', { class: 'pl-body' }, stage, side), transport));
-  pl.dom = { viewport, hud, phaseTag, side, runBar, note };
+  pl.dom = { viewport, hud, phaseTag, side, runBar, note, cinRun };
+  fillRunPills();
   mountScene();
   renderSide();
   drawBand();
@@ -491,6 +565,7 @@ function setActive(i) {
   if (!pl || i === pl.active) return;
   pl.active = i;
   if (pl.dom.runBar) for (const b of pl.dom.runBar.children) b.setAttribute('aria-checked', String(Number(b.dataset.run) === i));
+  if (pl.dom.cinRun) pl.dom.cinRun.value = String(i);
   if (pl.kind === 'rocket-3d') mountScene();
   if (pl.control) pl.control.refresh();
   else drawBand();
@@ -516,7 +591,7 @@ function onTime(t) {
   pl.dom.hud.hidden = !rocket && pl.kind !== 'ground-2d';
   if (pl.dom.hud.hidden) { updateTransport(t); return; }
   pl.dom.hud.replaceChildren(
-    h('p', { class: 'pl-hud-h' }, h('span', { class: 'pl-swatch', style: { background: run.colour } }), run.label, ph.end && td ? h('span', { class: 'pl-hud-at' }, 'at contact') : null),
+    h('p', { class: 'pl-hud-h' }, h('span', { class: 'pl-swatch', style: { background: run.colour } }), runFullName(run), ph.end && td ? h('span', { class: 'pl-hud-at' }, 'at contact') : null),
     h('dl', null, readouts(run, t, rocket).map(([k, v, u, kind, title]) => h('div', { class: 'pl-hud-row', title },
       h('dt', null, h('abbr', { class: `kind kind-${kind}`, title: KIND_WORD[kind] }, kind), k),
       h('dd', { class: 'mono' }, v === null ? '—' : typeof v === 'string' ? v : `${hudNum(v)}${u ? ` ${u}` : ''}`)))),
@@ -550,7 +625,8 @@ function buildTransport() {
       pl.kind === 'rocket-3d' ? h('span', null, h('i', { class: 'lg-powered' }), 'engine on') : null,
       h('span', null, h('i', { class: 'lg-onset' }), 'injected fault starts'),
       h('span', null, h('i', { class: 'lg-detect' }), 'controller detection'),
-      h('span', null, h('i', { class: 'lg-violation' }), 'requirement or rule violated'),
+      h('span', null, h('i', { class: 'lg-violation' }), 'safety rule broken (square)'),
+      h('span', null, h('i', { class: 'lg-violation lg-req' }), 'requirement failed (circle); colour = run'),
       pl.runs.length > 1 ? h('span', null, h('i', { class: 'lg-diverge' }), 'runs part') : null));
 }
 
@@ -568,10 +644,13 @@ function drawBand() {
   // playback reaches them, or analysis mode is on, or the result is shown: they are kept here as
   // data and created by gateMarks when allowed, so neither the page nor assistive technology holds
   // an outcome the viewer has not reached.
-  const button = (m) => h('button', { type: 'button', class: `pl-mark ${m.cls}`, style: { left: pos(m.t) }, 'aria-label': m.label, title: m.label, dataset: m.gated ? { t: String(m.t), gated: '1' } : {}, onclick: () => { c.pause(); c.set(m.t); } });
+  const button = (m) => h('button', { type: 'button', class: `pl-mark ${m.cls}`, style: { left: pos(m.t), ...(m.colour ? { background: m.colour } : {}) }, 'aria-label': m.label, title: m.label, dataset: m.gated ? { t: String(m.t), gated: '1' } : {}, onclick: () => { c.pause(); c.set(m.t); } });
   pl.gated = [];
-  const mark = (cls, t, label, gated) => {
-    const m = { cls, t, label, gated: !!gated, el: null, button };
+  // A violation marker takes the colour of its run; its shape says what broke: a square for a safety
+  // rule (invariant), a circle for a requirement.
+  const violationClass = (e, base) => (e.severity !== 'violation' ? base : `${base} ${e.kind === 'invariant_violation' ? 'is-rule' : 'is-req'}`);
+  const mark = (cls, t, label, gated, colour) => {
+    const m = { cls, t, label, gated: !!gated, el: null, button, colour: colour || null };
     if (gated) pl.gated.push(m);
     else marks.append(button(m));
   };
@@ -581,8 +660,20 @@ function drawBand() {
     const key = `${e.severity}@${e.t}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    mark(`sev-${e.severity}`, e.t, `${timeText(e.t, pl.unit)}: ${prose(e.label)}`, true);
+    mark(violationClass(e, `sev-${e.severity}`), e.t, `${timeText(e.t, pl.unit)}: ${prose(e.label)}`, true, e.severity === 'violation' ? run.colour : null);
   }
+  // A broken safety rule is drawn for every run, not only the shown one, so a run that is not on screen
+  // still shows where its rule broke; its marker names the run.
+  pl.runs.forEach((other, i) => {
+    if (i === pl.active) return;
+    for (const e of other.model.events || []) {
+      if (e.severity !== 'violation' || !Number.isFinite(e.t)) continue;
+      const key = `${i}:violation@${e.t}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      mark(violationClass(e, 'sev-violation'), e.t, `${other.label}, ${timeText(e.t, pl.unit)}: ${prose(e.label)}`, true, other.colour);
+    }
+  });
   for (const f of run.record.request.faults || []) mark('sev-onset', f.start, `${timeText(f.start, pl.unit)}: injected fault ${f.kind} starts`);
   for (let i = 1; i < pl.div.length; i++) {
     const d = pl.div[i];
@@ -623,8 +714,8 @@ function setAnalysis(on) {
 /** The analysis-mode switch, shared by the player and the Flight console. */
 export function analysisToggle() {
   return h('button', { type: 'button', class: 'btn btn-quiet btn-sm pl-analysis', dataset: { action: 'analysis' }, 'aria-pressed': String(!!(pl && pl.analysis)),
-    title: 'Analysis mode: show every finding and the result now, including those later in the run. Ordinary playback shows them only when it reaches them.',
-    onclick: () => setAnalysis(!(pl && pl.analysis)) }, 'Analysis mode');
+    title: 'Show every finding and the result now, including those later in the run. Ordinary playback shows them only when it reaches them.',
+    onclick: () => setAnalysis(!(pl && pl.analysis)) }, 'Show all findings now');
 }
 
 function updateTransport(t) {
@@ -659,9 +750,28 @@ function revealNow() {
   reveal();
 }
 
+/** After the result is shown, each run pill carries its mission and safety verdicts, so they are in view without scrolling. */
+function fillRunPills() {
+  if (!pl || !pl.dom || !pl.dom.runBar || !pl.revealed) return;
+  for (const span of pl.dom.runBar.querySelectorAll('.pl-run-v')) {
+    const rec = pl.runs[Number(span.dataset.v)].record;
+    span.textContent = ` · ${statusLine(rec)}`;
+    // A run with a broken safety rule is marked on its pill, with the warning icon and the failure colours.
+    const pill = span.closest('.pl-run');
+    const broken = safetyWording(rec).verdict === 'unsafe';
+    if (pill) {
+      pill.classList.toggle('is-unsafe', broken);
+      const old = pill.querySelector('.pl-run-warn');
+      if (old) old.remove();
+      if (broken) pill.insertBefore(h('span', { class: 'pl-run-warn', title: 'A safety rule was broken in this run' }, icon('warn')), pill.firstChild);
+    }
+  }
+}
+
 function reveal() {
   if (!pl || pl.revealed) return;
   pl.revealed = true;
+  fillRunPills();
   // The button that asks for the result is replaced by the result itself. Wherever the reveal
   // comes from (that button, the end of the playback, analysis mode), if focus was on it, focus
   // moves to the Result heading instead of falling to the page. The live region and the cards
@@ -679,31 +789,33 @@ function tone(status) {
   return 'neutral';
 }
 
-function verdictChip(text, status, sub) {
-  return h('span', { class: `vchip v-${tone(status)}` }, h('span', { class: 'vchip-k' }, sub), text);
+function verdictChip(text, status, sub, title) {
+  return h('span', { class: `vchip v-${tone(status)}`, title: title || null }, h('span', { class: 'vchip-k' }, sub), text);
 }
 
 function runResult(run) {
   const rec = run.record;
   const reqs = rec.requirements || [];
   const failed = reqs.filter((q) => q.status === 'fail');
-  const missionReqs = reqs.filter((q) => q.category !== 'invariant');
-  const invariants = reqs.filter((q) => q.category === 'invariant');
-  const brokenInv = invariants.filter((q) => q.status === 'fail');
+  const missionReqs = reqs.filter((q) => q.category === 'requirement');
   const metFail = missionReqs.filter((q) => q.status === 'fail');
   const metrics = pl.kind === 'rocket-3d' ? ROCKET_METRICS.map((id) => rec.metrics.find((m) => m.id === id)).filter(Boolean) : [];
-  const missionText = metFail.length ? `${metFail.length} of ${missionReqs.length} requirements failed` : `all ${missionReqs.length} requirements met`;
-  const safetyText = brokenInv.length ? `${brokenInv.length} of ${invariants.length} safety rules broken` : `no safety rule broken (${invariants.length} checked)`;
+  const missionText = requirementWording(rec) || 'no mission requirement listed';
+  const sw = safetyWording(rec);
+  const safetyText = sw.text;
+  // The chip's colour comes from the same reading as its words: a broken rule is never drawn green, an unjudged run is never drawn as a pass.
+  const safetyTone = sw.verdict === 'unsafe' ? 'unsafe' : sw.verdict === 'neutral' ? 'neutral' : 'pass';
   return h('div', { class: 'pl-run-result', dataset: { outcome: rec.outcome.code, safety: rec.safety.status } },
     h('p', { class: 'pl-run-name' }, h('span', { class: 'pl-swatch', style: { background: run.colour } }), run.label),
+    h('p', { class: 'pl-run-cond small dim', dataset: { run: run.runId, conditions: conditionsName(rec.request, (domainById(rec.request.domain) || {}).catalog) } }, `Conditions: ${conditionsName(rec.request, (domainById(rec.request.domain) || {}).catalog)}`),
     h('p', { class: 'pl-run-head' }, rec.outcome.label),
     h('div', { class: 'pl-verdicts' },
-      verdictChip(missionText, metFail.length ? 'fail' : 'pass', 'Mission'),
-      verdictChip(safetyText, rec.safety.status, 'Safety')),
+      verdictChip(missionText, metFail.length ? 'fail' : /not evaluated/.test(missionText) ? 'neutral' : 'pass', 'Mission'),
+      verdictChip(safetyText, safetyTone, 'Safety rules', SAFETY_NOTE)),
     metrics.length ? h('dl', { class: 'pl-metrics' }, metrics.map((m) => h('div', null, h('dt', null, m.label), h('dd', { class: 'mono' }, m.value === null ? '—' : `${hudNum(m.value)} ${m.unit}`)))) : null,
     failed.length ? h('ul', { class: 'pl-failed' }, failed.map((q) => h('li', null,
       h('button', { type: 'button', class: 'link', title: 'Move the playback to the decisive instant', onclick: () => { if (Number.isFinite(q.t)) { pl.cursor.pause(); pl.cursor.set(q.t); } } }, q.label),
-      h('span', { class: 'small dim' }, ` ${q.category === 'invariant' ? 'safety invariant' : 'requirement'}: expected ${q.expected}, observed ${q.observed}`)))) : h('p', { class: 'small ok-text' }, 'Every requirement and safety invariant met.'));
+      (() => { const rv = reqView(q); return h('span', { class: 'small dim', title: rv.full }, ` ${q.category === 'invariant' ? 'safety rule' : 'requirement'}: limit ${rv.limitText}, observed ${rv.obsText}`); })()))) : h('p', { class: 'small ok-text' }, 'Every requirement and safety rule met.'));
 }
 
 function changeSummary() {
@@ -735,7 +847,7 @@ function fillResult() {
   const heading = h('h2', { id: 'pl-result-h', tabindex: '-1' }, 'Result');
   pl.dom.resultHeading = heading;
   clear(live).append(h('section', { class: 'pl-card pl-result', 'aria-labelledby': 'pl-result-h' }, heading, pl.runs.map((r) => runResult(r)),
-    reqOnly ? h('p', { class: 'pl-fine' }, 'Mission requirements judge the landing or the goal; safety rules are judged on the true state throughout the run. A hard or off-target landing fails a requirement without breaking a safety rule.') : null));
+    reqOnly ? h('p', { class: 'pl-fine' }, 'A requirement can fail without any safety rule being broken. Mission requirements judge the landing or the goal; safety rules are judged on the true state throughout the run, so a hard or off-target landing can fail a requirement and still break no safety rule.') : null));
 }
 
 /** What follows the result: where the runs part and why it happened. Empty until the result is shown. */
@@ -757,8 +869,9 @@ function renderSide() {
   pl.dom.live = h('div', { class: 'pl-live', 'aria-live': 'polite' });
   pl.dom.after = h('div', { class: 'pl-after' });
   side.append(
-    h('section', { class: 'pl-card pl-brief' },
-      h('h2', null, 'Objective'), h('p', null, exp.objective),
+    // On a short window the objective starts folded, so the result is not pushed below the scene.
+    h('details', { class: 'pl-card pl-brief', open: window.innerHeight > 760 },
+      h('summary', null, h('h2', null, 'Objective')), h('p', null, exp.objective),
       h('h3', null, 'Watch for'), h('ul', { class: 'pl-list' }, exp.watch.map((w) => h('li', null, w)))),
     pl.dom.live, pl.dom.after);
   fillResult();

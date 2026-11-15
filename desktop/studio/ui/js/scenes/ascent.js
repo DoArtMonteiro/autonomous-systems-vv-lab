@@ -96,7 +96,7 @@ function drawWorld(ctx, P, mode, R, scene) {
     if (target !== null) { ctx.strokeStyle = c('--pass'); ctx.setLineDash([6, 4]); arc(R + target, -span, span); ctx.setLineDash([]); }
     if (zone) { ctx.strokeStyle = c('--pass'); ctx.lineWidth = 5; arc(R, zone[0] / R, zone[1] / R); ctx.lineWidth = 1.2; }
   }
-  ctx.font = `10.5px ${c('--sans')}`;
+  ctx.font = `12px ${c('--sans')}`;
   ctx.fillStyle = c('--fg-3');
   ctx.textAlign = 'left';
   ctx.textBaseline = 'bottom';

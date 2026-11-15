@@ -33,8 +33,17 @@
       <button type="button" class="nav-btn nav-work" data-view="prepare" aria-keyshortcuts="4">Configure</button>
       <button type="button" class="nav-btn nav-work" data-view="run" aria-keyshortcuts="5">Analyse</button>
       <button type="button" class="nav-btn nav-work" data-view="compare" aria-keyshortcuts="6">Compare</button>
-      <button type="button" class="nav-btn nav-work" data-view="library" aria-keyshortcuts="7">Records</button>
+      <button type="button" class="nav-btn nav-work" data-view="library" aria-keyshortcuts="7">Runs</button>
     </nav>
+    <div class="nav-more" id="nav-more-wrap">
+      <button type="button" class="nav-more-btn" id="nav-more" aria-haspopup="menu" aria-expanded="false" aria-controls="nav-more-menu">More</button>
+      <div class="nav-more-menu" id="nav-more-menu" role="menu" aria-label="More workspaces" hidden>
+        <button type="button" role="menuitem" class="nav-more-item" data-view="prepare">Configure</button>
+        <button type="button" role="menuitem" class="nav-more-item" data-view="run">Analyse</button>
+        <button type="button" role="menuitem" class="nav-more-item" data-view="compare">Compare</button>
+        <button type="button" role="menuitem" class="nav-more-item" data-view="library">Runs</button>
+      </div>
+    </div>
     <div class="appbar-end">
       <button type="button" class="nav-btn nav-settings" data-view="settings" aria-keyshortcuts="8">Settings</button>
       <span id="platform-status" class="status-dot" role="status" aria-live="polite">Starting</span>

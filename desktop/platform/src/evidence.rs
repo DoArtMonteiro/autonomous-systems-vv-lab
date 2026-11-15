@@ -40,6 +40,75 @@ pub fn file_name(run_id: &str, replay_status: &str) -> String {
 mod name_tests {
     use super::*;
 
+    fn record(status: &str, class: Option<&str>, rows: &[(&str, &str)]) -> RunRecord {
+        let rows_json: Vec<serde_json::Value> = rows
+            .iter()
+            .map(|(cat, st)| {
+                serde_json::json!({"id": "S1", "label": "Rule", "category": cat, "status": st,
+                    "expected": "x", "observed": "y", "t": null, "explanation": ""})
+            })
+            .collect();
+        serde_json::from_value(serde_json::json!({
+            "schema": "vv-run.v1",
+            "domain": {"id": "d", "version": "1", "contract": "c"},
+            "request": {"schema": "vv-run-request.v1", "domain": "d", "scenario": "s", "controller": "c",
+                "seed": 5, "faults": [{"kind": "gps_dropout", "magnitude": null, "start": 1.0, "end": 2.0}],
+                "parameters": {"gps_noise_mm": 1.0}},
+            "provenance": {"source_sha256": "0", "simulator": "sim", "artifacts": [], "reproduce": []},
+            "model_validity": "v",
+            "outcome": {"code": "x", "label": "X", "status": "success", "explanation": ""},
+            "safety": {"status": status, "class": class, "explanation": ""},
+            "timebases": {}, "channels": [], "events": [],
+            "requirements": rows_json, "metrics": [], "scene": null, "notes": []
+        }))
+        .expect("a record the contract accepts")
+    }
+
+    #[test]
+    fn the_safety_phrase_counts_rules_and_never_writes_a_bare_status() {
+        let ok = record(
+            "safe",
+            None,
+            &[("invariant", "pass"), ("invariant", "pass")],
+        );
+        assert_eq!(
+            safety_phrase(&ok),
+            "no safety rule broken (2 checked), judged on the true state"
+        );
+        let bad = record(
+            "unsafe",
+            None,
+            &[
+                ("invariant", "fail"),
+                ("invariant", "pass"),
+                ("requirement", "fail"),
+            ],
+        );
+        assert_eq!(safety_phrase(&bad), "1 of 2 safety rules broken");
+        let none = record("unsafe", None, &[("requirement", "fail")]);
+        assert_eq!(safety_phrase(&none), "a safety rule was broken");
+        let part = record(
+            "safe",
+            None,
+            &[("invariant", "pass"), ("invariant", "not_evaluated")],
+        );
+        assert!(safety_phrase(&part).contains("1 of 2 checked; 1 not evaluated"));
+        let all_unknown = record("safe", None, &[("invariant", "not_evaluated")]);
+        assert_eq!(safety_phrase(&all_unknown), "safety rules not evaluated");
+        let classed = record("safe", Some("not_evaluated"), &[("invariant", "pass")]);
+        assert_eq!(safety_phrase(&classed), "safety rules not evaluated");
+        let broken_wins = record("safe", Some("not_evaluated"), &[("invariant", "fail")]);
+        assert_eq!(safety_phrase(&broken_wins), "1 of 1 safety rules broken");
+    }
+
+    #[test]
+    fn the_request_line_lists_parameters_and_faults() {
+        let line = request_line(&record("safe", None, &[]));
+        assert!(line.contains("gps_noise_mm = 1"));
+        assert!(line.contains("gps_dropout from 1 to 2"));
+        assert!(line.contains("seed 5"));
+    }
+
     #[test]
     fn the_name_carries_the_replay_status() {
         assert_eq!(file_name("abc", "verified"), "abc-evidence.zip");
@@ -63,19 +132,92 @@ struct Manifest<'a> {
     files: Vec<FileHash>,
 }
 
+/// The safety verdict in the words every surface uses (the Studio's `safetyWording` in
+/// `ui/js/requirements.js` and the Cinematic View's panel say the same): how many safety rules were
+/// checked and how many broke, never the bare status. Only evaluated rules are counted.
+pub(crate) fn safety_phrase(record: &RunRecord) -> String {
+    let rules: Vec<_> = record
+        .requirements
+        .iter()
+        .filter(|q| q.category == "invariant")
+        .collect();
+    let judged: Vec<_> = rules
+        .iter()
+        .filter(|q| q.status != "not_evaluated")
+        .collect();
+    let broken = judged.iter().filter(|q| q.status == "fail").count();
+    let not_evaluated = rules.len() - judged.len();
+    if record.safety.status == "unsafe" || broken > 0 {
+        return if broken > 0 {
+            format!("{broken} of {} safety rules broken", judged.len())
+        } else {
+            "a safety rule was broken".to_string()
+        };
+    }
+    let unjudged = (record.safety.status == "safe"
+        && record.safety.class.as_deref() == Some("not_evaluated"))
+        || (!rules.is_empty() && judged.is_empty());
+    if unjudged {
+        return "safety rules not evaluated".to_string();
+    }
+    if rules.is_empty() {
+        return "no safety rule broken".to_string();
+    }
+    if not_evaluated > 0 {
+        format!(
+            "no safety rule broken ({} of {} checked; {not_evaluated} not evaluated), judged on the true state",
+            judged.len(),
+            rules.len()
+        )
+    } else {
+        format!(
+            "no safety rule broken ({} checked), judged on the true state",
+            judged.len()
+        )
+    }
+}
+
+/// The request line: scenario, controller, seed, every parameter the request carries and every
+/// fault, as recorded in request.json (the platform does not know the catalog defaults here).
+fn request_line(record: &RunRecord) -> String {
+    let r = &record.request;
+    let params = if r.parameters.is_empty() {
+        "no parameter set".to_string()
+    } else {
+        r.parameters
+            .iter()
+            .map(|(k, v)| format!("{k} = {v}"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    let faults = if r.faults.is_empty() {
+        "no fault".to_string()
+    } else {
+        r.faults
+            .iter()
+            .map(|f| match f.magnitude {
+                Some(m) => format!("{} {m} from {} to {}", f.kind, f.start, f.end),
+                None => format!("{} from {} to {}", f.kind, f.start, f.end),
+            })
+            .collect::<Vec<_>>()
+            .join("; ")
+    };
+    format!(
+        "scenario {}, controller {}, seed {}; parameters: {params}; faults: {faults}",
+        r.scenario, r.controller, r.seed
+    )
+}
+
 fn readme(run_id: &str, record: &RunRecord, replay: &ReplayReport) -> String {
     let mut text = format!(
-        "# Evidence package {run_id}\n\nEvidence class: development demonstration. Not a scientifically accepted outcome: this application refuses the protected evaluation and reserve seeds.\n\nDomain: {} {} (contract {})\n\nRequest: scenario {}, controller {}, seed {}, {} fault(s).\n\nOutcome: {} ({}). Safety: {}.\n\nFresh replay when this package was made: {}.\n\nModel validity: {}\n\n## Reproduce\n\nFrom a checkout of the repository at the commit that produced the simulator (source SHA-256 {}):\n\n",
+        "# Evidence package {run_id}\n\nEvidence class: development demonstration. Not a scientifically accepted outcome: this application refuses the protected evaluation and reserve seeds.\n\nDomain: {} {} (contract {})\n\nRequest: {}.\n\nOutcome: {} ({}). Safety rules: {}.\n\nFresh replay when this package was made: {}.\n\nModel validity: {}\n\n## Reproduce\n\nFrom a checkout of the repository at the commit that produced the simulator (source SHA-256 {}):\n\n",
         record.domain.id,
         record.domain.version,
         record.domain.contract,
-        record.request.scenario,
-        record.request.controller,
-        record.request.seed,
-        record.request.faults.len(),
+        request_line(record),
         record.outcome.label,
         record.outcome.status,
-        record.safety.status,
+        safety_phrase(record),
         replay.status,
         record.model_validity,
         record.provenance.source_sha256,

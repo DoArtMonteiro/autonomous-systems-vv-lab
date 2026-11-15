@@ -4,7 +4,7 @@
 
 import { h, clear, icon, prose, timeText, words } from '../dom.js';
 import { state, domainById, loadRecord, emit } from '../store.js';
-import { modelOf, requestText } from '../model.js';
+import { modelOf, requestText, displayRunLabel, conditionsName } from '../model.js';
 import { TimeCursor } from '../cursor.js';
 import { Telemetry } from '../charts.js';
 import { Timeline } from '../timeline.js';
@@ -96,13 +96,14 @@ function build() {
   // Header: identity, actions, verdicts, validity.
   const head = h('header', { class: 'run-head' },
     h('div', { class: 'run-id' },
-      h('h1', null, ws.meta && ws.meta.label ? ws.meta.label : `${rt.controller} on ${rt.scenario}`),
-      h('span', { class: 'ident' }, `Scenario: ${rt.scenario} · `, h('b', null, rt.controller), ` · seed ${rt.seed} · ${rt.faults}`),
+      h('h1', null, displayRunLabel(record, cat, ws.meta && ws.meta.label, ws.meta && ws.meta.tags) || `${rt.controller} on ${rt.scenario}`),
+      h('span', { class: 'ident' }, `Scenario: ${rt.scenario} · `, h('b', null, rt.controller), ` · seed ${rt.seed}`),
+      h('span', { class: 'ident run-cond-line', dataset: { conditions: conditionsName(record.request, cat) } }, `Conditions: ${conditionsName(record.request, cat)}`),
       devNote ? h('span', { class: 'tag tag-dev', title: devNote }, 'development') : null,
       h('span', { class: 'mono dim small' }, `${d ? d.manifest.name : record.domain.id} · run ${ws.runId}`)),
     h('div', { class: 'run-actions' },
       h('button', { type: 'button', class: 'btn', onclick: () => { selectTab('prov'); const b = root.querySelector('[data-action="replay"]'); if (b) b.click(); } }, icon('replay'), 'Replay'),
-      h('button', { type: 'button', class: 'btn', title: 'Change the conditions of this run, run a new simulation and compare', onclick: () => navigate('lab', { runId: ws.runId }) }, 'Experiment from this run'),
+      h('button', { type: 'button', class: 'btn', title: 'Change the conditions of this run, run a new simulation and compare', onclick: () => navigate('lab', { runId: ws.runId }) }, 'Open in Experiment Lab'),
       h('button', { type: 'button', class: 'btn btn-quiet', onclick: () => selectTab('prov') }, 'Provenance'),
       h('button', { type: 'button', class: 'btn btn-quiet', title: 'Open the run in the library to edit its label, notes and tags', onclick: () => navigate('library', { select: ws.runId }) }, 'Label and notes')),
     h('div', { class: 'verdicts' }, verdictBlocks(record)),

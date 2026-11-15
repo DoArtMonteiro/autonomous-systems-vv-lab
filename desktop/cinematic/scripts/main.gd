@@ -141,6 +141,15 @@ func _policy_dump() -> void:
 		"auto": Profiles.auto_pick(vram),
 		"vram_bytes": vram["bytes"],
 		"presentation_line": Hud.presentation_line(record),
+		# The display arguments as the module will show them (bidi controls removed), for the tests.
+		"display": {"run_label": cli.run_label, "vehicle": cli.vehicle, "exploratory": cli.exploratory, "seed": cli.seed, "conditions": cli.conditions},
+		# The texts the screen shows, from the same functions the interface uses: the run line, the result panel
+		# and the legend, so the tests can read the exploratory qualifier, the conditions and the impact sentence.
+		"run_line": Hud.run_line_text(cli.run_label, cli.vehicle, cli.seed, cli.run_dir.rstrip("/\\").get_file(), record, cli.conditions),
+		"verdict": Hud.verdict_text_for(record),
+		"title": Hud.title_text("Place name"),
+		"legend_data": Hud.DATA_ASCENT if record.is_v2 else Hud.DATA,
+		"legend_illustrative": Hud.ILLUSTRATIVE_ASCENT if record.is_v2 else Hud.ILLUSTRATIVE,
 	}
 	print("POLICY " + JSON.stringify(out, "", true, true))
 	get_tree().quit(0)
@@ -317,7 +326,9 @@ func _build() -> void:
 	# Interface.
 	hud = Hud.new()
 	hud.build(self, record, pack, record.t0(), record.t1(), Profiles.ORDER + ["custom"], cameras)
+	hud.set_run_info(cli.run_label, cli.vehicle, cli.exploratory, cli.seed, cli.run_dir.rstrip("/\\").get_file(), record, cli.conditions)
 	hud.play_btn.pressed.connect(func(): _set_playing(not playing))
+	hud.result_btn.pressed.connect(func(): hud.reveal())
 	hud.slider.value_changed.connect(func(v): if not hud.slider_blocked(): _set_time(v))
 	hud.speed_menu.item_selected.connect(func(i): speed = [0.25, 0.5, 1.0, 2.0][i])
 	for c in hud.cam_buttons:
@@ -364,7 +375,9 @@ func _first_frame() -> void:
 
 
 func _update_note() -> void:
-	hud.note.text = "Graphics: %s (%s). %s" % [profile_name.capitalize(), profile_reason, " ".join(notes.slice(1))]
+	# A short label that always fits the playback bar (the profile menu above it names the profile); the reason and the notes are in its tooltip.
+	var how := profile_reason.get_slice(":", 0).strip_edges()
+	hud.set_quality_note(how.begins_with("Auto"), "Quality: %s (%s). %s" % [profile_name.capitalize(), profile_reason, " ".join(notes.slice(1))])
 
 
 func _switch_profile(name: String, reason: String) -> void:

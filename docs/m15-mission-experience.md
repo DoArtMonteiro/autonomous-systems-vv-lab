@@ -34,7 +34,7 @@ Todas usam sementes de desenvolvimento (5000 a 5099). Os números vêm das execu
 | A fix with a price | foguetão | semente 5017, viés tardio: limiar 3 m dá subida com motor ligado (S5) e cerca de 24 m/s; limiar 1 m rejeita aos 0,18 s e aterra suave a cerca de 13 m (só R5) | exploratório |
 | One millimetre | terrestre | corredor junto à zona interdita: GPS exato completa; 1 mm de ruído entra na zona no tick 21; raio de chegada de 250 mm completa | exploratório |
 | Two faults at once, Riding out an outage | foguetão | demonstrações M11 com duas falhas | demonstração |
-| A clean drive, Stalled but safe, A late command | terrestre | demonstrações M11 do veículo terrestre | demonstração |
+| A clean drive, Stalled with no safety rule broken, A late command | terrestre | demonstrações M11 do veículo terrestre | demonstração |
 
 As missões exploratórias ilustram, numa semente, padrões que a investigação M13 mediu em 30 sementes novas. Não são confirmações.
 

@@ -101,7 +101,7 @@ def from_player(s):
     replace_if_asked(s)
     s.wait("window.__studio.view() === 'lab' && window.__studio.lab() && document.querySelector('.lab-base')", 30, "lab")
     st = lab(s)
-    check("Change the conditions opens the shown run as the Lab baseline", st["base"] == base_id, f"{st['base']} vs {base_id}")
+    check("Open in Experiment Lab opens the shown run as the Lab baseline", st["base"] == base_id, f"{st['base']} vs {base_id}")
     fails = s.js("[...document.querySelectorAll('.lab-req')].map((b) => b.querySelector('.lab-req-l').textContent)")
     check("The baseline lists its failed requirements with margins", len(fails) >= 1 and s.js("document.querySelectorAll('.lab-req .lab-mbar').length") >= 1, ", ".join(fails))
     hinted = s.js("[...document.querySelectorAll('.lab-field.is-hint')].map((e) => e.dataset.param)")

@@ -145,7 +145,7 @@ def explorer(s):
     res = s.results()
     check("Explorer: baseline lands hard, robust lands", res == [["hard_landing", "safe"], ["landed", "safe"]], json.dumps(res))
     check("Explorer: the difference is located in time", s.js("/departs from/.test(document.querySelector('.pl-side').innerText)") and s.js("!!document.querySelector('.pl-mark.sev-diverge')"))
-    check("Explorer: a failed requirement names expected and observed", s.js("/expected .* observed /.test(document.querySelector('.pl-failed').innerText)"))
+    check("Explorer: a failed requirement names expected and observed", s.js("/(expected|limit) .* observed /.test(document.querySelector('.pl-failed').innerText)"))
     s.shot("m15-player-lying-altimeter-result-dark")
 
 
@@ -164,10 +164,10 @@ def analyst(s):
     s.page.click("#view-missions [data-experience='lying-altimeter'] [data-action='launch']")
     s.wait_player("lying-altimeter")
     s.page.click(".pl-head-actions [data-action='configure']")
-    # M17: Change the conditions opens the shown run in the Experiment Lab (Configure stays in the nav).
+    # M17: Open in Experiment Lab opens the shown run in the Experiment Lab (Configure stays in the nav).
     s.wait("window.__studio.view() === 'lab' && document.querySelector('.lab-base')", 30)
     txt = s.js("document.querySelector('#view-lab').innerText")
-    check("Analyst: Change the conditions opens the run in the Experiment Lab", "What would change this outcome?" in txt and "Altimeter bias" in txt)
+    check("Analyst: Open in Experiment Lab opens the run in the Experiment Lab", "What would change this outcome?" in txt and "Altimeter bias" in txt)
     s.shot("m15-configure-from-player-dark")
 
 

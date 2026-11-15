@@ -21,6 +21,7 @@ export function cinematicStatus() {
   return current(true);
 }
 
+const OPENING_MS = 30000; // how long "Opening the Cinematic View" stays when the window is not dismissed
 const mbText = (b) => `${(b / 1048576).toFixed(0)} MB`;
 
 /**
@@ -32,10 +33,10 @@ const mbText = (b) => `${(b / 1048576).toFixed(0)} MB`;
  * aria-describedby points to, so a keyboard or screen-reader user can read why. Returns a wrapper
  * (the button and that text); the button carries data-action="cinematic".
  */
-export function cinematicButton(runId, envId, replayable) {
+export function cinematicButton(runId, envId, replayable, info) {
   const reasonId = `cin-why-${++cinSeq}`;
   const why = h('span', { class: 'sr-only', id: reasonId });
-  const b = h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'cinematic' }, 'aria-disabled': 'true', 'aria-describedby': reasonId, title: 'Checking the Cinematic View module…' }, 'Cinematic view');
+  const b = h('button', { type: 'button', class: 'btn btn-quiet', dataset: { action: 'cinematic' }, 'aria-disabled': 'true', 'aria-describedby': reasonId, title: 'Checking the Cinematic View module…' }, 'Open Cinematic View');
   const wrap = h('span', { class: 'cin-wrap' }, b, why);
   why.textContent = 'Checking the Cinematic View module…';
   const off = (text) => { b.setAttribute('aria-disabled', 'true'); b.title = text; why.textContent = text; };
@@ -52,8 +53,13 @@ export function cinematicButton(runId, envId, replayable) {
   }).catch((e) => off(`The module status could not be read: ${errorText(e)}`));
   b.addEventListener('click', () => {
     if (b.getAttribute('aria-disabled') === 'true') return;
-    api.cinematicLaunch(runId(), envId()).then(() => toast('The Cinematic View opens in its own window.', 'info'))
-      .catch((e) => toast(errorText(e), 'error'));
+    api.cinematicLaunch(runId(), envId(), info ? info() : {}).then(() => {
+      // The module decodes its assets before it draws (about 12 to 15 s on the reference PC), so say
+      // so in a status that stays until the window has had time to open, or until it is dismissed.
+      const opening = toast('Opening the Cinematic View in its own window. The first frame takes about 15 seconds.', 'info', 0);
+      opening.dataset.role = 'cinematic-opening';
+      setTimeout(() => opening.remove(), OPENING_MS);
+    }).catch((e) => toast(errorText(e), 'error'));
   });
   return wrap;
 }

@@ -369,7 +369,7 @@ function topView(host, runs, pad, opts = {}) {
         ctx.beginPath(); ctx.arc(P.x(pad.cx), P.y(pad.cy), pad.land * P.scale, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = P.colour('--pass'); circle2d(ctx, P, pad.cx, pad.cy, pad.land);
       }
-      ctx.font = `11px ${P.colour('--sans')}`;
+      ctx.font = `12px ${P.colour('--sans')}`;
       ctx.fillStyle = P.colour('--fg-2');
       ctx.textAlign = 'left';
       if (pad.land) ctx.fillText(`R5 ${num(pad.land)} m`, P.x(pad.cx + pad.land * 0.72) + 3, P.y(pad.cy + pad.land * 0.72) - 3);

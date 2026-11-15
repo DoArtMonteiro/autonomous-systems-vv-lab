@@ -19,9 +19,9 @@ Uma missão estagnada com segurança PASS mantém código 0. Consultar sempre `m
 ## Reconstruir a análise da missão
 
 ```sh
-cargo run -- run scenarios/basic-mission.json --seed 42 --output runs/basic
-cargo run -- replay runs/basic/events.json
-cargo run -- analyze runs/basic/events.json --output runs/basic/mission-replayed.json
+cargo run --bin vv-lab -- run scenarios/basic-mission.json --seed 42 --output runs/basic
+cargo run --bin vv-lab -- replay runs/basic/events.json
+cargo run --bin vv-lab -- analyze runs/basic/events.json --output runs/basic/mission-replayed.json
 ```
 
 `analyze` reproduz os eventos antes de recalcular a análise. Não lê as conclusões de `mission.json`. Os dois relatórios de missão devem ter bytes iguais quando usam a mesma política de progresso. A referência `source_final_hash` identifica a sequência de eventos analisada.
@@ -29,8 +29,8 @@ cargo run -- analyze runs/basic/events.json --output runs/basic/mission-replayed
 A política de progresso tem parâmetros explícitos, independentes do cenário v1:
 
 ```sh
-cargo run -- run scenarios/m2/d-safe-held-stall.json --seed 42 --output runs/hold --stall-window-ticks 8 --min-progress-mm 1
-cargo run -- analyze runs/hold/events.json --output runs/hold/mission-replayed.json --stall-window-ticks 8 --min-progress-mm 1
+cargo run --bin vv-lab -- run scenarios/m2/d-safe-held-stall.json --seed 42 --output runs/hold --stall-window-ticks 8 --min-progress-mm 1
+cargo run --bin vv-lab -- analyze runs/hold/events.json --output runs/hold/mission-replayed.json --stall-window-ticks 8 --min-progress-mm 1
 ```
 
 Alterar a política pode mudar a classificação da missão; não muda os eventos nem os invariantes. Para reproduzir a classificação, conservar também a política indicada no relatório.
@@ -48,11 +48,11 @@ SHA-256 deteta alterações, mas não autentica a origem. Um registo reconstruí
 Uma execução M4 exige a política, os contratos e, opcionalmente, a configuração do atuador. O exemplo usa o cenário que torna visível o efeito de X-first quando um passo fixo ultrapassa a coordenada X do destino:
 
 ```sh
-cargo run -- run-m4 scenarios/m4/x-first-overshoot.json --seed 42 --controller dominant_axis --output runs/m4/dominant --contracts scenarios/m3/contracts-nominal.json --actuator scenarios/m3/actuator-none.json
-cargo run -- run-m4 scenarios/m4/x-first-overshoot.json --seed 42 --controller x_first --output runs/m4/x-first --contracts scenarios/m3/contracts-nominal.json --actuator scenarios/m3/actuator-none.json
-cargo run -- compare-m4 runs/m4/dominant/m4.json runs/m4/x-first/m4.json --output runs/m4/comparison.json
-cargo run -- replay-m4 runs/m4/dominant/m4.json
-cargo run -- replay-m4 runs/m4/x-first/m4.json
+cargo run --bin vv-lab -- run-m4 scenarios/m4/x-first-overshoot.json --seed 42 --controller dominant_axis --output runs/m4/dominant --contracts scenarios/m3/contracts-nominal.json --actuator scenarios/m3/actuator-none.json
+cargo run --bin vv-lab -- run-m4 scenarios/m4/x-first-overshoot.json --seed 42 --controller x_first --output runs/m4/x-first --contracts scenarios/m3/contracts-nominal.json --actuator scenarios/m3/actuator-none.json
+cargo run --bin vv-lab -- compare-m4 runs/m4/dominant/m4.json runs/m4/x-first/m4.json --output runs/m4/comparison.json
+cargo run --bin vv-lab -- replay-m4 runs/m4/dominant/m4.json
+cargo run --bin vv-lab -- replay-m4 runs/m4/x-first/m4.json
 ```
 
 `run-m4` grava os artefactos habituais da execução e um `m4.json` estrito com as versões, política, hashes de fonte/configuração, referências e métricas. `compare-m4` volta a executar e verificar cada política antes de comparar os calendários externos regenerados. Exige cenários, sementes e configurações iguais. `replay-m4` usa a política identificada no manifesto e verifica novamente a execução e os resultados. Estes comandos não alteram `events.json`, `report.json`, `verification.json` nem a reprodução legada.
