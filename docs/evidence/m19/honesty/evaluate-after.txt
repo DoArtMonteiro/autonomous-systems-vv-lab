@@ -9,4 +9,7 @@ PASS 1024x640: no pill has clipped text
 PASS 1024x640: an unselected pill gives an exact count of conditions
 PASS 1024x640: the tooltip of every pill has the whole identity
 PASS the Library cell 'None broken' is neutral, never the green class
+PASS the Safety rules section of the run workspace has held rows and no green row
+PASS the Compare matrix has held (neutral) safety cells
+PASS the Lab verdict pills for safety are held
 PASS no script error

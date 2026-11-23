@@ -1,0 +1,7 @@
+Isolation of the review-round capture (capture.py run on 23/11/2026, executable built with TAURI_CONFIG identifier org.vvlab.studio.m191review).
+Embedded identifier check: the executable contains the new identifier once and no other occurrence of org.vvlab.studio.
+Paths redirected: VVLAB_LIBRARY, VVLAB_CONFIG (preferences and log) and WEBVIEW2_USER_DATA_FOLDER to scratch folders; domains, engine and claims from the worktree stage.
+The module folder (app local data) and WebView2 default folder follow the identifier, so they lie under org.vvlab.studio.m191review, not under the installed application.
+Listing (recursive, LastWriteTime UTC, size, path) of %LOCALAPPDATA%\org.vvlab.studio, %APPDATA%\org.vvlab.studio, Documents\VV Lab Library and Godot app_userdata taken before and after the run: 1302 lines each, byte-identical.
+Top level of %LOCALAPPDATA%\org.vvlab.studio before and after: EBWebView 19:01:22 (from the earlier breach), logs 02/11/2026 22:41:06, modules 15/11/2026 08:10:01. %APPDATA%\org.vvlab.studio: preferences.json 06/11/2026 20:00:43.
+A new folder %LOCALAPPDATA%\org.vvlab.studio.m191review was created by the run (outside the installed application's folder).

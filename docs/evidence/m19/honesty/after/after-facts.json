@@ -96,17 +96,259 @@
   }
  ],
  "errors": [],
- "exe": "vv-studio-m191-after.exe",
+ "exe": "vv-studio-m191-review.exe",
+ "held_rows_compare": {
+  "cells": [
+   {
+    "cells": [
+     "cell v-fail",
+     "cell v-pass"
+    ],
+    "row": "Mission outcome"
+   },
+   {
+    "cells": [
+     "cell v-held",
+     "cell v-held"
+    ],
+    "row": "Safety rules"
+   },
+   {
+    "cells": [],
+    "row": "VERDICT CHANGES BETWEEN THE RUNS"
+   },
+   {
+    "cells": [
+     "cell v-fail",
+     "cell v-pass"
+    ],
+    "row": "R1_vertical_speed"
+   },
+   {
+    "cells": [
+     "cell v-fail",
+     "cell v-pass"
+    ],
+    "row": "R2_horizontal_speed"
+   },
+   {
+    "cells": [],
+    "row": "SAFETY RULES"
+   },
+   {
+    "cells": [
+     "cell v-held",
+     "cell v-held"
+    ],
+    "row": "S1_tilt_envelope"
+   },
+   {
+    "cells": [
+     "cell v-held",
+     "cell v-held"
+    ],
+    "row": "S2_keep_out"
+   },
+   {
+    "cells": [
+     "cell v-held",
+     "cell v-held"
+    ],
+    "row": "S3_axial_load"
+   },
+   {
+    "cells": [
+     "cell v-held",
+     "cell v-held"
+    ],
+    "row": "S4_no_relight"
+   },
+   {
+    "cells": [
+     "cell v-held",
+     "cell v-held"
+    ],
+    "row": "S5_no_powered_ascent"
+   },
+   {
+    "cells": [],
+    "row": "MISSION REQUIREMENTS"
+   },
+   {
+    "cells": [
+     "cell v-pass",
+     "cell v-pass"
+    ],
+    "row": "R3_tilt"
+   },
+   {
+    "cells": [
+     "cell v-pass",
+     "cell v-pass"
+    ],
+    "row": "R4_angular_rate"
+   }
+  ]
+ },
+ "held_rows_lab": {
+  "pills": [
+   "mini v-fail",
+   "mini v-held"
+  ]
+ },
+ "held_rows_run": [
+  {
+   "rows": [
+    "req v-held",
+    "req v-held",
+    "req v-held",
+    "req v-held",
+    "req v-held"
+   ],
+   "title": "Safety rules"
+  },
+  {
+   "rows": [
+    "req v-fail",
+    "req v-fail",
+    "req v-pass",
+    "req v-pass",
+    "req v-pass",
+    "req v-pass"
+   ],
+   "title": "Mission requirements"
+  }
+ ],
  "library_safety_cells": [
+  {
+   "cls": "cell v-fail",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Reached the ground, requirements not met"
+  },
   {
    "cls": "cell v-pass",
    "colour": "rgb(228, 233, 239)",
-   "text": "Mission completed"
+   "text": "Landed"
   },
   {
    "cls": "cell v-held",
    "colour": "rgb(228, 233, 239)",
-   "text": "None broken"
+   "text": "No safety rule broken (5 checked)"
+  },
+  {
+   "cls": "cell v-held",
+   "colour": "rgb(228, 233, 239)",
+   "text": "No safety rule broken (5 checked)"
+  },
+  {
+   "cls": "cell v-fail",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Fail \u00b7 33.03 m/sD margin -30.03 m/s"
+  },
+  {
+   "cls": "cell v-pass",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 2.672 m/sD margin +0.3285 m/s"
+  },
+  {
+   "cls": "cell v-fail",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Fail \u00b7 1.151 m/sD margin -0.151 m/s"
+  },
+  {
+   "cls": "cell v-pass",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 0.2932 m/sD margin +0.7068 m/s"
+  },
+  {
+   "cls": "cell v-held",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 10.31 \u00b0D margin +19.69 \u00b0"
+  },
+  {
+   "cls": "cell v-held",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 10.25 \u00b0D margin +19.75 \u00b0"
+  },
+  {
+   "cls": "cell v-held",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 4.745 mD margin +45.25 m"
+  },
+  {
+   "cls": "cell v-held",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 2.923 mD margin +47.08 m"
+  },
+  {
+   "cls": "cell v-held",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 2.196 g0D margin +0.8037 g0"
+  },
+  {
+   "cls": "cell v-held",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 2.294 g0D margin +0.7059 g0"
+  },
+  {
+   "cls": "cell v-held",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 1 ignitionsD margin +0 ignitions"
+  },
+  {
+   "cls": "cell v-held",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 1 ignitionsD margin +0 ignitions"
+  },
+  {
+   "cls": "cell v-held",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 0 mD margin +5 m"
+  },
+  {
+   "cls": "cell v-held",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 0 mD margin +5 m"
+  },
+  {
+   "cls": "cell v-pass",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 0.5843 \u00b0D margin +4.416 \u00b0"
+  },
+  {
+   "cls": "cell v-pass",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 0.6431 \u00b0D margin +4.357 \u00b0"
+  },
+  {
+   "cls": "cell v-pass",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 0.006374 rad/sD margin +0.09363 rad/s"
+  },
+  {
+   "cls": "cell v-pass",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 0.003141 rad/sD margin +0.09686 rad/s"
+  },
+  {
+   "cls": "cell v-pass",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 4.745 mD margin +5.255 m"
+  },
+  {
+   "cls": "cell v-pass",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 2.923 mD margin +7.077 m"
+  },
+  {
+   "cls": "cell v-pass",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 4799 kgD margin +4721 kg"
+  },
+  {
+   "cls": "cell v-pass",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 4266 kgD margin +4188 kg"
   },
   {
    "cls": "cell v-pass",
@@ -127,6 +369,16 @@
    "cls": "cell v-unsafe",
    "colour": "rgb(228, 233, 239)",
    "text": "1 safety rule broken"
+  },
+  {
+   "cls": "cell v-pass",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Mission completed"
+  },
+  {
+   "cls": "cell v-held",
+   "colour": "rgb(228, 233, 239)",
+   "text": "None broken"
   },
   {
    "cls": "cell v-fail",

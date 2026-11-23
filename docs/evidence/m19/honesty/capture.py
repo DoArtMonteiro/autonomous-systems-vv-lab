@@ -113,6 +113,21 @@ def main():
             facts["safety_chip"] = s.js(CHIPS_JS)
             s.shot(f"{a.tag}-1-safety-chip-1440x900")
 
+            # 1b. Safety rule rows elsewhere: the run workspace, the comparison and the Experiment Lab (review round).
+            def view_facts(view, action, js, shot):
+                open_mission(s, "lying-altimeter")
+                pick_run(s, 0)
+                s.page.click(f".pl-head [data-action='{action}']")
+                s.wait(f"window.__studio.view() === '{view}'", 60, view)
+                time.sleep(2.0)
+                got = s.js(js)
+                s.shot(f"{a.tag}-{shot}-1440x900")
+                return got
+
+            facts["held_rows_run"] = view_facts("run", "analyse", """() => [...document.querySelectorAll('.req-section')].map((sec) => ({ title: sec.getAttribute('aria-label'), rows: [...sec.querySelectorAll('.req')].map((r) => r.className) }))""", "1b-analyse-safety-rows")
+            facts["held_rows_compare"] = view_facts("compare", "compare", """() => ({ cells: [...document.querySelectorAll('.matrix tbody tr')].map((tr) => ({ row: tr.dataset.row || tr.querySelector('th').innerText.trim().slice(0, 40), cells: [...tr.querySelectorAll('.cell')].map((c) => c.className) })).slice(0, 14) })""", "1c-compare-safety-rows")
+            facts["held_rows_lab"] = view_facts("lab", "configure", """() => ({ pills: [...document.querySelectorAll('.lab-verdicts .mini')].map((m) => m.className) })""", "1d-lab-verdict-pills")
+
             # 2. The plume at the end of a run that ended before the other one.
             open_mission(s, "late-gnss")
             pick_run(s, 0)
@@ -195,6 +210,9 @@ def evaluate(facts):
         ("1024x640: an unselected pill gives an exact count of conditions", lambda: bool(unselected()) and all("condition" in p["text"] for p in unselected())),
         ("1024x640: the tooltip of every pill has the whole identity", lambda: all(p["title"] for p in facts["pills_corridor_1024x640"])),
         ("the Library cell 'None broken' is neutral, never the green class", lambda: any(c["cls"] == "cell v-held" for c in facts["library_safety_cells"] if c["text"] == "None broken") and not any("v-pass" in c["cls"] for c in facts["library_safety_cells"] if c["text"] == "None broken")),
+        ("the Safety rules section of the run workspace has held rows and no green row", lambda: any(sec["title"] == "Safety rules" and any("v-held" in r for r in sec["rows"]) and not any("v-pass" in r for r in sec["rows"]) for sec in facts["held_rows_run"])),
+        ("the Compare matrix has held (neutral) safety cells", lambda: any("v-held" in c for row in facts["held_rows_compare"]["cells"] for c in row["cells"])),
+        ("the Lab verdict pills for safety are held", lambda: any("v-held" in m for m in facts["held_rows_lab"]["pills"])),
         ("no script error", lambda: not facts["errors"]),
     ]
     ok = True

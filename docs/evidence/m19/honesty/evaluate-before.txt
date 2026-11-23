@@ -9,4 +9,7 @@ FAIL 1024x640: no pill has clipped text
 FAIL 1024x640: an unselected pill gives an exact count of conditions
 FAIL 1024x640: the tooltip of every pill has the whole identity
 FAIL the Library cell 'None broken' is neutral, never the green class
+FAIL the Safety rules section of the run workspace has held rows and no green row
+FAIL the Compare matrix has held (neutral) safety cells
+FAIL the Lab verdict pills for safety are held
 PASS no script error
