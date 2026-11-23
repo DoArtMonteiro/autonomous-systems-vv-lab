@@ -2,7 +2,7 @@
 
 Data: 2026-11-18. Base: `main` em `bec7b3f`, Studio 0.18.1 instalado, módulo Cinematic 0.2.8.
 
-Estado deste documento: **proposta à espera de decisões do responsável.** Nada aqui altera o produto, os registos, as sementes protegidas ou o estado científico de qualquer resultado.
+Estado deste documento: **estratégia com as decisões do responsável de 2026-11-23** (secção «Decisões do responsável»). Nada aqui altera o produto, os registos, as sementes protegidas ou o estado científico de qualquer resultado.
 
 ## Decisão central
 
@@ -29,7 +29,7 @@ Estas categorias não são intercambiáveis.
 
 | Ordem | Trabalho | Impacto | Risco | Dependência |
 | --- | --- | --- | --- | --- |
-| 1 | Evidência humana: piloto com 3 pessoas e pacote de revisão externa do G3 | Muito alto | Baixo | Responsável e participantes |
+| 1 | Evidência humana: piloto com 3 pessoas e pacote de revisão externa do G3 (indisponível em 2026-11-23; conjunto e pacote ficam prontos) | Muito alto | Baixo | Responsável e participantes |
 | 2 | Resultados honestos: fechar as pendências da 0.18.1 por classe | Alto | Baixo | Piloto, de preferência |
 | 3 | Percurso da investigação, de ponta a ponta | Muito alto | Médio | Resultados do piloto |
 | 4 | Vista instrumental de crença contra verdade | Alto | Médio | Percurso da investigação |
@@ -46,8 +46,8 @@ Cada marco tem ramo e PR próprios. O trabalho de produto e o de investigação 
 | --- | --- | --- |
 | M19.0 Evidência | Esta estratégia, pacote de revisão G3, conjunto do estudo de utilização | Revisão independente; decisões do responsável |
 | M19.1 Resultados honestos | Chip de segurança neutro ao lado de requisitos falhados, cláusula falhada de `mission_completion`, frase de impacto na subida, pluma depois do contacto, velocidade no contacto contra último ponto | Verificação do impacto nos hashes antes de cada alteração; percursos no executável isolado |
-| M19.2 Percurso da investigação | Uma jornada contínua, uma só identidade de corrida no cabeçalho | Jornada automática de ponta a ponta; 5 pessoas na fase 2 |
-| M19.3 Vista instrumental | Verdade, estimativa e corridas fantasma sobre os dados já gravados | Teste cego de compreensão; regra de paragem abaixo |
+| M19.3 Percurso da investigação (antes M19.2) | Uma jornada contínua, uma só identidade de corrida no cabeçalho | Jornada automática de ponta a ponta; 5 pessoas na fase 2 |
+| M19.2 Vista instrumental (antes M19.3) | Verdade, estimativa e corridas fantasma sobre os dados já gravados | Teste cego de compreensão; regra de paragem abaixo |
 | M20 Montra | Estudo de caso local, sem publicação | Aprovação explícita antes de qualquer publicação |
 | R10 Investigação M10 | Passos 1 a 3 do plano abaixo | Decisão do responsável; regra de paragem escrita antes |
 
@@ -129,10 +129,18 @@ Foram feitas duas consultas independentes em 2026-11-18, uma sobre o programa e 
 
 Pressupostos que o Fable considerou mais frágeis: que o acabamento seja o estrangulamento, que os três perfis de utilizador existam de facto e que produto e investigação se separem sem verificação.
 
-## Decisões pedidas ao responsável
+## Decisões do responsável (2026-11-23)
 
-1. **Público principal:** visitante da montra, engenheiro que instala o Studio, ou revisor técnico.
-2. **Piloto:** autorizar 3 pessoas a usar a 0.18.1 numa máquina separada, instalada com o instalador verificado por hash. Os participantes nunca recebem controlo do PC principal.
-3. **Vista Cinematic:** congelar o módulo e testar a linguagem instrumental.
-4. **M10:** aprovar a porta de decisão acima e o plano de três passos.
-5. **Protocolo G3:** indicar quem pode fazer a revisão humana externa.
+As cinco decisões pedidas em 2026-11-18 foram tomadas assim:
+
+1. **Público principal:** engenheiros técnicos e revisores técnicos independentes.
+2. **Piloto com pessoas:** indisponível por agora. O conjunto em `docs/usability/` fica pronto para um estudo futuro. Fazem-se agora percursos de especialista e verificações automáticas, sempre identificados como preparação e revisão de especialista, nunca como validação empírica. O portão humano continua aberto.
+3. **Vista Cinematic:** o módulo Godot fica congelado, salvo correções necessárias à honestidade científica.
+4. **M10:** fica isolado como investigação, sem integração em `main` e sem construir a arquitetura C. Permite-se uma única tentativa de reformulação, só com sementes de desenvolvimento e critérios de sucesso e de paragem fixados antes. Se não melhorar materialmente os critérios sem regressões inaceitáveis, o resultado é «não avançar».
+5. **Protocolo G3:** preparar um candidato corrigido, sem executar sementes protegidas. O revisor humano externo está indisponível por agora, por isso o candidato fica marcado como não revisto por pessoas e não aprovado para execução.
+
+Decisões adicionais: a vista de crença contra verdade é investigada como protótipo em Three.js, com no máximo duas iterações substantivas e uma recomendação final (adotar, rever mais tarde ou rejeitar); a versão 0.18.1 instalada não muda neste marco.
+
+A falta de revisores humanos não baixa os critérios de aceitação. O critério de refutação da vista instrumental (2 de 3 revisores novos e participantes do piloto) continua por cumprir: as revisões por agentes podem avaliar correção e riscos, mas não substituem esse teste.
+
+**Numeração em vigor.** A diretiva de 2026-11-23 chama M19.2 à vista de crença contra verdade. O percurso contínuo da investigação, que nas tabelas acima aparece como M19.2, passa a M19.3 e fica para depois.

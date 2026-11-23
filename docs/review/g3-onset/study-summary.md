@@ -8,7 +8,7 @@ Os números de linha entre parênteses, como (l. 115), referem-se ao protocolo n
 
 O projeto é um laboratório de verificação e validação. Um dos seus simuladores, `vv-rocket`, calcula a aterragem propulsiva de um único estágio de foguetão, em seis graus de liberdade, com passo fixo, aritmética reprodutível e geração pseudoaleatória (SplitMix64) com semente explícita. Em cada execução, o simulador devolve um veredicto sobre requisitos de aterragem e invariantes de segurança. Não há dados de voo nem outro veículo.
 
-Caso base do estudo (`exec/cases/m13/g3-registered.json`): estágio de 22 000 kg de massa seca e 8 000 kg de propelente, altitude inicial de 3 000 m, velocidade vertical inicial de -200 m/s, contacto nominal por volta de 23,3 a 23,6 s (`docs/m9-powered-landing.md`, l. 241: 23,63 s para `baseline` e 23,27 s para `robust`, no caso nominal do M9, semente 0; não é medida de `guarded` no caso do G3), passo de 0,01 s, ciclo de controlo de 0,02 s, GNSS a cada 0,1 s, altímetro com ruído de 0,1 m e GNSS com ruído de 0,5 m (posição). O ruído dos sensores é limitado (soma de quatro uniformes, truncada a ±2√3 σ), não gaussiano (`crates/vv-rocket/src/prng.rs`).
+Caso base do estudo (`exec/cases/m13/g3-registered.json`): estágio de 22 000 kg de massa seca e 8 000 kg de propelente, altitude inicial de 3 000 m, velocidade vertical inicial de -200 m/s, contacto nominal por volta de 23,3 a 23,6 s (`docs/m9-powered-landing.md`, l. 241: 23,63 s para `baseline` e 23,27 s para `robust`, no caso nominal do M9, semente 0; não é medida de `guarded` no caso do G3), passo de 0,01 s, ciclo de controlo de 0,02 s, GNSS a cada 0,1 s, altímetro com ruído de 0,1 m e GNSS com ruído de 0,5 m (posição). O ruído dos sensores é limitado (soma de quatro uniformes, com suporte finito de ±2√3 σ), não gaussiano (`crates/vv-rocket/src/prng.rs`).
 
 Requisitos usados neste estudo (valores do caso):
 
@@ -45,13 +45,13 @@ Fontes no código: `crates/vv-rocket/src/landing_controller.rs`, `landing_sensor
 6. Com viés que começa depois, o estimador já convergiu com o altímetro. O GNSS enviesado puxa a altitude estimada, o altímetro puxa-a de volta. No modelo, o resíduo atinge o máximo 0,3 s depois do início (0,25 vezes a magnitude) e assenta em cerca de 0,22 vezes a magnitude. Se esse máximo ficar abaixo de 3 m, isto é, para magnitudes abaixo de b* ≈ 11,99 m, o altímetro nunca é rejeitado, a regra 1 nunca atua, e o erro de velocidade vertical que o resíduo persistente cria (no modelo, entre cerca de -4,2 e -5,1 m/s a 8 m) não é travado. Acima de b*, o transitório ultrapassa o limiar e o altímetro é rejeitado pouco depois do início (0,58 s a 12 m; 0,18 s a 15 m; 0,08 s a 30 m).
 7. b* ≈ 4 vezes o limiar de rejeição (3,996 m com 1 m; 7,992 m com 2 m; 11,989 m com 3 m) e não depende do número de ciclos de rejeição nem do instante de início, porque o modelo ignora o veículo.
 
-O horizontal não é corrigido pela regra 1: o guiamento lateral segue o GNSS enviesado, com ou sem rejeição (l. 21). Por isso um viés maior troca uma aterragem dura (R1) por uma aterragem fora da plataforma (R5).
+A regra 1 não corrige a posição horizontal: o guiamento lateral segue o GNSS enviesado, com ou sem rejeição (l. 21). Mas altera `h_base`, que entra no tempo até ao contacto (`landing_controller.rs:254`) e, por essa via, no guiamento lateral depois da rejeição; o efeito sobre o horizontal não foi medido neste pacote. Por isso um viés maior troca uma aterragem dura (R1) por uma aterragem fora da plataforma (R5).
 
 ### Papel causal da rejeição
 
 A rejeição é posterior ao tratamento (início e magnitude) e não é confundidor. É mediador e condição de ativação da regra 1 (l. 27 a 33). O protocolo toma como mediador a **primeira rejeição dentro de uma janela de decisão** [início; início + 1,0 s], lida de `altimeter_rejected_first` no `verification.json`, para evitar causalidade inversa (uma trajetória que já falha pode rejeitar tarde). Duas intervenções isolam o mecanismo:
 
-- **G0**: `guarded` com a regra 2 desligada (`ascent_abort_vz_mps` = 100) contra `robust` (sem regra 1 nem regra 2). Até à primeira rejeição os comandos são idênticos; só a regra 1 difere depois.
+- **G0**: `guarded` com a regra 2 desligada (`ascent_abort_vz_mps` = 100) contra `robust` (sem regra 1 nem regra 2). Até à primeira rejeição os comandos são idênticos; depois difere a regra 1, que muda a altitude de guiamento e, por ela, o tempo até ao contacto usado no guiamento (`landing_controller.rs:254`; ver Q6).
 - **N**: limiar de rejeição de 1000 m, que torna a rejeição impossível.
 
 ## Hipóteses e classificação
@@ -178,7 +178,7 @@ Um ficheiro `docs/m15-g3-onset-freeze.json`, por criar, com o sha256 dos bytes g
 - **Construção.** Requisitos e dispersões assumidos; um só veículo idealizado. Nada diz algo sobre um veículo real.
 - **Interna.** A fronteira depende do ruído dos sensores (limitado, não gaussiano). A janela de 1 s é uma escolha; a sensibilidade a 0,5 s e 2 s é descritiva.
 - **Exploração prévia.** Níveis de magnitude e inícios escolhidos depois de ver dados de desenvolvimento.
-- **Externa.** S3 depende do raio de R5 (10 m; o nível 13,5 m é o mais próximo). O viés é igual em x e z; um viés só vertical não é testado. Com contacto nominal por volta de 23,3 a 23,6 s (valores do M9 para `baseline` e `robust`, não para `guarded` neste caso), o início a 20 s deixa cerca de 3 s até ao contacto; o tempo restante nas sementes dispersas não foi medido neste pacote.
+- **Externa.** S3 depende do raio de R5 (10 m; o nível 13,5 m é o mais próximo). O viés é igual em x e z; um viés só vertical não é testado. Com contacto nominal por volta de 23,3 a 23,6 s (valores do M9 para `baseline` e `robust`, não para `guarded` neste caso), o início a 20 s deixa cerca de 3 s até ao contacto; o tempo restante nas sementes dispersas não foi medido neste pacote. Há evidência parcial de desenvolvimento para o viés desde 0 s: no M9, `guarded` recuperou 6 de 30 execuções de `gnss_bias` de 5,7 a 12,6 m, com R5 entre 4,18 e 9,92 m (`docs/m9-powered-landing.md`, l. 627). São dados de desenvolvimento, não confirmação de S3.
 - **Estatística.** Bonferroni é conservador. H3 com tolerância de 1 m é fraca. As proporções são sobre uma grelha escolhida, não uma população.
 - **Revisão.** Só agentes.
 

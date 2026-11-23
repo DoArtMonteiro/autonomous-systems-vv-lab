@@ -1,6 +1,6 @@
 # Guião do moderador
 
-Lê-se à letra. O texto em **negrito** entre aspas é dito ao participante. As notas em itálico são só para o moderador. Os tempos são do plano de 60 minutos (`README.md`). A sessão decorre numa máquina Windows do estudo, numa conta local dedicada; o participante nunca usa o PC principal do responsável nem a sessão remota.
+Lê-se à letra. O texto em **negrito** entre aspas é dito ao participante. As notas em itálico são só para o moderador. Os tempos são do plano de 60 minutos (`README.md`). A sessão decorre presencialmente numa máquina Windows do estudo, numa conta local dedicada; o participante nunca usa o PC principal do responsável nem a sessão remota.
 
 ## Princípios
 
@@ -23,7 +23,9 @@ Lê-se à letra. O texto em **negrito** entre aspas é dito ao participante. As 
 | 52 a 56 | Conversa final | 4 |
 | 56 a 60 | Esclarecimentos e agradecimento | 4 |
 
-Paragem rígida: minuto 70. Regra de corte em `tasks.md`: ao começar cada tarefa, o anotador calcula o fim projetado; se passar do minuto 53, saltam-se primeiro os segmentos opcionais (segunda parte de T4, Q6b de T6); depois cortam-se T5, T3, T7, T4 (por esta ordem, a primeira ainda por fazer); nunca T1, T2, T6, T8.
+A sessão é anunciada como "60 a 70 minutos". Regra de corte em `tasks.md`: ao começar cada tarefa, o anotador calcula o fim projetado; se passar do minuto 53, saltam-se primeiro os segmentos opcionais (segunda parte de T4, Q6b de T6); depois cortam-se T5, T3, T7, T4 (por esta ordem, a primeira ainda por fazer); nunca T1, T2, T6, T8. Com o corte no minuto 53, a sessão acaba no máximo ao minuto 64.
+
+**Paragem rígida: minuto 70.** Se o tempo acabar, perde-se por esta ordem: (1) o SUS, se não puder começar até ao minuto 59 (registar "SUS não feito"); (2) as perguntas 1, 2, 4 e 5 da conversa final. Nunca se perdem a pergunta 3 da conversa final nem o esclarecimento de segurança e de evidência da secção 13.
 
 ## 0. Antes de a pessoa chegar
 
@@ -32,11 +34,11 @@ Paragem rígida: minuto 70. Regra de corte em `tasks.md`: ao começar cada taref
 3. Ter à mão: consentimento, cartões de tarefa, chave de respostas, SUS, relógios. Confirmar que o pacote de investigação preparado existe na biblioteca.
 4. Abrir o produto em Mission Control. Não tocar em mais nada.
 
-## 1. Receção e consentimento (0 a 3 minutos)
+## 1. Receção e consentimento (0 a 5 minutos)
 
 **"Bom dia, obrigado por participar. Eu sou [nome]. A [nome] está comigo e vai tomar notas. Hoje vai usar um programa de simulação de veículos autónomos. Quero que saiba já uma coisa importante: o que estamos a testar é o programa, não é a si. Não há respostas certas nem erradas. Se algo for difícil ou confuso, isso diz-nos como melhorar o programa."**
 
-**"A sessão dura cerca de uma hora. Vai usar esta máquina, que é só para este estudo e não tem ficheiros pessoais de ninguém. Eu vejo o seu ecrã. Não vamos gravar o ecrã nem o som, a menos que tenha dito que sim no formulário. Escrevemos notas, sem o seu nome: usamos um código. Se eu for a pessoa que criou este programa, digo-lho já: [o moderador diz aqui se é o autor]. Pode criticar à vontade."**
+**"A sessão dura entre 60 e 70 minutos. Vai usar esta máquina, que é só para este estudo e não tem ficheiros pessoais de ninguém. Eu vejo o seu ecrã. Não vamos gravar o ecrã nem o som, a menos que tenha dito que sim no formulário. Escrevemos notas, sem o seu nome: usamos um código. Se eu for a pessoa que criou este programa, digo-lho já: [o moderador diz aqui se é o autor]. Pode criticar à vontade."**
 
 **"A sua participação é voluntária. Pode parar a qualquer momento, saltar qualquer tarefa ou pedir que apaguemos os seus dados, sem dar explicações. Tem alguma dúvida sobre o formulário que recebeu?"**
 
@@ -48,7 +50,7 @@ Paragem rígida: minuto 70. Regra de corte em `tasks.md`: ao começar cada taref
 
 **"Uma nota prática. O programa tem uma parte opcional que abre uma janela 3D à parte. Hoje não a vamos usar nem está instalada nesta máquina. Se vir um botão para ela, ignore-o: não faz mal, eu aviso e continuamos."**
 
-## 2. Pensar em voz alta e aquecimento (3 a 5 minutos)
+## 2. Pensar em voz alta e aquecimento (5 a 8 minutos)
 
 **"Durante a sessão peço-lhe que diga em voz alta o que está a pensar: o que procura, o que espera que aconteça, o que lhe parece estranho, mesmo que lhe pareça óbvio ou sem importância. Vou fazer pouco comentário, para não o influenciar. Se ficar calado/a, lembro-o de continuar a falar. Vamos treinar com um exemplo que nada tem a ver com o programa."**
 
@@ -58,7 +60,7 @@ Paragem rígida: minuto 70. Regra de corte em `tasks.md`: ao começar cada taref
 
 **"Obrigado. Agora vamos ao programa."**
 
-## 3. Primeira impressão (5 a 7 minutos)
+## 3. Primeira impressão (8 a 10 minutos)
 
 *O produto está em Mission Control. A pessoa ainda não toca em nada.*
 
@@ -169,6 +171,8 @@ Regras:
 - **Participante muito frustrado:** **"Está a correr bem. O que estamos a testar é o programa."** Oferecer pausa.
 
 ## 11. Questionário SUS (49 a 52 minutos)
+
+*Se o SUS não puder começar até ao minuto 59, não se faz: registar "SUS não feito" e a hora, e passar à conversa final (pergunta 3 primeiro).*
 
 **"Vou dar-lhe um questionário curto sobre o programa, com dez afirmações. Para cada uma, indique de 1, discordo totalmente, a 5, concordo totalmente. Pense no programa que acabou de usar. Responda pela primeira impressão."**
 

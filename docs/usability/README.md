@@ -6,9 +6,11 @@
 
 Este kit não altera o estado do requisito M15-R22 de `docs/m15-m18-acceptance.md` (BLOCKED-EXTERNAL). Só sessões realizadas, com dados recolhidos e analisados segundo estes ficheiros, o podem fazer. O kit em si não é evidência de usabilidade.
 
-### O recrutamento está bloqueado até o responsável preencher os campos obrigatórios
+**As sessões com pessoas estão adiadas.** Neste momento não há participantes humanos disponíveis. O recrutamento só começa quando o responsável o autorizar por escrito e existirem participantes. Todo o trabalho atual é preparação do kit e revisão por especialistas; não é validação empírica de usabilidade.
 
-Não se contacta nenhuma pessoa, e não se envia o convite nem o consentimento, enquanto estes campos de `screener-and-consent.md` estiverem em branco: **responsável pelo tratamento e contacto**, **destinatários e ferramentas** (voz, partilha de ecrã, armazenamento), **base de transferência** se o moderador estiver fora da União Europeia, **declaração de quem modera** (incluindo se é o autor do produto), **datas de retenção** e **versão do SUS**. Os campos estão marcados com `[PREENCHER ANTES DO RECRUTAMENTO]`. Uma pessoa só pode ser recrutada com a lista verificada (`observation-form.md`, parte H).
+### O recrutamento está bloqueado até haver autorização e os campos obrigatórios estarem preenchidos
+
+Não se contacta nenhuma pessoa, e não se envia o convite, o aviso de privacidade nem o consentimento, enquanto não houver autorização escrita do responsável e estes campos de `screener-and-consent.md` estiverem em branco: **responsável pelo tratamento e contacto**, **destinatários e ferramentas** (voz, partilha de ecrã, armazenamento), **base de transferência** se o moderador estiver fora da União Europeia, **declaração de quem modera** (incluindo se é o autor do produto), **datas de retenção**, **prazo de eliminação dos dados de seleção de quem não participa** e **versão do SUS**. Os campos estão marcados com `[PREENCHER ANTES DO RECRUTAMENTO]`. Uma pessoa só pode ser recrutada com a lista verificada (`observation-form.md`, parte H).
 
 ## Objetivo
 
@@ -18,7 +20,7 @@ O estudo procura descobrir problemas (sobretudo de interpretação de segurança
 
 ## Perguntas de investigação
 
-- **PI1.** Uma pessoa sem formação em autonomia ou verificação, e um engenheiro, conseguem escolher e executar uma missão e chegar ao resultado sem ajuda?
+- **PI1.** Um engenheiro ou revisor técnico independente (incluindo auditores de V&V) consegue escolher e executar uma missão e chegar ao resultado sem ajuda?
 - **PI2.** Interpretam o resultado da missão e as regras de segurança como dois veredictos separados, ou concluem que o veículo é "seguro" por causa do chip «No safety rule broken»?
 - **PI3.** Conseguem dizer qual é a diferença mais importante entre duas execuções e atribuí-la à execução certa?
 - **PI4.** Encontram o afastamento entre o que o controlador julga e a verdade, e distinguem-no de «Where the runs part» (afastamento entre execuções)?
@@ -43,33 +45,27 @@ Fora do âmbito, por decisão do desenho:
 
 | | Fase 1 (piloto) | Fase 2 |
 | --- | --- | --- |
-| Pessoas | 3 | 5 pessoas diferentes das da Fase 1 |
+| Pessoas | 3 (perfil E) | 5 (perfil E), diferentes das da Fase 1 |
 | Produto | 0.18.1 instalado, sem alteração | versão alterada após a análise da Fase 1 (já não é a 0.18.1 inalterada); versão e alterações registadas em `analysis-template.md` |
 | Tarefas | T1 a T8, `tasks.md` | as mesmas T1 a T8, com os mesmos critérios de sucesso |
-| Formato | 60 minutos, moderado, pensar em voz alta | igual |
+| Formato | 60 minutos previstos, 70 no máximo, moderado, pensar em voz alta | igual |
 | Objetivo | descobrir problemas e testar as previsões | verificar se os problemas foram removidos; descobrir problemas novos |
 
 A Fase 2 só começa depois de a análise da Fase 1 estar escrita e de o responsável ter decidido, por escrito, o que se altera e o que fica (`analysis-template.md`, registo de decisões).
 
-## Perfis e mistura-alvo
+## Perfil dos participantes
 
-Só se recrutam pessoas com 18 anos ou mais. Dois perfis, definidos pelo questionário de seleção (`screener-and-consent.md`):
+Só se recrutam pessoas com 18 anos ou mais. O público principal são engenheiros técnicos e revisores técnicos independentes. As fases 1 e 2 têm **um só perfil**, definido pelo questionário de seleção (`screener-and-consent.md`):
 
-- **N (novato):** sem formação nem experiência profissional em autonomia, verificação, segurança de sistemas críticos, controlo ou simulação física.
-- **E (engenheiro):** pelo menos 2 anos de experiência profissional ou académica em robótica ou autonomia, aeroespacial, software crítico, verificação e testes, ou engenharia de controlo.
+- **E (engenheiro ou revisor técnico):** pelo menos 2 anos de experiência profissional ou académica em robótica ou autonomia, aeroespacial, software crítico, verificação e testes, engenharia de controlo, ou auditoria e revisão técnica independente (incluindo auditores de V&V).
 
-Mistura-alvo (declarada antes do recrutamento):
+Todas as pessoas da Fase 1 (3) e da Fase 2 (5) são E. Se faltarem candidatos E, o responsável decide por escrito se adia; não se substitui o perfil em silêncio.
 
-| Fase | Mínimo obrigatório | Alvo |
-| --- | --- | --- |
-| Fase 1 (3) | 1 N e 1 E | 2 N e 1 E |
-| Fase 2 (5) | 2 N e 2 E | 3 N e 2 E |
-
-Se a mistura-alvo falhar, regista-se a mistura real e não se substitui um perfil em silêncio. Os perfis são analisados separadamente; com estes números não se comparam estatisticamente.
+Um perfil N (novato, sem experiência nas áreas acima) seria um **estudo secundário opcional e futuro, fora deste kit**: não tem quotas, formulários nem limiares aqui. Se o responsável o decidir, escreve primeiro o seu desenho; entretanto, ninguém com perfil N entra nas fases 1 e 2 nem nos números n = 3 e n = 5.
 
 ## Papéis
 
-- **Participante.** Usa a máquina Windows do estudo, na conta local dedicada. Nunca recebe controlo do PC principal do responsável nem usa a sessão de ambiente de trabalho remoto.
+- **Participante.** Usa a máquina Windows do estudo, na conta local dedicada, em presença. Nunca recebe controlo do PC principal do responsável nem usa a sessão de ambiente de trabalho remoto.
 - **Moderador.** Única voz dirigida ao participante. Segue `moderator-script.md` à letra. Não ajuda além da escada de ajuda. Se for o autor do produto, declara-o ao participante (consentimento) e no relatório.
 - **Anotador.** Silencioso durante as tarefas. Preenche `observation-form.md`, marca tempos e classifica erros. Classifica a gravidade de forma independente do moderador (`severity-and-measures.md`).
 - **Responsável pelo estudo.** Decide, guarda os dados e a tabela de ligação, aprova as alterações entre fases. O responsável é também o autor do produto: se for ele o moderador, declara-o no relatório (viés de autoria) e o anotador deve ser outra pessoa.
@@ -81,7 +77,7 @@ Mínimo de duas pessoas por sessão (moderador e anotador). Se só houver uma, a
 
 ### Disposição técnica
 
-1. **Máquina separada.** Os participantes usam uma máquina Windows dedicada ao estudo, numa **conta local dedicada, sem ficheiros pessoais**, sem sessão iniciada em contas pessoais e sem ligação ao PC principal do responsável. O PC principal e a sessão de ambiente de trabalho remoto nunca são usados por participantes.
+1. **Máquina separada.** Os participantes usam uma máquina Windows dedicada ao estudo, numa **conta local dedicada, sem ficheiros pessoais**, sem sessão iniciada em contas pessoais e sem ligação ao PC principal do responsável. O participante acede à máquina do estudo **em presença**. O PC principal e a sessão de ambiente de trabalho remoto nunca são usados por participantes. Este conjunto não prevê acesso à distância; usá-lo exigiria uma nova versão do conjunto, aprovada pelo responsável.
 2. **Produto.** O Studio 0.18.1 está instalado nessa máquina a partir do instalador cujo SHA-256 foi verificado: `0e37bbcf7228b7170ab392966b0cdc79b2e7446280e801cc9912c16bb0ebd0e1` (hash do instalador 0.18.1 registado em `docs/m15-m18-acceptance.md`). O hash do ficheiro usado regista-se na lista de estado inicial. O módulo Cinematic **não** está instalado.
 3. Canal de voz entre participante e moderador, se o moderador não estiver na sala. Ferramenta a decidir pelo responsável.
 4. O moderador e o anotador veem o ecrã do participante em tempo real (na sala ou por partilha de ecrã). Sem esta vista, a sessão não se realiza. Qualquer ferramenta de partilha entra na lista de destinatários e ferramentas do consentimento.
@@ -132,13 +128,16 @@ O responsável está no estrangeiro. As sessões marcam-se em horas razoáveis p
 | 52 a 56 | Conversa final |
 | 56 a 60 | Esclarecimentos e agradecimento |
 
-Paragem rígida aos 70 minutos. A regra de corte de tarefas (fim projetado acima do minuto 53; primeiro os segmentos opcionais, depois T5, T3, T7, T4; nunca T1, T2, T6, T8) está em `tasks.md`. O ensaio confirma ou corrige estes tempos antes da Fase 1; se não couberem em 60 minutos, o responsável decide entre prolongar a sessão e retirar uma tarefa nomeada para todos, nas duas fases.
+A sessão é anunciada como "60 a 70 minutos": 60 previstos, 70 no máximo. A regra de corte de tarefas (fim projetado acima do minuto 53; primeiro os segmentos opcionais, depois T5, T3, T7, T4; nunca T1, T2, T6, T8) está em `tasks.md`. O minuto 53 deixa 11 minutos para SUS, conversa final e esclarecimentos, ou seja, a sessão acaba no máximo ao minuto 64, com 6 de margem até ao limite.
+
+**Paragem rígida aos 70 minutos.** O que se perde, por esta ordem, se o tempo acabar: (1) o SUS, se não puder começar até ao minuto 59 (fica "não feito", registado; ver `severity-and-measures.md`, M5); (2) as perguntas 1, 2, 4 e 5 da conversa final. Nunca se perdem a pergunta 3 da conversa final (calibração) nem o esclarecimento de segurança e de evidência do fecho (`moderator-script.md`, secção 13). O ensaio confirma ou corrige estes tempos antes da Fase 1; se não couberem, o responsável decide entre prolongar a sessão e retirar uma tarefa nomeada para todos, nas duas fases.
 
 ## Lista de materiais
 
 Antes de cada sessão, marcar:
 
 - [ ] Guião do moderador impresso ou aberto (`moderator-script.md`)
+- [ ] Aviso de privacidade breve enviado antes do questionário de seleção (`screener-and-consent.md`)
 - [ ] Consentimento enviado com antecedência e confirmado (`screener-and-consent.md`)
 - [ ] Lista de pseudónimos e tabela de ligação (ficheiro separado, acesso restrito)
 - [ ] Cartões de tarefa (texto do participante de `tasks.md`), em papel, ou noutra janela ou dispositivo fora do Studio
@@ -158,7 +157,8 @@ Antes de cada sessão, marcar:
 
 - **Consentimento informado.** O participante recebe a folha de informação e o consentimento antes da sessão, pode fazer perguntas e confirma oralmente no início. Texto em `screener-and-consent.md`.
 - **Voluntariedade e retirada.** A participação é voluntária. O participante pode parar, saltar uma tarefa ou retirar-se em qualquer momento, sem dar razão e sem consequências. Pode pedir a eliminação dos seus dados enquanto a tabela de ligação existir; depois disso os dados são anónimos e já não é possível identificá-los.
-- **Dados mínimos.** Recolhem-se: pseudónimo (P1-01 a P1-03 na Fase 1, P2-01 a P2-05 na Fase 2), perfil (N ou E), faixa de anos de experiência, autoavaliação de leitura de inglês (S2), **profissão ou área atual em texto livre curto (S4)**, **necessidades de adaptação, se a pessoa as indicar (S8; opcional, sem dados de saúde pedidos)**, relação com o projeto e com o responsável (S5 e S6, só o resultado), declaração de maioridade, notas do que fez e disse, tempos, respostas, SUS. O texto livre de S4 e S8 é dado pessoal: guarda-se apenas na ficha de seleção, ligada ao pseudónimo, e não nas notas de observação. Não se recolhe imagem, nem se anota o nome nas notas.
+- **Aviso antes do questionário.** Antes de qualquer pergunta de seleção, o candidato recebe um aviso de privacidade breve (`screener-and-consent.md`). Os dados de seleção de quem não é selecionado, ou não quer participar, são apagados no prazo fixado pelo responsável (campo `[PREENCHER ANTES DO RECRUTAMENTO]`).
+- **Dados mínimos.** Recolhem-se: pseudónimo (P1-01 a P1-03 na Fase 1, P2-01 a P2-05 na Fase 2), perfil (E), faixa de anos de experiência, autoavaliação de leitura de inglês (S2), **profissão ou área atual em texto livre curto (S4)**, **necessidades de adaptação, se a pessoa as indicar (S8; opcional, sem dados de saúde pedidos)**, relação com o projeto e com o responsável (S5 e S6, só o resultado), declaração de maioridade, notas do que fez e disse, tempos, respostas, SUS. O texto livre de S4 e S8 é dado pessoal: guarda-se apenas na ficha de seleção, ligada ao pseudónimo, e não nas notas de observação. Não se recolhe imagem, nem se anota o nome nas notas.
 - **Pseudonimização.** O nome e o contacto ficam apenas na tabela de ligação e no consentimento assinado, guardados à parte dos dados do estudo.
 - **Gravação.** Sem gravação de ecrã. Áudio só com consentimento explícito e separado; o áudio é **dado pessoal** (voz identificável), guardado em local restrito e apagado no prazo indicado no consentimento. Confirmar que nenhuma ferramenta de voz ou de partilha de ecrã grava por omissão.
 - **Responsável pelo tratamento, destinatários e transferências.** O responsável pelo tratamento e o seu contacto, os destinatários e as ferramentas usadas (voz, partilha de ecrã, armazenamento) são **campos a preencher pelo responsável antes do recrutamento** (`screener-and-consent.md`). Se o moderador ou o anotador estiverem fora da União Europeia, o consentimento indica a base de transferência.
@@ -177,6 +177,7 @@ Não se assume revisão por comissão de ética. Se o responsável estiver sujei
 - O tempo nas tarefas mistura pensar em voz alta, leitura em inglês e pausas; não é desempenho do produto.
 - A máquina do estudo tem um ecrã e um hardware próprios: o resultado não vale para outros tamanhos de janela (a 1024x640 e abaixo de 1100 px a interface muda).
 - A interface está em inglês. Quem participa lê inglês técnico; o resultado não vale para quem não o lê.
+- Os participantes são engenheiros e revisores técnicos (perfil E): o resultado não vale para novatos nem para outros públicos.
 - Voluntários recrutados na rede do responsável tendem a ser benevolentes.
 - Fase 1 e Fase 2 usam pessoas diferentes: a comparação é por contagens, nunca por testes estatísticos.
 
@@ -195,12 +196,12 @@ Não se assume revisão por comissão de ética. Se o responsável estiver sujei
 
 ## Decisões em aberto para o responsável
 
-1. **Campos obrigatórios do consentimento** (bloqueiam o recrutamento): responsável pelo tratamento e contacto; destinatários e ferramentas; base de transferência; declaração de quem modera.
-2. Quem modera e onde está (o responsável está no estrangeiro), quem anota, onde está a máquina do estudo e como os participantes lhe acedem (o questionário de seleção, S1, depende disto).
+1. **Autorização do recrutamento e campos obrigatórios** (bloqueiam o recrutamento): autorização escrita do responsável e existência de participantes; responsável pelo tratamento e contacto; destinatários e ferramentas; base de transferência; declaração de quem modera; prazo de eliminação dos dados de seleção de quem não participa.
+2. Quem modera e onde está (o responsável está no estrangeiro), quem anota, e onde está a máquina do estudo (o acesso dos participantes é sempre em presença; o questionário de seleção, S1, depende disto).
 3. Ferramenta do canal de voz e forma de o moderador ver o ecrã em tempo real, sem gravação.
 4. Reposição do estado: restaurar uma cópia da biblioteca, ou usar a lista de estado inicial.
 5. Incentivo aos participantes, se houver.
-6. Retenção: confirmar os 90 dias e o apagamento das gravações em 14 dias.
+6. Retenção: confirmar os 90 dias e o apagamento das gravações em 14 dias; fixar o prazo de eliminação dos dados de seleção de quem não participa.
 7. SUS: usar a versão validada em português europeu ou o original inglês (ver `severity-and-measures.md`); conferir o texto dos itens com a fonte antes de usar.
 8. Orçamento de tempo: se o ensaio mostrar que as 8 tarefas com perguntas não cabem nos 39 minutos, escolher entre prolongar a sessão e retirar uma tarefa nomeada, para todos, nas duas fases.
 9. T4 ou T4-alt: decidido no ensaio pela regra pré-declarada em `tasks.md`.

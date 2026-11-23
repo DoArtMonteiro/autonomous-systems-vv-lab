@@ -46,14 +46,14 @@ Origem: **B** = backlog documentado, **C** = leitura do código. Localização c
 ### H05. Os níveis «Explorer» e «Analyst» não orientam (B)
 
 - **Localização.** `views/missions.js`, `card()`, campo «Level»; `experiences.js` (`level`).
-- **Sintoma esperado.** Novatos não sabem o que «Explorer» ou «Analyst» implicam, ignoram o campo, ou evitam as missões «Analyst» por se acharem sem qualificação. Engenheiros ignoram o campo.
+- **Sintoma esperado.** Os participantes não sabem o que «Explorer» ou «Analyst» implicam, ignoram o campo, ou evitam as missões «Analyst» por se acharem sem qualificação. A parte sobre novatos não se testa por desenho (as fases 1 e 2 só têm o perfil E).
 - **Razão.** M15-R05 está PARTIAL: só existem etiquetas de nível e agrupamento; a página inicial já não explica os níveis.
 - **Tarefa.** T1, T2.
 
 ### H06. Sem integração por interação, o propósito do produto não é percebido (B, C)
 
 - **Localização.** `views/home.js`, parágrafo `hm-lead` («A deterministic simulator of autonomous vehicles… recompute»), três percursos `hm-path`.
-- **Sintoma esperado.** Na primeira impressão, novatos não conseguem dizer o que a aplicação faz; termos como «deterministic», «engineering telemetry» e «recompute» não são percebidos. Engenheiros percebem o domínio, mas não sabem por onde começar.
+- **Sintoma esperado.** Na primeira impressão, os engenheiros percebem o domínio, mas não sabem por onde começar, e alguns termos («deterministic», «engineering telemetry», «recompute») podem não ser percebidos fora da sua área. A previsão sobre novatos não se testa por desenho (as fases 1 e 2 só têm o perfil E).
 - **Razão.** M15-R06 está PARTIAL: sem tutorial, e a compreensão nunca foi medida com pessoas. O texto inicial é denso e usa vocabulário técnico.
 - **Momento.** Primeira impressão (antes de T1).
 
@@ -76,7 +76,7 @@ Origem: **B** = backlog documentado, **C** = leitura do código. Localização c
 - **Localização.** `views/discover.js`, `acceptance()`: peças «Evidence integrity» («Recomputed, every check passed») e «Claim» («Refuted»).
 - **Sintoma esperado.** O participante lê o verde de «Recomputed» como "a alegação está confirmada" ou "o veículo está validado", ou usa-o para desvalorizar o veredicto «Refuted».
 - **Razão.** Cinco peças separadas («Evidence integrity», «Claim», «Mechanism», «Mitigation», «Evidence grade») aparecem lado a lado, cada uma com o seu tom de cor; o verde de uma pode ser lido como aprovação das outras. M15-R17 diz que a cadeia Observação para Verificação não foi percorrida com pessoas. A palavra «Recompute» aparece em dois sítios («Recompute now», «Recompute from scratch») e a análise de uma execução usa «Replay».
-- **Tarefa.** T8. **Se observada:** interpretação errada de evidência, gravidade mínima 3.
+- **Tarefas.** T8; também T6, só se a pessoa abrir o pacote guardado (via ii), porque só aí as peças aparecem lado a lado. **Se observada:** interpretação errada de evidência, gravidade mínima 3.
 
 ### H10. «Refuted» lido como prova sobre um veículo real; o grau «Exploratory» ignorado (B, C)
 
@@ -167,7 +167,7 @@ Origem: **B** = backlog documentado, **C** = leitura do código. Localização c
 ### H22. Excesso de confiança no alcance real dos resultados (B, C)
 
 - **Localização.** `views/home.js` (declaração só em Mission Control e rodapé); `views/player.js`, cartão «How far this goes» (no fim do painel lateral); grau «Reference case».
-- **Sintoma esperado.** No fim, perguntado quanto confia nos resultados para um foguetão real, o participante (sobretudo N) dá 4 ou 5.
+- **Sintoma esperado.** No fim, perguntado quanto confia nos resultados para um foguetão real, o participante dá 4 ou 5. A previsão de que o excesso seria maior em novatos não se testa por desenho (só perfil E).
 - **Razão.** Os limites de validade estão fora do caminho principal das tarefas.
 - **Momento.** Conversa final (calibração de confiança).
 

@@ -49,7 +49,7 @@ Documentos de apoio, só se precisar de contexto: `docs/m14-g3-onset-protocol-dr
 Detalhe, com linhas, em `independent-checks.md`, `source-commitments.md` e `reviewer-questions.md`.
 
 - O hash do código do simulador que o protocolo cita como atual (`12b276cb...`, linha 166) já não corresponde ao commit `bec7b3f`, onde vale `295a45b2...`. Só mudou `landing_model.rs` (um esquema de caso novo); não está demonstrado aqui que o comportamento dos casos antigos seja igual.
-- Duas citações de linha do protocolo (`landing_model.rs:414-418` na linha 33, `landing_model.rs:238` na linha 133) estão desatualizadas: hoje são as linhas 426 a 431 (`ascent_abort_vz_mps`) e 250. As linhas 414 a 418 mostram hoje os limites 0,1 a 1000 do limiar do altímetro (chamada `within(` nas linhas 417 a 422).
+- Duas citações de linha do protocolo (`landing_model.rs:414-418` na linha 33, `landing_model.rs:238` na linha 133) estão desatualizadas: hoje são as linhas 426 a 431 (`ascent_abort_vz_mps`) e 250. Hoje, as linhas 414 a 416 de `landing_model.rs` fecham o intervalo de `altimeter_velocity_gain`; as linhas 417 a 422 contêm a chamada `within(` do limiar do altímetro, com os limites 0,1 e 1000 nas linhas 420 e 421.
 - A linha 115 diz que seriam precisas 63 sementes para um teste binomial ao nível 0,01/14. A conta dá 69; 63 corresponde a 0,01/7.
 - O critério «fração ≥ 0,9» de S4 e S5, com 60 sementes, decide sozinho (o McNemar exato é redundante) e é uma estimativa pontual: aceitaria um sistema com taxa verdadeira de 0,80 em cerca de 3 % das vezes e de 0,85 em cerca de 18 %.
 - Os testes de H1 e H2 agregam 160 sementes e toleram 6 falhas; uma célula inteira de 5 sementes (um início, uma magnitude) pode falhar e a hipótese ainda ficar «confirmada».

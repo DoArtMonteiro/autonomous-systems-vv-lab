@@ -10,7 +10,7 @@ Citações: palavra a palavra, entre aspas, com a hora do relógio da sessão. N
 | --- | --- |
 | Pseudónimo | |
 | Fase | [ ] 1 [ ] 2 |
-| Perfil | [ ] N [ ] E |
+| Perfil (único nas fases 1 e 2) | [ ] E |
 | Data | |
 | Moderador (iniciais) | |
 | Anotador (iniciais) | |
@@ -193,9 +193,9 @@ Interpretações erradas (classe; disse; o ecrã mostrava):
 
 Citações:
 
-Compreensão (valor de «To goal» lido no ensaio, chave de Q5a: ______ mm): Q5a [ ] C [ ] P [ ] I; Q5b† [ ] C [ ] P [ ] I, confiança: ___ ; Q5c† resposta palavra a palavra: ______ [ ] C [ ] P [ ] I, confiança: ___ ; Q5d† [ ] C [ ] P [ ] I, confiança: ___ ; dificuldade: ___
+Compreensão (valor de «To goal» lido no ensaio, chave de Q5a: ______ mm): Q5a [ ] C [ ] P [ ] I; Q5b† [ ] C [ ] P [ ] I, confiança: ___ ; Q5c† resposta palavra a palavra: ______ [ ] C [ ] P [ ] I, confiança: ___ ; Q5c2 (aberta, sem pontuação nem confiança) resposta palavra a palavra: ______ (regra de segurança ou zona referida espontaneamente? [ ] sim [ ] não); Q5d† [ ] C [ ] P [ ] I, confiança: ___ ; dificuldade: ___
 
-Previsões: H02 ___ H03 ___ H17 ___
+Previsões: H02 ___ H03 ___
 
 Notas do anotador:
 
@@ -267,6 +267,7 @@ Notas do anotador:
 | Tempo em tarefa / pausas (excluir espera por recomputação) | |
 | Conclusão | [ ] S [ ] A [ ] F [ ] X |
 | Chegou à investigação guardada? Por que via? | |
+| Pacote usado ([ ] preparado [ ] criado pela pessoa em T6; aparecia recomputado?) | |
 | Sítio(s) que mostrou | |
 | Carregou em «Recompute from scratch» ou «Recompute now»? | [ ] Sim [ ] Não |
 | O que disse que lhe dá confiança | |
@@ -347,7 +348,7 @@ Resolução de discordâncias: fica a gravidade mais alta, e regista-se a discor
 - [ ] Nenhum nome, contacto ou caminho nos formulários
 - [ ] Consentimento e tabela de ligação guardados à parte
 - [ ] Citações com hora e pseudónimo
-- [ ] SUS pontuado
+- [ ] SUS pontuado, ou "SUS não feito" com a hora e o motivo (paragem rígida)
 - [ ] Classificações independentes feitas antes de qualquer discussão
 - [ ] Estado inicial reposto para o próximo participante
 - [ ] S4 e S8 (texto livre) só na ficha de seleção, nunca nestas notas
@@ -356,6 +357,8 @@ Resolução de discordâncias: fica a gravidade mais alta, e regista-se a discor
 
 O recrutamento só começa com todos os itens marcados. Os campos referidos estão em `screener-and-consent.md`.
 
+- [ ] Autorização escrita do responsável para iniciar o recrutamento, e participantes disponíveis
+- [ ] Aviso de privacidade breve preenchido, a enviar antes do questionário de seleção, com o prazo de eliminação dos dados de seleção de quem não participa
 - [ ] Responsável pelo tratamento e contacto preenchidos
 - [ ] Destinatários e ferramentas (voz, partilha de ecrã, armazenamento) preenchidos, com prestador e país
 - [ ] Base de transferência preenchida (ou "não há transferência")
@@ -363,6 +366,6 @@ O recrutamento só começa com todos os itens marcados. Os campos referidos est�
 - [ ] Prazos de retenção confirmados
 - [ ] Critério de 18 anos ou mais no questionário (S0) e no consentimento
 - [ ] Versão do SUS escolhida e itens conferidos com a fonte
-- [ ] Máquina do estudo: conta local dedicada, hash do instalador verificado (SHA-256 `0e37bbcf7228b7170ab392966b0cdc79b2e7446280e801cc9912c16bb0ebd0e1`), módulo Cinematic não instalado
+- [ ] Máquina do estudo: acesso só em presença, conta local dedicada, hash do instalador verificado (SHA-256 `0e37bbcf7228b7170ab392966b0cdc79b2e7446280e801cc9912c16bb0ebd0e1`), módulo Cinematic não instalado
 - [ ] Ensaio feito e chave de respostas congelada
 - Data e iniciais do responsável: ____________

@@ -68,7 +68,7 @@ Depois de cada pergunta de segurança ou de evidência (marcada † em `tasks.md
 
 ## Medidas de sucesso
 
-Todas se relatam por tarefa, por fase e por perfil (N, E), em contagens (por exemplo "2 de 3"). **Não se calculam percentagens nem intervalos de confiança** com estes números. Os perfis N e E apresentam-se descritivamente, lado a lado.
+Todas se relatam por tarefa e por fase, em contagens (por exemplo "2 de 3"). Todos os participantes das fases 1 e 2 têm o perfil E (engenheiro ou revisor técnico). **Não se calculam percentagens nem intervalos de confiança** com estes números.
 
 ### M1. Conclusão de tarefa
 
@@ -91,6 +91,8 @@ Número de participantes com pelo menos uma interpretação errada MS ou ME, por
 Pontuação 0 a 100 por participante (regra de cálculo em `observation-form.md`). Relata-se participante a participante e a mediana. O ponto de referência habitualmente citado para um SUS "médio" é cerca de 68 (Sauro e Lewis); usa-se apenas como referência de leitura, nunca como teste.
 
 O SUS mede a perceção global depois de uma sessão curta, com um produto que tem um circuito muito técnico. Não resolve problemas específicos e, com 3 ou 5 pessoas, pouco diz.
+
+Se a paragem rígida aos 70 minutos impedir o SUS de uma pessoa (não puder começar até ao minuto 59), fica "SUS não feito", registado com a hora, e essa pessoa não entra na mediana nem no mínimo. M5 só se avalia se pelo menos 2 de 3 (Fase 1) ou 4 de 5 (Fase 2) fizerem o SUS; caso contrário fica "não avaliado", e não "não cumprido".
 
 Versão do questionário: existe uma versão validada em português europeu (validação europeia portuguesa da SUS, Procedia Computer Science, 2015, vol. 67, pp. 293 a 300, DOI 10.1016/j.procs.2015.09.273). O texto dessa versão não está copiado neste kit. O texto inglês dos dez itens reproduzido em `observation-form.md` foi escrito de memória do original de Brooke (1996) e **não foi conferido com uma fonte nesta preparação**: conferir antes do primeiro uso. O responsável obtém-no na publicação e decide antes da Fase 1 entre essa versão e o original inglês que consta de `observation-form.md`. Como a interface está em inglês e se exige leitura de inglês, ambas são admissíveis; a escolha fica fixa na Fase 2.
 
@@ -119,7 +121,7 @@ Estes limiares definem o que se considera **aceitável** nesta versão, em conta
 | M3, restantes verificações | pelo menos 2 de 3 com C | pelo menos 3 de 5 com C |
 | M4, interpretações erradas críticas (MS, ME) | **0 de 3** | **0 de 5** |
 | M6, excesso de confiança em verificações de segurança ou de evidência | 0 ocorrências | 0 ocorrências |
-| M5, SUS | mediana pelo menos 68 e nenhum participante abaixo de 50 | mediana pelo menos 68 e nenhum participante abaixo de 50 |
+| M5, SUS (entre quem o fez; "não avaliado" se o fizerem menos de 2 de 3 ou 4 de 5) | mediana pelo menos 68 e nenhum participante abaixo de 50 | mediana pelo menos 68 e nenhum participante abaixo de 50 |
 | Gravidade | nenhum problema de gravidade 4 em aberto; todos os de gravidade 3 com decisão escrita | nenhum problema de gravidade 4; nenhum problema MS ou ME (gravidade 3 ou 4), persistente ou novo; nenhum outro problema de gravidade 3 em 2 ou mais participantes |
 
 Leitura:
@@ -127,7 +129,7 @@ Leitura:
 - Na Fase 1 os limiares **não** decidem uma aprovação: servem para decidir prioridades. Um limiar falhado indica trabalho a fazer.
 - Na Fase 2 a falha de qualquer limiar significa "não aceite nesta fase", com as causas listadas. Uma ocorrência de MS ou ME (1 de 5) fica "não aceite, problema residual", com decisão escrita do responsável.
 - Uma tarefa alcançada por menos de 2 de 3 (Fase 1) ou 4 de 5 (Fase 2) participantes é "não avaliada", e não se avalia o limiar.
-- Os limiares valem para a fase inteira. Os perfis N e E relatam-se **descritivamente**, lado a lado, sem limiar próprio: um perfil com resultados piores do que o outro é um achado a descrever, não uma falha de limiar. Com 3 e 5 pessoas e dois perfis não há números suficientes para limiares por perfil.
+- Os limiares valem para a fase inteira, que tem só participantes de perfil E. Se um dia houver um estudo secundário com novatos (perfil N), é outro estudo, com desenho e limiares próprios, e os seus resultados nunca entram nestes números.
 - Os cortes por tempo (regra em `tasks.md`) reduzem o número de participantes que alcançaram cada tarefa; o limiar de uma tarefa só se avalia se ela tiver sido alcançada pelo mínimo acima.
 
 ## Limites de inferência
@@ -150,10 +152,10 @@ Leitura:
 | 30 % | 66 % | 83 % | 94 % |
 | 50 % | 88 % | 97 % | 99 % |
 
-Estes valores supõem participantes independentes e a mesma probabilidade para todos, o que não é o caso (dois perfis, sessões moderadas, tarefas dirigidas), por isso são **limites otimistas**. A regra habitual "5 pessoas encontram cerca de 85 % dos problemas" só vale para um tipo homogéneo de utilizador e problemas que afetam pelo menos cerca de 31 % das pessoas, e este estudo tem dois perfis.
+Estes valores supõem participantes independentes e a mesma probabilidade para todos, o que não é o caso (áreas de experiência diferentes dentro do perfil E, sessões moderadas, tarefas dirigidas), por isso são **limites otimistas**. A regra habitual "5 pessoas encontram cerca de 85 % dos problemas" só vale para um tipo homogéneo de utilizador e problemas que afetam pelo menos cerca de 31 % das pessoas; o perfil E reúne áreas diferentes (autonomia, verificação, controlo, auditoria), por isso não se assume homogeneidade.
 
 - **Comparar fases com testes.** Fase 1 e Fase 2 são grupos diferentes, pequenos e, em parte, preparados por tarefas dirigidas. A diferença entre "2 de 3" e "1 de 5" é compatível com acaso. Só se relatam as contagens lado a lado, com a lista de alterações e a sua localização, sem valores p, sem "melhoria significativa", sem intervalos.
-- **Generalizar.** As pessoas são voluntários da rede do responsável, leem inglês, e usam uma só máquina de estudo com um ecrã próprio.
+- **Generalizar.** As pessoas são voluntários da rede do responsável, engenheiros ou revisores técnicos (nada se conclui sobre novatos), leem inglês, e usam uma só máquina de estudo com um ecrã próprio.
 
 ### Viéses reconhecidos
 
@@ -168,7 +170,7 @@ Estes valores supõem participantes independentes e a mesma probabilidade para t
 
 ## Regras de relato
 
-- Declarar sempre n, fase, perfil e versão do produto.
+- Declarar sempre n, fase, perfil (E) e versão do produto.
 - Relatar problemas, gravidades, localização e contagens. Nunca percentagens.
 - Distinguir sempre "observado", "não observado", "não alcançado" e "não aplicável".
 - Não usar a expressão "o programa é usável" nem "testado com utilizadores" como resultado geral. Dizer, por exemplo, "3 sessões piloto: problemas encontrados e gravidades".

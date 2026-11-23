@@ -57,7 +57,7 @@ O commit de referência completo é `bec7b3f990291239313360b163ad999c31fb6310`.
 
 ## Citações de linha desatualizadas
 
-O protocolo cita linhas de `crates/vv-rocket/src/landing_model.rs` que estavam certas em `3962482` e mudaram com o mesmo commit `3baa1c1`:
+O protocolo cita linhas de `crates/vv-rocket/src/landing_model.rs` que estavam certas em `3962482` e mudaram em duas etapas. Em `3baa1c1`: `ascent_abort_vz_mps` de 415 para 424, e o mínimo de 5 m do viés do altímetro de 238 para 247. Em `04de572`: `ascent_abort_vz_mps` de 424 para 427, e o mesmo mínimo de 247 para 250:
 
 | Linha do protocolo | Citação | Em `bec7b3f` | Nota |
 | --- | --- | --- | --- |

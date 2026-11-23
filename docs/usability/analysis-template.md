@@ -11,7 +11,7 @@ Uma síntese por fase. Cada uma indica o número de participantes realmente obse
 | Versão do produto (versão e commit) | | |
 | Datas das sessões | | |
 | Participantes observados (n) | | |
-| Mistura real (N, E) | | |
+| Perfil real dos participantes (todos E; registar qualquer desvio) | | |
 | Máquina e ambiente (Windows, resolução da janela, hash do instalador, Cinematic não instalado) | | |
 | Pacote de investigação preparado (identificação) | | |
 | T4 usada (T4 ou T4-alt) | | |
@@ -45,7 +45,7 @@ Regra: tarefa alcançada por menos de 2 de 3 (Fase 1) ou 4 de 5 (Fase 2) fica "n
 
 ## 3. Medidas (contagens)
 
-Contagens, sem percentagens. Os limiares avaliam-se na tabela **total da fase**; as tabelas por perfil (N, E) são só descritivas, lado a lado, sem limiar.
+Contagens, sem percentagens. Os limiares avaliam-se na tabela **total da fase**, que tem só participantes de perfil E. Não há tabelas por perfil nesta versão do kit.
 
 ### 3.1 Conclusão (M1) e conclusão sem ajuda (M2)
 
@@ -79,6 +79,8 @@ Contagens, sem percentagens. Os limiares avaliam-se na tabela **total da fase**;
 | Q8a | | | | | |
 | Q8b | | | | | |
 
+Q5c2 (pergunta aberta de T5) não tem pontuação: relatar só quantas pessoas referiram espontaneamente a regra de segurança ou a zona (n de n): ___ .
+
 ### 3.3 Interpretações erradas críticas (M4)
 
 | Tarefa | Código CE | Classe (MS, ME) | Participantes (n) | Confiança 4 ou 5? |
@@ -89,11 +91,11 @@ Total de participantes com pelo menos uma: ___ de ___ (limiar: 0).
 
 ### 3.4 SUS (M5)
 
-| Participante | Perfil | Pontuação | Versão usada |
+| Participante | Perfil | Pontuação (ou "SUS não feito") | Versão usada |
 | --- | --- | --- | --- |
 | | | | |
 
-Mediana: ___ (ponto de referência de leitura: cerca de 68). Mínimo: ___.
+Mediana: ___ (ponto de referência de leitura: cerca de 68). Mínimo: ___. Participantes com SUS feito: ___ de ___ (se for inferior a 2 de 3 na Fase 1 ou a 4 de 5 na Fase 2, M5 fica "não avaliado").
 
 ### 3.5 Calibração (M6)
 
@@ -247,6 +249,8 @@ Regra para o texto público do repositório (`AGENTS.md`, secção «Apresentaç
 - Interface só em inglês; participantes leem inglês.
 - Sem avaliação de acessibilidade com tecnologias de apoio.
 - Voluntários da rede do responsável.
+- Só participantes de perfil E (engenheiros e revisores técnicos): nada se conclui sobre novatos.
+- Sessão com paragem rígida aos 70 minutos: SUS ou conversa final podem ter faltado (registar quais).
 - Fases com pessoas diferentes e produtos diferentes.
 - Tarefas cortadas por tempo e ordem fixa (efeito de aprendizagem).
 

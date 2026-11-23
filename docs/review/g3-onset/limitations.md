@@ -8,7 +8,7 @@ Duas listas: as do estudo proposto e as deste pacote. Nenhuma é exaustiva.
 
 - **Simulação idealizada, sem dados de voo.** O `vv-rocket` é um modelo de seis graus de liberdade de um só estágio, com requisitos e dispersões assumidos. Nunca foi comparado com telemetria de um veículo real; não existe tal comparação neste projeto. Mesmo uma confirmação completa não diz nada sobre um veículo real, e o protocolo di-lo (l. 191).
 - **Um só veículo, um só perfil de descida.** Massa, altitude inicial, velocidade, ganhos do estimador e do controlador são os do caso registado. A fronteira (b* ≈ 12 m) é uma função desses ganhos: no modelo, vale cerca de 4 vezes o limiar de rejeição de 3 m.
-- **Ruído limitado e dispersões uniformes.** O ruído dos sensores é uma soma de quatro uniformes truncada a ±2√3 σ; as dispersões iniciais são uniformes (`crates/vv-rocket/src/prng.rs`, `landing_model.rs`). Não há caudas pesadas, nem correlação temporal, nem falhas combinadas.
+- **Ruído limitado e dispersões uniformes.** O ruído dos sensores é uma soma de quatro uniformes, limitada a ±2√3 σ pelo próprio suporte (o corte em `prng.rs` nunca atua); as dispersões iniciais são uniformes (`crates/vv-rocket/src/prng.rs`, `landing_model.rs`). Não há caudas pesadas, nem correlação temporal, nem falhas combinadas.
 - **Viés igual em x e z.** A falha registada soma a mesma magnitude às duas componentes (`landing_sensors.rs:79-80`). Um viés só vertical separaria R1 de R5 e não se testa.
 - **Regressões não simuláveis.** Um viés do altímetro de 1 a 3 m, a regressão mais plausível de um limiar de rejeição menor, não pode ser simulado sem alterar a biblioteca (mínimo de 5 m). Ruído do altímetro maior, erros combinados e dispersões maiores também ficam de fora.
 - **Dois limiares de mitigação.** Só se estudam 1 m e 2 m. Sem otimização, sem outros ganhos.
@@ -34,7 +34,7 @@ Duas listas: as do estudo proposto e as deste pacote. Nenhuma é exaustiva.
 
 ### Revisão
 
-- **Toda a revisão anterior foi feita por agentes.** O protocolo, o rascunho que o precedeu, as investigações M13 e M14 e as suas revisões «independentes» foram feitos por agentes de inteligência artificial; as revisões independentes foram feitas por outros agentes, não por pessoas. O M13 e o M14 dizem-no (`docs/m13-discovery-lab.md`, l. 120; `docs/m14-evidence-robustness.md`, l. 130). **Revisão por agentes não é revisão humana por pares.** Este pacote pede a primeira leitura humana.
+- **Toda a revisão anterior foi feita por agentes.** O protocolo, o rascunho que o precedeu, as investigações M13 e M14 e as suas revisões «independentes» foram feitos por agentes de inteligência artificial; as revisões independentes foram feitas por outros agentes, não por pessoas. O M13 di-lo (`docs/m13-discovery-lab.md`, l. 120). O M14 não o afirma: refere revisões independentes sem dizer quem as fez. **Revisão por agentes não é revisão humana por pares.** Este pacote pede a primeira leitura humana.
 - **Os resultados sobre o instante de início do viés são exploratórios.** Nada neste pacote os confirma.
 - **O revisor anterior também viu dados.** Houve um revisor que correu as sementes 45000 a 45003; esses dados são de desenvolvimento e estão gastos.
 
