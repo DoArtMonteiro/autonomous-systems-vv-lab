@@ -254,6 +254,126 @@ class Candidate(unittest.TestCase):
         for stage in stages.values():
             self.assertIn(f"{stage['first']} a {stage['last']}", self.text)
 
+class HolmAndGates(unittest.TestCase):
+    def test_holm_rule(self):
+        self.assertTrue(m.holm_ok((3, 3, 3)))
+        self.assertTrue(m.holm_ok((3, 2, 1)))
+        self.assertTrue(m.holm_ok((3, 3, 1)))
+        self.assertFalse(m.holm_ok((2, 2, 2)))  # nobody passes 0.01/3
+        self.assertFalse(m.holm_ok((3, 1, 1)))  # second smallest p fails 0.01/2
+        self.assertFalse(m.holm_ok((3, 3, 0)))
+
+    def test_class_based_holm_matches_direct_p_values(self):
+        sizes, pis = (60, 66, 72), (F("0.99"), F("0.985"), F("0.995"))
+        classes = [m.class_probs_binom(n, p) for n, p in zip(sizes, pis)]
+        fast = m.holm_joint(*classes)
+        pmfs = [[comb_pmf(n, k, p) for k in range(n + 1)] for n, p in zip(sizes, pis)]
+        tails = [[m.sf(k, n, F(9, 10)) for k in range(n + 1)] for n in sizes]
+        direct = F(0)
+        for a in range(sizes[0] + 1):
+            for b in range(sizes[1] + 1):
+                for c in range(sizes[2] + 1):
+                    ps = sorted((tails[0][a], tails[1][b], tails[2][c]))
+                    if ps[0] <= F(1, 300) and ps[1] <= F(1, 200) and ps[2] <= F(1, 100):
+                        direct += pmfs[0][a] * pmfs[1][b] * pmfs[2][c]
+        self.assertEqual(fast, direct)
+
+    def test_ladder_thresholds_and_ordering_of_the_bounds(self):
+        h = built()["holm_design"]
+        self.assertEqual(h["thresholds"]["H1a_H1b_n168"], [162, 161, 161])
+        self.assertEqual(h["thresholds"]["H2_n140"], [136, 135, 135])
+        self.assertEqual(h["thresholds"]["H3_order_statistic_positions_n60"], [[20, 41], [20, 41], [21, 40]])
+        self.assertEqual(h["thresholds"]["mcnemar_min_discordant_0.01"], 7)
+        for name, v in h["scenarios"].items():
+            g = v["gates"]
+            self.assertLessEqual(v["bonferroni_lower_bound_all_at_0.01/3"], v["holm_joint_power"] + 1e-6, name)
+            self.assertLessEqual(v["holm_joint_power"], v["all_at_0.01_upper_bound"] + 1e-6, name)
+            self.assertLessEqual(g["G3_replicado_(Holm_and_McNemar_and_H1b)"], g["mascaramento_(Holm_and_McNemar)"] + 1e-6)
+            self.assertLessEqual(g["mascaramento_(Holm_and_McNemar)"], g["R1_fails_late_headline_(Holm)"] + 1e-6)
+            lo, hi = g["frechet_G3_replicado"]
+            self.assertLessEqual(lo - 1e-6, g["G3_replicado_(Holm_and_McNemar_and_H1b)"])
+            self.assertLessEqual(g["G3_replicado_(Holm_and_McNemar_and_H1b)"], hi + 1e-6)
+            self.assertAlmostEqual(sum(v["classes_H1a"].values()), 1.0, places=5)
+
+    def test_gates_agree_with_a_direct_enumeration_in_a_small_case(self):
+        # n = 12, alpha ladder replaced by the real ladder; no Holm family (rest = 1 for every class):
+        # the gate sums must equal a direct sum over the four-cell multinomial.
+        n, p0, q = 12, F("0.9"), F("0.8")
+        rest = {c: F(1) for c in range(4)}
+        got = m.gates_power(n, p0, q, rest)
+        # with n = 12 no binomial threshold exists, so H1a never rejects and every gate is zero
+        self.assertEqual(got["G3_replicado_(Holm_and_McNemar_and_H1b)"], 0.0)
+        self.assertEqual(got["R1_fails_late_headline_(Holm)"], 0.0)
+
+    def test_cells_and_non_acting_rule(self):
+        c = built()["cell_tolerance"]
+        self.assertEqual(c["H1a"]["by_level"]["0.01/3"]["whole_cells_tolerated"], 1)
+        self.assertEqual(c["H2"]["by_level"]["0.01/3"]["whole_cells_tolerated"], 0)
+        self.assertEqual(c["H2"]["by_level"]["0.01/3"]["majority_contrary_cells_tolerated"], 1)
+        self.assertEqual((c["not_acting_runs"]["H1a_max_excluded"], c["not_acting_runs"]["H2_max_excluded"]), (8, 7))
+
+    def test_s4_s5_direction_test(self):
+        s = built()["s4_s5_mcnemar"]
+        self.assertEqual(s["min_discordant_all_predicted"], 10)
+        self.assertGreaterEqual(s["power_by_predicted_rate"]["0.50"]["both_conditions"], 0.9999)
+        self.assertAlmostEqual(s["fraction_descriptive_cp99_lower"]["54_of_60"], 0.774088, places=5)
+
+
+def comb_pmf(n, k, p):
+    from math import comb
+    return comb(n, k) * p**k * (1 - p) ** (n - k)
+
+
+class SeedIndependence(unittest.TestCase):
+    def test_positions_reproduce_the_generator(self):
+        g = m.SplitMix64(44000 ^ ((2 * m.GOLDEN) & m.MASK64))
+        h = m.SplitMix64(44128 ^ ((6 * m.GOLDEN) & m.MASK64))
+        a = [g.next() for _ in range(6)]
+        b = [h.next() for _ in range(2)]
+        self.assertEqual(b, a[4:6])  # the near collision noted in the document
+        d = (m.stream_position(44128, 6) - m.stream_position(44000, 2)) & m.MASK64
+        self.assertEqual(d, 4)
+
+    def test_no_overlap_in_the_outputs_actually_used(self):
+        ind = built()["seed_independence"]
+        for key in ("seeds_44000_44919_case_40s", "seeds_44000_44919_code_limit", "seeds_44000_44999_code_limit"):
+            r = ind[key]
+            self.assertEqual(r["pairs_overlapping_in_the_outputs_actually_used"], 0, key)
+            self.assertEqual(r["distinct_positions"], r["streams"], key)
+            self.assertGreaterEqual(r["min_slack_between_next_stream_and_used_range"], 1, key)
+        self.assertEqual(ind["seeds_44000_44919_case_40s"]["streams"], 920 * 12)
+        self.assertEqual(ind["seeds_44000_44919_case_40s"]["pairs_overlapping_if_every_stream_used_the_largest_count"], 3180)
+
+    def test_used_draws_follow_the_code(self):
+        u = m.used_draws(2000, 400)
+        self.assertEqual((u[7], u[8], u[10]), (8000, 4800, 24000))
+
+
+class RevisionTwoText(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.text = DOC.read_text(encoding="utf-8")
+
+    def test_decisions_are_in_the_text(self):
+        for needle in ("Holm de passo descendente", "Portas em série", "interseção-união",
+                       "161 de 168", "135 de 140", "direção confirmada (teste exato emparelhado a 0,01/7, mínimo 10 pares discordantes)",
+                       "nenhuma sobreposição nas saídas usadas", "acted = false", "fecha todas as portas a jusante"):
+            self.assertIn(needle, self.text, needle)
+        self.assertNotIn("padrão provisório", self.text.lower())
+        self.assertNotIn("sem inferência», nunca", self.text)
+
+    def test_holm_numbers_in_the_text(self):
+        h = built()["holm_design"]["scenarios"]
+        for name in ("development-like", "moderate", "pessimistic"):
+            self.assertIn(pt(h[name]["holm_joint_power"], 3), self.text, name)
+        g = h["moderate"]["gates"]
+        self.assertIn(pt(g["G3_replicado_(Holm_and_McNemar_and_H1b)"], 3), self.text)
+        self.assertIn(pt(h["pessimistic"]["gates"]["G3_replicado_(Holm_and_McNemar_and_H1b)"], 3), self.text)
+        fb = built()["budgets_fallback_E19"]
+        self.assertIn(str(fb["pairs_invariants_and_r2_r6"]), self.text)
+        self.assertIn(pt(fb["invariants_cp99_upper_at_0"] * 100, 3) + " %", self.text)
+
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -910,7 +910,7 @@ JOINT_SCENARIOS = [
 def joint_rule(n_low: int, n_high: int, with_mcnemar: bool = True) -> dict:
     dist, bstar = bs_distribution()
     out = {"n_low_band": n_low, "n_high_band": n_high}
-    for alpha_label, a in (("0.01/3", F(1, 300)), ("0.01/4", F(1, 400)), ("0.01", F(1, 100))):
+    for alpha_label, a in (("0.01/3", F(1, 300)), ("0.01", F(1, 100))):
         l, u = os_positions(60, a)
         rows = {}
         for name, p0, q, h2, shift in JOINT_SCENARIOS:
@@ -940,25 +940,6 @@ def joint_rule(n_low: int, n_high: int, with_mcnemar: bool = True) -> dict:
     return out
 
 
-def family_of_four(n_low: int, n_high: int) -> dict:
-    """Thresholds if H1b is counted as a fourth claim-bearing test (Bonferroni 0.01/4)."""
-    a = F(1, 400)
-    dist, bstar = bs_distribution()
-    l, u = os_positions(60, a)
-    out = {
-        "alpha": r6(a),
-        "worst_case_family_error_if_H1b_is_outside_the_family_at_0.01/3": r6(4 * F(1, 300)),
-        "H1a_and_H1b_n": n_low, "H1a_and_H1b_reject_if_at_least": threshold(n_low, a),
-        "H2_n": n_high, "H2_reject_if_at_least": threshold(n_high, a),
-        "H3_positions": [l, u],
-        "power_H1a_or_H1b_pi": {f"{p}": r6(power(n_low, F(p), a)) for p in ("0.95", "0.97", "0.99")},
-        "power_H2_pi": {f"{p}": r6(power(n_high, F(p), a)) for p in ("0.95", "0.97", "0.99")},
-        "H3_confirm_by_shift": {f"{float(s):.2f}": median_interval_power(dist, bstar, 60, l, u, F(1), s)["confirm"]
-                                for s in (F(0), F(1, 4), F(1, 2), F(3, 4))},
-    }
-    return out
-
-
 def budgets(pairs_all: int, pairs_zero: int) -> dict:
     return {
         "pairs_invariants_and_r2_r6": pairs_all,
@@ -978,6 +959,293 @@ def budgets(pairs_all: int, pairs_zero: int) -> dict:
             "pairs_invariants": 280 + 160, "cp99_upper_at_0": r6(cp_upper(0, 440)),
             "feasible_within_1pct": cp_upper(0, 440) <= 0.01},
     }
+
+
+# ---------------------------------------------------------------------------------------------
+# Revision 2: Holm step-down over {H1a, H2, H3}, serial gates, cells, seed independence
+# ---------------------------------------------------------------------------------------------
+
+LEVELS = (F(1, 300), F(1, 200), F(1, 100))  # 0.01/3, 0.01/2, 0.01: the Holm ladder for a family of 3
+NOT_ACTING_FRACTION = F(1, 20)
+
+
+def class_probs_binom(n: int, pi) -> dict[int, F]:
+    """Class 3: rejects at 0.01/3; 2: at 0.01/2 but not 0.01/3; 1: at 0.01 only; 0: never."""
+    pi = frac(pi)
+    t = [threshold(n, a) for a in LEVELS]
+    tail = [F(0) if k is None else sf(k, n, pi) for k in t]
+    return {3: tail[0], 2: tail[1] - tail[0], 1: tail[2] - tail[1], 0: 1 - tail[2]}
+
+
+def class_probs_h3(dist: dict[F, F], bstar: F, n: int, tol: F, shift: F) -> dict[int, F]:
+    pos = [os_positions(n, a) for a in LEVELS]
+    q = F(1, 4)
+    shifted = {k + shift: v for k, v in dist.items()}
+    p_low = sum((v for k, v in shifted.items() if k <= bstar - tol + q), F(0))
+    p_up = sum((v for k, v in shifted.items() if k < bstar + tol), F(0))
+    terms, den = multinomial_terms(n, p_low, p_up - p_low)
+    acc = {3: 0, 2: 0, 1: 0, 0: 0}
+    for a, b, t in terms:
+        cls = 0
+        for rank, (l, u) in zip((3, 2, 1), pos):
+            if a <= l - 1 and a + b >= u:
+                cls = rank
+                break
+        acc[cls] += t
+    return {c: F(v, den) for c, v in acc.items()}
+
+
+def holm_ok(classes: tuple[int, int, int]) -> bool:
+    """Holm step-down at family level 0.01 rejects all three: p(1) <= a/3, p(2) <= a/2, p(3) <= a."""
+    return (sum(c >= 3 for c in classes) >= 1 and sum(c >= 2 for c in classes) >= 2
+            and all(c >= 1 for c in classes))
+
+
+def holm_joint(pa: dict, pb: dict, pc: dict) -> F:
+    return sum((pa[x] * pb[y] * pc[z] for x in range(4) for y in range(4) for z in range(4)
+                if holm_ok((x, y, z))), F(0))
+
+
+def holm_rest(pb: dict, pc: dict) -> dict[int, F]:
+    """P(Holm rejects all three | class of H1a = c), over the classes of H2 and H3."""
+    return {c: sum((pb[y] * pc[z] for y in range(4) for z in range(4) if holm_ok((c, y, z))), F(0))
+            for c in range(4)}
+
+
+def class_of(count: int, thr3, thr2, thr1) -> int:
+    if thr3 is not None and count >= thr3:
+        return 3
+    if thr2 is not None and count >= thr2:
+        return 2
+    if thr1 is not None and count >= thr1:
+        return 1
+    return 0
+
+
+def gates_power(n: int, p0, q, rest: dict[int, F]) -> dict:
+    """Exact power of the serial gates after the Holm family, arms of a seed independent.
+
+    Seeds are the n of stage A (low band). F = seeds where R1 fails late (H1a), R = seeds where R1
+    holds at 0 s (H1b), a = seeds with both (0 s holds, late fails), b = seeds with neither.
+    Given F = f and R = r, a is hypergeometric(n, r, f) when the arms are independent. Gate (i) is
+    the exact one-sided sign test on (a, b) at 0.01; gate (ii) is H1b at 0.01."""
+    p0, q = frac(p0), frac(q)
+    t = [threshold(n, a) for a in LEVELS]
+    t_b = threshold(n, F(1, 100))
+    sign = {d: sign_threshold(d, F(1, 100)) for d in range(n + 1)}
+    holm = F(0)
+    mask = F(0)
+    chain = F(0)
+    for f in range(0, n + 1):
+        cf = class_of(f, *t)
+        if cf == 0 or rest[cf] == 0:
+            continue
+        pf = comb(n, f) * q**f * (1 - q) ** (n - f)
+        holm += pf * rest[cf]
+        tot_m = F(0)
+        tot_c = F(0)
+        for r in range(0, n + 1):
+            pr = comb(n, r) * p0**r * (1 - p0) ** (n - r)
+            if pr == 0:
+                continue
+            ok = 0
+            for a in range(max(0, f + r - n), min(f, r) + 1):
+                b = n - r - f + a
+                k = sign[a + b]
+                if k is not None and a >= k:
+                    ok += comb(r, a) * comb(n - r, f - a)
+            if ok:
+                share = pr * F(ok, comb(n, f))
+                tot_m += share
+                if t_b is not None and r >= t_b:
+                    tot_c += share
+        mask += pf * rest[cf] * tot_m
+        chain += pf * rest[cf] * tot_c
+    # marginals for the Frechet bounds (no assumption about the dependence of the three events)
+    terms, den = multinomial_terms(n, p0 * q, (1 - p0) * (1 - q))
+    num = sum(x for (a, b, x) in terms if sign[a + b] is not None and a >= sign[a + b])
+    p_m = F(num, den)
+    p_b = power(n, p0, F(1, 100))
+    lo2 = max(F(0), holm + p_m - 1)
+    lo3 = max(F(0), holm + p_m + p_b - 2)
+    return {
+        "R1_fails_late_headline_(Holm)": r6(holm),
+        "mascaramento_(Holm_and_McNemar)": r6(mask),
+        "G3_replicado_(Holm_and_McNemar_and_H1b)": r6(chain),
+        "frechet_mascaramento": [r6(lo2), r6(min(holm, p_m))],
+        "frechet_G3_replicado": [r6(lo3), r6(min(holm, p_m, p_b))],
+        "marginals": {"holm": r6(holm), "mcnemar_alone_0.01": r6(p_m), "H1b_alone_0.01": r6(p_b)},
+    }
+
+
+def holm_design(n_low: int, n_high: int) -> dict:
+    dist, bstar = bs_distribution()
+    out = {
+        "ladder": ["0.01/3", "0.01/2", "0.01"],
+        "thresholds": {
+            "H1a_H1b_n%d" % n_low: [threshold(n_low, a) for a in LEVELS],
+            "H2_n%d" % n_high: [threshold(n_high, a) for a in LEVELS],
+            "H3_order_statistic_positions_n60": [list(os_positions(60, a)) for a in LEVELS],
+            "H1b_gate_0.01": threshold(n_low, F(1, 100)),
+            "mcnemar_min_discordant_0.01": sign_min_d(F(1, 100)),
+        },
+        "scenarios": {},
+    }
+    for name, p0, q, h2, shift in JOINT_SCENARIOS:
+        pa, pb = class_probs_binom(n_low, q), class_probs_binom(n_high, h2)
+        pc = class_probs_h3(dist, bstar, 60, F(1), shift)
+        joint = holm_joint(pa, pb, pc)
+        lower = pa[3] * pb[3] * pc[3]
+        upper = (1 - pa[0]) * (1 - pb[0]) * (1 - pc[0])
+        out["scenarios"][name] = {
+            "assumptions": {"p0": float(p0), "q": float(q), "H2_pi": float(h2), "boundary_shift_m": float(shift)},
+            "classes_H1a": {str(k): r6(v) for k, v in pa.items()},
+            "classes_H2": {str(k): r6(v) for k, v in pb.items()},
+            "classes_H3": {str(k): r6(v) for k, v in pc.items()},
+            "holm_joint_power": r6(joint),
+            "bonferroni_lower_bound_all_at_0.01/3": r6(lower),
+            "all_at_0.01_upper_bound": r6(upper),
+            "gates": gates_power(n_low, p0, q, holm_rest(pb, pc)),
+        }
+    out["illustrative"] = ("Powers use the b_s distribution reconstructed from 20 seeds (shifted by the "
+                           "stated amount), independence between the arms of a seed, and, for the gate "
+                           "bounds, Frechet limits; they illustrate the risk of an inconclusive run and "
+                           "say nothing about the risk of a false claim, which the procedure controls")
+    return out
+
+
+def sign_min_d(alpha) -> int:
+    d = 1
+    while F(1, 2**d) >= frac(alpha):
+        d += 1
+    return d
+
+
+def s4_s5_mcnemar(n: int = 60) -> dict:
+    """Power of the exact paired test of S4 or S5 in one condition (0.01/7), opposite-direction pairs 1 %."""
+    a = F(1, 700)
+    sign = {d: sign_threshold(d, a) for d in range(n + 1)}
+    rows = {}
+    for pa in ("0.50", "0.70", "0.80", "0.85", "0.90", "0.95", "0.97", "0.99"):
+        terms, den = multinomial_terms(n, F(pa), F("0.01"))
+        num = sum(x for (p, b, x) in terms if sign[p + b] is not None and p >= sign[p + b])
+        one = F(num, den)
+        rows[pa] = {"one_condition": r6(one), "both_conditions": r6(one * one)}
+    return {"alpha": r6(a), "min_discordant_all_predicted": sign_min_d(a), "n_pairs": n,
+            "opposite_direction_rate_assumed": 0.01, "power_by_predicted_rate": rows,
+            "fraction_descriptive_cp99_lower": {"54_of_60": r6(cp_lower(54, 60)), "57_of_60": r6(cp_lower(57, 60)),
+                                                "60_of_60": r6(cp_lower(60, 60))}}
+
+
+def cell_tolerance(n_low: int, n_high: int) -> dict:
+    out = {}
+    for name, n, size in (("H1a", n_low, 6), ("H2", n_high, 5)):
+        rows = {}
+        for label, a in zip(("0.01/3", "0.01/2", "0.01"), LEVELS):
+            k = threshold(n, a)
+            tol = n - k
+            majority = size // 2 + 1
+            rows[label] = {"reject_if_at_least": k, "failures_tolerated": tol,
+                           "whole_cells_tolerated": tol // size,
+                           "majority_contrary_cells_tolerated": tol // majority}
+        out[name] = {"n": n, "seeds_per_cell": size, "majority_contrary_means_at_least": size // 2 + 1,
+                     "by_level": rows}
+    out["not_acting_runs"] = {
+        "fraction": float(NOT_ACTING_FRACTION),
+        "H1a_max_excluded": int(NOT_ACTING_FRACTION * n_low), "H2_max_excluded": int(NOT_ACTING_FRACTION * n_high),
+        "definition": "runs whose verification.json lists the gnss_bias fault with acted = false (no biased GNSS "
+                      "fix before the run ended, for instance touchdown before the onset)"}
+    return out
+
+
+GOLDEN = 0x9E3779B97F4A7C15
+MASK64 = (1 << 64) - 1
+GOLDEN_INV = pow(GOLDEN, -1, 1 << 64)
+SOURCES = tuple(range(1, 13))  # crates/vv-rocket/src/prng.rs, `source`
+MAX_STEPS = 200_000  # crates/vv-rocket/src/model.rs
+CONTROL_PERIOD = 2
+
+
+def stream_position(seed: int, source: int) -> int:
+    """Position of a stream on the single cycle of the SplitMix64 state sequence (state + k * GOLDEN).
+
+    Stream (seed, source) starts at state seed ^ (source * GOLDEN) and its k-th output uses state
+    start + k * GOLDEN; position = start * GOLDEN^-1 mod 2^64 makes the k-th output position + k.
+    Two streams share an output state (hence an output word, the output map is a bijection) iff their
+    position ranges intersect."""
+    start = seed ^ ((source * GOLDEN) & MASK64)
+    return (start * GOLDEN_INV) & MASK64
+
+
+def used_draws(cycles: int, fixes: int) -> dict[int, int]:
+    """Outputs consumed per stream in one run, from crates/vv-rocket/src/landing_model.rs (sources 1 to 6,
+    `centered()` 3, 3, 2 and 1, 1, 1 times; 3 taken as the bound for source 3) and landing_sensors.rs
+    (altimeter: one noise, 4 draws, per control cycle; GNSS position and velocity: 3 noises, 12 draws, per
+    GNSS fix; IMU attitude, rate and acceleration: 12 draws per control cycle)."""
+    return {1: 3, 2: 3, 3: 3, 4: 1, 5: 1, 6: 1, 7: 4 * cycles, 8: 12 * fixes, 9: 12 * fixes,
+            10: 12 * cycles, 11: 12 * cycles, 12: 12 * cycles}
+
+
+def seed_independence(first: int, last: int, cycles: int, fixes: int) -> dict:
+    """Overlap of the output ranges [position + 1, position + draws] of every stream of every seed."""
+    used = used_draws(cycles, fixes)
+    uniform = max(used.values())
+    pos = sorted((stream_position(s, src), s, src) for s in range(first, last + 1) for src in SOURCES)
+    n = len(pos)
+    reach = max(used.values())
+    used_overlaps = []
+    uniform_overlaps = 0
+    margin = None
+    for i in range(n):
+        pi, si, ci = pos[i]
+        j = i + 1
+        while j < i + n:
+            pj, sj, cj = pos[j % n]
+            g = (pj - pi) & MASK64
+            if g >= reach:
+                break
+            if g <= uniform - 1:
+                uniform_overlaps += 1
+            if g <= used[ci] - 1:
+                used_overlaps.append([g, [si, ci], [sj, cj]])
+            j += 1
+        g1 = (pos[(i + 1) % n][0] - pi) & MASK64
+        slack = g1 - used[ci]
+        margin = slack if margin is None else min(margin, slack)
+    return {"seeds": [first, last], "streams": n, "distinct_positions": len({p for p, _, _ in pos}),
+            "draws_used_per_source": {str(k): v for k, v in used.items()},
+            "pairs_overlapping_if_every_stream_used_the_largest_count": uniform_overlaps,
+            "pairs_overlapping_in_the_outputs_actually_used": len(used_overlaps),
+            "examples_of_used_overlap": used_overlaps[:3],
+            "min_slack_between_next_stream_and_used_range": margin}
+
+
+def independence() -> dict:
+    return {
+        "method": "integer arithmetic on the SplitMix64 definition only (state0 = seed ^ source * G, state += G); "
+                  "no simulator code path is called; verified against explicit generator outputs in the tests",
+        "sources": list(SOURCES),
+        "bound_derivation": {"max_steps": MAX_STEPS, "control_period_steps": CONTROL_PERIOD,
+                             "case_40s": {"control_cycles": 2000, "gnss_fixes": 400},
+                             "code_limit": {"control_cycles": MAX_STEPS // CONTROL_PERIOD,
+                                            "gnss_fixes": MAX_STEPS // CONTROL_PERIOD // GNSS_PERIOD_CYCLES}},
+        "seeds_44000_44919_case_40s": seed_independence(44000, 44919, 2000, 400),
+        "seeds_44000_44919_code_limit": seed_independence(
+            44000, 44919, MAX_STEPS // CONTROL_PERIOD, MAX_STEPS // CONTROL_PERIOD // GNSS_PERIOD_CYCLES),
+        "seeds_44000_44999_code_limit": seed_independence(
+            44000, 44999, MAX_STEPS // CONTROL_PERIOD, MAX_STEPS // CONTROL_PERIOD // GNSS_PERIOD_CYCLES),
+    }
+
+
+def budgets_fallback(pairs_zero: int) -> dict:
+    pairs = 308 + 152
+    return {"pairs_invariants_and_r2_r6": pairs, "E_points_per_family": 19,
+            "invariants_cp99_upper_at_0": r6(cp_upper(0, pairs)),
+            "invariants_feasible_within_1pct": cp_upper(0, pairs) <= 0.01,
+            "r2_r6_max_events_5pct": max_events(pairs, 0.05),
+            "r1_at_0s_pairs": pairs_zero,
+            "seeds_total": 336 + 60 + 60 + 308 + 152,
+            "costed_only": "A_high at 168 seeds and E at 19 points; not adopted"}
 
 
 # ---------------------------------------------------------------------------------------------
@@ -1017,9 +1285,13 @@ def build() -> dict:
             if label in ("p0=0.93 q=1.00", "p0=0.99 q=0.99")},
         "median_tests": median_tests(),
         "joint_rule": joint_rule(n_low, n_high),
-        "family_of_four_if_H1b_counts": family_of_four(n_low, n_high),
         "joint_rule_pooled_A_and_D": joint_rule(3 * 7 * 11 + n_low, 77 + n_high, with_mcnemar=False),
         "budgets": budgets(n_d + n_e, n_d),
+        "budgets_fallback_E19": budgets_fallback(n_d),
+        "holm_design": holm_design(n_low, n_high),
+        "s4_s5_mcnemar": s4_s5_mcnemar(),
+        "cell_tolerance": cell_tolerance(n_low, n_high),
+        "seed_independence": independence(),
     }
 
 
