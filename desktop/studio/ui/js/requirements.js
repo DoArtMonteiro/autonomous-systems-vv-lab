@@ -140,7 +140,9 @@ export function reqLabel(r) {
  * many broke, never a bare "safe". Only evaluated invariants are counted (a rule the run never judged
  * is neither checked nor passed), a broken rule is looked at before anything else so it never reads as
  * neutral, and no count is written that the record's own rows do not give. `verdict` is the glyph
- * class (pass, unsafe or neutral).
+ * class: `unsafe`, `neutral` or `held`. "No safety rule broken" is never `pass`: that class is green and belongs to
+ * a requirement that was met, while a rule that held is a bounded statement (judged on the true state, only the
+ * rules the domain lists) and is drawn in a neutral tone of its own, so it never reads as the outcome of the mission.
  */
 export function safetyWording(record) {
   const inv = (record.requirements || []).filter((q) => q.category === 'invariant');
@@ -156,9 +158,9 @@ export function safetyWording(record) {
   }
   const unjudged = (record.safety.status === 'safe' && record.safety.class === 'not_evaluated') || (inv.length > 0 && judged.length === 0);
   if (unjudged) return { ...base, text: 'Safety not evaluated', heldText: 'safety not evaluated', verdict: 'neutral', unjudged: true };
-  if (!inv.length) return { ...base, text: 'No safety rule broken', heldText: 'no safety rule broken', verdict: 'pass', unjudged: false };
+  if (!inv.length) return { ...base, text: 'No safety rule broken', heldText: 'no safety rule broken', verdict: 'held', unjudged: false };
   const count = notEvaluated ? `${judged.length} of ${inv.length} checked; ${notEvaluated} not evaluated` : `${judged.length} checked`;
-  return { ...base, text: `No safety rule broken (${count})`, heldText: held, verdict: 'pass', unjudged: false };
+  return { ...base, text: `No safety rule broken (${count})`, heldText: held, verdict: 'held', unjudged: false };
 }
 
 /**
@@ -182,6 +184,20 @@ export function requirementWording(record) {
   if (!failed && !unknown) return `all ${m.length} requirements met`;
   if (!failed) return `${met} of ${m.length} requirements met, ${unknown} not evaluated`;
   return `${failed} of ${m.length} requirements failed${unknown ? `, ${unknown} not evaluated, ${met} met` : ''}`;
+}
+
+/**
+ * The sentence for a record in which no row failed: "Every requirement met." only when every row of those
+ * categories passed. A row that was not evaluated is neither met nor failed, so it is named instead of being counted
+ * as met; a record with no row of the category says so. `categories` is ['requirement'] or ['requirement', 'invariant'].
+ */
+export function noFailureSentence(record, categories) {
+  const rows = (record.requirements || []).filter((q) => categories.includes(q.category));
+  const what = categories.length === 1 ? 'requirement' : 'requirement and safety rule';
+  if (!rows.length) return `The record lists no ${what}.`;
+  const unknown = rows.filter((q) => q.status !== 'pass' && q.status !== 'fail');
+  if (!unknown.length) return `Every ${what} met.`;
+  return `No ${what} failed, but ${unknown.length} ${unknown.length === 1 ? 'was' : 'were'} not evaluated: ${unknown.map(plainName).join(', ')}.`;
 }
 
 /** The combined status, failure first, with the two kinds of verdict kept apart: "2 of 6 requirements failed · 5 of 5 safety rules held". */

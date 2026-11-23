@@ -10,7 +10,7 @@ import { domainById, visibleDomains, emit, loadRecord } from '../store.js';
 import { toast, errorText, askConfirm } from '../ui.js';
 import { verdictOfOutcome, faultText, distinguishingLabels, conditionsName } from '../model.js';
 import { verdictGlyph } from '../verification.js';
-import { indexNumbers, limitOf, marginOf, unitOf, reqView, reqLabel, safetyWording, SAFETY_NOTE, headlineChange, fmtSig, statusLine, DERIVED_NOTE } from '../requirements.js';
+import { indexNumbers, limitOf, marginOf, unitOf, reqView, reqLabel, safetyWording, SAFETY_NOTE, headlineChange, fmtSig, statusLine, DERIVED_NOTE, noFailureSentence } from '../requirements.js';
 
 const REQUEST_SCHEMA = 'vv-run-request.v1';
 const BATCH = 8; // the platform's MAX_COMPARE
@@ -377,7 +377,7 @@ function renderBase(rec) {
             m === null ? null : h('span', { class: 'lab-req-m small' }, `${rv.numeric ? `${fmtSig(Math.abs(rv.margin))} ${rv.unit}` : `${fmtSig(Math.abs(m))} ${unitOf(r)}`} ${(rv.numeric ? rv.margin : m) >= 0 ? 'inside' : 'beyond'} the limit`)));
         })),
         h('p', { class: 'small dim' }, 'Margins are the numbers the domain publishes with the record; where it publishes none they are read from the expected and observed text, and a requirement made of several quantities shows no margin. Select a requirement to highlight the parameters the domain lists for it.'))
-      : h('p', { class: 'lab-allmet' }, 'Every requirement met. Try a harder condition to find where this configuration stops meeting them.'),
+      : h('p', { class: 'lab-allmet' }, `${noFailureSentence(rec, ['requirement'])} Try a harder condition to find where this configuration stops meeting them.`),
     h('div', { class: 'row lab-base-actions' },
       h('button', { type: 'button', class: 'btn btn-quiet', onclick: () => navigate('run', { runId: lab.base.id }) }, 'Analyse the baseline')),
     h('details', { class: 'lab-model' }, h('summary', null, 'Model and its limits'), h('p', { class: 'small' }, prose(domain().manifest.model_validity))));

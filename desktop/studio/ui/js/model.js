@@ -82,8 +82,9 @@ export function verdictOfOutcome(status) {
   return { success: 'pass', partial: 'partial', failure: 'fail' }[status] || 'neutral';
 }
 
+/** A rule that held is `held`: a neutral tone of its own, never the green `pass` of a requirement that was met. */
 export function verdictOfSafety(status) {
-  return status === 'safe' ? 'pass' : status === 'unsafe' ? 'unsafe' : 'neutral';
+  return status === 'safe' ? 'held' : status === 'unsafe' ? 'unsafe' : 'neutral';
 }
 
 export function verdictOfRequirement(r) {

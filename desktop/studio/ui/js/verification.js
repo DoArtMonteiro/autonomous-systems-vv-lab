@@ -6,7 +6,8 @@ import { h, icon, num, timeText, prose, words } from './dom.js';
 import { safetyWording, SAFETY_NOTE, failureSentence, reqView, shortText } from './requirements.js';
 import { CATEGORY_TITLE, STATUS_TEXT, verdictOfOutcome, verdictOfSafety, verdictOfRequirement } from './model.js';
 
-const GLYPH = { pass: 'check', fail: 'cross', unsafe: 'warn', partial: 'dash', neutral: 'dash' };
+// `held` is the safety rules that were not broken: an outlined shield in a neutral tone, never the green check of a requirement that was met.
+const GLYPH = { pass: 'check', fail: 'cross', unsafe: 'warn', partial: 'dash', neutral: 'dash', held: 'shield' };
 
 export function verdictGlyph(v) {
   return h('span', { class: ['glyph', `v-${v}`], 'aria-hidden': 'true' }, icon(GLYPH[v] || 'dash'));

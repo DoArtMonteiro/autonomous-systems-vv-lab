@@ -28,7 +28,7 @@ import { buildControl } from './control.js';
 import { sourcesInfo } from '../sources-info.js';
 import { openCatalogue } from '../env-catalogue.js';
 import { cinematicButton } from '../cinematic.js';
-import { reqView, safetyWording, SAFETY_NOTE, failureSentence, indexNumbers, statusLine, requirementWording, endChip } from '../requirements.js';
+import { reqView, safetyWording, SAFETY_NOTE, failureSentence, indexNumbers, statusLine, requirementWording, endChip, noFailureSentence } from '../requirements.js';
 import { conditionsName } from '../model.js';
 
 let root;
@@ -783,7 +783,8 @@ function reveal() {
 }
 
 function tone(status) {
-  if (status === 'success' || status === 'safe' || status === 'pass') return 'ok';
+  if (status === 'held') return 'held';
+  if (status === 'success' || status === 'pass') return 'ok';
   if (status === 'unsafe') return 'bad';
   if (status === 'partial' || status === 'failure' || status === 'fail') return 'warn';
   return 'neutral';
@@ -804,18 +805,18 @@ function runResult(run) {
   const sw = safetyWording(rec);
   const safetyText = sw.text;
   // The chip's colour comes from the same reading as its words: a broken rule is never drawn green, an unjudged run is never drawn as a pass.
-  const safetyTone = sw.verdict === 'unsafe' ? 'unsafe' : sw.verdict === 'neutral' ? 'neutral' : 'pass';
+  const safetyTone = sw.verdict;
   return h('div', { class: 'pl-run-result', dataset: { outcome: rec.outcome.code, safety: rec.safety.status } },
     h('p', { class: 'pl-run-name' }, h('span', { class: 'pl-swatch', style: { background: run.colour } }), run.label),
     h('p', { class: 'pl-run-cond small dim', dataset: { run: run.runId, conditions: conditionsName(rec.request, (domainById(rec.request.domain) || {}).catalog) } }, `Conditions: ${conditionsName(rec.request, (domainById(rec.request.domain) || {}).catalog)}`),
     h('p', { class: 'pl-run-head' }, rec.outcome.label),
     h('div', { class: 'pl-verdicts' },
-      verdictChip(missionText, metFail.length ? 'fail' : /not evaluated/.test(missionText) ? 'neutral' : 'pass', 'Mission'),
+      verdictChip(missionText, metFail.length ? 'fail' : !missionReqs.length || /not evaluated/.test(missionText) ? 'neutral' : 'pass', 'Mission'),
       verdictChip(safetyText, safetyTone, 'Safety rules', SAFETY_NOTE)),
     metrics.length ? h('dl', { class: 'pl-metrics' }, metrics.map((m) => h('div', null, h('dt', null, m.label), h('dd', { class: 'mono' }, m.value === null ? '—' : `${hudNum(m.value)} ${m.unit}`)))) : null,
     failed.length ? h('ul', { class: 'pl-failed' }, failed.map((q) => h('li', null,
       h('button', { type: 'button', class: 'link', title: 'Move the playback to the decisive instant', onclick: () => { if (Number.isFinite(q.t)) { pl.cursor.pause(); pl.cursor.set(q.t); } } }, q.label),
-      (() => { const rv = reqView(q); return h('span', { class: 'small dim', title: rv.full }, ` ${q.category === 'invariant' ? 'safety rule' : 'requirement'}: limit ${rv.limitText}, observed ${rv.obsText}`); })()))) : h('p', { class: 'small ok-text' }, 'Every requirement and safety rule met.'));
+      (() => { const rv = reqView(q); return h('span', { class: 'small dim', title: rv.full }, ` ${q.category === 'invariant' ? 'safety rule' : 'requirement'}: limit ${rv.limitText}, observed ${rv.obsText}`); })()))) : (() => { const nf = noFailureSentence(rec, ['requirement', 'invariant']); return h('p', { class: /^Every /.test(nf) ? 'small ok-text' : 'small dim' }, nf); })());
 }
 
 function changeSummary() {

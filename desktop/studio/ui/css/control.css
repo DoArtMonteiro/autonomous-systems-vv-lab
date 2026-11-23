@@ -85,6 +85,8 @@
 .mc-v-s::before { content: "○ "; }
 .v-ok .mc-v-s { color: var(--pass); border-color: color-mix(in srgb, var(--pass) 45%, transparent); }
 .v-ok .mc-v-s::before { content: "✓ "; }
+.v-held .mc-v-s { color: var(--fg-2); }
+.v-held .mc-v-s::before { content: "◇ "; }
 .v-warn .mc-v-s { color: var(--fail); border-color: color-mix(in srgb, var(--fail) 50%, transparent); background: var(--fail-wash); }
 .v-warn .mc-v-s::before { content: "✕ "; }
 .v-bad .mc-v-s { color: var(--unsafe); border-color: color-mix(in srgb, var(--unsafe) 55%, transparent); background: var(--unsafe-wash); }

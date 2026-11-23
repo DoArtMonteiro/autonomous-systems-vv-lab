@@ -8,9 +8,9 @@ import path from 'node:path';
 // fileURLToPath keeps a path with spaces or '&' (for example "v&v lab") intact.
 const here = path.dirname(fileURLToPath(import.meta.url));
 const mod = await import(pathToFileURL(path.join(here, '..', 'desktop', 'studio', 'ui', 'js', 'requirements.js')).href);
-const { safetyWording, reqView, failureSentence, plainName, headlineChange, indexNumbers, shortText, SAFETY_NOTE, requirementWording, statusLine, endChip } = mod;
+const { noFailureSentence, safetyWording, reqView, failureSentence, plainName, headlineChange, indexNumbers, shortText, SAFETY_NOTE, requirementWording, statusLine, endChip } = mod;
 const model = await import(pathToFileURL(path.join(here, '..', 'desktop', 'studio', 'ui', 'js', 'model.js')).href);
-const { conditionsName, conditionsShared, displayRunLabel } = model;
+const { conditionsName, conditionsShared, displayRunLabel, verdictOfSafety, verdictOfOutcome } = model;
 
 const inv = (id, status) => ({ id, label: `Rule ${id}`, category: 'invariant', status, expected: '<= 1 m', observed: '0.5 m' });
 const req = (id, status, label = `Req ${id}`) => ({ id, label, category: 'requirement', status, expected: '<= 3 m/s', observed: '1.654537 m/s' });
@@ -40,13 +40,13 @@ test('a failing row is never neutral, even when the class says not evaluated', (
 test('safe with all rows evaluated says how many were checked', () => {
   const w = safetyWording(rec('safe', null, [inv('S1', 'pass'), inv('S2', 'pass'), inv('S3', 'pass')]));
   assert.equal(w.text, 'No safety rule broken (3 checked)');
-  assert.equal(w.verdict, 'pass');
+  assert.equal(w.verdict, 'held');
 });
 
 test('safe with some rows not evaluated counts only the evaluated ones and says so', () => {
   const w = safetyWording(rec('safe', null, [inv('S1', 'pass'), inv('S2', 'not_evaluated'), inv('S3', 'pass')]));
   assert.equal(w.text, 'No safety rule broken (2 of 3 checked; 1 not evaluated)');
-  assert.equal(w.verdict, 'pass');
+  assert.equal(w.verdict, 'held');
   assert.equal(w.checked, 2);
 });
 
@@ -66,7 +66,7 @@ test('a record whose safety class is not_evaluated is neutral', () => {
 test('safe with no rows at all writes no count', () => {
   const w = safetyWording(rec('safe', null, []));
   assert.equal(w.text, 'No safety rule broken');
-  assert.equal(w.verdict, 'pass');
+  assert.equal(w.verdict, 'held');
 });
 
 test('the safety note is generic and says requirements are judged separately', () => {
@@ -242,5 +242,35 @@ test('the end chip names the failed requirement and the broken rule', () => {
   assert.match(chip.text, /^Not met: Vertical speed at contact 24\.23 m\/s \(limit <= 3 m\/s\); safety rule broken: Climb under power; impact not modelled$/);
 });
 
+// ----------------------------------------------------------------------------- M19.1: the safety chip is never the green of a requirement
+
+test('a safety rule that held is neutral and never the green class of a requirement that was met', () => {
+  for (const rows of [[], [inv('S1', 'pass')], [inv('S1', 'pass'), inv('S2', 'not_evaluated')], [req('R1', 'fail'), inv('S1', 'pass')]]) {
+    const w = safetyWording(rec('safe', null, rows));
+    assert.equal(w.verdict, 'held', JSON.stringify(rows));
+    assert.notEqual(w.verdict, 'pass');
+  }
+  assert.equal(verdictOfSafety('safe'), 'held');
+  assert.equal(verdictOfSafety('unsafe'), 'unsafe');
+  assert.equal(verdictOfSafety('not_evaluated'), 'neutral');
+  // the mission outcome keeps its own green
+  assert.equal(verdictOfOutcome('success'), 'pass');
+});
+
+test('beside failed requirements the safety verdict is held and the requirement wording says failed', () => {
+  const r = rec('safe', null, [req('R1', 'fail'), req('R2', 'fail'), inv('S1', 'pass'), inv('S2', 'pass')]);
+  assert.equal(requirementWording(r), '2 of 2 requirements failed');
+  assert.equal(safetyWording(r).verdict, 'held');
+  assert.equal(safetyWording(r).text, 'No safety rule broken (2 checked)');
+});
+test('a record with a row that was not evaluated never says every requirement met', () => {
+  const rows = [req('R1', 'pass'), req('R2', 'not_evaluated', 'Mission starts and completes'), inv('S1', 'pass')];
+  const r = rec('safe', null, rows);
+  assert.equal(noFailureSentence(r, ['requirement', 'invariant']), 'No requirement and safety rule failed, but 1 was not evaluated: Mission starts and completes.');
+  assert.doesNotMatch(noFailureSentence(r, ['requirement']), /^Every/);
+  assert.equal(noFailureSentence(rec('safe', null, [req('R1', 'pass'), inv('S1', 'pass')]), ['requirement', 'invariant']), 'Every requirement and safety rule met.');
+  assert.equal(noFailureSentence(rec('safe', null, [req('R1', 'pass')]), ['requirement']), 'Every requirement met.');
+  assert.equal(noFailureSentence(rec('safe', null, []), ['requirement', 'invariant']), 'The record lists no requirement and safety rule.');
+});
 
 console.log(`${n} tests passed`);
