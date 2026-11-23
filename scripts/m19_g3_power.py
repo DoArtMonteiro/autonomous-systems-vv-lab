@@ -910,7 +910,7 @@ JOINT_SCENARIOS = [
 def joint_rule(n_low: int, n_high: int, with_mcnemar: bool = True) -> dict:
     dist, bstar = bs_distribution()
     out = {"n_low_band": n_low, "n_high_band": n_high}
-    for alpha_label, a in (("0.01/3", F(1, 300)), ("0.01", F(1, 100))):
+    for alpha_label, a in (("0.01/3", F(1, 300)), ("0.01/4", F(1, 400)), ("0.01", F(1, 100))):
         l, u = os_positions(60, a)
         rows = {}
         for name, p0, q, h2, shift in JOINT_SCENARIOS:
@@ -937,6 +937,25 @@ def joint_rule(n_low: int, n_high: int, with_mcnemar: bool = True) -> dict:
     out["independence"] = ("H1 (low band), H2 (high band) and H3 (stage B) use disjoint seeds, so the joint "
                            "power is the product; inside H1 the two arms share seeds, and the split options "
                            "are reported under independence and as Frechet bounds")
+    return out
+
+
+def family_of_four(n_low: int, n_high: int) -> dict:
+    """Thresholds if H1b is counted as a fourth claim-bearing test (Bonferroni 0.01/4)."""
+    a = F(1, 400)
+    dist, bstar = bs_distribution()
+    l, u = os_positions(60, a)
+    out = {
+        "alpha": r6(a),
+        "worst_case_family_error_if_H1b_is_outside_the_family_at_0.01/3": r6(4 * F(1, 300)),
+        "H1a_and_H1b_n": n_low, "H1a_and_H1b_reject_if_at_least": threshold(n_low, a),
+        "H2_n": n_high, "H2_reject_if_at_least": threshold(n_high, a),
+        "H3_positions": [l, u],
+        "power_H1a_or_H1b_pi": {f"{p}": r6(power(n_low, F(p), a)) for p in ("0.95", "0.97", "0.99")},
+        "power_H2_pi": {f"{p}": r6(power(n_high, F(p), a)) for p in ("0.95", "0.97", "0.99")},
+        "H3_confirm_by_shift": {f"{float(s):.2f}": median_interval_power(dist, bstar, 60, l, u, F(1), s)["confirm"]
+                                for s in (F(0), F(1, 4), F(1, 2), F(3, 4))},
+    }
     return out
 
 
@@ -998,6 +1017,7 @@ def build() -> dict:
             if label in ("p0=0.93 q=1.00", "p0=0.99 q=0.99")},
         "median_tests": median_tests(),
         "joint_rule": joint_rule(n_low, n_high),
+        "family_of_four_if_H1b_counts": family_of_four(n_low, n_high),
         "joint_rule_pooled_A_and_D": joint_rule(3 * 7 * 11 + n_low, 77 + n_high, with_mcnemar=False),
         "budgets": budgets(n_d + n_e, n_d),
     }

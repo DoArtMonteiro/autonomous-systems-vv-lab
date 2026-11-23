@@ -253,6 +253,34 @@
     "primary": 3,
     "secondary": 7
   },
+  "family_of_four_if_H1b_counts": {
+    "H1a_and_H1b_n": 168,
+    "H1a_and_H1b_reject_if_at_least": 162,
+    "H2_n": 140,
+    "H2_reject_if_at_least": 136,
+    "H3_confirm_by_shift": {
+      "0.00": 1.0,
+      "0.25": 1.0,
+      "0.50": 0.999996,
+      "0.75": 0.56324
+    },
+    "H3_positions": [
+      19,
+      42
+    ],
+    "alpha": 0.0025,
+    "power_H1a_or_H1b_pi": {
+      "0.95": 0.260238,
+      "0.97": 0.758494,
+      "0.99": 0.998368
+    },
+    "power_H2_pi": {
+      "0.95": 0.166024,
+      "0.97": 0.589245,
+      "0.99": 0.986259
+    },
+    "worst_case_family_error_if_H1b_is_outside_the_family_at_0.01/3": 0.013333
+  },
   "h1_options": {
     "alpha_bonferroni": "0.01/3",
     "alpha_full": "0.01",
@@ -1120,6 +1148,98 @@
         }
       }
     },
+    "alpha_0.01/4": {
+      "H3_positions": [
+        19,
+        42
+      ],
+      "scenarios": {
+        "development-like": {
+          "H1_O0": 0.947951,
+          "H1_O1": 0.996739,
+          "H1_O2": 0.996828,
+          "H1_O5": 0.998368,
+          "H1a_alone": 0.998368,
+          "H2": 0.986259,
+          "H3": 1.0,
+          "assumptions": {
+            "H2_pi": 0.99,
+            "boundary_shift_m": 0.0,
+            "p0": 0.99,
+            "q": 0.99
+          },
+          "joint_O0": 0.934925,
+          "joint_O1_H1a_and_H1b_and_H2_and_H3": 0.983043,
+          "joint_O1_H1a_only_with_H1b_as_positive_control": 0.98465,
+          "joint_O2": 0.983131,
+          "joint_O3": 0.986259,
+          "joint_O5": 0.98465
+        },
+        "moderate": {
+          "H1_O0": 0.497902,
+          "H1_O1": 0.757256,
+          "H1_O2": 0.757417,
+          "H1_O5": 0.998368,
+          "H1a_alone": 0.998368,
+          "H2": 0.589245,
+          "H3": 1.0,
+          "assumptions": {
+            "H2_pi": 0.97,
+            "boundary_shift_m": 0.25,
+            "p0": 0.97,
+            "q": 0.99
+          },
+          "joint_O0": 0.293386,
+          "joint_O1_H1a_and_H1b_and_H2_and_H3": 0.446209,
+          "joint_O1_H1a_only_with_H1b_as_positive_control": 0.588283,
+          "joint_O2": 0.446304,
+          "joint_O3": 0.589245,
+          "joint_O5": 0.588283
+        },
+        "optimistic": {
+          "H1_O0": 1.0,
+          "H1_O1": 1.0,
+          "H1_O2": 1.0,
+          "H1_O5": 1.0,
+          "H1a_alone": 1.0,
+          "H2": 1.0,
+          "H3": 1.0,
+          "assumptions": {
+            "H2_pi": 1.0,
+            "boundary_shift_m": 0.0,
+            "p0": 1.0,
+            "q": 1.0
+          },
+          "joint_O0": 1.0,
+          "joint_O1_H1a_and_H1b_and_H2_and_H3": 1.0,
+          "joint_O1_H1a_only_with_H1b_as_positive_control": 1.0,
+          "joint_O2": 1.0,
+          "joint_O3": 1.0,
+          "joint_O5": 1.0
+        },
+        "pessimistic": {
+          "H1_O0": 0.122754,
+          "H1_O1": 0.259814,
+          "H1_O2": 0.25988,
+          "H1_O5": 0.998063,
+          "H1a_alone": 0.998368,
+          "H2": 0.589245,
+          "H3": 0.56324,
+          "assumptions": {
+            "H2_pi": 0.97,
+            "boundary_shift_m": 0.75,
+            "p0": 0.95,
+            "q": 0.99
+          },
+          "joint_O0": 0.04074,
+          "joint_O1_H1a_and_H1b_and_H2_and_H3": 0.086229,
+          "joint_O1_H1a_only_with_H1b_as_positive_control": 0.331345,
+          "joint_O2": 0.086251,
+          "joint_O3": 0.331886,
+          "joint_O5": 0.331243
+        }
+      }
+    },
     "independence": "H1 (low band), H2 (high band) and H3 (stage B) use disjoint seeds, so the joint power is the product; inside H1 the two arms share seeds, and the split options are reported under independence and as Frechet bounds",
     "n_high_band": 140,
     "n_low_band": 168
@@ -1298,6 +1418,94 @@
           "joint_O1_H1a_only_with_H1b_as_positive_control": 0.626047,
           "joint_O2": 0.533244,
           "joint_O5": 0.626047
+        }
+      }
+    },
+    "alpha_0.01/4": {
+      "H3_positions": [
+        19,
+        42
+      ],
+      "scenarios": {
+        "development-like": {
+          "H1_O0": 0.999998,
+          "H1_O1": 1.0,
+          "H1_O2": 1.0,
+          "H1_O5": 1.0,
+          "H1a_alone": 1.0,
+          "H2": 0.999921,
+          "H3": 1.0,
+          "assumptions": {
+            "H2_pi": 0.99,
+            "boundary_shift_m": 0.0,
+            "p0": 0.99,
+            "q": 0.99
+          },
+          "joint_O0": 0.999919,
+          "joint_O1_H1a_and_H1b_and_H2_and_H3": 0.999921,
+          "joint_O1_H1a_only_with_H1b_as_positive_control": 0.999921,
+          "joint_O2": 0.999921,
+          "joint_O5": 0.999921
+        },
+        "moderate": {
+          "H1_O0": 0.969491,
+          "H1_O1": 0.998814,
+          "H1_O2": 0.998814,
+          "H1_O5": 1.0,
+          "H1a_alone": 1.0,
+          "H2": 0.879804,
+          "H3": 1.0,
+          "assumptions": {
+            "H2_pi": 0.97,
+            "boundary_shift_m": 0.25,
+            "p0": 0.97,
+            "q": 0.99
+          },
+          "joint_O0": 0.852962,
+          "joint_O1_H1a_and_H1b_and_H2_and_H3": 0.878761,
+          "joint_O1_H1a_only_with_H1b_as_positive_control": 0.879804,
+          "joint_O2": 0.878761,
+          "joint_O5": 0.879804
+        },
+        "optimistic": {
+          "H1_O0": 1.0,
+          "H1_O1": 1.0,
+          "H1_O2": 1.0,
+          "H1_O5": 1.0,
+          "H1a_alone": 1.0,
+          "H2": 1.0,
+          "H3": 1.0,
+          "assumptions": {
+            "H2_pi": 1.0,
+            "boundary_shift_m": 0.0,
+            "p0": 1.0,
+            "q": 1.0
+          },
+          "joint_O0": 1.0,
+          "joint_O1_H1a_and_H1b_and_H2_and_H3": 1.0,
+          "joint_O1_H1a_only_with_H1b_as_positive_control": 1.0,
+          "joint_O2": 1.0,
+          "joint_O5": 1.0
+        },
+        "pessimistic": {
+          "H1_O0": 0.49215,
+          "H1_O1": 0.796072,
+          "H1_O2": 0.796072,
+          "H1_O5": 1.0,
+          "H1a_alone": 1.0,
+          "H2": 0.879804,
+          "H3": 0.56324,
+          "assumptions": {
+            "H2_pi": 0.97,
+            "boundary_shift_m": 0.75,
+            "p0": 0.95,
+            "q": 0.99
+          },
+          "joint_O0": 0.24388,
+          "joint_O1_H1a_and_H1b_and_H2_and_H3": 0.394486,
+          "joint_O1_H1a_only_with_H1b_as_positive_control": 0.495541,
+          "joint_O2": 0.394486,
+          "joint_O5": 0.495541
         }
       }
     },

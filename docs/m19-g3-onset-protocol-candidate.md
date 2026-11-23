@@ -10,8 +10,8 @@ O critério G3 do M9.1 não muda. Foi registado e suportado com o viés presente
 
 Nenhuma simulação foi corrida para escrever este documento, e nenhuma semente de 44000 a 44999 foi usada. Não se correu `vv-rocket`, `vv-exec` nem `cargo`. Os números vêm de leitura de código, de evidência guardada e de aritmética exata em `scripts/m19_g3_power.py` (só biblioteca padrão), cuja saída está em `docs/evidence/m19/g3-candidate/calculations.json`.
 
-- sha256 de `scripts/m19_g3_power.py` (bytes do blob, fim de linha LF): `4aac30010313ac9edfc4ce546d9aecaee9c75fd0e0b8c33c32cd2fa60d0982a2`
-- sha256 de `docs/evidence/m19/g3-candidate/calculations.json`: `4b2f6f23e68fae3e0f06eb1168b882f3caabd90ab5992831c95371142a5b3d65`
+- sha256 de `scripts/m19_g3_power.py` (bytes do blob, fim de linha LF): `2dfdad80d2e265ca8cf070ad754cfb73a25f0e8e5ffed6dca169fdbe7959e1af`
+- sha256 de `docs/evidence/m19/g3-candidate/calculations.json`: `199913e9ddafe49b8c9e63decd397165bcc885cb61d1e98ea243230aadb4b944`
 - Reprodução: `python scripts/m19_g3_power.py --check docs/evidence/m19/g3-candidate/calculations.json` (não escreve nada, devolve 0 se os bytes coincidirem).
 
 **Revisão por agentes não é revisão humana por pares.** Recomenda-se a leitura por um engenheiro que não participou no M13, no M14, no M15 nem no M19.
@@ -32,7 +32,7 @@ Nenhuma simulação foi corrida para escrever este documento, e nenhuma semente 
 | 1 | Estado | «Candidato a protocolo congelado» | «Candidato corrigido», etiqueta no topo | Não há congelamento nem aprovação. |
 | 2 | Inícios T | {0,01; 0,1; 1; 2; 5; 10; 15; 20} s (8) | {0,1; 1; 2; 5; 10; 15; 20} s (7) | O GNSS mede a cada 10 passos; um início em (0; 0,1] s só se vê na medida do passo 10. 0,01 e 0,1 dão a mesma história de sensores. |
 | 3 | Texto das «63 sementes» | «seriam precisas 63» ao nível 0,01/14 | 63 ao nível 0,01/7; 69 ao nível 0,01/14 | 0,9^63 = 0,00131 ≤ 0,01/7 = 0,00143; 0,9^69 = 0,00070 ≤ 0,01/14 = 0,00071. |
-| 4 | Nível de S4 e S5 | McNemar a 0,01/14 por condição | 0,01/7 por condição | S4 (e S5) é um teste da família secundária; exige as duas condições (união de interseções), logo cada condição usa o nível total do teste. Dividir outra vez conta a multiplicidade duas vezes. |
+| 4 | Nível de S4 e S5 | McNemar a 0,01/14 por condição | 0,01/7 por condição | S4 (e S5) é um teste da família secundária; exige as duas condições (teste de interseção-união), logo cada condição usa o nível total do teste. Dividir outra vez conta a multiplicidade duas vezes. |
 | 5 | McNemar de S4 e S5 | pelo menos 11 pares discordantes | pelo menos 10 | 0,5^10 = 0,00098 < 0,01/7. |
 | 6 | Palavra para S4 e S5 | «confirmada» | «suportada pela regra do motor», sem inferência | Com 60 sementes um teste binomial contra 0,9 é impossível ao nível 0,01/7 (mínimo 63) e ao nível 0,01/14 (mínimo 69). A regra «54 de 60» aceita 0,18 das vezes se a taxa for 0,85. |
 | 7 | H1 | Conjunção: R1 cumpre-se a 0 s **e** falha no início tardio, n = 160, limiar 154 | H1a (falha no início tardio, n = 168, ≥ 162) com H1b (R1 cumpre-se a 0 s) como controlo positivo declarado. Outras opções na secção própria | A conjunção tem potência 0,064 (n = 160) ou 0,047 (n = 168) se a taxa a 0 s for 0,93 e a falha tardia for total, e 0,12 (n = 168) se a taxa for 0,95 e a falha tardia 0,99; depende de uma propriedade do G3 já registado. |
@@ -47,18 +47,26 @@ Nenhuma simulação foi corrida para escrever este documento, e nenhuma semente 
 | 16 | Mapas das etapas | A 44000 a 44319, B 44320 a 44379, C 44380 a 44439, D 44440 a 44759, E 44760 a 44919 | A 44000 a 44307, B 44308 a 44367, C 44368 a 44427, D 44428 a 44735, E 44736 a 44895 | Fórmulas novas para A e D; B, C e E mantêm o conteúdo e deslocam-se. |
 | 17 | Sementes protegidas | «as sementes protegidas do foguetão em `exec/src/seeds.rs`» | 3000 a 3099 e 6000 a 6099 (M10) | `ROCKET_PROTECTED` também lista 44000 a 44999; à letra, proibia as sementes do protocolo. |
 | 18 | `source_sha256` do `vv-rocket` | `12b276cb...` «hoje» | `295a45b2...`; `12b276cb...` fica como valor do M13 | Só `landing_model.rs` mudou. Ver «Fontes fixadas». |
-| 19 | Citações de linha | `landing_model.rs:414-418` e `:238` | Nomes de função e hashes de ficheiro | As linhas mudaram (agora 426 a 431 e 250). |
+| 19 | Citações de linha | `landing_model.rs:414-418` e `:238` (também nas secções do M15 incluídas por referência) | Nomes de função e hashes de ficheiro; as duas frases em causa ficam reescritas em «Mecanismo» | As linhas mudaram (agora 426 a 431 e 250). |
 | 20 | Janela do mediador | [início; início + 1,0 s] | [início efetivo; início efetivo + 1,0 s] | Início efetivo = primeiro passo de GNSS não anterior ao início. É igual a T em todos os inícios de T. |
 | 21 | Verificação do código antes de correr | Não existe | Passo de equivalência de bytes (por correr, depois de aprovado) | `run.json` embute `source_sha256`, por isso difere por construção; `trace.json` e `verification.json` têm de coincidir com o registo M13. |
-| 22 | Nível do achado conjunto | Bonferroni 0,01/3 sem discussão | Mantém-se; alternativa de 0,01 por teste descrita com números | A conjunção H1 e H2 e H3 é uma união de interseções (pergunta 11 do pacote de revisão). |
+| 22 | Nível do achado conjunto | Bonferroni 0,01/3 sem discussão | Mantém-se; alternativa de 0,01 por teste descrita com números | A conjunção H1 e H2 e H3 é um teste de interseção-união (pergunta 11 do pacote de revisão). |
 | 23 | Scripts | `scripts/m15_g3_confirm.py`, `scripts/m15_g3_analyse.py`, `docs/m15-g3-onset-freeze.json` | `scripts/m19_g3_confirm.py`, `scripts/m19_g3_analyse.py`, `docs/m19-g3-onset-freeze.json` | Nenhum existe; os nomes seguem o candidato. |
 | 24 | Potência | n = 160, π único | Potência e efeito mínimo detetável de cada teste, por cenário, em `calculations.json` | Ver «Análise» e «Opções de desenho para H1». |
+| 25 | Sementes não monótonas (etapa B) | «contadas e reportadas», sem dizer se entram na mediana | entram na mediana com o seu b_s | Pergunta 13(d) do pacote de revisão. |
+| 26 | Etapa inválida | inválida e sem substituição, sem regra para as hipóteses | as hipóteses da etapa ficam inconclusivas | Pergunta 18. |
+| 27 | S6 | n cerca de 160 | limiar recalculado com o n observado (cerca de 140); inconclusiva abaixo de 63 | n depende de quantas execuções tardias rejeitam. |
+| 28 | Palavras do veredicto | «achado M14 confirmado», «mecanismo confirmado» | «achado M14 replicado», com a frase a declarar que só a fronteira foi prevista; «mecanismo suportado» | Classificação corrigida; pergunta 22. |
+| 29 | Sementes já vistas | sem o G3 do M9.1 | acrescenta 2000 a 2029 | São sementes onde o G3 se registou. |
+| 30 | Decisão do responsável | uma só: aprovar ou rejeitar | por ordem: escolher a opção de H1 e as escolhas de desenho, ler o texto corrigido, só depois aprovar ou rejeitar | Há escolhas de desenho por tomar. |
+| 31 | H1b e a multiplicidade | não existia | declarado: quatro testes com afirmação se H1b licenciar «G3 replicado», alternativa 0,01/4 | Evita um erro de família de até 0,0133 sem o dizer. |
+| 32 | Distribuição de b_s em S1 | implícita | declarada como pressuposto (reutiliza a de 5 s) | S1 mede-se a 15 s. |
 
 **Não tratado aqui.** Os restantes pontos do pacote de revisão (por exemplo as perguntas 1, 2, 5 a 7, 9, 14, 15, 17 a 19, 21 a 24) ficam como no M15. Em particular: a proporção agregada tolera a falha de uma célula inteira (H1a: 6 falhas, uma célula tem 6 sementes), os denominadores do orçamento de regressão incluem pares em que a mitigação não pode atuar, e não há controlo global entre famílias (até 0,03 no conjunto das três).
 
 ## Mecanismo, segundo o código
 
-Tudo o que o candidato M15 diz sobre o mecanismo (viés, inicialização, rejeição, regra 1, componente lateral, políticas, registo) mantém-se; ver `docs/m15-g3-onset-protocol.md`, secção «Mecanismo, segundo o código». Acrescenta-se a geometria do início, que o M15 só escrevia em parte.
+Tudo o que o candidato M15 diz sobre o mecanismo (viés, inicialização, rejeição, regra 1, componente lateral, políticas, registo) mantém-se; ver `docs/m15-g3-onset-protocol.md`, secção «Mecanismo, segundo o código». Acrescenta-se a geometria do início, que o M15 só escrevia em parte. Duas citações de linha desse texto ficam substituídas por identificadores: o máximo aceite de `ascent_abort_vz_mps` (100) está em `validate_gains` e o mínimo de 5 m do viés do altímetro em `FaultKind::magnitude_range` (`AltimeterBias`), ambos em `crates/vv-rocket/src/landing_model.rs`.
 
 ### Geometria do início
 
@@ -115,8 +123,8 @@ Os oito ficheiros de famílias, `sources.json`, `scripts/m14_stats.py`, `scripts
 - **Como se calcula.** `source_sha256()` em `crates/vv-rocket/src/lib.rs`: sha256 sobre 20 ficheiros (`Cargo.lock`, `Cargo.toml` e 18 de `src/`), cada um com o nome, um byte 0, o conteúdo com `\r\n` trocado por `\n` e outro byte 0. Recalculado em Python sobre os blobs, sem compilar; a reprodução dá `12b276cb...` em `3962482` e `295a45b2...` em `4777160` e em `bec7b3f`.
 - **O que difere.** Só `crates/vv-rocket/src/landing_model.rs` (+152 linhas, −3), por dois commits (`3baa1c1`, `04de572`). Os outros 19 ficheiros têm o mesmo blob.
 - **O que o diff faz.** Acrescenta o esquema `vv-rocket-landing.v2` e `check_exploratory`, que só corre para casos v2; `prepare_landing` passa a ramificar por esquema (v2 para `check_exploratory`, o resto para `check_registered`, que não mudou); `prepare_unpinned` alarga a verificação do esquema para aceitar v2; e uma constante nova só usada por `check_exploratory`. Para um caso v1 (o `g3-registered.json` é v1) a sequência de operações de `sensors`, `controller`, `sim` e `verify` é a mesma, e esses ficheiros têm blobs idênticos.
-- **Conclusão.** Por leitura do diff, as saídas de simulação de casos v1 **não devem diferir**; isto **não está demonstrado por execução**. Há duas consequências certas: (a) `run.json` embute `source_sha256` (`landing_run.rs`, `manifest_for`), por isso muda por construção; `trace.json` e `verification.json` não o embutem; (b) a verificação `vv-rocket verify` de pacotes construídos com `12b276cb...` regista «built from the same sources» como falhada com o código atual (`landing_run.rs`, verificação de manifesto); não afeta a simulação.
-- **Passo de equivalência (por correr, depois da aprovação e antes do congelamento).** Compilar o `vv-rocket` do commit a fixar, correr os casos guardados em `docs/evidence/m13/g3-onset/` (semente 42879: registado, contraexemplo, gémeo e as duas mitigações) e comparar o sha256 de `trace.json` e de `verification.json` com os de `investigation.json`. Qualquer diferença suspende o protocolo até se perceber a causa. Não se corre com sementes 44000 a 44999.
+- **Conclusão.** Por leitura do diff, as saídas de simulação de casos v1 **não devem diferir**; isto **não está demonstrado por execução**. Há duas consequências certas: (a) `run.json` embute `source_sha256` (`landing_run.rs`, `manifest_for`), por isso muda por construção; `trace.json` e `verification.json` não o embutem; (b) `vv-rocket replay <pasta>` de um pacote construído com `12b276cb...` regista «built from the same sources» como falhado, e o manifesto como diferente, com o código atual (`landing_run.rs`, `replay`); não afeta a simulação.
+- **Passo de equivalência (por correr, depois da aprovação e antes do congelamento).** Os ficheiros `case.json`, `trace.json` e `verification.json` dos cinco artefactos da semente 42879 (registado, contraexemplo, gémeo e as duas mitigações) **não estão no repositório**: `docs/evidence/m13/g3-onset/` só tem `investigation.json`, `manifest.json` e `verification.json`, que guardam os sha256 (`artifacts.<nome>.files`). Por isso o passo é: (1) reconstruir cada `case.json` a partir de `exec/cases/m13/g3-registered.json` e dos valores guardados (`findings.counterexample.minimised`, `registered`, e o ponteiro do limiar de cada mitigação) e conferir o sha256 com `files.case.json`; (2) se coincidir, compilar o `vv-rocket` do commit a fixar, correr `vv-rocket land` com a semente 42879 e comparar o sha256 de `trace.json` e de `verification.json` com os guardados (`run.json` difere por construção); (3) se um `case.json` não se reconstruir byte a byte, esse artefacto fica fora do passo, e o passo tem de ser substituído por outra comparação aprovada. Os artefactos guardados vieram do `vv-exec 0.12.0` em processo; uma diferença pode vir da linha de comandos em vez do código-fonte (a equivalência entre os dois só foi verificada numa amostra pequena, `docs/m14-evidence-robustness.md`). Qualquer diferença suspende o protocolo até se perceber a causa. Não se corre com sementes 44000 a 44999.
 - **Referência.** O hash a fixar é o do commit de congelamento; hoje é `295a45b2...`. A evidência de desenvolvimento do M13 refere-se a `12b276cb...`.
 
 ## Hipóteses
@@ -126,7 +134,7 @@ Os oito ficheiros de famílias, `sources.json`, `scripts/m14_stats.py`, `scripts
 | Origem | Data do commit (UTC) | Sementes | O que se viu |
 | --- | --- | --- | --- |
 | M9.1, critério G3 | 2026-10-28 e 29 | 2000 a 2029 | R1 cumprido em 30 de 30 com início 0 s (`docs/m9-powered-landing.md`, quadro de resultados). |
-| M14, fragilidade, braços por início | 2026-11-03 17:07 a 17:43 | 32000 a 32099 | Início 0 s: R1 cumprido em 180 de 180 (6 magnitudes de 5 a 30 m). Inícios 2, 5 e 10 s: R1 falha em 30 de 30 a 5 e 10 m e cumpre-se a 15 m ou mais. Primeira vez que se viu o mascaramento e a recuperação. |
+| M14, fragilidade, braços por início | 2026-11-03 17:07 a 17:43 | 32000 a 32029 (a fragilidade completa usa 32000 a 32099) | Início 0 s: R1 cumprido em 180 de 180 (6 magnitudes de 5 a 30 m). Inícios 2, 5 e 10 s: R1 falha em 30 de 30 a 5 e 10 m e cumpre-se a 15 m ou mais. Primeira vez que se viu o mascaramento e a recuperação. |
 | M13, investigação | dados de 2026-11-03; evidência no commit de 21:31 | 42000 a 43999 | Envelope 16 × 16 com 4 sementes: linha de 0 s com 64 de 64; 240 de 240 falhas com início tardio a 10 m ou menos; 660 de 660 cumprimentos a 13,3 m ou mais. Contraexemplo reduzido (0,02 s, 9,72 m). Limiar 1 m: 280 pares corrigidos e 35 compromissos. |
 | M14, previsão e teste | 20:20 e 20:25 | 47000 a 47019 | P1: b50 = 11,89 m contra b* = 11,99 m. P2: a 8 m, só o início 0 s evita o mascaramento (0,01, 0,02 e 0,1 s são uma só condição). |
 | M14, revisão independente | 2026-11-03 | 33500 a 33529 | Inícios 0,5 e 1 s: R1 em 0 de 30 a 5 e 10 m. |
@@ -165,7 +173,7 @@ Nenhuma destas sementes volta a servir de confirmação. A previsão P1 foi fixa
 
 S1 a S7 como no M15 (S1: H3 com início a 15 s, posições 19 e 42; S2: H3 a 5 s com tolerância 0,5 m; S3: R5 falha a 0 s na banda alta; S4: `guarded` sem regra 2 cumpre R1 e `robust` falha; S5: limiar 1000 m faz R1 falhar onde o `guarded` registado cumpre; S6: primeira rejeição dentro da janela; S7: limiar 2 m falha a 5 m e cumpre a 10,5 m), todas a posteriori. As alterações são de contagens e de palavras:
 
-- **S4 e S5, nível.** São duas hipóteses da família de 7, cada uma confirmada só se **as duas** condições (0 s e 15 m; 5 s e 15 m) rejeitarem. Numa regra de união de interseções cada condição é testada ao nível total do teste, 0,01/7; o M15 aplicava 0,01/14, o que conta a multiplicidade duas vezes.
+- **S4 e S5, nível.** São duas hipóteses da família de 7, cada uma confirmada só se **as duas** condições (0 s e 15 m; 5 s e 15 m) rejeitarem. Numa regra de interseção-união cada condição é testada ao nível total do teste, 0,01/7; o M15 aplicava 0,01/14, o que conta a multiplicidade duas vezes.
 - **S4 e S5, o que se pode concluir com 60 sementes.** Um teste binomial contra 0,9 só rejeita com n sucessos em n se 0,9^n ≤ α. A 0,01/7 isso exige n ≥ 63 (0,9^63 = 0,00131; 0,9^62 = 0,00146 > 0,00143). A 0,01/14 exigiria 69. Com 60 sementes nenhum dos dois é possível. Mantém-se a regra do motor (fração de sementes no sentido previsto ≥ 0,9, mais McNemar exato com p < 0,01/7, isto é, pelo menos 10 pares discordantes no sentido previsto), mas **como regra, não como inferência**: a fração ≥ 54 de 60 implica um p de McNemar de 4,9 × 10⁻¹¹ no pior caso, por isso o McNemar nunca decide, e a regra aceita taxas verdadeiras de 0,85 com probabilidade 0,185 e de 0,90 com probabilidade 0,606. O veredicto escreve-se «suportada pela regra do motor, sem inferência», nunca «confirmada». Com mais sementes por condição, o teste binomial a 0,01/7 passa a ser possível (63, 70, 77, 84: tolera 0 falhas; 100: 1 falha; 150: 4 falhas); a potência é baixa mesmo assim (n = 150, π = 0,97: 0,531). Ver `calculations.json`, `s4_s5`.
 - **S4 e S5, definição de sucesso.** São conjunções de dois braços na mesma semente (S4: G0 cumpre R1 e `robust` falha; S5: o `guarded` registado cumpre R1 e o braço de 1000 m falha), como H1; os valores de π dependem das duas taxas.
 - **S6.** n é o número de execuções tardias da etapa A com rejeição (cerca de 140, banda alta); o limiar recalcula-se com o n observado ao nível 0,01/7 e, abaixo de 63, S6 é inconclusiva por construção.
@@ -227,7 +235,7 @@ S7 só se confirma se as duas proporções derem 77 de 77; com π = 0,99 em cada
 
 ### Fronteira (H3, S1, S2)
 
-Intervalo da mediana sem distribuição: [X(l) − 0,25; X(u)], com n = 60 e posições (20; 41) ao nível 0,01/3 (H3) e (19; 42) ao nível 0,01/7 (S1, S2). Confirma-se se o intervalo cabe dentro de b* ± tolerância (1 m em H3 e S1; 0,5 m em S2); refuta-se se ficar inteiramente fora.
+Intervalo da mediana sem distribuição: [X(l) − 0,25; X(u)], com n = 60 e posições (20; 41) ao nível 0,01/3 (H3) e (19; 42) ao nível 0,01/7 (S1, S2). S1 reutiliza a distribuição de b_s de 5 s para o início de 15 s, o que é um pressuposto, não um dado. Confirma-se se o intervalo cabe dentro de b* ± tolerância (1 m em H3 e S1; 0,5 m em S2); refuta-se se ficar inteiramente fora.
 
 Potência exata (distribuição de b_s reconstruída de `test.json`, supondo R1 monótono em cada semente, o que o ficheiro não permite verificar; o deslocamento move a distribuição inteira). Cruzamento Monte Carlo: gerador SplitMix64, semente 20261123 (do script, sem relação com sementes do simulador), 5000 repetições; a 0,75 m dá 0,674 contra 0,669 exato.
 
@@ -248,7 +256,9 @@ Iguais às do M15: uma execução que falha repete-se uma vez com a mesma sement
 
 ### Controlo de multiplicidade
 
-Bonferroni dentro de cada família (0,01/3, 0,01/7, 0,01/2). Entre famílias não há correção: o erro máximo agregado é 0,03. Os limites de Clopper-Pearson do orçamento de regressão não têm correção. O achado conjunto (H1a, H2, H3) é uma união de interseções; ver a alternativa de nível 0,01 em «Opções de desenho para H1».
+Bonferroni dentro de cada família (0,01/3, 0,01/7, 0,01/2). Entre famílias não há correção: o erro máximo agregado é 0,03. Os limites de Clopper-Pearson do orçamento de regressão não têm correção. O achado conjunto (H1a, H2, H3) é um teste de interseção-união; ver a alternativa de nível 0,01 em «Opções de desenho para H1».
+
+**H1b e a multiplicidade no padrão provisório.** H1b é testado ao nível 0,01/3 fora da família de três, mas uma confirmação sua autoriza a frase «G3 replicado». Há então quatro testes com afirmação (H1a, H1b, H2, H3) e, com 0,01/3 cada, o erro de família pode chegar a 4 × 0,01/3 = 0,0133. Alternativa: família de quatro a 0,01/4 = 0,0025. Os limiares binomiais não mudam (H1a e H1b 162 de 168; H2 136 de 140, porque os testes são discretos); só mudam as posições de H3, de (20; 41) para (19; 42), e a potência de H3 a 0,75 m, de 0,669 para 0,563. Na regra conjunta do padrão, a potência com 0,01/4 é 1,000 / 0,985 / 0,588 / 0,331 nos quatro cenários (com 0,01/3: 1,000 / 0,985 / 0,588 / 0,394).
 
 ## Opções de desenho para H1
 
@@ -273,15 +283,15 @@ As execuções partilham sementes entre células (30 na fragilidade, 4 no envelo
 
 Cenários (p0; q): (1,00; 1,00), (0,99; 0,99), (0,97; 0,99), (0,95; 0,99), (0,93; 0,99), (0,93; 1,00), (0,90; 1,00, o piso do G3), (1,00; 0,93, equivalente a um início em sete a falhar metade das vezes). Todas as potências são exatas, sob independência entre os dois braços da mesma semente; no ficheiro de cálculos há também os limites de Fréchet das opções 1 e 2 (a diferença não passa de 0,002).
 
-| Opção | O que testa | (0,99; 0,99) | (0,97; 0,99) | (0,95; 0,99) | (0,93; 0,99) | (0,93; 1,00) | (1,00; 0,93) |
+| Opção | O que testa (testes com afirmação; nível) | (0,99; 0,99) | (0,97; 0,99) | (0,95; 0,99) | (0,93; 0,99) | (0,93; 1,00) | (1,00; 0,93) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0. Conjunção M15 | π = p0 · q > 0,9 | 0,948 | 0,498 | 0,123 | 0,018 | 0,047 | 0,047 |
-| 1. Separar, ambas exigidas | H1a: q > 0,9 e H1b: p0 > 0,9 | 0,997 | 0,757 | 0,260 | 0,046 | 0,047 | 0,047 |
-| 2. Condicional | H1b, e q > 0,9 entre as sementes com R1 cumprido a 0 s | 0,997 | 0,757 | 0,260 | 0,046 | 0,047 | 0,047 |
-| 3. Emparelhado (McNemar exato) | a falha tardia é mais provável do que a de 0 s | 1,000 | 1,000 | 1,000 | 1,000 | 1,000 | 1,000 |
-| 4. Separar, H1b só controlo | H1a: q > 0,9 (H1b reportado) | 0,998 | 0,998 | 0,998 | 0,998 | 1,000 | 0,047 |
-| 5. Separar, nula 0,8 em H1b | q > 0,9 e p0 > 0,8 | 0,998 | 0,998 | 0,998 | 0,984 | 0,986 | 0,047 |
-| 6. Agrupar braços de A e D (n = 399) | opção 1 com 168 + 231 sementes | 1,000 | 0,999 | 0,852 | 0,255 | 0,255 | 0,255 |
+| 0. Conjunção M15 | π = p0 · q > 0,9 (3: H1, H2, H3; 0,01/3) | 0,948 | 0,498 | 0,123 | 0,018 | 0,047 | 0,047 |
+| 1. Separar, ambas exigidas | H1a: q > 0,9 e H1b: p0 > 0,9, ambos a rejeitar (3 compostos: H1, H2, H3; 0,01/3 cada) | 0,997 | 0,757 | 0,260 | 0,046 | 0,047 | 0,047 |
+| 2. Condicional | H1b, e q > 0,9 entre as sementes com R1 cumprido a 0 s (3 compostos; 0,01/3) | 0,997 | 0,757 | 0,260 | 0,046 | 0,047 | 0,047 |
+| 3. Emparelhado (McNemar exato) | a falha tardia é mais provável do que a de 0 s (3; 0,01/3) | 1,000 | 1,000 | 1,000 | 1,000 | 1,000 | 1,000 |
+| 4. Separar, H1b só controlo | H1a: q > 0,9 (H1b reportado) (3 mais o controlo, que conta como quarto se licenciar «G3 replicado»; 0,01/3, ou 0,01/4 com quatro) | 0,998 | 0,998 | 0,998 | 0,998 | 1,000 | 0,047 |
+| 5. Separar, nula 0,8 em H1b | q > 0,9 e p0 > 0,8 (3 compostos; 0,01/3 cada) | 0,998 | 0,998 | 0,998 | 0,984 | 0,986 | 0,047 |
+| 6. Agrupar braços de A e D (n = 399) | opção 1 com 168 + 231 sementes (3 compostos; 0,01/3 cada) | 1,000 | 0,999 | 0,852 | 0,255 | 0,255 | 0,255 |
 
 Notas:
 
@@ -305,12 +315,13 @@ H1 (banda baixa), H2 (banda alta) e H3 (etapa B) usam sementes disjuntas, por is
 | Opção 4: H1a, H2, H3 (H1b controlo) | 1,000 | 0,985 | 0,588 | 0,394 |
 | Opção 3: H1 emparelhado, H2, H3 | 1,000 | 0,986 | 0,589 | 0,394 |
 | Opção 6: braços agrupados, H1a e H1b, H2, H3 | 1,000 | 1,000 | 0,935 | 0,533 |
+| Opção 4 com família de quatro (0,01/4) | 1,000 | 0,985 | 0,588 | 0,331 |
 | Opção 4 com nível 0,01 por teste | 1,000 | 0,997 | 0,755 | 0,575 |
 | Opção 6 com nível 0,01 por teste | 1,000 | 1,000 | 0,968 | 0,685 |
 
 O limite da regra conjunta com as opções 3 e 4 é H2 (n = 140: potência 0,589 com π = 0,97), não H1.
 
-**Nível do achado conjunto.** Como o achado exige H1, H2 e H3 todas confirmadas, o erro de afirmar o conjunto sem que seja verdade não passa de 0,01 se cada teste usar 0,01 (união de interseções). O ganho é grande (moderado: 0,588 para 0,755 na opção 4). O custo é que as três hipóteses deixam de ter controlo de família 0,01 quando lidas isoladamente (até 0,03). O padrão mantém Bonferroni; a escolha pertence a quem decide.
+**Nível do achado conjunto.** Como o achado exige H1, H2 e H3 todas confirmadas, o erro de afirmar o conjunto sem que seja verdade não passa de 0,01 se cada teste usar 0,01 (interseção-união). O ganho é grande (moderado: 0,588 para 0,755 na opção 4). O custo é que as três hipóteses deixam de ter controlo de família 0,01 quando lidas isoladamente (até 0,03). O padrão mantém Bonferroni; a escolha pertence a quem decide.
 
 ### Padrão provisório (não é uma decisão)
 
