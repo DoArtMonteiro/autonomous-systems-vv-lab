@@ -44,7 +44,7 @@ Conclusão: a rejeição de A **tal como proposta** está suportada (isolamento 
 | Evidência registada | Suporta a rejeição? | Lacuna |
 | --- | --- | --- |
 | `val-approved-summary.md` e `val-bounded-summary.md`: nos dois pares com `gnss_dropout`, B+ 41/32/27 passa a 85/0/15. Texto da revisão: T para R 27, U para R 17, **T para U 5** (sementes 5044, 5049, 5067, 5084, 5088). | **Parcial.** No agregado registado a variante é melhor (U 27 para 15); o dano é a troca T para U. | As trocas por semente não estão commitadas. As duas células `gnss_dropout` são a mesma experiência e os agregados globais contam-na duas vezes. |
-| `probe-chase-summary.txt`, `late_drop` com início de 12 s ou mais (10 pontos, 200 execuções): B+ aprovado R 153, T 32, U 15; variante R 169, T 0, U 31; `robust` e `guarded` R 178, U 22. | **Sim**, para «não aceitar com base no 41 para 85»: a variante tem mais U do que B+ aprovado (+16) e do que `robust` (+9), e menos R do que `robust` (−9). | 20 sementes por ponto, sem intervalo emparelhado (as sementes são as mesmas entre modelos, mas as saídas não estão commitadas). O excesso de U está **repartido** pelos 10 pontos (+1 a +3 em cada), não concentrado em 16 s mais 6 s. A 8 s a variante é muito melhor (U 3 contra 18 em 20 com perda de 3 s, mesmo ficheiro). |
+| `probe-chase-summary.txt`, `late_drop` com início de 12 s ou mais (10 pontos, 200 execuções): B+ aprovado R 153, T 32, U 15; variante R 169, T 0, U 31; `robust` e `guarded` R 178, U 22. | **Sim**, para «não aceitar com base no 41 para 85»: a variante tem mais U do que B+ aprovado (+16) e do que `robust` (+9), e menos R do que `robust` (−9). | 20 sementes por ponto, sem intervalo emparelhado (as sementes são as mesmas entre modelos, mas as saídas não estão commitadas). A 8 s a variante é muito melhor (U 3 contra 18 em 20 com perda de 3 s, mesmo ficheiro). |
 | `probe-chase-summary.txt`, `imudrift0.03+drop`: aprovado T 14, R 6; variante R 17, U 3. | **Sim**, para a qualidade da covariância. | O limite de deriva `σ_h + ½·b_h·t²` não tem termo `σ_vh·t` (`nav_filter.rs:390-392`, lido pela revisão). |
 | Residual contra `robust` no par registado: 15 U contra 8 (dossiê, tabela de regressões). | **Sim.** | Sem lacuna. |
 
@@ -55,15 +55,15 @@ Conclusão: a rejeição de C é suportada como «não adotar com esta evidênci
 **H.** Em rampas coerentes do recetor de 0,2 a 0,8 m/s, o isolamento errado de B+ e o excesso de U sobre B têm duas causas separáveis no código:
 
 1. **Exoneração indevida do recetor.** A testemunha da IMU, ancorada a 0,2 s antes do ponto de mudança do CUSUM, pode ter o degrau de velocidade do recetor já no passado e então «concorda» com o GNSS; o radar é culpado e o recetor errado continua em uso (`nav_filter.rs:891`). Isto produz o isolamento errado e a falha `hv`.
-2. **Ausência da rejeição por inovação de B.** Sem isolamento (ou com isolamento tardio), B+ continua a assimilar o recetor errado, enquanto B o rejeita por NIS e termina em T. A diferença de 58 U que o isolamento errado não explica (secção 1.1) é compatível com isto, mas não está demonstrada.
+2. **Ausência da rejeição por inovação de B.** Enquanto não há isolamento (ou o isolamento chega tarde), B+ continua a assimilar o recetor errado, enquanto B o rejeita por NIS e termina em T. A diferença de 58 U que o isolamento errado não explica (secção 1.1) é compatível com isto, mas não está demonstrada.
 
-Se H é verdadeira, uma única política que (1) só isole quando a exoneração resiste a uma estimativa de início 1 s mais cedo e (2) em alarme não isolado rejeite por NIS como B, elimina as falhas `hv` e reduz U ao nível de B nessas rampas, sem desligar o isolamento das falhas grandes. H é falsificada pelas cláusulas de paragem da secção 7. Não é possível atribuir o resultado a (1) ou a (2) em separado: isso exigiria um braço adicional, que seria uma segunda tentativa.
+Se H é verdadeira, uma única política que (1) só isole quando a exoneração resiste a uma estimativa de início 1 s mais cedo e (2) enquanto houver sinal de alteração vertical sem isolamento rejeite por NIS como B, elimina as falhas `hv` e reduz U ao nível de B nessas rampas, sem desligar o isolamento das falhas grandes. H é falsificada pelas cláusulas de paragem da secção 7. Não é possível atribuir o resultado a (1) ou a (2) em separado: isso exigiria um braço adicional, que seria uma segunda tentativa.
 
 ## 3. A reformulação: porta de ambiguidade (uma só)
 
-Uma só bandeira, `controller.nav.ambiguity_gate`, por omissão `false`. Com `false`, o comportamento tem de ser byte a byte o de `b733d14` (secção 5, porta 0). A bandeira só atua no braço B+ (`m10_b_plus`); os outros braços ignoram-na.
+Uma só bandeira, `controller.nav.ambiguity_gate`, por omissão `false`. Com `false`, o comportamento tem de ser byte a byte o de `b733d14` (secção 5, etapa 0). A bandeira só atua no braço B+ (`m10_b_plus`); os outros braços ignoram-na.
 
-Princípio: «não isolado» é uma declaração por omissão. Só há isolamento quando a evidência resiste a uma estimativa de início mais antiga; sem isso, o episódio é ambíguo e o braço comporta-se como B (rejeição por NIS) até o alarme limpar. Com a bandeira ligada, o conjunto de isolamentos é um subconjunto do conjunto sem bandeira (a porta só converte isolamentos em não-isolamentos).
+Princípio: «não isolado» é uma declaração por omissão. Só há isolamento quando a exoneração resiste a uma estimativa de início mais antiga. Além disso, enquanto houver sinal de alteração vertical (algum CUSUM vertical acima de `h/4`, ou seja, **antes** do alarme a `h`) com as duas fontes de altitude em uso e sem isolamento feito, o braço rejeita por NIS as amostras das duas fontes, como B. Com a bandeira ligada as trajetórias divergem das de B+ a partir do primeiro instante em que a porta atua, por isso não se afirma nenhuma relação de inclusão entre os isolamentos dos dois braços.
 
 ### 3.1 O que muda
 
@@ -74,7 +74,7 @@ Princípio: «não isolado» é uma declaração por omissão. Só há isolament
 | `crates/vv-rocket/src/nav_filter.rs`, constantes | `FAR_ANCHOR_S = 1.0` (igual ao recuo de 1 s do reprocessamento, `reprocess`) e `GATE_FRACTION = 0.25` (a mesma fração `h/4` já usada para o ponto de mudança). Ficam fixadas aqui e **não se afinam**. |
 | `nav_filter.rs`, `anchored_imu_witness` | Passa a receber a margem da âncora; a chamada atual usa `ANCHOR_MARGIN_S` (0,2 s) e não muda. |
 | `nav_filter.rs`, `rate_pattern` | Com a bandeira ligada, calcula-se também a testemunha com margem `FAR_ANCHOR_S`. Toda a exoneração pela IMU (`ok(d_ig)`) exige `ok` nas duas âncoras: o ramo «radar culpado» e o ramo «GNSS culpado» por `bad(d_gg) && ok(d_rg) && ok(d_ig)`. O ramo «GNSS culpado» por `bad(d_rg) && bad(d_ig) && ok(d_gg)` não muda. Sem época anterior a `change_t − FAR_ANCHOR_S` no histórico, a testemunha distante não existe e não há exoneração (mesma regra que já vale para a âncora próxima). |
-| `nav_filter.rs`, `radar_sample` e `gnss_sample` (ramo B+) | Com a bandeira ligada e em **episódio ambíguo**, a amostra é rejeitada (não se assimila) se `y² > nis_reject · S`, com o mesmo `nis_reject` (15,14) que B usa. Episódio ambíguo: as duas fontes de altitude em uso, `episode_isolated` falso e algum CUSUM vertical (radar, GNSS z, GNSS vz) acima de `GATE_FRACTION · cusum_h`. O CUSUM continua a ser calculado antes da decisão. |
+| `nav_filter.rs`, `radar_sample` e `gnss_sample` (ramo B+) | Com a bandeira ligada e em **episódio ambíguo**, a amostra é rejeitada (não se assimila) se `y² > nis_reject · S`, com o mesmo `nis_reject` (15,14) que B usa. Episódio ambíguo: as duas fontes de altitude em uso, `episode_isolated` falso e algum CUSUM vertical (radar, GNSS z, GNSS vz) acima de `GATE_FRACTION · cusum_h`. O estado de episódio avalia-se no início de cada chamada de `radar_sample` e de `gnss_sample`, com o CUSUM nesse momento. O CUSUM continua a ser calculado antes da decisão e vê a inovação mesmo quando a amostra é rejeitada. Efeitos laterais fixados: a rejeição **não** atualiza `last_reject` (que só A e B leem); **não** altera `last_data` (a amostra conta como dado recebido, por isso `stale_s` não cresce e a fonte não é excluída por falta de dados nem perde `detector_flag` por esse caminho); a saúde dos grupos continua a ser decidida só pelo CUSUM e pelo tempo sem dados; as seis componentes do GNSS avaliam-se uma a uma e em sequência, cada uma contra a estimativa já atualizada pelas anteriores, como em B (`gnss_sample`). A readmissão de grupos fora do filtro não muda. |
 | `scripts/m10_adversarial_probe.py` | Planos novos `ramps` e `onset` (secção 5) com a mesma proteção de sementes; sem alterar os planos existentes. |
 | `scripts/m10_redesign_analysis.py` (novo) | Agregação e critérios desta secção, só biblioteca padrão. |
 | `crates/vv-rocket/tests/m10.rs` | Testes: com a bandeira desligada os traços fixados não mudam; com ela ligada, uma rampa coerente de 0,5 m/s que hoje isola o radar passa a «não isolado»; `validate_nav` recusa a combinação inválida. |
@@ -83,13 +83,13 @@ Nada mais muda: `bounded_chase_when_untrusted` fica `false`, nenhum parâmetro a
 
 ### 3.2 O que a reformulação não toca
 
-- O par `altimeter_bias` mais `gnss_dropout` não tem isolamentos (0 em 100, `m10-implementation.md`, secção 10) e a causa registada é lateral (regra `untrusted`, decisão 8). A reformulação **não o altera**; prevê-se resultado idêntico semente a semente (verificação da secção 6, S7).
+- O par `altimeter_bias` mais `gnss_dropout` não tem isolamentos (0 em 100, `m10-implementation.md`, secção 10) e a causa registada é lateral (regra `untrusted`, decisão 8). A reformulação **não o altera por desenho**: o radar nunca é admitido e a porta exige as duas fontes em uso. Prevê-se, sem ser critério, resultado idêntico semente a semente nos cinco pares distintos de F3 e nas quatro células de viés constante de F1 (`altimeter_bias`, `altimeter_bias_low`, `gnss_bias`, `gnss_bias_low`); qualquer diferença é reportada e investigada (secção 7.2, S7).
 - As regressões de `gnss_bias` (+99 U e +86 U contra `guarded`) são um limite de observabilidade de `E0`, sem isolamento.
 - As três falhas de invariante de B+ em `gnss_horizontal_bias` não envolvem isolamento (0 em 100). A reformulação não as explica; esta tentativa só regista os identificadores dos invariantes (secção 8).
 
 ### 3.3 Alternativas descartadas (não testadas)
 
-Persistência do padrão por N épocas; limiares `RATE_BAD` e `RATE_OK` mais largos; chão de magnitude para isolar; reposição por reprocessamento com NIS ligado. Todas ficam por testar e não entram nesta tentativa.
+**Só abstenção** (a exoneração robusta sem a rejeição por NIS): fica descartada porque 58 dos 64 U de B+ a 0,5 m/s não têm isolamento errado (secção 1.1), pelo que se prevê que não cumpra a cláusula 2; é a alternativa mais próxima da letra da estratégia e pode ser pedida pelo responsável em vez desta (secção 12). Persistência do padrão por N épocas; limiares `RATE_BAD` e `RATE_OK` mais largos; chão de magnitude para isolar; reposição por reprocessamento com NIS ligado. Todas ficam por testar e não entram nesta tentativa.
 
 ## 4. Braços e binário único
 
@@ -109,9 +109,9 @@ O modelo de B+G é um ficheiro gerado fora do repositório; o seu SHA-256 e o do
 
 Só sementes 5000 a 5099. Todos os scripts recusam sementes protegidas antes de correr.
 
-### 5.1 Porta 0: o braço desligado reproduz o registado (sem novas execuções além da fase 2)
+### 5.1 Etapa 0: o braço desligado reproduz o registado
 
-Na fase 2, antes da matriz, correm-se `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` e `cargo test` (incluindo os hashes de `tests/m10.rs`, `tests/landing.rs` e `tests/reference.rs`), e os resultados do braço desligado da fase 2 (B e B+) têm de reproduzir **exatamente** as contagens R/T/U registadas pela revisão com o binário `9a3f4776…` (só como verificação de que a bandeira não vaza para o caminho desligado, não como base de comparação):
+Na fase 2, antes da etapa 1, correm-se `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` e `cargo test` (incluindo os hashes de `tests/m10.rs`, `tests/landing.rs` e `tests/reference.rs`) e a etapa 0 da tabela de 5.2: B e B+ com a bandeira desligada nas células abaixo (1 400 execuções). Os resultados têm de reproduzir **exatamente** as contagens R/T/U registadas pela revisão com o binário `9a3f4776…` (só como verificação de que a bandeira não vaza para o caminho desligado, não como base de comparação). Estas células voltam a correr na etapa 2; os resultados das duas execuções têm de coincidir semente a semente (verificação de determinismo):
 
 | Célula (100 sementes) | B+ | B |
 | --- | --- | --- |
@@ -125,21 +125,22 @@ Na fase 2, antes da matriz, correm-se `cargo fmt --check`, `cargo clippy --all-t
 | `altimeter_delay` | 78/4/18 | 82/0/18 |
 | `altimeter_outliers` | 94/0/6 | 94/0/6 |
 
-Se alguma contagem diferir, a execução para antes da etapa 1 da matriz e reporta-se «bandeira desligada não equivalente»; corrigir só é permitido se restaurar a equivalência sem tocar na lógica da bandeira ligada, e antes de qualquer resultado da matriz.
+Se alguma contagem diferir, a execução não passa à etapa 1 e reporta-se «bandeira desligada não equivalente»; corrigir só é permitido se restaurar a equivalência sem tocar na lógica da bandeira ligada, e antes de qualquer resultado da matriz.
 
-### 5.2 Fases e células
+### 5.2 Etapas e células
 
-Execução por etapas, para poder parar cedo (secção 7). Cada etapa é um conjunto de invocações; o limite por invocação é o das ferramentas (campanha 2 500 execuções, sonda 6 000, 8 tarefas).
+Execução por etapas, pela ordem 0 a 5. Todas as etapas correm, mesmo que uma cláusula de paragem já tenha disparado, para que as comparações com `robust`, `guarded` e os pares fiquem medidas (secção 7.1). Cada etapa é um conjunto de invocações; o limite por invocação é o das ferramentas (campanha 2 500 execuções, sonda 6 000, 8 tarefas).
 
 | Etapa | Código | Falhas, magnitudes e inícios | Sementes | Braços | Execuções |
 | --- | --- | --- | --- | --- | --- |
+| **0. Porta** | `m10_campaign.py`, braço desligado | os pares de F3 (6) e as células `gnss_coherent_ramp`, `altimeter_stuck`, `altimeter_delay`, `altimeter_outliers` da tabela de 5.1; 100 sementes cada | 5000 a 5099 | B+ (F3 e F2), B (F2) | 600 + 400 + 400 = 1 400 |
 | **1. Grelha de rampas (G1)** | sonda, plano novo `ramps` | `gnss_coherent_ramp` até 40 s; magnitude {0,2; 0,3; 0,5; 0,8} m/s; início {3,00; 3,25; …; 6,00} (13 valores), 8,0, 10,0, 12,0 s (16 inícios); 64 células | 5020 a 5059 (40) | B, B+, B+G | 3 × 2 560 = 7 680 |
 | **2. Campanha de desenvolvimento (M1)** | `scripts/m10_campaign.py` | famílias F1 (11), F2 (7, sem `altimeter_drift`), F3 (6 pares): 24 células de 100 sementes, sorteios do código existente | 5000 a 5099 | B, B+, B+G, `robust`, `guarded` | 5 × 2 400 = 12 000 |
 | **3. Ruído 1,5 vezes (M3)** | `m10_campaign.py` com modelo derivado | as 24 células de M1; `sensors.altimeter_sigma_m` 0,15, `gnss_position_sigma_m` 0,75, `gnss_velocity_sigma_mps` 0,075, `imu_accel_sigma_mps2` 0,03; `controller.nav` **não muda** | 5000 a 5099 | B+, B+G | 2 × 2 400 = 4 800 |
 | **4. Varrimento de início (M4)** | sonda, plano novo `onset` | as cinco falhas de `m10_onset_sweep.py` (`altimeter_stuck` 3 s, `altimeter_delay` 0,1 s, `gnss_coherent_ramp` 1 m/s, `gnss_dropout` 5 s, `imu_accel_drift` 0,05), início de 2 a 20 s em passos de 1 s; mesmos fins (`fault_at`) | 5020 a 5039 (20) | B, B+, B+G, `robust`, `guarded` | 5 × 1 900 = 9 500 |
 | **5. Completar G1** | sonda, `ramps` | como a etapa 1 | 5020 a 5059 | `robust`, `guarded` | 2 × 2 560 = 5 120 |
 
-Total planeado: **39 100 execuções.**
+Total planeado: **40 500 execuções** (1 400 da etapa 0 e 39 100 das etapas 1 a 5).
 
 Razões das escolhas:
 
@@ -158,7 +159,7 @@ M1 e M3 usam `--keep-sample 2 --keep-failures 5` (valores por omissão) e a repr
 ## 6. Métricas
 
 - **Classe física R, T, U** (estado real): R sem requisitos falhados; T só com R5 falhado; U caso contrário. U é a métrica de segurança; R a de recuperação.
-- **Isolamento errado**: veredicto `wrong` **ou** `before_onset` em `navigation.isolation_events` (leitura mais estrita do que só `wrong`: ambos são isolamentos sem falha do mesmo grupo a justificá-los). O resumo reporta também cada veredicto em separado.
+- **Isolamento errado**: a execução tem `navigation.isolation == "wrong"`, ou seja, pelo menos um isolamento cujo veredicto não é `correct` (`wrong` ou `before_onset`, `nav_verify.rs`). É a definição das 186 execuções registadas. O resumo reporta também cada veredicto de evento em separado.
 - **Falhas de alerta** `vertical`, `horizontal_velocity` (`hv`) e `horizontal_position`, por canal, do bloco `navigation`.
 - **Invariantes falhados** por identificador, instante lógico e condição observada (contrato de falhas de `AGENTS.md`).
 - **Isolamentos corretos** (veredicto `correct`) e o seu atraso.
@@ -173,13 +174,13 @@ Os limiares estão fixados antes de qualquer execução. As células «distintas
 
 > voltar à secção 6.3 se, depois da reformulação, restar alguma falha de alerta da velocidade horizontal, se `U` de B+ exceder `U` de B em mais de 2 entre 0,2 e 0,8 m/s, ou se surgir um isolamento errado com ruído 1,5 vezes o modelado.
 
-Operacionalização, sem enfraquecer nenhuma cláusula. Qualquer uma dá «não avançar» e a execução para nessa etapa:
+Operacionalização, sem enfraquecer nenhuma cláusula. O veredicto «não avançar» fixa-se na **primeira** cláusula que dispare, pela ordem das etapas; as etapas seguintes correm na mesma e só alimentam o relatório.
 
 | Cláusula | Operacionalização | Onde |
 | --- | --- | --- |
-| 1. Falha `hv` restante | **Zero** falhas de alerta `hv` em **todas** as execuções de B+G com ruído nominal (G1, M1, M4). Se B tiver `hv` numa célula (a evidência registada indica 0), reporta-se ao orquestrador como regra mal calibrada e **não** se considera cumprida. | Etapas 1, 2, 4 |
+| 1. Falha `hv` restante | **Zero** falhas de alerta `hv` em **todas** as execuções de B+G da matriz (G1, M1, M3, M4), incluindo as de ruído 1,5 vezes: a cláusula diz «alguma». A exclusão de M3 é uma decisão do responsável (secção 12); sem ela, vale esta leitura. Se B tiver `hv` numa célula (a evidência registada indica 0), reporta-se ao orquestrador como regra mal calibrada e **não** se considera cumprida. | Etapas 1 a 4 |
 | 2. U de B+ contra U de B | Com B+ lido como B+G: em cada uma das 4 unidades de 80 execuções (uma por magnitude 0,2; 0,3; 0,5; 0,8) e no estrato de 18 sementes da campanha, `U(B+G) − U(B) ≤ 2`. Reportam-se também o conjunto da grelha e B+ aprovado, sem efeito no veredicto. | Etapas 1 e 2 |
-| 3. Isolamento errado com ruído 1,5 vezes | **Zero** isolamentos errados (secção 6) nas 2 400 execuções de B+G em M3 (limite superior de Clopper-Pearson a 95 % de 0,15 % com 0 em 2 400). | Etapa 3 |
+| 3. Isolamento errado com ruído 1,5 vezes | **Zero** execuções com isolamento errado (secção 6) nas 2 400 execuções de B+G em M3 (limite superior de Clopper-Pearson a 95 % de 0,15 % com 0 em 2 400). | Etapa 3 |
 
 ### 7.2 Sucesso
 
@@ -187,13 +188,13 @@ Todos têm de se verificar, e nenhuma cláusula de paragem pode ter disparado. �
 
 | Id | Critério |
 | --- | --- |
-| S1 | Cláusula 1 cumprida (zero `hv`). |
-| S2 | Em G1, magnitudes 0,3 e 0,5, 16 inícios, 1 280 execuções de B+G: **no máximo 5 isolamentos errados** (0,39 %, limite superior a 95 % de 0,91 %; este é o «limite declarado» do teste 1), **e** pelo menos 90 % menos do que B+ na mesma grelha. Condição de validade: B+ tem pelo menos 60 isolamentos errados na mesma grelha (hoje 10 a 31 %); se tiver menos, a premissa não se reproduziu e o resultado é «inconclusivo», não «sucesso». |
+| S1 | Cláusula 1 cumprida (zero `hv`, M3 incluída). |
+| S2 | Em G1, magnitudes 0,3 e 0,5, 16 inícios, 1 280 execuções de B+G: **no máximo 5 execuções com isolamento errado** (0,39 %, limite superior a 95 % de 0,91 %; este é o «limite declarado» do teste 1), **e** pelo menos 90 % menos do que B+ na mesma grelha. Condição de validade: B+ tem pelo menos 60 execuções com isolamento errado na mesma grelha (hoje 10 a 31 %); se tiver menos, a premissa não se reproduziu e o resultado é «inconclusivo», não «sucesso». |
 | S3 | Cláusula 2 cumprida (5 unidades). |
 | S4 | Teste 10: a taxa de isolamento errado de B+G «dentro» da janela de ignição não excede a «fora», na grelha G1 completa. |
 | S5 | Cláusula 3 cumprida. |
 | S6 | **O isolamento não está desligado.** (a) Em M1, `altimeter_stuck` e `altimeter_delay`: `R(B+G) ≥ R(B+) − 4` em cada. (b) Em M1, `gnss_coherent_ramp`: `R(B+G) ≥ R(B) + 0,5 · (R(B+) − R(B))`. (c) Em G1 a 0,8 m/s (640 execuções): `R(B+G) ≥ R(B)` e `R(B+G) ≥ R(B+) − 32` (5 %). (d) Isolamentos corretos de B+G nas três células de M1 (`altimeter_stuck`, `altimeter_delay`, `gnss_coherent_ramp`, 300 execuções) pelo menos 70 % dos de B+ (hoje 98 + 99 + 84 = 281; é o mesmo binário a medir). |
-| S7 | **Sem regressão contra B+ no mesmo binário**, em cada célula distinta de M1: `U(B+G) ≤ U(B+) + 2`, `R(B+G) ≥ R(B+) − 4` (a recuperação de `gnss_coherent_ramp` fica regida por S6b), e invariantes falhados de B+G não superiores aos de B+. Nas células sem isolamento (todas menos `altimeter_stuck`, `altimeter_delay`, `altimeter_outliers` e `gnss_coherent_ramp`), prevê-se resultado idêntico semente a semente; qualquer diferença é reportada e investigada. |
+| S7 | **Sem regressão contra B+ no mesmo binário**, em cada célula distinta de M1: `U(B+G) ≤ U(B+) + 2`, `R(B+G) ≥ R(B+) − 4` (a recuperação de `gnss_coherent_ramp` fica regida por S6b), e invariantes falhados de B+G não superiores aos de B+. As diferenças face a B+ fora das quatro células com isolamento (`altimeter_stuck`, `altimeter_delay`, `altimeter_outliers`, `gnss_coherent_ramp`) são reportadas: a porta depende do CUSUM e do NIS e não só do isolamento, por isso `thrust_loss`, `ignition_delay` ou `imu_accel_drift` podem mudar. |
 
 ### 7.3 Limites de regressão contra `robust` e `guarded` (leitura estrita, por omissão)
 
@@ -207,7 +208,7 @@ Para que o resultado seja informativo, o relatório dá **dois veredictos separa
 
 ### 7.4 Previsões (não são critérios)
 
-Escritas antes de correr, para que o resultado possa contradizê-las: o autor espera S2 e S4 satisfeitos; considera **a cláusula 2 a 0,5 m/s a mais provável de falhar** (a rejeição por NIS só entra depois do alarme, com as primeiras épocas já assimiladas); e espera V2 falhado na leitura estrita.
+Escritas antes de correr, para que o resultado possa contradizê-las: o autor espera S2 e S4 satisfeitos; considera **a cláusula 2 a 0,5 m/s a mais provável de falhar** (a rejeição por NIS só entra depois de o CUSUM passar `h/4`, com as primeiras épocas já assimiladas); e espera V2 falhado na leitura estrita.
 
 ## 8. Plano de análise
 
@@ -215,17 +216,17 @@ Escritas antes de correr, para que o resultado possa contradizê-las: o autor es
 - Verificações de integridade antes de calcular: um só `binary_sha256`; modelos desligado (`c28a258c…`) e ligado registados; nenhuma semente fora de 5000 a 5099; contagem de execuções igual à da matriz; reprodução das execuções retidas.
 - Decomposição por veredicto de isolamento (secção 6), incluindo os 58 U de B+ a 0,5 m/s.
 - `gnss_horizontal_bias`: lista das falhas de invariante de B+ e B+G com identificador, instante lógico, estado, causa, condição esperada e observada (a partir das execuções retidas). Continua por explicar enquanto não houver explicação escrita; **bloqueia o congelamento** mesmo com «avançar».
-- Resultado global: V1, V2 e o veredicto («avançar» ou «não avançar»), com o critério que decidiu. Um «não avançar» por cláusula de paragem encerra o M10 como investigação e devolve a decisão à secção 6.3.
+- Resultado global: V1, V2 e o veredicto («avançar» ou «não avançar»), com o critério que decidiu. Um «não avançar» por cláusula de paragem encerra o M10 como investigação e devolve a decisão à secção 6.3; o relatório dá em qualquer caso todas as comparações e indica qual foi a primeira cláusula a disparar.
 
 ## 9. Orçamento
 
 | Limite | Valor |
 | --- | --- |
-| Execuções | máximo 40 000 (planeadas 39 100) |
-| Tempo de simulação | máximo 45 minutos de relógio, em 8 tarefas (estimativa 11 a 12 minutos: a revisão mediu 11 700 execuções em 200 s) |
+| Execuções | máximo 42 000 (planeadas 40 500) |
+| Tempo de simulação | máximo 45 minutos de relógio, em 8 tarefas (estimativa 12 a 13 minutos: a revisão mediu 11 700 execuções em 200 s) |
 | Por invocação | campanha: 2 500 execuções e 1 800 s; sonda: 6 000 execuções (limites das ferramentas) |
 | Artefactos | menos de 1 GB fora do repositório; no repositório só resumos e registos compactos comprimidos, na ordem de 1 a 5 MB |
-| Paragem antecipada | a primeira cláusula de paragem que dispare encerra as etapas seguintes. Se a etapa 1 (G1, 7 680 execuções) disparar a cláusula 1 ou 2, o total fica em 7 680 |
+| Paragem antecipada | nenhuma por cláusula: o veredicto fixa-se na primeira que dispare e todas as etapas correm (a comparação com `robust`, `guarded` e os pares é exigida). Só os limites deste quadro interrompem a execução |
 | Código | só o descrito na secção 3.1 |
 
 O tempo e o número de execuções medem-se fora da simulação, com máquina, comando e limites publicados no resumo.
@@ -248,5 +249,6 @@ O tempo e o número de execuções medem-se fora da simulação, com máquina, c
 
 ## 12. Decisões pedidas
 
-1. Leitura dos limites de regressão (secção 7.3): estrita (por omissão, previsão de falha a priori) ou delimitada.
-2. Aprovar a alteração de código da secção 3.1 antes da fase 2, em particular a rejeição por NIS no episódio ambíguo, que acrescenta ao isolamento um comportamento de B.
+1. **Âmbito da reformulação.** Esta reformulação vai além da letra da estratégia («declarar não isolado quando a evidência é ambígua») ao acrescentar a rejeição por NIS de B enquanto não há isolamento. A alternativa é a abstenção sozinha, descrita em 3.3, que se prevê falhar a cláusula 2 (só 6 dos 64 U de B+ a 0,5 m/s têm isolamento errado). Aprovar a alteração de código da secção 3.1, ou pedir a alternativa, antes da fase 2.
+2. **Leitura dos limites de regressão** (secção 7.3): estrita (por omissão, previsão de falha a priori) ou delimitada.
+3. **Âmbito da cláusula 1** (secção 7.1): por omissão inclui as execuções com ruído 1,5 vezes (M3); o responsável pode excluí-las por escrito antes da etapa 1.
