@@ -1,0 +1,1 @@
+{"campaign_directory": "runs/campaign/campaign-20261123T183313Z-18024", "cases": 87, "simulator_invocations": 324, "status": "passed", "suite": "all", "summary": "runs/campaign/campaign-20261123T183313Z-18024/summary.json"}
