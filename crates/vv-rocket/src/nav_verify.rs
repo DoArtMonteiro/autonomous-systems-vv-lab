@@ -88,6 +88,19 @@ pub struct NavigationReport {
     pub isolation: &'static str,
     /// Each isolation with its instant and its own verdict: `correct`, `before_onset` or `wrong`.
     pub isolation_events: Vec<IsolationEvent>,
+    /// Ambiguity gate (research, flag on only): rejection streaks over the run.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gate: Option<GateReport>,
+}
+
+/// Longest run of control cycles with a sample rejected by the gate, cycles with a rejection, the
+/// longest run with the gate active, and whether the rejection streak was still open at the end.
+#[derive(Clone, Debug, Serialize, PartialEq)]
+pub struct GateReport {
+    pub max_streak_cycles: u32,
+    pub rejecting_cycles: u64,
+    pub max_active_cycles: u32,
+    pub streak_open_at_end: bool,
 }
 
 #[derive(Clone, Debug, Serialize, PartialEq)]
@@ -397,5 +410,25 @@ pub fn verify_navigation(
         isolated,
         isolation,
         isolation_events,
+        gate: gate_report(decls),
     }
+}
+
+fn gate_report(decls: &[CycleDeclaration]) -> Option<GateReport> {
+    let streaks: Vec<(u32, u32)> = decls
+        .iter()
+        .filter_map(|d| {
+            Some((
+                d.declaration.report.gate_streak?,
+                d.declaration.report.gate_active_streak?,
+            ))
+        })
+        .collect();
+    let last = streaks.last()?;
+    Some(GateReport {
+        max_streak_cycles: streaks.iter().map(|s| s.0).max().unwrap_or(0),
+        rejecting_cycles: streaks.iter().filter(|s| s.0 > 0).count() as u64,
+        max_active_cycles: streaks.iter().map(|s| s.1).max().unwrap_or(0),
+        streak_open_at_end: last.0 > 0,
+    })
 }

@@ -526,6 +526,9 @@ fn validate_nav(n: &NavParams) -> Result<(), String> {
     if n.exclude_after_s < n.suspect_after_s {
         return Err("controller.nav.exclude_after_s must not be below suspect_after_s".into());
     }
+    if n.ambiguity_gate && !n.anchored_imu_witness {
+        return Err("controller.nav.ambiguity_gate needs anchored_imu_witness".into());
+    }
     for (value, name) in [
         (n.admission_cycles, "admission_cycles"),
         (n.readmission_samples, "readmission_samples"),

@@ -57,6 +57,11 @@ const GNSS_WINDOW: usize = 5;
 const GNSS_HISTORY: usize = 40;
 /// The anchored IMU witness starts at the last epoch at least this long before the change point.
 const ANCHOR_MARGIN_S: f64 = 0.2;
+/// Ambiguity gate (research, `controller.nav.ambiguity_gate`): the IMU exoneration must also hold
+/// with the anchor this far before the change point (the rewind of `reprocess`), and the gate opens
+/// when a vertical CUSUM passes this fraction of `h`. Fixed by the pre-registration, not tuned.
+const FAR_ANCHOR_S: f64 = 1.0;
+const GATE_FRACTION: f64 = 0.25;
 /// Validation: an altimeter sample outside this range is treated as missing.
 const ALTIMETER_RANGE_M: (f64, f64) = (-100.0, 100_000.0);
 
@@ -260,6 +265,12 @@ pub struct NavSystem {
     mode_cycles: u32,
     ambiguous_cycles: u32,
     unusable_cycles: u32,
+    /// Ambiguity gate: a sample was rejected / the gate was active in this cycle, and the
+    /// consecutive-cycle streaks of both.
+    gate_hit: bool,
+    gate_seen: bool,
+    gate_streak: u32,
+    gate_active_streak: u32,
     transitions: u32,
     monitor: Monitor,
     h_est: f64,
@@ -309,6 +320,10 @@ impl NavSystem {
             mode_cycles: 0,
             ambiguous_cycles: 0,
             unusable_cycles: 0,
+            gate_hit: false,
+            gate_seen: false,
+            gate_streak: 0,
+            gate_active_streak: 0,
             transitions: 0,
             monitor: Monitor::new(),
             h_est: 0.0,
@@ -676,8 +691,13 @@ impl NavSystem {
                 }
             }
             Arm::BPlus => {
+                let gate = self.gate_active();
                 self.cusum(RADAR, y, s);
-                self.apply(2, y, s, r);
+                if gate && y * y > self.prm.nis_reject * s {
+                    self.gate_hit = true;
+                } else {
+                    self.apply(2, y, s, r);
+                }
             }
         }
     }
@@ -738,6 +758,7 @@ impl NavSystem {
             }
             return;
         }
+        let gate = self.gate_active();
         for i in 0..6 {
             let (y, s) = self.innovation(i, z[i], r[i]);
             if self.arm == Arm::B && y * y > self.prm.nis_reject * s {
@@ -746,6 +767,10 @@ impl NavSystem {
             }
             if self.arm == Arm::BPlus {
                 self.cusum(1 + i, y, s);
+                if gate && y * y > self.prm.nis_reject * s {
+                    self.gate_hit = true;
+                    continue;
+                }
             }
             self.apply(i, y, s, r[i]);
         }
@@ -840,6 +865,21 @@ impl NavSystem {
         }
     }
 
+    /// Ambiguity gate: both altitude groups in use, nothing isolated in this episode and a
+    /// vertical CUSUM above `GATE_FRACTION * h`. Evaluated at the start of each sample call.
+    fn gate_active(&mut self) -> bool {
+        let open = self.prm.ambiguity_gate
+            && self.arm == Arm::BPlus
+            && self.radar.usable()
+            && self.gnss.usable()
+            && !self.episode_isolated
+            && [RADAR, GNSS_Z, GNSS_VZ].iter().any(|&i| {
+                self.cusum_pos[i].max(self.cusum_neg[i]) > GATE_FRACTION * self.prm.cusum_h
+            });
+        self.gate_seen |= open;
+        open
+    }
+
     /// Rate parity (vertical channel): the radar slope against the mean GNSS vertical velocity,
     /// the GNSS altitude slope against the same velocity, and the IMU velocity change against the
     /// GNSS velocity change over the window. Under the single-fault hypothesis the faulty source is
@@ -888,9 +928,16 @@ impl NavSystem {
         };
         let bad = |d: f64| d > RATE_BAD;
         let ok = |d: f64| d < RATE_OK;
-        if bad(d_rg) && ok(d_gg) && ok(d_ig) {
+        // Ambiguity gate: an exoneration by the IMU must survive an earlier anchor too; without
+        // an epoch that early there is no witness, so no exoneration.
+        let far_ok = !self.prm.ambiguity_gate
+            || self
+                .anchored_imu_witness_at(change_t, FAR_ANCHOR_S)
+                .is_some_and(ok);
+        let ok_ig = ok(d_ig) && far_ok;
+        if bad(d_rg) && ok(d_gg) && ok_ig {
             Some(Odd::Radar)
-        } else if (bad(d_rg) && bad(d_ig) && ok(d_gg)) || (bad(d_gg) && ok(d_rg) && ok(d_ig)) {
+        } else if (bad(d_rg) && bad(d_ig) && ok(d_gg)) || (bad(d_gg) && ok(d_rg) && ok_ig) {
             Some(Odd::Gnss)
         } else {
             None
@@ -903,6 +950,10 @@ impl NavSystem {
     /// is already in the GNSS velocity (a coherent receiver fault); the anchored one can. The
     /// variance adds the integrated process noise and the bias uncertainty over the span.
     fn anchored_imu_witness(&self, change_t: f64) -> Option<f64> {
+        self.anchored_imu_witness_at(change_t, ANCHOR_MARGIN_S)
+    }
+
+    fn anchored_imu_witness_at(&self, change_t: f64, margin_s: f64) -> Option<f64> {
         let w = &self.rates;
         if w.history_len < 2 {
             return None;
@@ -913,7 +964,7 @@ impl NavSystem {
         // the onset: no witness, so no isolation.
         let anchor = hist[..hist.len() - 1]
             .iter()
-            .rposition(|e| e.0 <= change_t - ANCHOR_MARGIN_S)?;
+            .rposition(|e| e.0 <= change_t - margin_s)?;
         let k: u32 = hist[anchor + 1..].iter().map(|e| e.3).sum();
         let span = last.0 - hist[anchor].0;
         let sv = self.prm.gnss_velocity_sigma_mps;
@@ -1238,6 +1289,19 @@ impl NavSystem {
                 ChannelStatus::Degraded
             }
         };
+        let gate_on = self.prm.ambiguity_gate && self.arm == Arm::BPlus;
+        self.gate_streak = if self.gate_hit {
+            self.gate_streak + 1
+        } else {
+            0
+        };
+        self.gate_active_streak = if self.gate_seen {
+            self.gate_active_streak + 1
+        } else {
+            0
+        };
+        self.gate_hit = false;
+        self.gate_seen = false;
         self.report = Some(NavReport {
             mode,
             radar: self.radar.health,
@@ -1256,6 +1320,8 @@ impl NavSystem {
             cusum_gnss: self.cusum_max(1..SOURCES),
             isolated_radar: self.isolated_radar,
             isolated_gnss: self.isolated_gnss,
+            gate_streak: gate_on.then_some(self.gate_streak),
+            gate_active_streak: gate_on.then_some(self.gate_active_streak),
         });
     }
 

@@ -440,3 +440,48 @@ fn m10_traces_and_verifications_are_bit_identical_on_every_platform() {
         assert_eq!(v, want_verification, "{label} verification");
     }
 }
+
+// Ambiguity gate (research, docs/m10-redesign-preregistration.md, adenda 1). The unit-test seed is
+// pinned there: 5090, a coherent receiver ramp of 0.5 m/s from 8.0 s. The assertions are
+// structural; no seed was chosen from a result.
+fn gate_ramp() -> Value {
+    json!([{"kind": "gnss_coherent_ramp", "start_s": 8.0, "end_s": 40.0, "magnitude": 0.5}])
+}
+
+#[test]
+fn the_ambiguity_gate_needs_the_anchored_witness_and_is_off_when_omitted_or_false() {
+    let mut c = m10_case();
+    c["controller"]["nav"]["anchored_imu_witness"] = json!(false);
+    c["controller"]["nav"]["ambiguity_gate"] = json!(true);
+    assert!(input_error(&c).contains("ambiguity_gate"));
+    let omitted = with("m10_b_plus", gate_ramp());
+    let explicit = with_nav("m10_b_plus", gate_ramp(), "ambiguity_gate", json!(false));
+    let a = artifacts(&bytes(&omitted), 5090).unwrap();
+    let b = artifacts(&bytes(&explicit), 5090).unwrap();
+    assert_eq!(a.trace, b.trace);
+    assert_eq!(a.verification, b.verification);
+    let v: Value = serde_json::from_slice(&a.verification).unwrap();
+    assert!(v["navigation"].get("gate").is_none());
+}
+
+#[test]
+fn the_ambiguity_gate_is_deterministic_acts_on_a_slow_ramp_and_reports_its_streaks() {
+    let off = with("m10_b_plus", gate_ramp());
+    let on = with_nav("m10_b_plus", gate_ramp(), "ambiguity_gate", json!(true));
+    let first = artifacts(&bytes(&on), 5090).unwrap();
+    let second = artifacts(&bytes(&on), 5090).unwrap();
+    assert_eq!(first.trace, second.trace);
+    assert_eq!(first.verification, second.verification);
+    let reference = artifacts(&bytes(&off), 5090).unwrap();
+    assert_ne!(first.trace, reference.trace, "the gate did not act");
+    let v: Value = serde_json::from_slice(&first.verification).unwrap();
+    assert!(v["navigation"]["gate"]["max_streak_cycles"].is_u64());
+    assert!(v["navigation"]["gate"]["max_active_cycles"].is_u64());
+    // Policies other than B+ ignore the flag.
+    let b_off = with("m10_b", gate_ramp());
+    let b_on = with_nav("m10_b", gate_ramp(), "ambiguity_gate", json!(true));
+    assert_eq!(
+        artifacts(&bytes(&b_off), 5090).unwrap().trace,
+        artifacts(&bytes(&b_on), 5090).unwrap().trace
+    );
+}

@@ -162,6 +162,13 @@ pub struct NavReport {
     /// The rate parity isolated this group at least once (B+).
     pub isolated_radar: bool,
     pub isolated_gnss: bool,
+    /// Ambiguity gate (B+, flag on only): consecutive control cycles with at least one sample
+    /// rejected by the gate, and consecutive cycles with the gate active. Not serialised without
+    /// the flag.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gate_streak: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gate_active_streak: Option<u32>,
 }
 
 /// Per-cycle record for the verifier: the estimate with its full covariance (position, velocity,
@@ -241,6 +248,10 @@ pub struct NavParams {
     /// Exploratory policy, not accepted (owner decision): under `untrusted`, keep chasing the pad
     /// while the horizontal dead-reckoning bound allows it, instead of damping only.
     pub bounded_chase_when_untrusted: bool,
+    /// Research (docs/m10-redesign-preregistration.md): B+ isolates only when the IMU exoneration
+    /// holds at two anchors, and rejects the samples of both altitude sources by NIS while a
+    /// vertical alarm signal is open and nothing is isolated. Needs `anchored_imu_witness`.
+    pub ambiguity_gate: bool,
 }
 
 impl Default for NavParams {
@@ -281,6 +292,7 @@ impl Default for NavParams {
             monitor_radar_gain: 0.1,
             anchored_imu_witness: false,
             bounded_chase_when_untrusted: false,
+            ambiguity_gate: false,
         }
     }
 }
