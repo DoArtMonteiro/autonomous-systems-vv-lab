@@ -1316,13 +1316,24 @@ def seed_independence(first: int, last: int, cycles: int, fixes: int) -> dict:
             "min_slack_between_next_stream_and_used_range": margin}
 
 
-def cross_independence(cycles: int, fixes: int) -> dict:
-    """Overlap between the used output ranges of the 44000-44919 streams and those of every seed of the
-    ranges the protocol lists as seen or protected (the same draw counts for both sides)."""
-    import bisect
-    used = used_draws(cycles, fixes)
+EXTRA_PROTECTED = {  # exec/src/seeds.rs GROUND_PROTECTED and the campaign seeds of AGENTS.md
+    "100-129 M6 reserved and unguarded M12 loop": (100, 129),
+    "201-212 M6 confirmation": (201, 212),
+    "7349 M6 final": (7349, 7349), "18265 M6 final": (18265, 18265), "29581 M6 final": (29581, 29581),
+    "83017 M6 final": (83017, 83017), "156432 M6 final": (156432, 156432), "241907 M6 final": (241907, 241907),
+    "318604 M6 final": (318604, 318604), "407753 M6 final": (407753, 407753), "536218 M6 final": (536218, 536218),
+    "672941 M6 final": (672941, 672941), "794306 M6 final": (794306, 794306), "921685 M6 final": (921685, 921685),
+    "42 campaign": (42, 42), "1337 campaign": (1337, 1337), "2026 campaign": (2026, 2026),
+}
+
+
+def protocol_seen_ranges() -> dict:
     ranges = dict(SPENT_OR_PROTECTED)
     ranges["2000-2029 M9.1 G3"] = (2000, 2029)
+    return ranges
+
+
+def _seen_index(ranges: dict, used: dict) -> tuple:
     seen = []
     for name, (lo, hi) in ranges.items():
         for sd in range(lo, hi + 1):
@@ -1331,11 +1342,14 @@ def cross_independence(cycles: int, fixes: int) -> dict:
     seen.sort()
     span = 1 << 64
     keys = [x[0] - span for x in seen] + [x[0] for x in seen] + [x[0] + span for x in seen]
-    meta = seen * 3
-    reach = max(used.values())
-    cond, _ = seed_map()
+    return keys, seen * 3, max(used.values())
+
+
+def _block_vs_index(first: int, last: int, index: tuple, used: dict) -> list:
+    import bisect
+    keys, meta, reach = index
     found = []
-    for sd in range(SEED_FIRST, SEED_LAST + 1):
+    for sd in range(first, last + 1):
         for src in SOURCES:
             pi, ni = stream_position(sd, src), used[src]
             lo = bisect.bisect_left(keys, pi - reach)
@@ -1346,6 +1360,16 @@ def cross_independence(cycles: int, fixes: int) -> dict:
                 if -(nj - 1) <= d <= ni - 1:
                     shared = min(pi + ni, pi + d + nj) - max(pi, pi + d)
                     found.append((sd, src, meta[idx][2], meta[idx][3], meta[idx][4], shared))
+    return found
+
+
+def cross_independence(cycles: int, fixes: int, ranges: dict | None = None) -> dict:
+    """Overlap between the used output ranges of the 44000-44919 streams and those of every seed of the
+    ranges the protocol lists as seen or protected (the same draw counts for both sides)."""
+    used = used_draws(cycles, fixes)
+    ranges = ranges or protocol_seen_ranges()
+    found = _block_vs_index(SEED_FIRST, SEED_LAST, _seen_index(ranges, used), used)
+    cond, _ = seed_map()
     by_pair: dict[str, int] = {}
     by_stage: dict[str, set] = {}
     for sd, src, sd2, src2, name, shared in found:
@@ -1353,16 +1377,97 @@ def cross_independence(cycles: int, fixes: int) -> dict:
         by_pair[key] = by_pair.get(key, 0) + 1
         by_stage.setdefault(cond.get(sd, ("unassigned",))[0], set()).add(sd)
     shared_all = [f[5] for f in found]
+    largest = max(found, key=lambda f: f[5], default=None)
     return {"seen_ranges": {k: list(v) for k, v in ranges.items()},
             "seen_seeds": sum(hi - lo + 1 for lo, hi in ranges.values()),
             "streams_checked": 920 * 12, "draws_used_per_source": {str(k): v for k, v in used.items()},
             "pairs_overlapping_in_the_outputs_actually_used": len(found),
             "distinct_new_seeds_affected": len({f[0] for f in found}),
-            "new_seeds_affected_by_stage": {k: len(v) for k, v in sorted(by_stage.items())},
+            "new_seeds_affected_by_stage_layout_A_only": {k: len(v) for k, v in sorted(by_stage.items())},
             "pairs_by_source_pair_and_seen_range": dict(sorted(by_pair.items())),
             "shared_output_words_per_pair": {"min": min(shared_all, default=0), "max": max(shared_all, default=0),
                                              "total": sum(shared_all)},
-            "examples": [list(f) for f in sorted(found)[:3]]}
+            "examples": [list(f) for f in sorted(found)[:3]],
+            "largest_example": list(largest) if largest else None}
+
+
+def seen_internal_overlaps(ranges: dict, cycles: int, fixes: int) -> dict:
+    """Overlap between the streams of different seeds inside and between the seen ranges themselves."""
+    import bisect
+    used = used_draws(cycles, fixes)
+    seen = []
+    for name, (lo, hi) in ranges.items():
+        for sd in range(lo, hi + 1):
+            for src in SOURCES:
+                seen.append((stream_position(sd, src), used[src], sd, src, name))
+    seen.sort()
+    span = 1 << 64
+    keys = [x[0] - span for x in seen] + [x[0] for x in seen] + [x[0] + span for x in seen]
+    meta = seen * 3
+    reach = max(used.values())
+    pairs: dict[str, int] = {}
+    seeds: dict[str, set] = {}
+    for pi, ni, sd, src, name in seen:
+        lo = bisect.bisect_left(keys, pi + 1)
+        hi = bisect.bisect_right(keys, pi + reach)
+        for idx in range(lo, hi):
+            d = keys[idx] - pi
+            if 0 < d <= ni - 1:
+                _, _, sd2, src2, name2 = meta[idx]
+                a, b = sorted((name, name2))
+                kind = "dispersion words only" if (src <= 6 and src2 <= 6) else "a sensor stream involved"
+                key = f"{a} | {b} | {kind}"
+                pairs[key] = pairs.get(key, 0) + 1
+                seeds.setdefault(key, set()).update({(name, sd), (name2, sd2)})
+    return {"definition": "stream pairs of different seeds or sources whose used output ranges intersect; "
+                          "counted once, from the stream that starts first",
+            "pairs_and_distinct_seeds_by_range_pair": {k: {"pairs": pairs[k], "distinct_seeds": len(seeds[k])}
+                                                       for k in sorted(pairs)}}
+
+
+def clean_block(size: int, ranges: dict, cycles: int, fixes: int, first: int = 60000, step: int = 1000,
+                tries: int = 400) -> dict:
+    """First block of `size` consecutive seeds, starting at multiples of `step` from `first`, whose streams
+    overlap neither each other nor the streams of any seed in `ranges` (used outputs, same draw counts).
+    Only reported, never assigned."""
+    used = used_draws(cycles, fixes)
+    index = _seen_index(ranges, used)
+    n_checked = 0
+    for k in range(tries):
+        a = first + k * step
+        b = a + size - 1
+        if any(lo <= b and a <= hi for lo, hi in ranges.values()):
+            continue
+        n_checked += 1
+        if _block_vs_index(a, b, index, used):
+            continue
+        if seed_independence(a, b, cycles, fixes)["pairs_overlapping_in_the_outputs_actually_used"]:
+            continue
+        return {"first_seed": a, "last_seed": b, "size": size, "candidates_checked": n_checked,
+                "searched_from": first, "step": step,
+                "note": "reported only; no seed is reassigned; the block is outside every range listed as seen or protected"}
+    return {"first_seed": None, "candidates_checked": n_checked}
+
+
+def option_c_costs(summary: dict, cross: dict) -> dict:
+    """Option (c): exclude the seeds that share output words, option A only."""
+    aff = cross["new_seeds_affected_by_stage_layout_A_only"]
+    rows = {}
+    for stage in ("A_low", "A_high", "B", "C", "D", "E"):
+        n0 = summary[stage]["seeds"]
+        n1 = n0 - aff.get(stage, 0)
+        rows[stage] = {"seeds": n0, "affected": aff.get(stage, 0), "remaining": n1}
+    lo, hi = rows["A_low"]["remaining"], rows["A_high"]["remaining"]
+    e_left, d_n = rows["E"]["remaining"], rows["D"]["remaining"]
+    pairs = d_n + e_left
+    return {"stages": rows,
+            "H1a_threshold_at_0.01/3_with_remaining_A_low": threshold(lo, F(1, 300)),
+            "H1a_min_n_at_0.01/3": min_n_all_success(F(1, 300)),
+            "H2_threshold_at_0.01/3_with_remaining_A_high": threshold(hi, F(1, 300)),
+            "H2_power_pi_0.97_with_remaining_A_high": r6(power(hi, F("0.97"), F(1, 300))),
+            "H1b_pooled_n": lo + hi, "H1b_threshold_0.01": threshold(lo + hi, F(1, 100)),
+            "mitigation_pairs": pairs, "min_pairs_for_zero_events_within_1pct": 459,
+            "invariants_budget_feasible": pairs >= 459}
 
 
 def independence() -> dict:
@@ -1382,6 +1487,13 @@ def independence() -> dict:
         "against_seen_and_protected_ranges_case_40s": cross_independence(2000, 400),
         "against_seen_and_protected_ranges_code_limit": cross_independence(
             MAX_STEPS // CONTROL_PERIOD, MAX_STEPS // CONTROL_PERIOD // GNSS_PERIOD_CYCLES),
+        "inside_and_between_seen_ranges_case_40s": seen_internal_overlaps(protocol_seen_ranges(), 2000, 400),
+        "against_extended_list_case_40s": cross_independence(2000, 400, {**protocol_seen_ranges(), **EXTRA_PROTECTED}),
+        "extended_list_adds": {k: list(v) for k, v in EXTRA_PROTECTED.items()},
+        "not_checked": "seeds used by other scripts or documents of the repository that are not in the protocol list, "
+                       "in exec/src/seeds.rs or in AGENTS.md; seed 0 (nominal case, no dispersion draws)",
+        "zero_overlap_block_candidate": clean_block(
+            920, {**protocol_seen_ranges(), **EXTRA_PROTECTED}, 2000, 400),
     }
 
 
@@ -1412,6 +1524,7 @@ def layout_option_b() -> dict:
 
 
 def build() -> dict:
+    ind = independence()
     cond, summary = seed_map()
     checks = seed_checks(cond, summary)
     n_low = summary["A_low"]["seeds"]
@@ -1450,7 +1563,9 @@ def build() -> dict:
         "holm_design": holm_design(n_low, n_high),
         "s4_s5_mcnemar": s4_s5_mcnemar(),
         "cell_tolerance": cell_tolerance(n_low, n_high),
-        "seed_independence": independence(),
+        "seed_independence": ind,
+        "option_c_exclude_overlapping_seeds": option_c_costs(
+            summary, ind["against_seen_and_protected_ranges_case_40s"]),
     }
 
 

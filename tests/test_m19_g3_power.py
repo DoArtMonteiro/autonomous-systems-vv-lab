@@ -398,10 +398,23 @@ class RevisionThree(unittest.TestCase):
         self.assertLess(e["slowest_s"], e["minimum_exposure_s"])
         self.assertAlmostEqual(e["slowest_s"], 0.58)
 
-    def test_hoeffding_condition_for_the_pooled_binomials(self):
+    def test_hoeffding_condition_for_every_computed_confirmatory_threshold(self):
         # thresholds must exceed n * 0.9 + 1 for the binomial tail to bound the heterogeneous one
-        for n, k in ((168, 162), (140, 136), (308, 290), (231, 220), (77, 76)):
-            self.assertGreater(k, n * 0.9 + 1, (n, k))
+        d = built()
+        checked = 0
+        tests = dict(d["tests"])
+        tests.update({k + "_B": v for k, v in d["layout_option_B_E19_Ahigh168"]["tests"].items()})
+        for name, t in tests.items():
+            if name.startswith("M15_") or name.startswith("H2_if") or "pooled_A_and_D" in name or "if_A_and_D" in name:
+                continue
+            k, n = t["reject_if_successes_at_least"], t["n"]
+            self.assertGreater(k, n * 0.9 + 1, name)
+            checked += 1
+        self.assertGreaterEqual(checked, 9)
+        for n, ks in ((168, [162, 161]), (140, [136, 135]), (308, [290])):
+            for k in ks:
+                self.assertGreater(k, n * 0.9 + 1)
+        self.assertEqual(d["tests"]["S7_each_proportion"]["reject_if_successes_at_least"], 77)
 
     def test_layout_option_b(self):
         b = built()["layout_option_B_E19_Ahigh168"]
@@ -423,6 +436,36 @@ class RevisionThree(unittest.TestCase):
 
     def test_no_literal_dash_in_the_tests(self):
         self.assertNotIn(EM_DASH, Path(__file__).read_text(encoding="utf-8"))
+
+    def test_a_cross_pair_against_explicit_generator_outputs(self):
+        r = built()["seed_independence"]["against_seen_and_protected_ranges_case_40s"]
+        for ex in (r["examples"][0], r["largest_example"]):
+            sd, src, sd2, src2, _, shared = ex
+            p1, p2 = m.stream_position(sd, src), m.stream_position(sd2, src2)
+            d = (p2 - p1) & m.MASK64
+            if d > 1 << 63:
+                d -= 1 << 64
+            # the stream that starts first, a, and the later one, b: a's output index d + k equals b's output k
+            (a, b, gap) = ((sd, src), (sd2, src2), d) if d >= 0 else ((sd2, src2), (sd, src), -d)
+            ga = m.SplitMix64(a[0] ^ ((a[1] * m.GOLDEN) & m.MASK64))
+            gb = m.SplitMix64(b[0] ^ ((b[1] * m.GOLDEN) & m.MASK64))
+            outs_a = [ga.next() for _ in range(gap + min(shared, 5))]
+            outs_b = [gb.next() for _ in range(min(shared, 5))]
+            self.assertEqual(outs_a[gap:gap + len(outs_b)], outs_b, ex)
+            self.assertGreaterEqual(shared, 1)
+        self.assertGreater(r["largest_example"][5], 1000)
+
+    def test_zero_overlap_block_is_outside_the_listed_ranges(self):
+        b = built()["seed_independence"]["zero_overlap_block_candidate"]
+        self.assertGreaterEqual(b["first_seed"], 60000)
+        self.assertEqual(b["last_seed"] - b["first_seed"] + 1, 920)
+        self.assertEqual(b["first_seed"], 81000)
+
+    def test_option_c_cost(self):
+        c = built()["option_c_exclude_overlapping_seeds"]
+        self.assertIsNone(c["H1a_threshold_at_0.01/3_with_remaining_A_low"])
+        self.assertFalse(c["invariants_budget_feasible"])
+        self.assertEqual(c["stages"]["A_low"]["remaining"], 52)
 
 
 if __name__ == "__main__":

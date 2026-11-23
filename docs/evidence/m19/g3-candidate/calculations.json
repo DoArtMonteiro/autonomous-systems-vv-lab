@@ -2558,6 +2558,49 @@
     ],
     "steps_between_gnss_fixes": 10
   },
+  "option_c_exclude_overlapping_seeds": {
+    "H1a_min_n_at_0.01/3": 55,
+    "H1a_threshold_at_0.01/3_with_remaining_A_low": null,
+    "H1b_pooled_n": 150,
+    "H1b_threshold_0.01": 144,
+    "H2_power_pi_0.97_with_remaining_A_high": 0.433492,
+    "H2_threshold_at_0.01/3_with_remaining_A_high": 96,
+    "invariants_budget_feasible": false,
+    "min_pairs_for_zero_events_within_1pct": 459,
+    "mitigation_pairs": 392,
+    "stages": {
+      "A_high": {
+        "affected": 42,
+        "remaining": 98,
+        "seeds": 140
+      },
+      "A_low": {
+        "affected": 116,
+        "remaining": 52,
+        "seeds": 168
+      },
+      "B": {
+        "affected": 0,
+        "remaining": 60,
+        "seeds": 60
+      },
+      "C": {
+        "affected": 0,
+        "remaining": 60,
+        "seeds": 60
+      },
+      "D": {
+        "affected": 0,
+        "remaining": 308,
+        "seeds": 308
+      },
+      "E": {
+        "affected": 76,
+        "remaining": 84,
+        "seeds": 160
+      }
+    }
+  },
   "provenance": {
     "base_commit": "47771609c030d8705eca867f4185f45427f8ae2b",
     "m13_simulator_commit": "3962482681cab167d4311789e7d5beb9e1ffba41",
@@ -2746,6 +2789,200 @@
   },
   "schema": "vv-m19-g3-candidate-calculations.v1",
   "seed_independence": {
+    "against_extended_list_case_40s": {
+      "distinct_new_seeds_affected": 258,
+      "draws_used_per_source": {
+        "1": 3,
+        "10": 24000,
+        "11": 24000,
+        "12": 24000,
+        "2": 3,
+        "3": 3,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 8000,
+        "8": 4800,
+        "9": 4800
+      },
+      "examples": [
+        [
+          44000,
+          1,
+          42016,
+          3,
+          "42000-43999 M13 investigation",
+          1
+        ],
+        [
+          44000,
+          3,
+          46176,
+          5,
+          "45000-46999 development",
+          1
+        ],
+        [
+          44001,
+          1,
+          42017,
+          3,
+          "42000-43999 M13 investigation",
+          1
+        ]
+      ],
+      "largest_example": [
+        44804,
+        10,
+        41212,
+        12,
+        "41000-41999 development",
+        23998
+      ],
+      "new_seeds_affected_by_stage_layout_A_only": {
+        "A_high": 42,
+        "A_low": 116,
+        "E": 76,
+        "unassigned": 24
+      },
+      "pairs_by_source_pair_and_seen_range": {
+        "new source 1 x seen source 3 (42000-43999 M13 investigation)": 32,
+        "new source 10 x seen source 12 (41000-41999 development)": 42,
+        "new source 11 x seen source 9 (41000-41999 development)": 42,
+        "new source 12 x seen source 7 (30001 M14 equivalence)": 1,
+        "new source 12 x seen source 7 (30017 M14 equivalence)": 1,
+        "new source 3 x seen source 1 (41000-41999 development)": 42,
+        "new source 3 x seen source 5 (45000-46999 development)": 10,
+        "new source 5 x seen source 3 (45000-46999 development)": 42,
+        "new source 7 x seen source 11 (50000-59999 M14 split)": 76
+      },
+      "pairs_overlapping_in_the_outputs_actually_used": 288,
+      "seen_ranges": {
+        "100-129 M6 reserved and unguarded M12 loop": [
+          100,
+          129
+        ],
+        "1337 campaign": [
+          1337,
+          1337
+        ],
+        "156432 M6 final": [
+          156432,
+          156432
+        ],
+        "18265 M6 final": [
+          18265,
+          18265
+        ],
+        "2000-2029 M9.1 G3": [
+          2000,
+          2029
+        ],
+        "201-212 M6 confirmation": [
+          201,
+          212
+        ],
+        "2026 campaign": [
+          2026,
+          2026
+        ],
+        "241907 M6 final": [
+          241907,
+          241907
+        ],
+        "29581 M6 final": [
+          29581,
+          29581
+        ],
+        "3000-3099 M10": [
+          3000,
+          3099
+        ],
+        "30001 M14 equivalence": [
+          30001,
+          30001
+        ],
+        "30017 M14 equivalence": [
+          30017,
+          30017
+        ],
+        "318604 M6 final": [
+          318604,
+          318604
+        ],
+        "32000-32099 M14 fragility": [
+          32000,
+          32099
+        ],
+        "33500-33529 M14 review": [
+          33500,
+          33529
+        ],
+        "407753 M6 final": [
+          407753,
+          407753
+        ],
+        "41000-41999 development": [
+          41000,
+          41999
+        ],
+        "42 campaign": [
+          42,
+          42
+        ],
+        "42000-43999 M13 investigation": [
+          42000,
+          43999
+        ],
+        "45000-46999 development": [
+          45000,
+          46999
+        ],
+        "47000-47019 P1 and P2 test": [
+          47000,
+          47019
+        ],
+        "50000-59999 M14 split": [
+          50000,
+          59999
+        ],
+        "536218 M6 final": [
+          536218,
+          536218
+        ],
+        "6000-6099 M10": [
+          6000,
+          6099
+        ],
+        "672941 M6 final": [
+          672941,
+          672941
+        ],
+        "7349 M6 final": [
+          7349,
+          7349
+        ],
+        "794306 M6 final": [
+          794306,
+          794306
+        ],
+        "83017 M6 final": [
+          83017,
+          83017
+        ],
+        "921685 M6 final": [
+          921685,
+          921685
+        ]
+      },
+      "seen_seeds": 15439,
+      "shared_output_words_per_pair": {
+        "max": 23998,
+        "min": 1,
+        "total": 1833244
+      },
+      "streams_checked": 11040
+    },
     "against_seen_and_protected_ranges_case_40s": {
       "distinct_new_seeds_affected": 258,
       "draws_used_per_source": {
@@ -2788,7 +3025,15 @@
           1
         ]
       ],
-      "new_seeds_affected_by_stage": {
+      "largest_example": [
+        44804,
+        10,
+        41212,
+        12,
+        "41000-41999 development",
+        23998
+      ],
+      "new_seeds_affected_by_stage_layout_A_only": {
         "A_high": 42,
         "A_low": 116,
         "E": 76,
@@ -2906,7 +3151,15 @@
           1
         ]
       ],
-      "new_seeds_affected_by_stage": {
+      "largest_example": [
+        44804,
+        10,
+        41212,
+        12,
+        "41000-41999 development",
+        1199998
+      ],
+      "new_seeds_affected_by_stage_layout_A_only": {
         "A_high": 42,
         "A_low": 116,
         "E": 76,
@@ -2994,7 +3247,207 @@
       "control_period_steps": 2,
       "max_steps": 200000
     },
+    "extended_list_adds": {
+      "100-129 M6 reserved and unguarded M12 loop": [
+        100,
+        129
+      ],
+      "1337 campaign": [
+        1337,
+        1337
+      ],
+      "156432 M6 final": [
+        156432,
+        156432
+      ],
+      "18265 M6 final": [
+        18265,
+        18265
+      ],
+      "201-212 M6 confirmation": [
+        201,
+        212
+      ],
+      "2026 campaign": [
+        2026,
+        2026
+      ],
+      "241907 M6 final": [
+        241907,
+        241907
+      ],
+      "29581 M6 final": [
+        29581,
+        29581
+      ],
+      "318604 M6 final": [
+        318604,
+        318604
+      ],
+      "407753 M6 final": [
+        407753,
+        407753
+      ],
+      "42 campaign": [
+        42,
+        42
+      ],
+      "536218 M6 final": [
+        536218,
+        536218
+      ],
+      "672941 M6 final": [
+        672941,
+        672941
+      ],
+      "7349 M6 final": [
+        7349,
+        7349
+      ],
+      "794306 M6 final": [
+        794306,
+        794306
+      ],
+      "83017 M6 final": [
+        83017,
+        83017
+      ],
+      "921685 M6 final": [
+        921685,
+        921685
+      ]
+    },
+    "inside_and_between_seen_ranges_case_40s": {
+      "definition": "stream pairs of different seeds or sources whose used output ranges intersect; counted once, from the stream that starts first",
+      "pairs_and_distinct_seeds_by_range_pair": {
+        "2000-2029 M9.1 G3 | 2000-2029 M9.1 G3 | a sensor stream involved": {
+          "distinct_seeds": 6,
+          "pairs": 12
+        },
+        "2000-2029 M9.1 G3 | 2000-2029 M9.1 G3 | dispersion words only": {
+          "distinct_seeds": 8,
+          "pairs": 6
+        },
+        "3000-3099 M10 | 3000-3099 M10 | a sensor stream involved": {
+          "distinct_seeds": 92,
+          "pairs": 143
+        },
+        "3000-3099 M10 | 3000-3099 M10 | dispersion words only": {
+          "distinct_seeds": 60,
+          "pairs": 64
+        },
+        "30001 M14 equivalence | 32000-32099 M14 fragility | a sensor stream involved": {
+          "distinct_seeds": 5,
+          "pairs": 4
+        },
+        "30001 M14 equivalence | 32000-32099 M14 fragility | dispersion words only": {
+          "distinct_seeds": 3,
+          "pairs": 2
+        },
+        "30017 M14 equivalence | 30017 M14 equivalence | a sensor stream involved": {
+          "distinct_seeds": 1,
+          "pairs": 1
+        },
+        "30017 M14 equivalence | 30017 M14 equivalence | dispersion words only": {
+          "distinct_seeds": 1,
+          "pairs": 1
+        },
+        "30017 M14 equivalence | 32000-32099 M14 fragility | a sensor stream involved": {
+          "distinct_seeds": 4,
+          "pairs": 4
+        },
+        "30017 M14 equivalence | 32000-32099 M14 fragility | dispersion words only": {
+          "distinct_seeds": 3,
+          "pairs": 3
+        },
+        "41000-41999 development | 41000-41999 development | a sensor stream involved": {
+          "distinct_seeds": 996,
+          "pairs": 1858
+        },
+        "41000-41999 development | 41000-41999 development | dispersion words only": {
+          "distinct_seeds": 1000,
+          "pairs": 2812
+        },
+        "41000-41999 development | 42000-43999 M13 investigation | a sensor stream involved": {
+          "distinct_seeds": 210,
+          "pairs": 116
+        },
+        "41000-41999 development | 42000-43999 M13 investigation | dispersion words only": {
+          "distinct_seeds": 242,
+          "pairs": 152
+        },
+        "41000-41999 development | 45000-46999 development | dispersion words only": {
+          "distinct_seeds": 68,
+          "pairs": 34
+        },
+        "41000-41999 development | 50000-59999 M14 split | a sensor stream involved": {
+          "distinct_seeds": 2136,
+          "pairs": 3874
+        },
+        "42000-43999 M13 investigation | 42000-43999 M13 investigation | a sensor stream involved": {
+          "distinct_seeds": 1092,
+          "pairs": 2000
+        },
+        "42000-43999 M13 investigation | 42000-43999 M13 investigation | dispersion words only": {
+          "distinct_seeds": 1060,
+          "pairs": 2928
+        },
+        "42000-43999 M13 investigation | 45000-46999 development | dispersion words only": {
+          "distinct_seeds": 64,
+          "pairs": 32
+        },
+        "42000-43999 M13 investigation | 50000-59999 M14 split | a sensor stream involved": {
+          "distinct_seeds": 3318,
+          "pairs": 5038
+        },
+        "45000-46999 development | 45000-46999 development | a sensor stream involved": {
+          "distinct_seeds": 1944,
+          "pairs": 3706
+        },
+        "45000-46999 development | 45000-46999 development | dispersion words only": {
+          "distinct_seeds": 1940,
+          "pairs": 3740
+        },
+        "45000-46999 development | 47000-47019 P1 and P2 test | a sensor stream involved": {
+          "distinct_seeds": 40,
+          "pairs": 20
+        },
+        "45000-46999 development | 47000-47019 P1 and P2 test | dispersion words only": {
+          "distinct_seeds": 50,
+          "pairs": 40
+        },
+        "45000-46999 development | 50000-59999 M14 split | dispersion words only": {
+          "distinct_seeds": 3804,
+          "pairs": 1902
+        },
+        "47000-47019 P1 and P2 test | 47000-47019 P1 and P2 test | a sensor stream involved": {
+          "distinct_seeds": 16,
+          "pairs": 12
+        },
+        "47000-47019 P1 and P2 test | 50000-59999 M14 split | dispersion words only": {
+          "distinct_seeds": 40,
+          "pairs": 20
+        },
+        "50000-59999 M14 split | 50000-59999 M14 split | a sensor stream involved": {
+          "distinct_seeds": 10000,
+          "pairs": 25706
+        },
+        "50000-59999 M14 split | 50000-59999 M14 split | dispersion words only": {
+          "distinct_seeds": 10000,
+          "pairs": 23068
+        },
+        "6000-6099 M10 | 6000-6099 M10 | a sensor stream involved": {
+          "distinct_seeds": 100,
+          "pairs": 118
+        },
+        "6000-6099 M10 | 6000-6099 M10 | dispersion words only": {
+          "distinct_seeds": 82,
+          "pairs": 94
+        }
+      }
+    },
     "method": "integer arithmetic on the SplitMix64 definition only (state0 = seed ^ source * G, state += G); no simulator code path is called; verified against explicit generator outputs in the tests",
+    "not_checked": "seeds used by other scripts or documents of the repository that are not in the protocol list, in exec/src/seeds.rs or in AGENTS.md; seed 0 (nominal case, no dispersion draws)",
     "seeds_44000_44919_case_40s": {
       "distinct_positions": 11040,
       "draws_used_per_source": {
@@ -3086,7 +3539,16 @@
       10,
       11,
       12
-    ]
+    ],
+    "zero_overlap_block_candidate": {
+      "candidates_checked": 22,
+      "first_seed": 81000,
+      "last_seed": 81919,
+      "note": "reported only; no seed is reassigned; the block is outside every range listed as seen or protected",
+      "searched_from": 60000,
+      "size": 920,
+      "step": 1000
+    }
   },
   "tests": {
     "H1_and_H2_if_A_and_D_arms_are_pooled_n_low_399": {
