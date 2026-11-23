@@ -294,3 +294,7 @@ A porta não tem saída senão a decadência do CUSUM ou o isolamento. Reportam-
 ### 13.9 Orçamento revisto
 
 Execuções: etapa 0 1 400; etapa 1 7 680; etapa 2 12 000; etapa 3 7 200; etapa 3b (G1 com ruído) 1 920; etapa 4 9 500; etapa 5 5 120: **44 820**, mais no máximo 10 de ensaio e testes. **Máximo 45 000.** Tempo e artefactos como em 9. Todas as etapas correm mesmo que uma cláusula dispare.
+
+## 14. Adenda 2 (alteração de código para o ruído 1,5 vezes; antes da etapa 3)
+
+A execução de ensaio do ruído 1,5 vezes (secção 5.2, semente 5091 fixada na adenda 1) foi recusada pelo simulador antes de qualquer resultado: `sensors.altimeter_sigma_m must equal the pre-registered value 0.1 (docs/m9-powered-landing.md), got 0.15000000000000002`. A secção 5.2 previa este caso («alteração extra de código que se regista antes de correr»). Alteração, só em `crates/vv-rocket/src/landing_model.rs` (`check_registered`): em casos de esquema v2, os quatro desvios-padrão dos sensores (`altimeter_sigma_m`, `gnss_position_sigma_m`, `gnss_velocity_sigma_mps`, `imu_accel_sigma_mps2`) aceitam-se ou todos iguais ao valor registado ou todos exatamente 1,5 vezes o registado (tolerância relativa 1e-12); qualquer outra combinação e qualquer caso v1 continuam recusados. Os valores registados e os hashes de M1 e M9 não mudam (a alteração só aceita mais um caso). Isto não toca na reformulação, nas constantes, nos limiares nem na matriz. Teste unitário com a semente 5091 (bandeira desligada).
