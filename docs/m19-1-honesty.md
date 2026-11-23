@@ -98,11 +98,12 @@ Testes acrescentados:
 
 - Sem teste com pessoas e sem passagem por leitor de ecrã; o `held` neutro e as pílulas não foram avaliados quanto a contraste.
 - Não foram corridos `m17_cinematic_journey.py`, `review_captures.py` nem `installed_spotcheck.py` (precisam do módulo Cinematic instalado ou de um executável instalado). A Cinematic só foi exercitada pelos testes de `--policy-dump` e por capturas do Godot.
-- O `held` neutro foi visto numa captura da Library e no player (chips); no Flight console, na Compare e no Lab só se verificou por classes CSS e por testes de código, não visualmente.
+- O `held` neutro foi visto em capturas da Library, do player (chips), da Compare (`after-1c`) e das pílulas de veredicto do Lab (`after-1d`). Não foram vistos no ecrã: o Flight console, a tabela de comparação do Lab com linhas de regras, a página Runs e a lista «Investigations» do Discover; para estes só há verificação por classes CSS e por testes de código.
 - 39 testes Python que precisam do binário `vv-rocket` de `crates/vv-rocket` ficam ignorados com o comando do AGENTS.md, antes e depois.
 - A pílula selecionada a 1024x640 ocupa quatro linhas (antes três) e o gráfico 2D perde alguns píxeis de altura; os percursos que medem a altura do gráfico e as sobreposições passaram (`ux2` 90/90).
 - Não foi construído nem testado o instalador, nem a reversão. A Studio 0.18.1 instalada não foi lançada nem alterada, mas ver «Quebra do passo 4».
-- A revisão de UX independente das correções não foi feita.
+- Os percursos anteriores (m15, ux, ux2, m18, m17 Lab, m16, ui_smoke) não foram repetidos depois das correções da revisão nem do seguimento; só se repetiu o `capture.py` isolado, com 20 verificações.
+- Nenhuma revisão foi feita por pessoas. As revisões independentes descritas em «Revisões independentes por agentes» foram feitas por agentes de IA.
 
 ## Seguimento da passagem de especialistas (F01 a F04, F06, F07, F10, F11)
 
@@ -112,6 +113,23 @@ Classificação na tabela, linhas 10 a 15; tudo o que se implementou é da class
 
 Aplicadas depois da revisão (veredicto «accept with fixes»): linhas de segurança neutras em todos os consumidores, testes comportamentais onde são possíveis, tom do chip «Mission» a partir dos estados, frase de «sem falhas» com categoria, preenchimento de bloco e `position: relative` nas pílulas (para o anel de foco não ser cortado pela linha deslocável), `completionFacts` documentado e frase do booster restringida ao verificado. Por regra nova da coordenação, os percursos anteriores (m15, ux, ux2, m18, m17 Lab, m16, ui_smoke) não foram repetidos; os resultados referidos acima são de antes destas correções. As capturas de `after/` e as 15 verificações de `capture.py` foram repetidas depois das correções, com um executável construído com outro identificador (`org.vvlab.studio.m191review`, por `TAURI_CONFIG`), biblioteca, configuração e perfil WebView2 temporários. A listagem recursiva (datas e tamanhos) de `%LOCALAPPDATA%\org.vvlab.studio`, `%APPDATA%\org.vvlab.studio`, da biblioteca em Documentos e de `app_userdata` do Godot ficou idêntica antes e depois (`app-data-isolation.txt`). Novas capturas: `after-1b-analyse-safety-rows`, `after-1c-compare-safety-rows` e `after-1d-lab-verdict-pills`; as 15 verificações passam (12 falham nos factos da 0.18.1). A tabela de comparação do Lab com linhas de regras (células `st-held`) exige executar uma experiência e continua coberta só por testes estruturais; o anel de foco das pílulas não foi visto.
 
+## Revisões independentes por agentes
+
+Foram feitas três rondas de revisão independente por agentes (revisão de agente, não revisão humana): a revisão do ramo, a revisão dos commits de seguimento e a das correções finais menores. Os relatórios das duas primeiras estão em `docs/evidence/m19/reviews/` (`01-independent-review-of-m19-1-honesty-branch.md`, `02-review-m19-1-follow-up-commits.md`), ambas com o veredicto «accept with fixes»; o relatório da terceira ronda não está nessa pasta. As correções da revisão e do seguimento foram, portanto, revistas por agentes. Continuam por fazer a revisão por pessoas e a verificação visual listada em «Limitações».
+
 ## Quebra do passo 4
 
-Os percursos anteriores (m15, ux, ux2, m18, m17 Lab, m16 e ui_smoke) criam a sua própria biblioteca e configuração temporárias, mas não redirecionam o perfil do WebView2. O executável deste ramo tem o mesmo identificador (`org.vvlab.studio`) que a Studio instalada, por isso o WebView2 escreveu na cache do perfil da instalação, `%LOCALAPPDATA%\org.vvlab.studio\EBWebView` (`DIPS`, `GrShaderCache`, `ShaderCache`; a última escrita passou de 15/11/2026 08:30:18 para 23/11/2026 19:01:22). Não foi limpo nem reposto, porque a decisão é do responsável. As restantes pastas da instalação não mudaram: `modules` (15/11/2026 08:10:01), `logs` (02/11/2026 22:41:06), as preferências em `%APPDATA%\org.vvlab.studio` (06/11/2026 20:00:43) e a pasta de dados do Godot (`app_userdata`, 04/11/2026). A biblioteca de investigação em Documentos não foi tocada (a variável `VVLAB_LIBRARY` apontou sempre para uma pasta temporária). A captura de `capture.py` e as capturas do Godot não escreveram aí. Quem repetir os percursos deve definir antes `WEBVIEW2_USER_DATA_FOLDER` para uma pasta temporária.
+**Factos.** Várias suítes de percursos anteriores da Studio (m15, ux, ux2, m18, m17 Lab, m16 e ui_smoke; sete, ver `journeys-after.txt`) correram, ao longo de cerca de seis minutos, contra um executável construído deste ramo. Criam a sua própria biblioteca e configuração temporárias, mas não redirecionam o perfil do WebView2. O executável tem o mesmo identificador (`org.vvlab.studio`) que a Studio instalada, por isso o WebView2 escreveu no perfil completo da instalação, a pasta de dados de utilizador `%LOCALAPPDATA%\org.vvlab.studio\EBWebView`. A escrita não se limitou a caches.
+
+**O que se sabe.**
+
+- A listagem mais antiga que existe (`appdata-before.txt`, fora do repositório) foi tirada **depois** da quebra. Não existe nenhuma listagem anterior.
+- Dos 1302 registos dessa listagem, 203 têm data de 23/11 entre as 18:55 e as 19:01, incluindo `History`, `Preferences`, `Secure Preferences`, `Local State`, `Web Data`, `Local Storage\leveldb`, `Session Storage`, `Network` e `Code Cache\js`.
+- Uma inspeção só de leitura de `Local Storage\leveldb\000003.log` (2671 bytes) mostra apenas registos de metadados internos do Chromium (`VERSION`) e nenhuma chave da aplicação. O código-fonte da interface da 0.18.1 não tem chamadas a armazenamento web.
+- Não foram tocados: os ficheiros do programa, `modules` (15/11/2026 08:10:01), `logs` (02/11/2026 22:41:06), as preferências da Studio em `%APPDATA%\org.vvlab.studio` (06/11/2026 20:00:43), a pasta de dados do Godot (`app_userdata`, 04/11/2026) e a biblioteca de investigação em Documentos (`VVLAB_LIBRARY` apontou sempre para uma pasta temporária). A captura de `capture.py` e as capturas do Godot não escreveram aí.
+
+**Julgamento (não verificado).** O impacto provável é nulo para os dados da Studio, porque a interface não guarda nada em armazenamento web e as preferências e a biblioteca ficam noutros sítios. É uma inferência a partir do que se leu, não uma medição.
+
+**Decisão do responsável.** Como não há listagem anterior à quebra, repor o estado anterior é impossível. As opções são apagar `EBWebView` (o WebView2 volta a criá-lo no próximo arranque) ou deixá-lo como está. Nada foi apagado nem reposto.
+
+**Quem repetir os percursos** deve definir antes `WEBVIEW2_USER_DATA_FOLDER` para uma pasta temporária (o `capture.py` e as capturas de revisão já o fazem, com o identificador `org.vvlab.studio.m191review`).
