@@ -475,7 +475,8 @@ for (const id of ['err_est_x', 'err_z_host']) {
   if (runs.length !== 1) throw new Error('estimate line should be one run');
 }
 if (m.nearestSample(8.18) !== 82 && m.nearestSample(8.18) !== 81) throw new Error('snap');
-if (m.eventJump(0, 1) !== 36) throw new Error('event jump');
+const ign = data.events.find((e) => e.id === 'ignition').nav_index;
+if (m.eventJump(0, 1) !== ign) throw new Error('event jump');
 console.log(JSON.stringify({ refused, points }));
 """
         res = subprocess.run(
@@ -1011,6 +1012,22 @@ class RenderedPageIteration2(unittest.TestCase):
 
     def test_cursor_starts_at_the_start_of_the_run_and_says_so(self):
         self.assertIn("Cursor at recorded sample 0 of 230: t = 0.000 s, start of the run.", self.full)
+
+    def test_the_touchdown_dump_obeys_the_same_number_audit(self):
+        audit = DomAudit()
+        audit.feed(self.td)
+        self.assertEqual(audit.bad, [])
+        for attrs, txt in audit.values:
+            ref = attrs["data-ref"]
+            if attrs.get("data-display") == "label" or "data-legend" in attrs:
+                continue
+            e = DATA["series"].get(ref) or DATA["scalars"][ref]
+            want = expected_text(e, int(attrs.get("data-i", "0") or 0), attrs.get("data-digits"))
+            self.assertTrue(txt.strip().startswith(want), f"{ref}: {txt!r} vs {want!r}")
+
+    def test_run_hashes_are_shown_in_provenance(self):
+        for ref in ("run.hash.case", "run.hash.trace", "run.hash.verification", "run.hash.source"):
+            self.assertIn(f'data-ref="{ref}"', self.full)
 
     def test_threshold_options_and_the_divergence_statement(self):
         self.assertIn("No divergence instant is recorded.", self.full)

@@ -249,3 +249,4 @@ button { font: inherit; }
 .tb-group [aria-pressed="true"] { background: #15181c; color: #fff; }
 #plan .tb-group button { background: #fff; border: 1.5px solid #333; border-radius: 4px; padding: 2px 8px; cursor: pointer; color: var(--text); }
 #plan .tb-group button[aria-pressed="true"] { background: #15181c; color: #fff; }
+.val { overflow-wrap: anywhere; }

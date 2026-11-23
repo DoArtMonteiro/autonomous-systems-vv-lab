@@ -36,7 +36,7 @@
     </li>
     <li id="card-4">
       <h3>Why it mattered</h3>
-      <p>From <span data-v="run.reject_first_t_s"></span> the altimeter stopped being fused and guidance read the lower of two altitudes (source code, not recorded); the altimeter was the lower in <span data-v="lane.altimeter_lower_samples"></span> of <span data-v="lane.flagged_samples"></span> flagged samples (approximate). That is consistent with R1 <span data-word="verdict" data-v="req.R1_vertical_speed.pass"></span> at <span data-v="req.R1_vertical_speed.value"></span> although z was <span data-v="td.err_z_host"></span> too high. Nothing guards x and y, so the biased belief was followed there; the true and believed nozzle points are <span data-v="td.gap_m"></span> apart, consistent with the bias driving the miss (no counterfactual run).</p>
+      <p>By <span data-v="run.reject_first_t_s"></span> the altimeter had stopped being fused and guidance read the lower of two altitudes (source code, not recorded; the altimeter was the lower in <span data-v="lane.altimeter_lower_samples"></span> of <span data-v="lane.flagged_samples"></span> flagged samples, approximate), consistent with R1 <span data-word="verdict" data-v="req.R1_vertical_speed.pass"></span> at <span data-v="req.R1_vertical_speed.value"></span> although z was <span data-v="td.err_z_host"></span> too high. Nothing guards x and y, so the biased belief was followed there: the true and believed nozzle points are <span data-v="td.gap_m"></span> apart, consistent with the bias driving the miss (no counterfactual run).</p>
     </li>
   </ol>
 </section>
@@ -69,7 +69,7 @@
 
 <section id="strips" aria-labelledby="strips-h">
   <h2 id="strips-h" class="sr">Estimate and observations against truth</h2>
-  <p class="strip-intro">Every strip is in error space: <strong>truth is the zero line</strong>. Estimates are recorded every <span data-v="run.sample_interval_s"></span> (one control cycle in <span data-v="cad.samples_per_cycle" data-nounit="1"></span>). Markers are recorded values; the thin connector is a reading aid. Observations are separate hollow markers and are never joined.</p>
+  <p class="strip-intro">The error strips (x, y, z and velocity) are in error space: <strong>truth is the zero line</strong>; the other strips say what they show. Estimates are recorded every <span data-v="run.sample_interval_s"></span> (one control cycle in <span data-v="cad.samples_per_cycle" data-nounit="1"></span>). Markers are recorded values; the thin connector is a reading aid. Observations are separate hollow markers and are never joined.</p>
   <figure class="strip" id="fig-x">
     <figcaption><h3>East (x): the faulted axis</h3><ul class="legend" id="leg-x"></ul></figcaption>
     <svg id="svg-x" role="img" aria-labelledby="fig-x-t"></svg>

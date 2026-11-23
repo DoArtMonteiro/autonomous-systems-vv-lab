@@ -46,7 +46,7 @@ SCHEMA = "m19-belief-truth-data.v2"
 # that hash. The per-file hashes below (CRLF normalised to LF, as the algorithm does) are pinned so
 # this extractor needs no git history; tests/test_m19_belief_truth.py proves the pins against git
 # and that the aggregate at that commit equals run.json#/source_sha256.
-RECORDING_COMMIT = "3962482"
+RECORDING_COMMIT = "3962482681cab167d4311789e7d5beb9e1ffba41"
 HASHED_FILES = [
     "Cargo.lock", "Cargo.toml", "src/dynamics.rs", "src/landing_actuator.rs", "src/landing_controller.rs",
     "src/landing_model.rs", "src/landing_run.rs", "src/landing_sensors.rs", "src/landing_sim.rs",
@@ -784,7 +784,8 @@ def build() -> dict:
                  "touchdown_gap", math.hypot(v("base_x")[last] - bel[last][0], v("base_y")[last] - bel[last][1]),
                  series_inputs=["base_x", "base_y", "believed_nozzle_x", "believed_nozzle_y"], at=last, digits=2)
     b.der_scalar("td.err_est_x", "Estimate - truth in x, last estimate before contact", "m", "touchdown_sample_value",
-                 S["err_est_x"]["values"][last], series_inputs=["err_est_x"], at=last, digits=2)
+                 S["err_est_x"]["values"][last], series_inputs=["err_est_x"], at=last, digits=2,
+                 note="D-view, computed against the host-interpolated truth of the touchdown sample; the estimate is the last control cycle's.")
     b.der_scalar("td.err_z_host", "Estimate - truth in z, last estimate before contact (host metric)", "m",
                  "touchdown_sample_value", S["err_z_host"]["values"][last], series_inputs=["err_z_host"], at=last,
                  cls="D-host", digits=2)

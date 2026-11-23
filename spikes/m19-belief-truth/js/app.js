@@ -463,6 +463,11 @@ function renderProvenance() {
     return b;
   };
   item("Recorded source hash", "The run declares the hash of the simulator sources that wrote it: ", hashB("run.hash.source"), ".");
+  item(
+    "Run file hashes",
+    "Declared by run.json for the files of this run: case ", hashB("run.hash.case"), ", trace ", hashB("run.hash.trace"), ", verification ", hashB("run.hash.verification"),
+    ". They match the files and the record's own list (checked by the extractor and the tests).",
+  );
   item("Current tree", "The same algorithm over this tree gives ", hashB("prov.current_sha"), ": ", wordBtn("equal", "prov.hash_matches"), " to the recorded one.");
   item(
     "What differs",
