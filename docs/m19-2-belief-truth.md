@@ -2,7 +2,7 @@
 
 Protótipo isolado, em `spikes/m19-belief-truth/`. Não altera o Studio nem nenhum crate. Não simula nada: lê uma corrida guardada e mostra, lado a lado, o que aconteceu, o que o controlador acreditava, quando os dois divergiram e porque isso importou.
 
-Estado: iteração 1 construída e verificada no ramo `prototype/m19.2-belief-truth`, só localmente. Não foi avaliada por utilizadores nem pela revisão independente.
+Estado: iteração 2 (a última substantiva) construída e verificada no ramo `prototype/m19.2-belief-truth`, só localmente. A iteração 1 foi avaliada por um crítico de UX independente e por uma verificação de compreensão feita por agentes (não é um estudo com pessoas). A iteração 2 responde a essa avaliação e ainda não foi reavaliada. As secções abaixo descrevem a iteração 1; a secção "Iteração 2", no fim, diz o que mudou e o que ficou por resolver e prevalece sobre elas quando divergem.
 
 ## Tese
 
@@ -44,6 +44,7 @@ Cada número e cada elemento visual traz uma etiqueta. As etiquetas têm texto e
 | D-host | Derivada pelo anfitrião 0.15.0 e guardada (veredictos, métricas do anfitrião, amostra de toque interpolada) |
 | D-view | Derivada por esta vista (extrator), com a derivação nomeada |
 | S | Do código-fonte, não guardada na corrida |
+| K | Comando do controlador, guardado em `command` no traço (acelerador, cardan). Acrescentada na iteração 2, para manter separados o estado real, as observações e as decisões do controlador |
 | C | Configuração da missão em `case.json`. Acrescentada às classes pedidas, porque a configuração não é verdade nem estimativa |
 
 Mais o aviso visível **U: nenhuma**. Este estimador não tem incerteza (ganhos fixos, sem covariância). Os sigmas de `case.json` são o ruído do simulador, não a crença do controlador sobre o próprio erro, e não se desenham envelopes com eles.
@@ -85,7 +86,7 @@ O que a corrida mostra, lido da vista: antes da falha a estimativa ficou a 0,40 
 - A amostra de toque está fora da grelha. A verdade é o estado de contacto interpolado pelo anfitrião (D-host); a estimativa e a observação são do último ciclo de controlo antes do contacto, não do instante do toque. A vista rotula o ponto acreditado como "última estimativa antes do contacto".
 - O resíduo e a posição acreditada do bocal usam o substituto de `s_cm`, a estimativa guardada depois da atualização e amostras de 0,1 s. A concordância antes da falha (resíduo máximo de 0,25 m, contra um limiar de 3 m) apoia o substituto, mas não o prova para o `s_cm` do controlador.
 - Sem covariância: não há incerteza para mostrar. Sem contrafactual: não há prova de causa.
-- As linhas das estimativas unem amostras consecutivas por segmentos retos. É um traço de leitura entre valores guardados; nenhum valor entre amostras é lido ou mostrado.
+- Na iteração 1 as linhas das estimativas uniam amostras consecutivas e sugeriam uma subida gradual entre 7,9 s e 8,0 s. Foi corrigido na iteração 2 (marcador em cada amostra e conector fino, rotulado como ajuda de leitura).
 - Os factos de código ficam presos ao commit `bec7b3f`: se `landing_controller.rs` e os vizinhos mudarem, o teste falha até o extrator ser reexecutado e os factos revistos.
 
 ## Como executar
@@ -116,3 +117,41 @@ Teclado: no eixo do tempo, Esquerda e Direita avançam uma amostra, Shift com se
 - O plano mostra apenas a janela de ±20 m. Com o cursor fora da janela, o plano diz que o ponto verdadeiro está fora e não o desenha.
 - A vista não permite comparar duas corridas, nem mostra o que teria acontecido sem a falha.
 - A aproximação do resíduo poderia ser medida contra uma corrida que guarde o resíduo interno do controlador; esta não o guarda.
+
+
+## Iteração 2
+
+Resposta à avaliação da iteração 1: não enganou nas armadilhas centrais, mas a compreensão ficou abaixo do limiar porque a mecânica do controlador estava pouco explicada. Mantêm-se o SVG 2D (sem Three.js; o crítico confirma que não há vantagem material), a classe C e a formulação "gravado pelo anfitrião rocket-landing 0.15.0". A vista continua a não simular nada.
+
+Mudanças, por prioridade:
+
+1. **Marcadores por amostra (bloqueador).** As tiras das estimativas ligavam as amostras de 7,9 s e 8,0 s e desenhavam divergência antes da falha. Agora cada amostra guardada tem um marcador, o conector é fino e a legenda diz "connector between recorded samples, not data". O texto das tiras diz que as estimativas são guardadas a cada 0,1 s (um ciclo de controlo em cinco) e que os marcadores são valores guardados. Na amostra de 8,0 s a vista explica que o erro de 2,27 m é o estado depois de a falha ter feito efeito nesse ciclo e não uma subida gradual, e mostra o salto esperado de um fix GNSS com desvio (ganho vezes desvio, 2,25 m, inferência do ganho fixo).
+2. **Etiqueta de classe no toque.** `err_est_x` e `err_est_y` deixam de ser D-host na amostra de toque: ficam D-view, e a gaveta diz "computado contra a verdade interpolada pelo anfitrião". A verdade e a velocidade verdadeira dessa amostra continuam D-host.
+3. **Proveniência da build.** O `extract.py` calcula, sem git, o hash dos 20 ficheiros do `vv-rocket` pelo algoritmo de `crates/vv-rocket/src/lib.rs` (CRLF lido como LF) e compara-o com o `source_sha256` da corrida (`12b276cb...`): são **diferentes**. Difere apenas `src/landing_model.rs`. Os hashes por ficheiro da árvore do commit `3962482` estão fixados no extrator; o teste prova com git que essa árvore reproduz o hash gravado (diz-se que a árvore o reproduz, não que construiu a corrida) e que os valores fixados coincidem com o git. Todos os ficheiros de simulador citados pela vista (controlador, sensores, simulação, verdade, verificador) são idênticos aos dessa árvore. A versão não chega para identificar a build: a corrida regista a versão `0.15.0` e a árvore atual também declara `0.15.0` (`domain.json`), mas o pedido guardado tem 6 parâmetros e o catálogo atual tem mais. O replay estrito é rejeitado ("stored request is valid and canonical"); o replay de "build anterior" volta a simular com os valores por omissão atuais e concorda nos campos comparados (resultado, segurança, veredictos, canais, eventos, métricas; textos, cena e ficheiros nativos não se comparam). O teste `earlier_build.rs` foi executado de novo nesta iteração (`1 passed; 0 failed`, ver `docs/evidence/m19/belief-truth/iteration-2/cargo-earlier-build.txt`). O teste das linhas fixas do código-fonte diz agora, ao falhar, para repetir o `extract.py`.
+4. **Cadência dos sensores.** GNSS um fix por 0,1 s (cinco ciclos de controlo, `gnss_period_cycles`), altímetro e IMU a cada ciclo de 0,02 s, amostras do traço a cada 0,1 s. A amostra de toque, fora da grelha, mostra "no fix on this cycle" onde o GNSS é nulo (230 amostras com fix, uma sem).
+5. **Decisões do controlador.** Nova secção: ignição comandada às 3,6 s (antes da falha; regra do código-fonte com a fração de ignição), comandos guardados (classe K, no painel do cursor), sem corte, aborto nem reacendimento (`cutoff_t_s`, `flameout_t_s` e `ascent_abort_first` nulos; S4 igual a 1). `sensor_disagreement` e `altimeter_rejected` são a mesma condição (`landing_controller.rs`, `sensor_disagreement: ...then_some(self.rejected)`) e aparecem como uma só deteção. A rejeição significa duas coisas, do código-fonte e não guardadas: o altímetro deixa de ser fundido em cada ciclo cujo resíduo excede o limiar (começa antes da bandeira) e, depois de cinco ciclos consecutivos, o guiamento lê o mínimo entre a altitude estimada do bocal e o altímetro. Pela lógica implementada o controlador não podia saber qual dos sensores estava errado (só compara o altímetro com a própria estimativa); a vista diz que é uma afirmação sobre o código, não uma avaliação com retrospetiva.
+6. **Painel de divergência.** "No divergence instant is recorded." Mostra o início da falha, o erro nas amostras de 7,9 s e 8,0 s e um limiar escolhido pelo utilizador (1, 3, 5, 10 m) que dá a primeira amostra guardada acima dele, para o erro horizontal e para o vertical, em D-view (amostra guardada, nunca um cruzamento interpolado).
+7. **Erro de velocidade.** Tira com `err_vz` e `err_vh` do `record.json` (D-host) e as velocidades verdadeira e estimada no painel do cursor. Antes de os rotular como D-host, o extrator verifica em todas as amostras que `err_z`, `err_h`, `err_vz`, `err_vh` e `pad_distance` são as subtrações simples.
+8. **Distância à plataforma e altitude.** Tira com a distância verdadeira (D-host) e a acreditada (D-view, aproximada) do plano do bocal ao centro, com a linha do raio R5 e barras do primeiro ao último ponto guardado dentro do raio: a verdade esteve dentro entre 12,1 s e 15,7 s e saiu, a crença está dentro desde 15,6 s até ao fim. Tira da altitude verdadeira. O plano tem o botão "Whole track" para ver a trajetória inteira e não só os 20 m junto à plataforma.
+9. **Estado inicial e janela da falha.** Quadro nominal (`case.json`) contra disperso (`record.json`) e meia-largura da dispersão. A falha está configurada de 8,0 s a 40,0 s e a corrida terminou ao toque, por isso a falha esteve ativa até ao fim (lido das falhas ativas da última amostra).
+10. **Decisões ligadas aos resultados.** O cartão 4 diz que o altímetro foi o mais baixo em 149 das 149 amostras com a bandeira (aproximado) e que isso é consistente com o veredicto do R1 e a velocidade de 2,07 m/s apesar de a estimativa estar 14,79 m acima da verdade (suavizado para "consistente com"; deixou de dizer "porque"). Cada linha de requisito tem "At touchdown"; o R5 tem também "On the pad plan". R1, R2 e R5 dizem "nozzle plane" (verificado numericamente contra `verification.json` e ancorado em `landing_verify.rs`). A nota do S2 diz que é avaliado no contacto e tem o mesmo número que o R5.
+11. **Convenção de sinais.** "x = -12,32 m (east positive), y = -1,79 m (north positive)", lida do quadro de referência do `record.json`, mais uma frase marcada como inferência (um desvio de 15 m em x seguido pelo guiamento põe o veículo do lado de x negativo).
+12. **Palavras de veredicto vindas dos dados.** Nenhuma palavra de veredicto, nem "inside" ou "outside" junto ao R5, está escrita no HTML ou no JavaScript da página: vêm de um mapa único em `model.js`, escolhidas por um booleano dos dados. Um teste procura essas palavras nas fontes.
+13. **Acessibilidade.** `touch-action: pan-y` nas figuras; a legenda abre a gaveta com o índice do cursor; as células da tabela de amostras são botões com uma só paragem de tabulação e navegação por setas; a etiqueta "approx." aparece em cada valor aproximado, não só em parênteses.
+14. **Hierarquia.** Cartões mais curtos, 2x2 a 1024 px, tira x e plano da plataforma no primeiro ecrã a 1440x900, cursor inicial no início da corrida e dito como tal, ajuda de teclado recolhida, lista de eventos movida para a secção de decisões.
+15. **Pequenos acertos.** Redação da amostra de toque fora da grelha; "at recorded samples"; eventos procurados por tipo e não por índice (extrator e testes); redesenho do cursor ao arrastar agrupado por `requestAnimationFrame`.
+
+Testes novos (57 no total no ficheiro): todos os números novos rastreados e recalculados de forma independente, sem palavras de veredicto escritas, um marcador de estimativa por amostra guardada no DOM renderizado (231 em x, y e z), etiquetas D-view do erro no toque no DOM de `?sample=230`, hash da fonte contra a árvore atual e contra o commit fixado, e diferença esperada apenas em `landing_model.rs`.
+
+Verificação desta iteração: `python -m unittest tests/test_m19_belief_truth.py` (57 testes, passam), `python -m unittest discover -s tests -p "test_*.py"` (487 testes, 1 erro que já existia: `test_minimize` sem o executável `vv-lab`), `cargo fmt --check` limpo, `node --check` dos três módulos, `extract.py --check`. Capturas em `docs/evidence/m19/belief-truth/iteration-2/` (1440x900, 1024x640, 390x844, zoom do início da falha, toque com a trajetória inteira, páginas completas a 1024 e 390). O Chromium sem interface limita a largura da janela; a vista de 390 px usa um `iframe` dessa largura (`harness-390.html`).
+
+O que fica por resolver:
+
+- Nenhum estudo com pessoas: a compreensão não foi remedida depois destas mudanças.
+- Sem leitor de ecrã nem ferramenta automática de acessibilidade; o contraste foi calculado à mão na iteração 1 e as cores novas (marcadores, etiqueta "approx.", classe K) não foram recalculadas.
+- `touch-action: pan-y` e o arrastar por ponteiro não foram testados num dispositivo tátil real.
+- A 1024x640 o primeiro ecrã é o dos cartões; as tiras ficam abaixo da dobra.
+- O texto dos cartões é fixo para esta corrida (números e palavras de veredicto vêm dos dados, as frases não generalizam).
+- O resíduo, a posição acreditada e "qual das altitudes foi a menor" continuam aproximados (substituto de `s_cm`, estimativa pós-atualização, amostras de 0,1 s). A frase do cartão 4 sobre o R1 é "consistente com", sem contrafactual.
+- A primeira amostra acima de um limiar é uma amostra guardada, não o instante do cruzamento.
+- O teste de proveniência prende o hash e as linhas de cinco ficheiros Rust, do `host_sdk.rs` e do `earlier_build.rs`: qualquer alteração a esses ficheiros faz falhar o `discover` até o extrator ser repetido.
