@@ -12,7 +12,7 @@ import { sceneFor, sceneKind } from '../scenes/registry.js';
 import { TimeCursor } from '../cursor.js';
 import { api } from '../api.js';
 import { toast, errorText, askName } from '../ui.js';
-import { indexNumbers, reqView, reqLabel, safetyWording, SAFETY_NOTE, headlineChange, statusLine, DERIVED_NOTE, EXPECTATION_GLOSS } from '../requirements.js';
+import { indexNumbers, reqView, reqLabel, safetyWording, SAFETY_NOTE, headlineChange, statusLine, DERIVED_NOTE, expectationGloss } from '../requirements.js';
 
 const MAX = 8;
 let root;
@@ -90,7 +90,7 @@ function build() {
       h('h1', null, cmp.name || (cmp.demo ? cmp.demo.title : `Comparison of ${records.length} runs`)),
       h('span', { class: 'dim small' }, cmp.domainIds.length === 1 ? `${domainById(cmp.domainIds[0]) ? domainById(cmp.domainIds[0]).manifest.name : cmp.domainIds[0]}` : `${cmp.domainIds.length} domains`),
       h('div', { class: 'spacer' }), saveBtn),
-    cmp.demo ? h('div', { class: 'demo-banner' }, h('div', null, h('span', { class: 'dim' }, 'Expected, stated by the domain: '), prose(cmp.demo.expectation), h('div', { class: 'small dim demo-gloss' }, EXPECTATION_GLOSS)),
+    cmp.demo ? h('div', { class: 'demo-banner' }, h('div', null, h('span', { class: 'dim' }, 'Expected, stated by the domain: '), prose(cmp.demo.expectation), expectationGloss(cmp.demo.expectation) ? h('div', { class: 'small dim demo-gloss' }, expectationGloss(cmp.demo.expectation)) : null),
       cmp.demo.look_at.length ? h('div', { class: 'small' }, h('span', { class: 'dim' }, 'Look at: '), cmp.demo.look_at.map(prose).join(' · ')) : null) : null,
     h('div', { class: 'run-legend', role: 'list', 'aria-label': 'Runs in this comparison' }, records.map((r, i) => {
       const rec = r.record;

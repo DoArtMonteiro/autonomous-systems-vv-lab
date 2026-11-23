@@ -178,7 +178,9 @@ class WalkthroughFollowUp(unittest.TestCase):
 
     def test_f03_the_domain_expectation_texts_carry_the_gloss(self):
         for rel in (("js", "views", "compare.js"), ("js", "views", "run.js"), ("js", "views", "prepare.js")):
-            self.assertIn("EXPECTATION_GLOSS", read(*rel), rel[-1])
+            text = read(*rel)
+            self.assertIn("expectationGloss(", text, rel[-1])
+            self.assertNotIn("EXPECTATION_GLOSS", text, rel[-1])
 
     def test_f10_the_ground_readings_stay_on_a_short_window(self):
         css = read("css", "mission.css")

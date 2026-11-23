@@ -13,7 +13,7 @@ import { provenancePanel } from '../provenance.js';
 import { sceneFor, sceneKind } from '../scenes/registry.js';
 import { errorText } from '../ui.js';
 import { api, logUiError } from '../api.js';
-import { EXPECTATION_GLOSS } from '../requirements.js';
+import { expectationGloss } from '../requirements.js';
 
 let root;
 let ws = null; // {runId, record, model, cursor, telemetry, timeline, scene, tabs}
@@ -194,7 +194,7 @@ function demoBanner(demo) {
     else look.append(h('span', { class: 'small' }, text));
   }
   return h('div', { class: 'demo-banner' },
-    h('div', null, h('b', null, `Demonstration: ${demo.title}. `), h('span', { class: 'dim' }, 'Expected: '), prose(demo.expectation), h('div', { class: 'small dim demo-gloss' }, EXPECTATION_GLOSS)),
+    h('div', null, h('b', null, `Demonstration: ${demo.title}. `), h('span', { class: 'dim' }, 'Expected: '), prose(demo.expectation), expectationGloss(demo.expectation) ? h('div', { class: 'small dim demo-gloss' }, expectationGloss(demo.expectation)) : null),
     demo.look_at.length ? h('div', { class: 'look' }, h('span', { class: 'dim small' }, 'Look at:'), look) : null);
 }
 

@@ -243,7 +243,12 @@ export const SAFETY_NOTE = 'Safety rules are judged on the true state throughout
 export const SAFETY_SCOPE = 'Safety rules are judged on the true state throughout the run and are not the mission result: a requirement can fail without any safety rule being broken.';
 
 /** Said under a demonstration text written by a domain, whose words about safety mean only that no safety rule was broken. */
-export const EXPECTATION_GLOSS = 'Words about safety in this text mean only that no safety rule was broken; the mission requirements are separate verdicts.';
+const EXPECTATION_GLOSS = '"safe" here means only that no safety rule was broken, and "unsafe" that one was; requirements are separate verdicts.';
+
+/** The gloss for a domain's demonstration text, or null when the text says nothing about safety. */
+export function expectationGloss(text) {
+  return new RegExp('\\b(safe|unsafe|safety)\\b', 'i').test(String(text || '')) ? EXPECTATION_GLOSS : null;
+}
 
 /** The name of a requirement for people: the label, never the id ("R1_vertical_speed"). */
 export function plainName(q) {
