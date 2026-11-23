@@ -252,3 +252,45 @@ O tempo e o número de execuções medem-se fora da simulação, com máquina, c
 1. **Âmbito da reformulação.** Esta reformulação vai além da letra da estratégia («declarar não isolado quando a evidência é ambígua») ao acrescentar a rejeição por NIS de B enquanto não há isolamento. A alternativa é a abstenção sozinha, descrita em 3.3, que se prevê falhar a cláusula 2 (só 6 dos 64 U de B+ a 0,5 m/s têm isolamento errado). Aprovar a alteração de código da secção 3.1, ou pedir a alternativa, antes da fase 2.
 2. **Leitura dos limites de regressão** (secção 7.3): estrita (por omissão, previsão de falha a priori) ou delimitada.
 3. **Âmbito da cláusula 1** (secção 7.1): por omissão inclui as execuções com ruído 1,5 vezes (M3); o responsável pode excluí-las por escrito antes da etapa 1.
+
+## 13. Adenda 1 (decisões do orquestrador depois da revisão estratégica)
+
+Esta adenda foi escrita e commitada **antes da primeira execução com a bandeira `ambiguity_gate` ligada**, testes unitários incluídos. O relógio da tentativa única começa nessa primeira execução. Onde contradiz as secções 1 a 12, **a adenda prevalece**. Nenhum código foi escrito antes desta adenda.
+
+### 13.1 Diagnóstico e regra de âmbito (passo 1 da estratégia, feito antes)
+
+O diagnóstico em `docs/evidence/m10-redesign/diagnostic/` (commit `d350177`, 160 execuções, código sem alterações, sementes 5000 a 5019, B e B+ a 0,5 m/s) decompõe os 64 U de B+: 58 sem isolamento e 6 com isolamento errado; nenhum com isolamento correto tardio; R1 falhado em 64 de 64 e R2 (lateral) só em 5, todos de isolamento errado. Um traço mostra os dois grupos `suspect` (ainda assimilados) do início da rampa ao toque. A regra fixada pelo orquestrador («se a maioria dos U sem isolamento errado são execuções não isoladas que continuam a assimilar o recetor errado, prosseguir com abstenção mais NIS») **manda prosseguir**. Isto não gasta a tentativa única.
+
+Desvio declarado face aos passos 1 e 2 da estratégia: o passo 1 foi feito só para uma célula (0,5 m/s, 20 sementes) e uma execução com traço, não para as sondas `ramp` e `ignition` completas; o passo 2 («B+ sem paridade») **não foi feito**: não existe bandeira que desligue a paridade e produzi-la exigiria outra alteração de código (declarado em `summary.md`). O passo 3 é esta tentativa.
+
+### 13.2 Limites de regressão e veredicto
+
+Mantém-se a leitura **estrita** (7.3), sem relaxar. A decisão 2 da secção 12 fica resolvida assim. Declara-se de antemão que o veredicto global V2 está **previsto como «não avançar»** (regressões herdadas de B+). A aceitação do limite de `E0` em `gnss_bias` (linha 85 de `m19-programme-strategy.md`) é uma recomendação, não uma decisão aprovada pelo responsável, por isso `gnss_bias` conta como regressão. Esta execução é uma **experiência de fecho só de V1**: V1 não pode, por si, alterar nenhuma decisão do responsável.
+
+### 13.3 Cláusula 1, braço B no ruído 1,5 vezes e orçamento
+
+A cláusula 1 inclui as execuções com ruído 1,5 vezes e **não oferece exclusão**; a decisão 3 da secção 12 fica retirada. O braço B passa a correr também na etapa 3 (para avaliar a salvaguarda «B tem `hv`, regra mal calibrada»): etapa 3 com B, B+ e B+G, 3 × 2 400 = 7 200 execuções (mais 2 400).
+
+### 13.4 Sementes fixadas para testes e ensaio
+
+Fixadas agora, dentro de 5000 a 5099 e fora de 5020 a 5059: **5090** para o teste unitário com a bandeira ligada (rampa coerente de 0,5 m/s com início a 8,0 s, B+ ligado e desligado) e **5091** para a execução de ensaio do ruído 1,5 vezes (caso nominal, B+G). Os testes unitários só afirmam factos estruturais (validação recusa a combinação inválida; a bandeira desligada não altera o traço; a ligada é determinista e diferente da desligada em 5090); nenhuma semente se escolhe pelo resultado.
+
+### 13.5 Cláusula 2: onde vincula
+
+A cláusula 2 é **vácua** numa unidade em que B já tem U em todas as execuções (80 de 80; esperado a 0,2 e 0,3 m/s, onde todos os braços eram 80 de 80). Os testes vinculativos são 0,5 m/s, 0,8 m/s e o estrato de 18 sementes (e qualquer outra unidade em que B não esteja saturado). Acrescenta-se um limite proporcional na grelha completa de G1: por magnitude, todos os inícios (16 × 40 = 640 execuções), `U(B+G) − U(B) ≤ 16` (2 por cada 80), vinculativo onde B não está saturado (640 de 640).
+
+### 13.6 Recuperação: S6b e S6c apertados
+
+S6b passa a `R(B+G) ≥ R(B+) − 4` em `gnss_coherent_ramp` (regra geral de materialidade: perder 5 ou mais recuperações contra B+ é material), sem a interpolação com B. S6c passa a `R(B+G) ≥ R(B)` e `R(B+G) ≥ R(B+) − 31` em G1 a 0,8 m/s (640 execuções; perder 32 ou mais, 5 %, é material). O carve-out de `gnss_coherent_ramp` em S7 fica retirado: S7 aplica-se a todas as células de M1.
+
+### 13.7 Cláusula 3: G1 com ruído 1,5 vezes
+
+A cláusula 3 acrescenta G1 a 0,3 e 0,5 m/s com ruído 1,5 vezes (modelo da etapa 3), 16 inícios, sementes 5020 a 5039, braços B, B+ e B+G: 3 × 640 = 1 920 execuções, zero execuções com isolamento errado em B+G (limite superior de Clopper-Pearson a 95 % de 0,58 % com 0 em 640). As falhas `hv` destas execuções contam na cláusula 1.
+
+### 13.8 Comprimentos de rejeição
+
+A porta não tem saída senão a decadência do CUSUM ou o isolamento. Reportam-se os comprimentos das sequências de rejeição. Acrescenta-se à secção 3.1 instrumentação só com a bandeira ligada: `NavReport.gate_streak: Option<u32>` (ciclos de controlo consecutivos com pelo menos uma amostra rejeitada pela porta; `None` com a bandeira desligada e sem serialização), e no verificador `navigation.gate: Option<{max_streak_cycles, rejecting_cycles, streak_open_at_end}>`, também só com a bandeira ligada. Por célula reportam-se o máximo e a mediana de `max_streak_cycles` e o número de execuções em que a sequência estava aberta no toque. Não é critério.
+
+### 13.9 Orçamento revisto
+
+Execuções: etapa 0 1 400; etapa 1 7 680; etapa 2 12 000; etapa 3 7 200; etapa 3b (G1 com ruído) 1 920; etapa 4 9 500; etapa 5 5 120: **44 820**, mais no máximo 10 de ensaio e testes. **Máximo 45 000.** Tempo e artefactos como em 9. Todas as etapas correm mesmo que uma cláusula dispare.
