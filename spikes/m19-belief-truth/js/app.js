@@ -81,6 +81,9 @@ function wordBtn(kind, ref, { i = 0, tag = true } = {}) {
 }
 
 function fillPlaceholders(root = document) {
+  for (const ph of $$("[data-fact-tag]", root)) {
+    ph.replaceWith(h("span", "s-src", tagEl("S"), " ", factButton(ph.dataset.factTag)));
+  }
   for (const ph of $$("[data-v]", root)) {
     const ref = ph.dataset.v;
     const i = indexFrom(ph.dataset.at);
@@ -253,7 +256,9 @@ function renderDecisions() {
   const item = (title, ...nodes) => dl.append(h("dt", null, title), h("dd", null, ...nodes));
   item(
     "Ignition",
-    "Commanded at ", V("run.ignition_command_t_s"), ", ", wordBtn("before", "check.ignition_before_fault"), " the fault starts at ", V("case.fault_start_s"),
+    "Engine ignition recorded (truth event) at ", V("run.ignition_t_s"), "; the event detail records command step ", V("run.ignition_command_t_s"),
+    " as its command time. First recorded sample with the engine on: ", V("ign.first_engine_on_t"), "; first recorded sample with a throttle command above zero: ", V("ign.first_command_t"),
+    ". Ignition comes ", wordBtn("before", "check.ignition_before_fault"), " the fault starts at ", V("case.fault_start_s"),
     ". Rule (source code): light the engine when descending faster than the target and the needed deceleration reaches ", V("case.ignition_fraction", { nounit: true }),
     " of the available thrust-to-mass ", factButton("S_ignition_rule"), ".",
   );
@@ -427,6 +432,15 @@ function renderVerdicts() {
   }
   rt.append(tb);
 
+  const note = $("#req-notes");
+  note.append(
+    h("p", "fig-note", "R2 judges the nozzle-plane horizontal speed at contact, ", V("req.R2_horizontal_speed.value", { tag: true }),
+      ". The centre of mass moves at ", V("td.cm_horizontal_speed"), ". The ", V("td.nozzle_minus_cm_speed"), " difference is about the angular rate times the lever arm, ",
+      V("td.angular_rate_times_lever"), ": the nozzle plane sits below the rotating body's centre of mass."),
+    h("p", "fig-note", "R6 limit: the margin fraction ", V("case.r6_margin_fraction", { nounit: true }), " of the initial propellant ", V("init.propellant_kg"), " is ", V("req.R6_propellant_margin.limit"),
+      " (", V("check.r6_limit_is_fraction_of_initial", { nounit: true }), "); the value is the propellant left at touchdown, ", V("req.R6_propellant_margin.value"), ". The record's own words: ", V("req.R6.explanation", { nounit: true }), "."),
+  );
+
   const it = $("#inv-table");
   it.insertAdjacentHTML("beforeend", "<thead><tr><th scope='col'>Id</th><th scope='col'>Invariant</th><th scope='col'>Worst value</th><th scope='col'>Limit</th><th scope='col'>Verdict</th><th scope='col'>First failure</th></tr></thead>");
   const tb2 = h("tbody");
@@ -454,6 +468,7 @@ function renderVerdicts() {
 
 function renderProvenance() {
   const root = $("#prov-body");
+  root.append(h("p", "u-box", h("strong", null, "Verdicts shown are stored, not recomputed by this view; the build that wrote the run is " + (model.scalar("prov.hash_matches").v ? "" : "not ") + "the current tree.")));
   const dl = h("dl", "facts");
   const item = (title, ...nodes) => dl.append(h("dt", null, title), h("dd", null, ...nodes));
   const hashB = (ref) => {
@@ -543,6 +558,7 @@ function renderReadout() {
   vel.append(
     row("Truth", model.cls("truth_vx", i), ["truth_vx", "truth_vy", "truth_vz"].map((s) => v(s))),
     row("Estimate", "E", ["est_vx", "est_vy", "est_vz"].map((s) => v(s))),
+    row("GNSS velocity", "O", ["gnss_vx", "gnss_vy", "gnss_vz"].map((s) => v(s))),
     row("Host error, vertical and horizontal", "D-host", [v("err_vz_host"), v("err_vh_host"), null]),
   );
   const noz = table("Nozzle plane, vertical, metres");
@@ -631,6 +647,7 @@ function buildLegends() {
   connector($("#leg-z"));
   legendItem($("#leg-v"), "marker-line", "ln-est", "err_vz_host", "Vertical velocity error");
   legendItem($("#leg-v"), "marker-line-diamond", "mk-vh", "err_vh_host", "Horizontal velocity error");
+  legendItem($("#leg-v"), "circle", "pt-gnss", "err_gnss_vz", "GNSS vertical velocity \u2212 truth");
   connector($("#leg-v"));
   legendItem($("#leg-d"), "marker-line", "mk-true", "pad_distance_host", "True distance");
   legendItem($("#leg-d"), "marker-line-diamond", "mk-bel", "believed_pad_distance", "Believed distance");
@@ -671,23 +688,25 @@ function planHalf() {
 function renderAll() {
   const w = widthOf($("#strips"));
   const common = { model, width: w, t0: state.t0, t1: state.t1, cursor: state.cursor };
+  const brk = model.data.index.fault_first_sample; // no connector across the fault start
   drawTimeAxis($("#axis"), { ...common, width: widthOf($("#slider")) });
   drawStrip($("#svg-x"), { ...common, height: 190, layers: [
-    { series: "err_est_x", kind: "line", cls: "ln-est" },
+    { series: "err_est_x", kind: "line", cls: "ln-est", breakBefore: brk },
     { series: "err_gnss_x", kind: "points", cls: "pt-gnss", shape: "circle" },
   ] });
   drawStrip($("#svg-y"), { ...common, height: 120, layers: [
-    { series: "err_est_y", kind: "line", cls: "ln-est" },
+    { series: "err_est_y", kind: "line", cls: "ln-est", breakBefore: brk },
     { series: "err_gnss_y", kind: "points", cls: "pt-gnss", shape: "circle" },
   ] });
   drawStrip($("#svg-z"), { ...common, height: 190, layers: [
-    { series: "err_z_host", kind: "line", cls: "ln-est" },
+    { series: "err_z_host", kind: "line", cls: "ln-est", breakBefore: brk },
     { series: "err_gnss_z", kind: "points", cls: "pt-gnss", shape: "circle" },
     { series: "err_altimeter", kind: "points", cls: "pt-alt", shape: "triangle" },
   ] });
   drawStrip($("#svg-v"), { ...common, height: 150, layers: [
-    { series: "err_vz_host", kind: "line", cls: "ln-est" },
-    { series: "err_vh_host", kind: "line", cls: "mk-vh", shape: "diamond" },
+    { series: "err_vz_host", kind: "line", cls: "ln-est", breakBefore: brk },
+    { series: "err_vh_host", kind: "line", cls: "mk-vh", shape: "diamond", breakBefore: brk },
+    { series: "err_gnss_vz", kind: "points", cls: "pt-gnss", shape: "circle" },
   ] });
   const r5 = model.scalar("case.r5_radius_m").v;
   const win = (key, cls) => ({ t0: model.scalar(`win.${key}.first_t`).v, t1: model.scalar(`win.${key}.last_t`).v, cls });
@@ -716,8 +735,8 @@ function updateSlider() {
   s.setAttribute("aria-valuenow", String(state.cursor));
   const t = model.text("t_s", state.cursor, 3);
   const where = state.cursor === 0 ? ", start of the run" : state.cursor === model.last ? ", touchdown sample, off the grid" : "";
-  s.setAttribute("aria-valuetext", `sample ${state.cursor} of ${model.last}, t = ${t} s${where}`);
-  $("#cursor-status").textContent = `Cursor at recorded sample ${state.cursor} of ${model.last}: t = ${t} s${where}.`;
+  s.setAttribute("aria-valuetext", `sample index ${state.cursor} (last index ${model.last}), t = ${t} s${where}`);
+  $("#cursor-status").textContent = `Cursor at recorded sample index ${state.cursor} (last index ${model.last}, ${model.n} samples): t = ${t} s${where}.`;
 }
 
 // ---------------------------------------------------------------------------------------------

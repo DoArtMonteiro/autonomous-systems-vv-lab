@@ -263,6 +263,12 @@ IMPLEMENTED = {
     "source_tree_diff",
     "cited_sources_identical",
     "evidence_file_line",
+    "first_sample_where",
+    "first_over_threshold",
+    "horizontal_speed_at_touchdown",
+    "velocity_difference_at_touchdown",
+    "angular_rate_times_lever",
+    "product_check",
 }
 
 
@@ -799,6 +805,67 @@ class Iteration2Data(unittest.TestCase):
         self.assertTrue(self.sc["fault.active_at_last_sample"]["v"])
         self.assertFalse(self.sc["fault.ended_before_touchdown"]["v"])
 
+    def test_approximation_propagates_to_everything_derived_from_an_approximate_value(self):
+        regs = DATA["derivations"]
+
+        def approx_flag(e):
+            return bool(e.get("approx") or (e.get("derivation") and regs[e["derivation"]["name"]]["approx"]))
+
+        for e in list(DATA["series"].values()) + list(DATA["scalars"].values()):
+            d = e.get("derivation")
+            if not d:
+                continue
+            ins = [DATA["series"][i] for i in d["series_inputs"]] + [DATA["scalars"][i] for i in d["scalar_inputs"]]
+            if any(approx_flag(x) for x in ins):
+                self.assertTrue(approx_flag(e), e["label"])
+        self.assertTrue(DATA["scalars"]["td.believed_inside_r5"]["approx"])
+        self.assertFalse(approx_flag(DATA["scalars"]["td.err_est_x"]))
+
+    def test_r2_centre_of_mass_and_nozzle_speeds(self):
+        last = self.S[-1]["truth"]
+        cm = math.hypot(last["velocity_mps"][0], last["velocity_mps"][1])
+        bv = math.hypot(last["base_velocity_mps"][0], last["base_velocity_mps"][1])
+        r2 = [r for r in FX.docs["verification.json"]["requirements"] if r["id"] == "R2_horizontal_speed"][0]["value"]
+        self.assertTrue(approx(bv, r2))
+        self.assertTrue(approx(self.sc["td.cm_horizontal_speed"]["v"], cm))
+        self.assertGreater(abs(r2 - cm), 0.05)
+        diff = math.hypot(last["base_velocity_mps"][0] - last["velocity_mps"][0], last["base_velocity_mps"][1] - last["velocity_mps"][1])
+        self.assertTrue(approx(self.sc["td.nozzle_minus_cm_speed"]["v"], diff))
+        r4 = [r for r in FX.docs["verification.json"]["requirements"] if r["id"] == "R4_angular_rate"][0]["value"]
+        self.assertTrue(approx(self.sc["td.angular_rate_times_lever"]["v"], r4 * FX.s_cm[-1]))
+        self.assertLess(abs(diff - r4 * FX.s_cm[-1]), 0.01 * max(1.0, diff))
+
+    def test_ignition_first_samples_and_r6_limit(self):
+        eng = [s["applied"]["engine"] for s in self.S]
+        thr = [s["command"]["throttle"] for s in self.S]
+        self.assertEqual(self.sc["ign.first_engine_on_t"]["v"], self.t[next(i for i, e in enumerate(eng) if e != "off")])
+        self.assertEqual(self.sc["ign.first_command_t"]["v"], self.t[next(i for i, x in enumerate(thr) if x > 0)])
+        ev = [e for e in FX.docs["trace.json"]["events"] if e["kind"] == "ignition"][0]
+        self.assertEqual(ev["detail"]["command_step"], ev["step"])  # no delay: the command and the event coincide
+        r6 = [r for r in FX.docs["verification.json"]["requirements"] if r["id"] == "R6_propellant_margin"][0]
+        init = self.S[0]["truth"]["propellant_kg"]
+        self.assertEqual(self.sc["init.propellant_kg"]["v"], init)
+        self.assertTrue(approx(FX.case["requirements"]["r6_propellant_margin_fraction"] * init, r6["limit"]))
+        self.assertTrue(self.sc["check.r6_limit_is_fraction_of_initial"]["v"])
+
+    def test_gnss_velocity_observations(self):
+        for k, ax in enumerate("xyz"):
+            e = DATA["series"][f"gnss_v{ax}"]
+            self.assertEqual((e["cls"], e["render"]), ("O", "points"))
+            for i, s in enumerate(self.S):
+                g = s["observation"]["gnss_velocity_mps"]
+                self.assertEqual(e["values"][i], None if g is None else g[k])
+        want = [None if s["observation"]["gnss_velocity_mps"] is None else s["observation"]["gnss_velocity_mps"][2] - s["truth"]["velocity_mps"][2] for s in self.S]
+        for a, b in zip(DATA["series"]["err_gnss_vz"]["values"], want):
+            self.assertTrue(approx(a, b))
+
+    def test_first_over_threshold_sample(self):
+        thr = FX.case["controller"]["gains"]["altimeter_residual_threshold_m"]
+        resid = DATA["series"]["alt_residual"]["values"]
+        first = next(i for i, x in enumerate(resid) if abs(x) > thr)
+        self.assertEqual(self.sc["lane.first_over_threshold_t"]["v"], self.t[first])
+        self.assertLess(self.sc["lane.first_over_threshold_t"]["v"], self.sc["run.reject_first_t_s"]["v"])
+
     def test_every_new_class_tag_is_declared(self):
         self.assertIn("K", DATA["classes"])
         for e in list(DATA["series"].values()) + list(DATA["scalars"].values()):
@@ -927,6 +994,11 @@ class StaticPage(unittest.TestCase):
         self.assertIn('class: "connector"', charts)
         self.assertIn('data-sample', charts)
 
+    def test_numeric_cells_do_not_wrap(self):
+        css = (SPIKE / "css" / "style.css").read_text(encoding="utf-8")
+        self.assertRegex(css, r"\.val[^{]*\.rt td[^{]*\{[^}]*white-space: nowrap[^}]*font-variant-numeric: tabular-nums")
+        self.assertIn("#readout-body { overflow-x: auto; }", css)
+
     def test_events_are_looked_up_by_kind(self):
         ids = [e["id"] for e in DATA["events"]]
         self.assertEqual(sorted(ids), ["altimeter_rejected", "fault_start", "ignition", "touchdown"])
@@ -963,6 +1035,7 @@ class RenderedPageIteration2(unittest.TestCase):
 
         cls.full = dump("")
         cls.td = dump("?sample=230")
+        cls.track = dump("?plan=track&sample=230")
 
     @classmethod
     def tearDownClass(cls):
@@ -984,7 +1057,13 @@ class RenderedPageIteration2(unittest.TestCase):
         self.assertEqual(len(gnss), FX.n - 1)
         self.assertNotRegex(block, r'<polyline[^>]*class="pt-gnss"')
         # the connector is a thin separate element, one polyline per unbroken run of the estimate
-        self.assertEqual(len(re.findall(r'class="connector"', block)), 1)
+        # ... and it is broken before the first faulted sample: no connector crosses the fault start
+        polys = re.findall(r'<polyline points="([^"]*)" class="connector"', block)
+        self.assertEqual([len(p.split()) for p in polys], [DATA["index"]["fault_first_sample"], FX.n - DATA["index"]["fault_first_sample"]])
+
+    def test_whole_track_plan_has_no_labels_over_the_track(self):
+        self.assertGreaterEqual(self.svg_block(self.full, "svg-plan").count('class="plan-label"'), 2)
+        self.assertEqual(self.svg_block(self.track, "svg-plan").count('class="plan-label"'), 0)
 
     def test_the_touchdown_errors_are_tagged_d_view_not_d_host(self):
         for dom in (self.td,):
@@ -1011,7 +1090,8 @@ class RenderedPageIteration2(unittest.TestCase):
         self.assertNotRegex(table, r"<td[^>]*data-ref")
 
     def test_cursor_starts_at_the_start_of_the_run_and_says_so(self):
-        self.assertIn("Cursor at recorded sample 0 of 230: t = 0.000 s, start of the run.", self.full)
+        self.assertIn("Cursor at recorded sample index 0 (last index 230, 231 samples): t = 0.000 s, start of the run.", self.full)
+        self.assertNotIn("sample 0 of 230", self.full)
 
     def test_the_touchdown_dump_obeys_the_same_number_audit(self):
         audit = DomAudit()
@@ -1028,6 +1108,58 @@ class RenderedPageIteration2(unittest.TestCase):
     def test_run_hashes_are_shown_in_provenance(self):
         for ref in ("run.hash.case", "run.hash.trace", "run.hash.verification", "run.hash.source"):
             self.assertIn(f'data-ref="{ref}"', self.full)
+
+    def test_approximate_values_carry_the_approx_tag_at_the_point_of_use(self):
+        for ref in ("td.believed_pad_distance", "td.believed_inside_r5", "td.gap_m", "win.believed.first_t", "win.believed.last_t"):
+            m = re.search(r'<button[^>]*data-ref="' + re.escape(ref) + r'"[^>]*>(.*?)</button>', self.full, re.S)
+            self.assertIsNotNone(m, ref)
+            self.assertIn("tag-approx", m.group(1), ref)
+        m = re.search(r'<li id="card-2">.*?</li>', self.full, re.S).group(0)
+        self.assertEqual(m.count("tag-approx"), 2)
+
+    def test_every_chart_svg_is_an_image_with_a_label(self):
+        ids = re.findall(r'<svg id="(axis|svg-[a-z]+)"([^>]*)>', self.full)
+        self.assertEqual(sorted(i for i, _ in ids), sorted(["axis", "svg-x", "svg-y", "svg-z", "svg-v", "svg-d", "svg-a", "svg-r", "svg-l", "svg-plan"]))
+        for sid, attrs in ids:
+            self.assertIn('role="img"', attrs, sid)
+            m = re.search(r'aria-label="([^"]+)"', attrs)
+            self.assertIsNotNone(m, sid)
+            self.assertGreater(len(m.group(1)), 30, sid)
+
+    def test_each_strip_has_its_own_time_labels(self):
+        for sid in ("svg-x", "svg-y", "svg-z", "svg-v", "svg-d", "svg-a", "svg-r"):
+            block = self.svg_block(self.full, sid)
+            labels = re.findall(r'class="ax-label" text-anchor="middle" data-layout="1"', block)
+            self.assertGreaterEqual(len(labels), 4, sid)
+
+    def test_provenance_lead_line_and_card_wording(self):
+        self.assertIn("Verdicts shown are stored, not recomputed by this view; the build that wrote the run is not the current tree.", self.full)
+        card1 = re.search(r'<li id="card-1">.*?</li>', self.full, re.S).group(0)
+        self.assertIn("(the point R5 judges)", card1)
+        self.assertIn("then left", card1)
+        card4 = re.search(r'<li id="card-4">.*?</li>', self.full, re.S).group(0)
+        self.assertIn('data-fact="S_gnss_ungated"', card4)
+        self.assertIn('data-ref="lane.first_over_threshold_t"', card4)
+        self.assertEqual(len(re.findall(r"[.;] ", re.sub(r"<[^>]+>", "", card4))) >= 2, True)
+
+    def test_r2_and_r6_notes_are_rendered_from_data(self):
+        notes = re.search(r'<div id="req-notes">.*?</div>', self.full, re.S).group(0)
+        for ref in ("req.R2_horizontal_speed.value", "td.cm_horizontal_speed", "td.nozzle_minus_cm_speed",
+                    "td.angular_rate_times_lever", "init.propellant_kg", "req.R6_propellant_margin.limit", "req.R6.explanation"):
+            self.assertIn(f'data-ref="{ref}"', notes, ref)
+
+    def test_ignition_wording_is_a_truth_event_with_first_samples(self):
+        dec = re.search(r'<section id="decisions".*?</section>', self.full, re.S).group(0)
+        text = re.sub(r"<[^>]+>", "", dec)
+        self.assertIn("Engine ignition recorded (truth event) at", text)
+        self.assertIn('data-ref="ign.first_engine_on_t"', dec)
+        self.assertIn('data-ref="ign.first_command_t"', dec)
+
+    def test_gnss_velocity_is_shown_as_separate_markers(self):
+        block = self.svg_block(self.full, "svg-v")
+        self.assertEqual(len(re.findall(r'class="pt-gnss"', block)), FX.n - 1)
+        self.assertNotRegex(block, r'<polyline[^>]*class="pt-gnss"')
+        self.assertIn('data-ref="gnss_vz"', self.full)
 
     def test_threshold_options_and_the_divergence_statement(self):
         self.assertIn("No divergence instant is recorded.", self.full)

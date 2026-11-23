@@ -155,3 +155,25 @@ O que fica por resolver:
 - O resíduo, a posição acreditada e "qual das altitudes foi a menor" continuam aproximados (substituto de `s_cm`, estimativa pós-atualização, amostras de 0,1 s). A frase do cartão 4 sobre o R1 é "consistente com", sem contrafactual.
 - A primeira amostra acima de um limiar é uma amostra guardada, não o instante do cruzamento.
 - O teste de proveniência prende o hash e as linhas de cinco ficheiros Rust, do `host_sdk.rs` e do `earlier_build.rs`: qualquer alteração a esses ficheiros faz falhar o `discover` até o extrator ser repetido.
+
+
+## Correções finais (não substantivas)
+
+Passagem final depois da avaliação da iteração 2 (o crítico de UX recomenda adotar como candidato; a verificação de compreensão por agentes passou). Só redação, etiquetas, CSS e pequenos dados; sem vistas novas.
+
+1. A etiqueta "approx." propaga-se agora a tudo o que deriva de um valor aproximado (o extrator calcula o fecho): aparece nos 3,29 m e no "inside" do cartão 2, na distância acreditada e nos limites "believed within R5" (15,6 s a 22,955 s).
+2. Células numéricas sem quebra de linha e com algarismos tabulares; as tabelas do cursor deslizam na horizontal.
+3. Ignição: "Engine ignition recorded (truth event) at 3,6 s", o tempo do comando vem do detalhe do evento (passo 360, sem atraso), e as primeiras amostras com o motor ligado e com comando de acelerador acima de zero (3,6 s, derivadas, com a classe certa).
+4. O conector das estimativas quebra entre 7,9 s e 8,0 s (a primeira amostra com a falha ativa): nenhum traço atravessa o início da falha.
+5. Etiquetas de tempo em cada tira.
+6. Cartão 4 com três frases: bandeira aos 8,18 s; altímetro sem fusão desde o primeiro ciclo acima do limiar (primeira amostra guardada acima do limiar, 8,1 s, derivada e aproximada) e bandeira após cinco ciclos consecutivos; guiamento com o mínimo das duas altitudes (código-fonte, não guardado); nada verifica o GNSS em x e y (S, botão para `landing_controller.rs`), por isso o guiamento seguiu a crença enviesada; pontos do bocal a 15,15 m (aproximado).
+7. R2: velocidade horizontal do plano do bocal (0,612 m/s, a que o R2 usa) ao lado da do centro de massa (0,513 m/s), com a diferença (0,109 m/s) igual ao ritmo angular vezes o braço (verificada no extrator).
+8. "sample index N (last index 230, 231 samples)".
+9. R6: propelente inicial (7981,6 kg), limite como fração de margem dessa quantidade (verificado) e a frase do próprio registo.
+10. Velocidade do GNSS: marcadores ocos, nunca ligados, na tira de velocidade e linha no quadro do cursor; o conteúdo do IMU está guardado mas não se mostra, e a vista diz isso.
+11. Linha inicial da proveniência: os veredictos mostrados são os guardados, não recalculados; a build que escreveu a corrida não é a árvore atual.
+12. Cartão 1: "(nozzle plane)" e "o ponto verdadeiro esteve dentro do R5 de 12,1 s a 15,7 s e saiu".
+13. "Whole track": sem rótulos sobre a trajetória.
+14. Todas as figuras SVG têm `role="img"` e `aria-label` próprio, verificado no DOM por teste.
+
+Testes: 73 no ficheiro, todos passam. Capturas em `docs/evidence/m19/belief-truth/final/`. A 1440x900 a tira x deixou de caber por inteiro no primeiro ecrã (os cartões ficaram mais altos); mantém-se à vista a parte de cima.
