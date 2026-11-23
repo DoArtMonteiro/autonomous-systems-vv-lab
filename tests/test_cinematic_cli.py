@@ -165,6 +165,8 @@ class HonestPanels(unittest.TestCase):
         self.assertIn("Booster impact: its recorded path ends at the surface (t 617.2 s).", verdict)
         self.assertIn("The impact itself is not modelled and nothing is drawn for it", verdict)
         self.assertIn("no landing burn, break-up or recovery is simulated", verdict)
+        # verified in ascent.gd and record.gd: a node is visible only while entity_active (t within its first and last sample)
+        self.assertIn("vehicle is not drawn after its last sample (its recorded path line stays)", verdict)
         # the landing sentence is about a stage drawn at its contact and does not belong to a launch
         self.assertNotIn("the stage is drawn intact", verdict)
         self.assertNotIn("Booster impact", self.policy(RUN)["verdict"])

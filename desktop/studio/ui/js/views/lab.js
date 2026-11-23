@@ -8,7 +8,7 @@ import { h, clear, prose } from '../dom.js';
 import { api } from '../api.js';
 import { domainById, visibleDomains, emit, loadRecord } from '../store.js';
 import { toast, errorText, askConfirm } from '../ui.js';
-import { verdictOfOutcome, faultText, distinguishingLabels, conditionsName } from '../model.js';
+import { verdictOfOutcome, faultText, distinguishingLabels, conditionsName, statusClassOf } from '../model.js';
 import { verdictGlyph } from '../verification.js';
 import { indexNumbers, limitOf, marginOf, unitOf, reqView, reqLabel, safetyWording, SAFETY_NOTE, headlineChange, fmtSig, statusLine, DERIVED_NOTE, noFailureSentence } from '../requirements.js';
 
@@ -557,14 +557,14 @@ function renderComparison(el) {
       const vb = rb ? reqView(rb) : null;
       const delta = va && vb && va.numeric && vb.numeric ? vb.margin - va.margin : null;
       // Each cell: the verdict, the observed value and its margin to the limit, not only Pass or Fail.
-      const cell = (x, v) => (x ? h('td', { class: ['mono', 'small', `st-${x.status}`], title: v.full }, h('span', { class: 'lab-cell-v' }, `${x.status === 'pass' ? '✓' : x.status === 'fail' ? '✕' : '·'} ${v.obsText}`), v.marginText ? h('span', { class: 'lab-cell-m dim' }, v.marginDerived ? h('abbr', { class: 'kind kind-D', title: DERIVED_NOTE }, 'D') : null, v.marginDerived ? ' ' : null, `margin ${v.marginText}`) : null) : h('td', null, '–'));
+      const cell = (x, v) => (x ? h('td', { class: ['mono', 'small', `st-${statusClassOf(x)}`], title: v.full }, h('span', { class: 'lab-cell-v' }, `${x.status === 'pass' ? '✓' : x.status === 'fail' ? '✕' : '·'} ${v.obsText}`), v.marginText ? h('span', { class: 'lab-cell-m dim' }, v.marginDerived ? h('abbr', { class: 'kind kind-D', title: DERIVED_NOTE }, 'D') : null, v.marginDerived ? ' ' : null, `margin ${v.marginText}`) : null) : h('td', null, '–'));
       // A requirement made of several quantities has a sentence, not a number: it takes a row of its own.
       if (va && vb && !va.numeric && !vb.numeric) {
         const mark = (x) => (x.status === 'pass' ? '✓' : x.status === 'fail' ? '✕' : '·');
         return [h('tr', { class: ['lab-composite', ra && rb && ra.status !== rb.status ? 'is-flip' : ''], dataset: { req: r.id } }, h('td', { colspan: '5', title: vb.full },
           h('b', null, reqLabel(r)), h('span', { class: 'dim small' }, ` · ${vb.limitText}`),
-          h('div', { class: ['lab-comp-line', `st-${ra.status}`] }, h('span', { class: 'dim small' }, 'Baseline '), `${mark(ra)} ${va.obsText}`),
-          h('div', { class: ['lab-comp-line', `st-${rb.status}`] }, h('span', { class: 'dim small' }, 'Experiment '), `${mark(rb)} ${vb.obsText}`)))];
+          h('div', { class: ['lab-comp-line', `st-${statusClassOf(ra)}`] }, h('span', { class: 'dim small' }, 'Baseline '), `${mark(ra)} ${va.obsText}`),
+          h('div', { class: ['lab-comp-line', `st-${statusClassOf(rb)}`] }, h('span', { class: 'dim small' }, 'Experiment '), `${mark(rb)} ${vb.obsText}`)))];
       }
       return h('tr', { class: ra && rb && ra.status !== rb.status ? 'is-flip' : '', dataset: { req: r.id } },
         h('td', { title: (vb || va).full }, reqLabel(r)),
@@ -709,7 +709,7 @@ function sweepResult(sw, cat) {
       return h('tr', { class: passes(rec) ? 'is-pass' : '' },
         h('td', { class: 'mono' }, h('button', { type: 'button', class: 'link mono', title: 'Use this value in the experiment', onclick: () => { if (v === spec.default) delete lab.form.params[spec.id]; else lab.form.params[spec.id] = v; render(); } }, fmt(v, 6))),
         h('td', null, rec.outcome.label),
-        reqIds.map((id) => { const q = rec.requirements.find((r) => r.id === id); const rv = q ? reqView(q) : null; return h('td', { class: ['mono', 'small', q ? `st-${q.status}` : ''], title: rv ? rv.full : '' }, rv ? rv.obsText : '–'); }));
+        reqIds.map((id) => { const q = rec.requirements.find((r) => r.id === id); const rv = q ? reqView(q) : null; return h('td', { class: ['mono', 'small', q ? `st-${statusClassOf(q)}` : ''], title: rv ? rv.full : '' }, rv ? rv.obsText : '–'); }));
     }))));
   const target = reqIds.find((id) => sw.records.some((r) => r && r.requirements.find((q) => q.id === id && marginOf(q) !== null)));
   return h('div', null, target ? sweepChart(sw, spec, target, label(target)) : null, table,

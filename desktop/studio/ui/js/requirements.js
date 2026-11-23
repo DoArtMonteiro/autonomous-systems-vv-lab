@@ -197,7 +197,8 @@ export function noFailureSentence(record, categories) {
   if (!rows.length) return `The record lists no ${what}.`;
   const unknown = rows.filter((q) => q.status !== 'pass' && q.status !== 'fail');
   if (!unknown.length) return `Every ${what} met.`;
-  return `No ${what} failed, but ${unknown.length} ${unknown.length === 1 ? 'was' : 'were'} not evaluated: ${unknown.map(plainName).join(', ')}.`;
+  const kind = (q) => (q.category === 'invariant' ? 'safety rule' : 'requirement');
+  return `No ${what.replace(' and ', ' or ')} failed, but ${unknown.length} ${unknown.length === 1 ? 'was' : 'were'} not evaluated: ${unknown.map((q) => `${plainName(q)} (${kind(q)})`).join(', ')}.`;
 }
 
 /**
@@ -219,6 +220,13 @@ export function completionFacts(record) {
     ? ` The record does not say which part of "${q.label}" failed (it expects ${q.expected}). Reaching the goal is not the same as completing the mission.`
     : '';
   return { allReached: all, code, text: `${recorded}${gap}` };
+}
+
+/** The tone of the Mission chip from the statuses of the mission requirement rows: fail, neutral (none listed or one not evaluated) or pass. */
+export function missionTone(record) {
+  const rows = (record.requirements || []).filter((q) => q.category === 'requirement');
+  if (rows.some((q) => q.status === 'fail')) return 'fail';
+  return rows.length && rows.every((q) => q.status === 'pass') ? 'pass' : 'neutral';
 }
 
 /** The combined status, failure first, with the two kinds of verdict kept apart: "2 of 6 requirements failed · 5 of 5 safety rules held". */

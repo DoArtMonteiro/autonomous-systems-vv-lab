@@ -28,7 +28,7 @@ import { buildControl } from './control.js';
 import { sourcesInfo } from '../sources-info.js';
 import { openCatalogue } from '../env-catalogue.js';
 import { cinematicButton } from '../cinematic.js';
-import { reqView, safetyWording, SAFETY_NOTE, failureSentence, indexNumbers, statusLine, requirementWording, endChip, noFailureSentence, completionFacts } from '../requirements.js';
+import { reqView, safetyWording, SAFETY_NOTE, failureSentence, indexNumbers, statusLine, requirementWording, endChip, noFailureSentence, completionFacts, missionTone } from '../requirements.js';
 import { conditionsName, conditionsBrief } from '../model.js';
 
 let root;
@@ -801,7 +801,6 @@ function runResult(run) {
   const reqs = rec.requirements || [];
   const failed = reqs.filter((q) => q.status === 'fail');
   const missionReqs = reqs.filter((q) => q.category === 'requirement');
-  const metFail = missionReqs.filter((q) => q.status === 'fail');
   const metrics = pl.kind === 'rocket-3d' ? ROCKET_METRICS.map((id) => rec.metrics.find((m) => m.id === id)).filter(Boolean) : [];
   const missionText = requirementWording(rec) || 'no mission requirement listed';
   const sw = safetyWording(rec);
@@ -813,7 +812,7 @@ function runResult(run) {
     h('p', { class: 'pl-run-cond small dim', dataset: { run: run.runId, conditions: conditionsName(rec.request, (domainById(rec.request.domain) || {}).catalog) } }, `Conditions: ${conditionsName(rec.request, (domainById(rec.request.domain) || {}).catalog)}`),
     h('p', { class: 'pl-run-head' }, rec.outcome.label),
     h('div', { class: 'pl-verdicts' },
-      verdictChip(missionText, metFail.length ? 'fail' : !missionReqs.length || /not evaluated/.test(missionText) ? 'neutral' : 'pass', 'Mission'),
+      verdictChip(missionText, missionTone(rec), 'Mission'),
       verdictChip(safetyText, safetyTone, 'Safety rules', SAFETY_NOTE)),
     completionFacts(rec) ? h('p', { class: 'pl-run-clause small dim', dataset: { clause: '1' } }, completionFacts(rec).text) : null,
     metrics.length ? h('dl', { class: 'pl-metrics' }, metrics.map((m) => h('div', null, h('dt', null, m.label), h('dd', { class: 'mono' }, m.value === null ? '—' : `${hudNum(m.value)} ${m.unit}`)))) : null,

@@ -61,6 +61,7 @@
 .lab-table-wrap { overflow-x: auto; }
 .lab-table td.st-pass { color: var(--pass); }
 .lab-table td.st-fail { color: var(--fail); }
+.lab-table td.st-held { color: var(--fg-1); }
 .lab-table td.is-better { color: var(--pass); }
 .lab-table td.is-worse { color: var(--fail); }
 .lab-table tr.is-flip td:first-child { box-shadow: inset 3px 0 0 var(--accent); padding-left: 6px; }

@@ -1,7 +1,7 @@
 // Generic reading of a vv-run.v1 record. Nothing here knows a domain: channels, timebases, events and
 // requirements are taken from the record itself (never from the catalog, which may list fewer).
 
-import { words, num } from './dom.js';
+import { words, num, lowerIndex } from './dom.js';
 
 export const KINDS = ['truth', 'observation', 'estimate', 'uncertainty', 'command', 'metric', 'limit'];
 export const KIND_LETTER = { truth: 'T', observation: 'O', estimate: 'E', uncertainty: 'U', command: 'C', metric: 'M', limit: 'L' };
@@ -88,9 +88,30 @@ export function verdictOfSafety(status) {
 }
 
 export function verdictOfRequirement(r) {
-  if (r.status === 'pass') return 'pass';
+  // A safety rule that held is `held` (neutral); `pass` (green) is for a requirement that was met.
+  if (r.status === 'pass') return r.category === 'invariant' ? 'held' : 'pass';
   if (r.status === 'fail') return r.category === 'invariant' ? 'unsafe' : 'fail';
   return 'neutral';
+}
+
+/**
+ * Plume length in metres at time t from the recorded channels {times, throttle, engine}: 6 + 22 times the applied
+ * throttle while the engine is on. The record ends at its last sample (the contact, for a landing). The playback of a
+ * longer run goes on and the stage stays where it ended, but the record says nothing about the engine after that
+ * sample, so no plume is drawn.
+ */
+export function plumeLengthAt(ch, t) {
+  const times = ch.times || [];
+  if (!times.length || t > times[times.length - 1] + 1e-9) return 0;
+  const i = lowerIndex(times, t);
+  const thr = ch.throttle ? ch.throttle[i] : null;
+  const on = ch.engine ? ch.engine[i] === 1 : thr > 0;
+  return on && thr ? 6 + 22 * thr : 0;
+}
+
+/** The status of a row as a CSS class suffix: a safety rule that held is `held`, every other row keeps its status. */
+export function statusClassOf(r) {
+  return verdictOfRequirement(r) === 'held' ? 'held' : r.status;
 }
 
 export const STATUS_TEXT = { pass: 'Pass', fail: 'Fail', not_evaluated: 'Not evaluated' };

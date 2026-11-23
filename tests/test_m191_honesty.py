@@ -71,7 +71,9 @@ class NothingIsMetByDefault(unittest.TestCase):
 
     def test_the_mission_chip_is_neutral_when_no_mission_requirement_is_listed(self):
         player = read("js", "views", "player.js")
-        self.assertRegex(player, r"metFail\.length \? 'fail' : !missionReqs\.length \|\| /not evaluated/\.test\(missionText\) \? 'neutral' : 'pass'")
+        # the tone is computed from the statuses (missionTone, tested in Node), never by a regular expression on the text
+        self.assertIn("verdictChip(missionText, missionTone(rec), 'Mission')", player)
+        self.assertNotIn("/not evaluated/.test(", player)
 
 
 class NoPlumeAfterTheLastSample(unittest.TestCase):
@@ -79,8 +81,9 @@ class NoPlumeAfterTheLastSample(unittest.TestCase):
 
     def test_the_stage_scene_draws_no_plume_past_the_last_sample(self):
         text = read("js", "scenes", "rocket.js")
-        self.assertRegex(text, r"const ended = t > times\[times\.length - 1\] \+ 1e-9;")
-        self.assertRegex(text, r"const len = !ended && on && thr \? 6 \+ 22 \* thr : 0;")
+        # structural: the rule itself (plumeLengthAt in model.js) is tested in Node; this only checks that the scene uses it
+        self.assertIn("const len = plumeLengthAt(ch, t);", text)
+        self.assertRegex(read("js", "model.js"), r"t > times\[times\.length - 1\] \+ 1e-9\) return 0;")
         # the geospatial and cinematic stage scenes inherit setTime and read this.plumeLength
         for name in ("geo.js", "rocket-cinema.js"):
             self.assertIn("super.setTime(t)", read("js", "scenes", name))
@@ -134,6 +137,31 @@ class RunPillsNeverCutTheConditions(unittest.TestCase):
         self.assertIn("title: `${runFullName(r)} · ${shortId(r)}`", player)
         self.assertIn("conditionsBrief(r.record.request", player)
         self.assertRegex(css, r"\.pl-run-n \{ display: none; \}")
+
+
+class EveryRowConsumerUsesTheNeutralClass(unittest.TestCase):
+    """Structural only (the files build DOM and cannot be loaded by Node): each place that draws a requirement row takes its
+    class from verdictOfRequirement or statusClassOf (model.js, tested in Node), so a safety rule that held is never green."""
+
+    def test_the_four_consumers_use_the_shared_class(self):
+        self.assertIn("verdictOfRequirement(r)", read("js", "verification.js"))
+        self.assertIn("verdictOfRequirement(q)", read("js", "views", "compare.js"))
+        self.assertIn("verdictOfRequirement(r)", read("js", "scenes", "ascent.js"))
+        lab = read("js", "views", "lab.js")
+        self.assertIn("statusClassOf(", lab)
+        self.assertNotRegex(lab, r"`st-\$\{\w+\.status\}`")
+
+    def test_the_lab_table_has_a_neutral_style_for_held(self):
+        self.assertRegex(read("css", "lab.css"), r"\.lab-table td\.st-held \{ color: var\(--fg-1\); \}")
+
+
+class FocusRingsOfThePillsAreNotClipped(unittest.TestCase):
+    """Structural: a scrolling row clips its overflow, so it has block padding, and the hidden conditions are anchored to their pill."""
+
+    def test_the_row_has_padding_and_the_pill_is_positioned(self):
+        css = read("css", "mission.css")
+        self.assertRegex(css, r"\.pl-runs \{ overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; padding-block: 3px; margin-block: -3px; \}")
+        self.assertRegex(css, r"\.pl-run \{ position: relative; \}")
 
 
 if __name__ == "__main__":

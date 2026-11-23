@@ -348,7 +348,9 @@
   .pl:not(.pl-control):not(.pl-geo) .pl-run[aria-checked="false"] .pl-run-c { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .pl:not(.pl-control):not(.pl-geo) .pl-run[aria-checked="false"] .pl-run-n { display: inline; }
   /* If the names are still wider than the window, the row scrolls; nothing is cut. */
-  .pl:not(.pl-control):not(.pl-geo) .pl-runs { overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+  .pl:not(.pl-control):not(.pl-geo) .pl-runs { overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; padding-block: 3px; margin-block: -3px; }
+  /* The hidden conditions are positioned against their own pill, and the padding keeps the focus ring of a pill from being clipped by the scrolling row. */
+  .pl:not(.pl-control):not(.pl-geo) .pl-run { position: relative; }
 }
 /* The player page scrolls up and down only; nothing in it may push it sideways. */
 #view-mission { overflow-x: hidden; }

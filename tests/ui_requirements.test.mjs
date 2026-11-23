@@ -8,9 +8,9 @@ import path from 'node:path';
 // fileURLToPath keeps a path with spaces or '&' (for example "v&v lab") intact.
 const here = path.dirname(fileURLToPath(import.meta.url));
 const mod = await import(pathToFileURL(path.join(here, '..', 'desktop', 'studio', 'ui', 'js', 'requirements.js')).href);
-const { completionFacts, noFailureSentence, safetyWording, reqView, failureSentence, plainName, headlineChange, indexNumbers, shortText, SAFETY_NOTE, requirementWording, statusLine, endChip } = mod;
+const { missionTone, completionFacts, noFailureSentence, safetyWording, reqView, failureSentence, plainName, headlineChange, indexNumbers, shortText, SAFETY_NOTE, requirementWording, statusLine, endChip } = mod;
 const model = await import(pathToFileURL(path.join(here, '..', 'desktop', 'studio', 'ui', 'js', 'model.js')).href);
-const { conditionsName, conditionsShared, displayRunLabel, verdictOfSafety, verdictOfOutcome, conditionsBrief } = model;
+const { conditionsName, conditionsShared, displayRunLabel, verdictOfSafety, verdictOfOutcome, conditionsBrief, verdictOfRequirement, statusClassOf, plumeLengthAt } = model;
 
 const inv = (id, status) => ({ id, label: `Rule ${id}`, category: 'invariant', status, expected: '<= 1 m', observed: '0.5 m' });
 const req = (id, status, label = `Req ${id}`) => ({ id, label, category: 'requirement', status, expected: '<= 3 m/s', observed: '1.654537 m/s' });
@@ -266,7 +266,9 @@ test('beside failed requirements the safety verdict is held and the requirement 
 test('a record with a row that was not evaluated never says every requirement met', () => {
   const rows = [req('R1', 'pass'), req('R2', 'not_evaluated', 'Mission starts and completes'), inv('S1', 'pass')];
   const r = rec('safe', null, rows);
-  assert.equal(noFailureSentence(r, ['requirement', 'invariant']), 'No requirement and safety rule failed, but 1 was not evaluated: Mission starts and completes.');
+  assert.equal(noFailureSentence(r, ['requirement', 'invariant']), 'No requirement or safety rule failed, but 1 was not evaluated: Mission starts and completes (requirement).');
+  const two = rec('safe', null, [req('R1', 'pass'), inv('S1', 'not_evaluated'), req('R2', 'not_evaluated', 'Apoapsis')]);
+  assert.equal(noFailureSentence(two, ['requirement', 'invariant']), 'No requirement or safety rule failed, but 2 were not evaluated: Rule S1 (safety rule), Apoapsis (requirement).');
   assert.doesNotMatch(noFailureSentence(r, ['requirement']), /^Every/);
   assert.equal(noFailureSentence(rec('safe', null, [req('R1', 'pass'), inv('S1', 'pass')]), ['requirement', 'invariant']), 'Every requirement and safety rule met.');
   assert.equal(noFailureSentence(rec('safe', null, [req('R1', 'pass')]), ['requirement']), 'Every requirement met.');
@@ -300,6 +302,44 @@ test('the compact run pill counts the conditions exactly and never lists a cut t
   assert.equal(conditionsBrief({ parameters: { arrival_radius_mm: 250 }, faults: [{ kind: 'gps_noise', magnitude: 1, start: 0, end: 32 }] }, catalog), '2 conditions');
   // the full text it stands for is the one name of the conditions
   assert.match(conditionsName({ parameters: { arrival_radius_mm: 250 }, faults: [{ kind: 'gps_noise', magnitude: 1, start: 0, end: 32 }] }, catalog), /^Arrival radius 250 mm .* Gps noise 1/i);
+});
+
+test('a safety rule that held is neutral wherever a row is drawn: verdictOfRequirement and statusClassOf', () => {
+  // These two functions feed the Safety rules section (verification.js), the Compare matrix (compare.js), the
+  // Experiment Lab cells (lab.js) and the ascent scene (scenes/ascent.js); tests/test_m191_honesty.py checks that each one uses them.
+  assert.equal(verdictOfRequirement(inv('S1', 'pass')), 'held');
+  assert.equal(statusClassOf(inv('S1', 'pass')), 'held');
+  assert.equal(verdictOfRequirement(inv('S1', 'fail')), 'unsafe');
+  assert.equal(verdictOfRequirement(inv('S1', 'not_evaluated')), 'neutral');
+  assert.equal(verdictOfRequirement(req('R1', 'pass')), 'pass');
+  assert.equal(statusClassOf(req('R1', 'pass')), 'pass');
+  assert.equal(verdictOfRequirement(req('R1', 'fail')), 'fail');
+  assert.equal(statusClassOf(req('R1', 'fail')), 'fail');
+  assert.equal(statusClassOf(inv('S1', 'fail')), 'fail');
+  assert.equal(verdictOfRequirement(decl('D1', 'pass')), 'pass');
+});
+
+test('the Mission chip tone is read from the statuses of the mission rows', () => {
+  assert.equal(missionTone(rec('safe', null, [req('R1', 'pass'), req('R2', 'pass'), inv('S1', 'pass')])), 'pass');
+  assert.equal(missionTone(rec('safe', null, [req('R1', 'pass'), req('R2', 'fail')])), 'fail');
+  assert.equal(missionTone(rec('safe', null, [req('R1', 'pass'), req('R2', 'not_evaluated')])), 'neutral');
+  assert.equal(missionTone(rec('safe', null, [inv('S1', 'pass')])), 'neutral');
+  assert.equal(missionTone(rec('safe', null, [])), 'neutral');
+  // a label that happens to say "not evaluated" does not decide it
+  assert.equal(missionTone(rec('safe', null, [req('R1', 'pass', 'Not evaluated twice')])), 'pass');
+});
+
+test('no plume is drawn after the last sample, and it is drawn at and before it', () => {
+  const ch = { times: [0, 0.1, 0.2, 0.3], throttle: [0.5, 0.5, 0.4, 0.4], engine: [1, 1, 1, 1] };
+  assert.equal(plumeLengthAt(ch, 0.05), 6 + 22 * 0.5);
+  assert.equal(plumeLengthAt(ch, 0.3), 6 + 22 * 0.4);   // the last sample itself: the contact instant
+  assert.equal(plumeLengthAt(ch, 0.3 + 1e-12), 6 + 22 * 0.4);
+  assert.equal(plumeLengthAt(ch, 0.31), 0);              // the playback of a longer run goes on: nothing is recorded
+  assert.equal(plumeLengthAt(ch, 30), 0);
+  assert.equal(plumeLengthAt({ times: [0, 1], throttle: [0.5, 0], engine: [1, 1] }, 1), 0);
+  assert.equal(plumeLengthAt({ times: [0, 1], throttle: [0.5, 0.5], engine: [1, 2] }, 1), 0);   // engine off
+  assert.equal(plumeLengthAt({ times: [0, 1], throttle: [0.5, 0.5] }, 0.5), 6 + 22 * 0.5);     // no engine channel: throttle decides
+  assert.equal(plumeLengthAt({ times: [] }, 0), 0);
 });
 
 console.log(`${n} tests passed`);

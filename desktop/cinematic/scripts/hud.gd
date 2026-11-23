@@ -67,7 +67,7 @@ static func _impact_lines(record) -> String:
 	for e in record.entities:
 		if str(e.get("end_reason", "")).contains("impact"):
 			var who := str(e["label"]).get_slice(" (", 0)
-			out += "\n%s impact: its recorded path ends at the surface (t %.1f s). The impact itself is not modelled and nothing is drawn for it: no landing burn, break-up or recovery is simulated, and the %s is not drawn after its last sample." % [who, e["t_end"], who.to_lower()]
+			out += "\n%s impact: its recorded path ends at the surface (t %.1f s). The impact itself is not modelled and nothing is drawn for it: no landing burn, break-up or recovery is simulated, and the %s vehicle is not drawn after its last sample (its recorded path line stays)." % [who, e["t_end"], who.to_lower()]
 	return out
 
 
