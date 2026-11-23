@@ -55,7 +55,20 @@ static func verdict_text_for(record) -> String:
 	var failed_line := ("\nRequirements failed: %s." % ", ".join(failed)) if failed.size() > 0 else ""
 	var sc = record.data.get("scene", {})
 	var contact_line := "\nImpact is not modelled: the stage is drawn intact whatever the contact speed." if (typeof(sc) == TYPE_DICTIONARY and sc.get("touchdown") != null) else ""
-	return "From the record, shown as written and not re-verified here.\n%s\nOutcome: %s. %s%s%s\n%s\nThe record says: \"%s\"" % [EXPLORATORY, str(o.get("label", o.get("code", "n/a"))), str(o.get("explanation", "")), failed_line, contact_line, safety_phrase(record), str(s.get("explanation", ""))]
+	return "From the record, shown as written and not re-verified here.\n%s\nOutcome: %s. %s%s%s%s\n%s\nThe record says: \"%s\"" % [EXPLORATORY, str(o.get("label", o.get("code", "n/a"))), str(o.get("explanation", "")), failed_line, contact_line, _impact_lines(record), safety_phrase(record), str(s.get("explanation", ""))]
+
+
+# A launch record whose entity ends at the surface (the booster, ballistic after separation) says what the record does and
+# does not hold about that end: the path up to the impact, not the impact.
+static func _impact_lines(record) -> String:
+	var out := ""
+	if not record.is_v2:
+		return out
+	for e in record.entities:
+		if str(e.get("end_reason", "")).contains("impact"):
+			var who := str(e["label"]).get_slice(" (", 0)
+			out += "\n%s impact: its recorded path ends at the surface (t %.1f s). The impact itself is not modelled and nothing is drawn for it: no landing burn, break-up or recovery is simulated, and the %s is not drawn after its last sample." % [who, e["t_end"], who.to_lower()]
+	return out
 
 
 # The labels of the mission requirements that failed, from the record's own rows (never the ids).
@@ -437,18 +450,41 @@ func set_time(t: float, record) -> void:
 	if record.is_v2:
 		_set_time_ascent(t, record)
 		return
+	var r := readout_for(record, t, speed_word)
+	readout.text = r["readout"]
+	sample_line.text = r["sample"]
+	_block_slider = true
+	slider.value = t
+	_block_slider = false
+
+
+# The landing readout at t: {readout, sample}. Before the end it is the recorded sample at or before t, as always. At the end
+# of a record that states a ground contact the speed is not the last sample's speed dressed as a contact measurement:
+# when the record carries the verifier's speeds at the contact instant (touchdown_vertical_speed and
+# touchdown_horizontal_speed) those are shown and named as such, otherwise the line says the record has no contact speed
+# and that the number is the last sample's. An altitude within 5 cm of the ground reads 0.0, never -0.0.
+static func readout_for(record, t: float, speed_word := "speed") -> Dictionary:
 	var i: int = record.lower_index(t)
 	var st: float = record.times[i]
 	var v := func(id: String, d: int) -> String:
 		var x = record.sample_value(id, t)
-		return "n/a" if x == null else String.num(float(x), d)
+		return "n/a" if x == null else String.num(0.0 if absf(float(x)) < 0.05 and d == 1 else float(x), d)
 	var th = record.sample_value("act_throttle", t)
 	var th_text := "n/a" if th == null else "%d %%" % int(round(float(th) * 100.0))
-	readout.text = "t %.2f s of %.2f s\naltitude %s m   %s %s m/s   throttle %s" % [t, record.t1(), v.call(record.nozzle_ids[2], 1), speed_word, v.call("speed", 1), th_text]
-	sample_line.text = "reads the recorded sample at t %.2f s" % st
-	_block_slider = true
-	slider.value = t
-	_block_slider = false
+	var alt: String = v.call(record.nozzle_ids[2], 1)
+	if record.has_contact() and t >= record.t1() - 1e-9:
+		var vs = record.metric("touchdown_vertical_speed")
+		var hs = record.metric("touchdown_horizontal_speed")
+		var speeds: String
+		var sample: String
+		if vs != null and hs != null:
+			speeds = "at contact, the verifier's values: descent %s m/s, horizontal %s m/s" % [String.num(float(vs), 1), String.num(float(hs), 1)]
+			sample = "altitude and throttle: the recorded sample at t %.2f s; speeds: the verifier's, at the contact" % st
+		else:
+			speeds = "the record has no contact speed; %s of the last sample: %s m/s" % [speed_word, v.call("speed", 1)]
+			sample = "reads the recorded sample at t %.2f s (the last one, not a contact measurement)" % st
+		return {"readout": "t %.2f s of %.2f s\nground contact, end of the record: altitude %s m   throttle %s\n%s" % [t, record.t1(), alt, th_text, speeds], "sample": sample}
+	return {"readout": "t %.2f s of %.2f s\naltitude %s m   %s %s m/s   throttle %s" % [t, record.t1(), alt, speed_word, v.call("speed", 1), th_text], "sample": "reads the recorded sample at t %.2f s" % st}
 
 
 # Launch ascent readout: the mission clock and, for each entity, its own record at t: altitude,

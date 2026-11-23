@@ -147,6 +147,8 @@ func _policy_dump() -> void:
 		# and the legend, so the tests can read the exploratory qualifier, the conditions and the impact sentence.
 		"run_line": Hud.run_line_text(cli.run_label, cli.vehicle, cli.seed, cli.run_dir.rstrip("/\\").get_file(), record, cli.conditions),
 		"verdict": Hud.verdict_text_for(record),
+		"readout_end": Hud.readout_for(record, record.t1()) if not record.is_v2 else {},
+		"readout_before_end": Hud.readout_for(record, record.t1() - 1.0) if not record.is_v2 else {},
 		"title": Hud.title_text("Place name"),
 		"legend_data": Hud.DATA_ASCENT if record.is_v2 else Hud.DATA,
 		"legend_illustrative": Hud.ILLUSTRATIVE_ASCENT if record.is_v2 else Hud.ILLUSTRATIVE,
