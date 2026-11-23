@@ -18,9 +18,9 @@ Só dados guardados, sem simulação nova e sem sementes: `desktop/domain-rocket
 
 Cadeia de proveniência:
 
-1. `extract.py` lê o fixture, verifica o sha256 de cada ficheiro contra os valores que a própria corrida declara (`run.json` para `case`, `trace` e `verification`; `record.json#/provenance/artifacts` para os quatro que declara) e escreve `data.json`. O `record.json` não declara hash de si próprio, por isso o hash observado fica fixado no `extract.py`, no teste e no `data.json` (campo `pinned_only`).
-2. Cada valor de `data.json` tem uma classe de evidência e uma de três origens: um ponteiro JSON para o ficheiro guardado (`ptr`), uma derivação com nome (`derivation`, registada em `derivations` com a fórmula) ou um facto de código-fonte (`source_facts`, com ficheiro e linhas encontradas pelo próprio extractor a partir de âncoras de texto, nunca escritas à mão).
-3. Toda a aritmética derivada vive no extractor. A vista só escala, formata e desenha.
+1. `extract.py` lê o fixture, verifica o sha256 de cada ficheiro contra os valores que a própria corrida declara (`run.json` para `case`, `trace` e `verification`; `record.json#/provenance/artifacts` para os quatro que declara) e escreve `data.json`. O `record.json` não declara hash de si próprio, por isso o hash observado fica fixado no teste e registado no `data.json` (campo `pinned_only`).
+2. Cada valor de `data.json` tem uma classe de evidência e uma de três origens: um ponteiro JSON para o ficheiro guardado (`ptr`), uma derivação com nome (`derivation`, registada em `derivations` com a fórmula) ou um facto de código-fonte (`source_facts`, com ficheiro e linhas encontradas pelo próprio extrator a partir de âncoras de texto, nunca escritas à mão).
+3. Toda a aritmética derivada vive no extrator. A vista só escala, formata e desenha.
 4. Base de proveniência da corrida: o teste existente `a_run_written_by_the_0_15_0_host_verifies_against_its_record_under_the_current_host` (`desktop/domain-rocket/tests/earlier_build.rs`) foi executado nesta iteração e passou (`1 passed; 0 failed`). Mostra que a corrida escrita pelo anfitrião 0.15.0 verifica contra o seu registo sob o anfitrião atual, com a repetição estrita a ser rejeitada por causa da deriva de parâmetros e a repetição de "build anterior" a ser verificada. Saída e comando em `docs/evidence/m19/belief-truth/iteration-1/cargo-earlier-build.txt`. Esse teste fixa a proveniência; não prova que a vista está certa.
 
 ## Decisão de renderização: instrumento 2D, não 3D em perspetiva
@@ -42,7 +42,7 @@ Cada número e cada elemento visual traz uma etiqueta. As etiquetas têm texto e
 | E | Estimativa, guardada no traço |
 | O | Observação de sensor, guardada no traço |
 | D-host | Derivada pelo anfitrião 0.15.0 e guardada (veredictos, métricas do anfitrião, amostra de toque interpolada) |
-| D-view | Derivada por esta vista (extractor), com a derivação nomeada |
+| D-view | Derivada por esta vista (extrator), com a derivação nomeada |
 | S | Do código-fonte, não guardada na corrida |
 | C | Configuração da missão em `case.json`. Acrescentada às classes pedidas, porque a configuração não é verdade nem estimativa |
 
@@ -86,7 +86,7 @@ O que a corrida mostra, lido da vista: antes da falha a estimativa ficou a 0,40 
 - O resíduo e a posição acreditada do bocal usam o substituto de `s_cm`, a estimativa guardada depois da atualização e amostras de 0,1 s. A concordância antes da falha (resíduo máximo de 0,25 m, contra um limiar de 3 m) apoia o substituto, mas não o prova para o `s_cm` do controlador.
 - Sem covariância: não há incerteza para mostrar. Sem contrafactual: não há prova de causa.
 - As linhas das estimativas unem amostras consecutivas por segmentos retos. É um traço de leitura entre valores guardados; nenhum valor entre amostras é lido ou mostrado.
-- Os factos de código ficam presos ao commit `bec7b3f`: se `landing_controller.rs` e os vizinhos mudarem, o teste falha até o extractor ser reexecutado e os factos revistos.
+- Os factos de código ficam presos ao commit `bec7b3f`: se `landing_controller.rs` e os vizinhos mudarem, o teste falha até o extrator ser reexecutado e os factos revistos.
 
 ## Como executar
 

@@ -26,6 +26,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import threading
 import unittest
@@ -129,7 +130,7 @@ class Inputs(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             out = Path(d) / "data.json"
             subprocess.run(
-                ["python", "-I", str(SPIKE / "extract.py"), "--output", str(out)], check=True, capture_output=True
+                [sys.executable, "-I", str(SPIKE / "extract.py"), "--output", str(out)], check=True, capture_output=True
             )
             self.assertEqual(out.read_bytes(), (SPIKE / "data.json").read_bytes())
         self.assertNotIn(b"\r", (SPIKE / "data.json").read_bytes())
@@ -560,9 +561,14 @@ def expected_text(e, i, digits):
 class RenderedPage(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        handler = lambda *a, **k: http.server.SimpleHTTPRequestHandler(*a, directory=str(SPIKE), **k)  # noqa: E731
-        cls.httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
-        handler.log_message = lambda *a, **k: None
+        class Quiet(http.server.SimpleHTTPRequestHandler):
+            def __init__(self, *a, **k):
+                super().__init__(*a, directory=str(SPIKE), **k)
+
+            def log_message(self, *a, **k):
+                pass
+
+        cls.httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Quiet)
         threading.Thread(target=cls.httpd.serve_forever, daemon=True).start()
         port = cls.httpd.server_address[1]
         res = subprocess.run(

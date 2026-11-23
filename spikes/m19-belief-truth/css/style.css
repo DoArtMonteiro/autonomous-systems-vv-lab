@@ -42,6 +42,7 @@ code { font: .85em ui-monospace, Consolas, monospace; word-break: break-all; }
 .chips li { font-size: .88rem; }
 .chip-l { color: #cfd3d9; margin-right: .4em; text-transform: uppercase; font-size: .7rem; letter-spacing: .05em; }
 #evidence-bar .unit { color: #cfd3d9; }
+#evidence-bar .val:hover { background: #2a3038; }
 #evidence-bar .val { color: #fff; border-bottom-color: #9aa3ad; }
 #evidence-bar .tag { background: transparent; color: #fff; border-color: #cfd3d9; }
 

@@ -36,7 +36,7 @@
     </li>
     <li>
       <h3>Why it mattered</h3>
-      <p>Guidance steers the believed position to the pad. The estimator checks only the altimeter: it was rejected at <span data-v="run.reject_first_t_s"></span> (controller flag, recorded), after which guidance read the lower of the estimator and the altimeter altitude (from source code, not recorded). Nothing similar guards x and y, so the biased belief was followed there. The true miss and the believed one differ by <span data-v="td.gap_m"></span>. This is consistent with the bias driving the miss; the run has no counterfactual, so it does not prove it.</p>
+      <p>Guidance steers the believed position to the pad. The estimator checks only the altimeter: it was rejected at <span data-v="run.reject_first_t_s"></span> (controller flag, recorded), after which guidance read the lower of the estimator and the altimeter altitude (from source code, not recorded). Nothing similar guards x and y, so the biased belief was followed there. The sensor it rejected was the one close to the truth: at the last periodic sample the altimeter is <span data-v="err_altimeter" data-at="last_periodic"></span> from the true nozzle altitude, while GNSS z is <span data-v="err_gnss_z" data-at="last_periodic"></span> from the true z. At touchdown the true and the believed nozzle points are <span data-v="td.gap_m"></span> apart. This is consistent with the bias driving the miss; the run has no counterfactual, so it does not prove it.</p>
     </li>
   </ol>
 </section>

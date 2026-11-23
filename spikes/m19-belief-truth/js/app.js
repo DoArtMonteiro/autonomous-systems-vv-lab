@@ -392,7 +392,11 @@ function renderReadout() {
     row("Truth", model.cls("truth_x", i), ["truth_x", "truth_y", "truth_z"].map((s) => v(s, { nounit: true }))),
     row("Estimate", "E", ["est_x", "est_y", "est_z"].map((s) => v(s, { nounit: true }))),
     row("GNSS", "O", ["gnss_x", "gnss_y", "gnss_z"].map((s) => v(s, { nounit: true }))),
-    row("Estimate − truth", "D-view", [v("err_est_x", { nounit: true }), v("err_est_y", { nounit: true }), v("err_z_host", { nounit: true })]),
+    row("Estimate − truth", null, [
+      v("err_est_x", { nounit: true, tag: true }),
+      v("err_est_y", { nounit: true, tag: true }),
+      v("err_z_host", { nounit: true, tag: true }),
+    ]),
     row("GNSS − truth", "D-view", ["err_gnss_x", "err_gnss_y", "err_gnss_z"].map((s) => v(s, { nounit: true }))),
   );
   const note = document.createElement("p");
@@ -478,7 +482,7 @@ function buildLegends() {
   legendItem(lane1, "triangle", "pt-alt", "lower_source", "Altimeter lower");
   legendItem(lane1, "circle", "pt-est-lane", "lower_source", "Estimator lower");
   const lp = $("#leg-plan");
-  legendItem(lp, "circle", "plan-truth", "base_x", "True nozzle plane");
+  legendItem(lp, "circle", "plan-truth", "td.true_nozzle_x", "True nozzle plane at touchdown");
   legendItem(lp, "diamond", "plan-belief", "believed_nozzle_x", "Believed nozzle plane, approx.");
   legendItem(lp, "square", "plan-cur-gnss", "gnss_x", "GNSS (centre of mass)");
 }
@@ -685,10 +689,12 @@ async function main() {
   const start = params.get("sample");
   setZoom(params.get("zoom") || "full");
   setCursor(start === null ? model.data.index.flag_first_sample : Number(start), { keepWindow: true });
-  let timer = null;
+  let drawnWidth = widthOf($("#strips"));
   new ResizeObserver(() => {
-    clearTimeout(timer);
-    timer = setTimeout(renderAll, 60);
+    const w = widthOf($("#strips"));
+    if (w === drawnWidth) return;
+    drawnWidth = w;
+    requestAnimationFrame(renderAll);
   }).observe($("#strips"));
   document.documentElement.dataset.ready = "1";
 }
