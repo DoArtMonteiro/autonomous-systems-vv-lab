@@ -20,9 +20,15 @@ class AdversarialProbeTest(unittest.TestCase):
                 probe.guard(bad)
 
     def test_plan_sizes_match_the_review(self) -> None:
-        sizes = {p: len(probe.jobs_for(p)) * 20 for p in probe.PLANS}
+        sizes = {p: len(probe.jobs_for(p)) * 20 for p in probe.PLANS if p not in probe.REDESIGN_PLANS}
         self.assertEqual(sizes, {"ignition": 5100, "ramp": 500, "rampbase": 640, "steps": 1680, "chase": 1680})
         self.assertTrue(all(n <= probe.MAX_PLAN for n in sizes.values()))
+
+    def test_redesign_plan_sizes_per_arm_match_the_preregistration(self) -> None:
+        one = ("B+G",)
+        self.assertEqual(len(probe.jobs_for("ramps", one)) * 40, 2560)
+        self.assertEqual(len(probe.jobs_for("ramps15", one)) * 20, 640)
+        self.assertEqual(len(probe.jobs_for("onset", one)) * 20, 1900)
 
 
 if __name__ == "__main__":

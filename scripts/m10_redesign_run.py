@@ -98,6 +98,12 @@ def main() -> int:
         for label, policy, t in arms_main:
             camp_run(f"stage3-{label}", "F1,F2,F3", policy, t + "15")
             runs += 2400
+    if "2g" in stages:  # B+G again, with the gate streaks in the records (same classes, checked in the analysis)
+        camp_run("stage2-B+G-gate", "F1,F2,F3", "m10_b_plus", "gate")
+        runs += 2400
+    if "3g" in stages:
+        camp_run("stage3-B+G-gate", "F1,F2,F3", "m10_b_plus", "gate15")
+        runs += 2400
     if "3b" in stages:
         for label, _, _ in arms_main:
             probe_run(f"stage3b-ramps15-{label}", "ramps15", label, "5020-5039")

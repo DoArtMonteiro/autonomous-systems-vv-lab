@@ -306,6 +306,8 @@ def score(run: RunSpec, v: dict[str, Any]) -> dict[str, Any]:
             "detections": [d["first_declaration_delay_s"] for d in nav["detections"]],
             "isolation": nav["isolation"],
         }
+        if nav.get("gate") is not None:  # research: ambiguity gate streaks (flag on only)
+            record["gate"] = nav["gate"]
     return record
 
 
