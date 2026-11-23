@@ -99,7 +99,7 @@ Este estudo é conduzido por [PREENCHER ANTES DO RECRUTAMENTO: nome do responsá
 
 ### O que vai acontecer
 
-- Uma sessão prevista para 60 minutos e com o máximo de 70, com um moderador, presencialmente numa máquina Windows do estudo onde o programa está instalado. Não instala nada no seu computador e não usa o computador pessoal de ninguém.
+- Uma sessão prevista para 60 minutos e com o máximo de 70, numa máquina Windows do estudo, à qual acede sempre presencialmente; o moderador pode estar na sala ou acompanhar à distância, vendo apenas o ecrã, sem nunca controlar a máquina, onde o programa está instalado. Não instala nada no seu computador e não usa o computador pessoal de ninguém.
 - Vai realizar oito pequenas tarefas e dizer em voz alta o que pensa. O moderador ajuda só quando for necessário e anota o que acontece.
 - No fim responde a um questionário curto sobre o programa e a algumas perguntas.
 - Não há respostas certas ou erradas. O que se testa é o programa, não a si. Pode não conseguir fazer uma tarefa, e isso é informação útil.

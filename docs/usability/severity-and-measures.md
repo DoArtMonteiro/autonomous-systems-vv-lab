@@ -80,7 +80,7 @@ Número de participantes com S, por tarefa.
 
 ### M3. Exatidão de compreensão
 
-Número de participantes com resposta C, por verificação de compreensão. P e I contam como não corretas. As respostas P guardam-se à parte.
+Número de participantes com resposta C, por verificação de compreensão. P e I contam como não corretas. As respostas P guardam-se à parte. A pergunta aberta Q5c2 não é uma verificação de compreensão: regista só menções espontâneas e não entra em M3. O tempo de T5 (2,5 minutos) volta a medir-se no ensaio, porque Q5c2 foi acrescentada.
 
 ### M4. Interpretações erradas críticas
 

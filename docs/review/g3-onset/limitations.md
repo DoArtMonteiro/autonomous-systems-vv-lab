@@ -34,7 +34,7 @@ Duas listas: as do estudo proposto e as deste pacote. Nenhuma é exaustiva.
 
 ### Revisão
 
-- **Toda a revisão anterior foi feita por agentes.** O protocolo, o rascunho que o precedeu, as investigações M13 e M14 e as suas revisões «independentes» foram feitos por agentes de inteligência artificial; as revisões independentes foram feitas por outros agentes, não por pessoas. O M13 di-lo (`docs/m13-discovery-lab.md`, l. 120). O M14 não o afirma: refere revisões independentes sem dizer quem as fez. **Revisão por agentes não é revisão humana por pares.** Este pacote pede a primeira leitura humana.
+- **Toda a revisão anterior foi feita por agentes.** O protocolo, o rascunho que o precedeu, as investigações M13 e M14 e as suas revisões «independentes» foram feitos por agentes de inteligência artificial; as revisões independentes foram feitas por outros agentes, não por pessoas. O M13 di-lo (`docs/m13-discovery-lab.md`, l. 120). O M14 atribui o desenho das estratégias a um agente (`docs/m14-evidence-robustness.md`, l. 130) e não diz quem fez as revisões independentes. **Revisão por agentes não é revisão humana por pares.** Este pacote pede a primeira leitura humana.
 - **Os resultados sobre o instante de início do viés são exploratórios.** Nada neste pacote os confirma.
 - **O revisor anterior também viu dados.** Houve um revisor que correu as sementes 45000 a 45003; esses dados são de desenvolvimento e estão gastos.
 

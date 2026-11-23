@@ -10,7 +10,7 @@ O pacote não substitui o protocolo. Resume-o, verifica as contas que se podem r
 
 - O protocolo é um **candidato**. Não está aprovado, não está congelado e não foi executado. Nenhum ficheiro de congelamento existe.
 - Todos os resultados sobre o instante de início do viés continuam **exploratórios**. Nada neste pacote os confirma.
-- O protocolo, as revisões anteriores e este pacote foram produzidos por agentes de inteligência artificial. **Revisão por agentes não é revisão humana por pares.** Esta é a primeira leitura humana pedida.
+- O protocolo, as revisões anteriores e este pacote foram produzidos por agentes de inteligência artificial. **Revisão por agentes não é revisão humana por pares.** Esta seria a primeira leitura humana. Em 2026-11-23 não há revisor humano externo disponível: o protocolo continua não revisto por pessoas e não aprovado para execução.
 - As contas deste pacote usam só aritmética e estatística. Não se correu nenhum simulador, campanha, `vv-exec`, `vv-rocket` ou `cargo`, e não se usou nenhuma semente do protocolo.
 - Referência fixa: commit `bec7b3f` (`bec7b3f990291239313360b163ad999c31fb6310`) do repositório. Todos os números de linha citados referem-se aos ficheiros nesse commit.
 

@@ -79,7 +79,7 @@ Mínimo de duas pessoas por sessão (moderador e anotador). Se só houver uma, a
 
 1. **Máquina separada.** Os participantes usam uma máquina Windows dedicada ao estudo, numa **conta local dedicada, sem ficheiros pessoais**, sem sessão iniciada em contas pessoais e sem ligação ao PC principal do responsável. O participante acede à máquina do estudo **em presença**. O PC principal e a sessão de ambiente de trabalho remoto nunca são usados por participantes. Este conjunto não prevê acesso à distância; usá-lo exigiria uma nova versão do conjunto, aprovada pelo responsável.
 2. **Produto.** O Studio 0.18.1 está instalado nessa máquina a partir do instalador cujo SHA-256 foi verificado: `0e37bbcf7228b7170ab392966b0cdc79b2e7446280e801cc9912c16bb0ebd0e1` (hash do instalador 0.18.1 registado em `docs/m15-m18-acceptance.md`). O hash do ficheiro usado regista-se na lista de estado inicial. O módulo Cinematic **não** está instalado.
-3. Canal de voz entre participante e moderador, se o moderador não estiver na sala. Ferramenta a decidir pelo responsável.
+3. Canal de voz entre participante e moderador, se o moderador não estiver na sala. Ferramenta a decidir pelo responsável. O participante está sempre presencialmente na máquina do estudo; um moderador à distância só vê o ecrã e nunca recebe controlo.
 4. O moderador e o anotador veem o ecrã do participante em tempo real (na sala ou por partilha de ecrã). Sem esta vista, a sessão não se realiza. Qualquer ferramenta de partilha entra na lista de destinatários e ferramentas do consentimento.
 5. Sem gravação de ecrã nem de áudio por omissão. Ver "Ética e tratamento de dados".
 
