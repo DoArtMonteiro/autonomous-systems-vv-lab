@@ -194,6 +194,7 @@ def evaluate(facts):
         ("1024x640: no pill has clipped text", lambda: all(not p["clipped"] for p in facts["pills_corridor_1024x640"] + facts["pills_corridor_first_selected_1024x640"])),
         ("1024x640: an unselected pill gives an exact count of conditions", lambda: bool(unselected()) and all("condition" in p["text"] for p in unselected())),
         ("1024x640: the tooltip of every pill has the whole identity", lambda: all(p["title"] for p in facts["pills_corridor_1024x640"])),
+        ("the Library cell 'None broken' is neutral, never the green class", lambda: any(c["cls"] == "cell v-held" for c in facts["library_safety_cells"] if c["text"] == "None broken") and not any("v-pass" in c["cls"] for c in facts["library_safety_cells"] if c["text"] == "None broken")),
         ("no script error", lambda: not facts["errors"]),
     ]
     ok = True

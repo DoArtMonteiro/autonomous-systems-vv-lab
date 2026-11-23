@@ -1,4 +1,4 @@
-Journeys of the older Studio suites, run against a Studio built from this worktree (copy named vv-studio-m191-after.exe, scratch library, configuration and WebView2 profile).
+Journeys of the older Studio suites, run against a Studio built from this worktree (copy named vv-studio-m191-after.exe, scratch library and configuration; the WebView2 profile was NOT redirected, see the report).
 Counts from the final line of each run:
 m15_journeys: 48 of 48 checks passed
 ux_journeys (--no-cinematic): 67/67 checks passed

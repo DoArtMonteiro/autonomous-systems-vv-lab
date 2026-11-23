@@ -4,7 +4,7 @@ Estado: concluído localmente no ramo `fix/m19.1-honesty`, criado a partir de `m
 
 ## Defeitos de partida e classificação
 
-Classes: (a) só texto ou apresentação da interface; (b) altera evidência registada ou hashes de execução (por exemplo, texto em `evidence.rs` muda o hash do anfitrião e os identificadores das corridas); (c) pode influenciar o comportamento da simulação. Regras do mandato: (a) implementa-se; (b) só se não tocar em evidência protegida, linhas de base ou hashes canónicos, senão propõe-se; (c) nunca se implementa. Esta tabela foi escrita antes da implementação.
+Classes: (a) só texto ou apresentação da interface; (b) altera evidência registada ou hashes de execução (por exemplo, texto em `evidence.rs` muda o hash do anfitrião e os identificadores das corridas); (c) pode influenciar o comportamento da simulação. Regras do mandato: (a) implementa-se; (b) só se não tocar em evidência protegida, linhas de base ou hashes canónicos, senão propõe-se; (c) nunca se implementa. As linhas 1 a 8 foram escritas antes da implementação; a linha 9 foi acrescentada depois, ao procurar noutros sítios o mesmo defeito.
 
 | n.º | Defeito (Studio 0.18.1) | Onde nasce | Classe | Decisão |
 | --- | --- | --- | --- | --- |
@@ -47,7 +47,7 @@ Capturado antes de qualquer alteração e recapturado no fim com `docs/evidence/
 - `source_sha256` de `vv-rocket` (`295a45b2...`, 20 ficheiros) e de `vv-ascent` (`b11d38f3...`, 12 ficheiros), recalculados com a lista e a normalização de fim de linha das funções `source_sha256()`.
 - SHA-256 dos 266 ficheiros versionados em `docs/evidence/` e `exec/claims/`, dos cenários M1 (incluindo `sha256.json` e `canonical-seed-42.json`) e de todos os fixtures e golden dos testes.
 - SHA-256 dos anfitriões de domínio, de `vv-lab` e de `vv-exec` construídos por `desktop/build.ps1 -StageOnly`, depois de os reconstruir.
-- Registo e ficheiros nativos de cada execução de demonstração dos quatro domínios (25 execuções, sementes de demonstração do produto, nenhuma semente protegida) e os artefactos M1 da missão básica com a semente 42.
+- Registo e ficheiros nativos de cada execução de demonstração dos quatro domínios (25 execuções; sementes distintas 42, 5000, 5002 e 5017, todas de demonstração do produto e nenhuma dentro dos intervalos protegidos de `exec/src/seeds.rs`, de 3000 a 3099, 6000 a 6099, 44000 a 44999 e 50000 a 59999) e os artefactos M1 da missão básica com a semente 42.
 
 ## Verificação
 
@@ -64,15 +64,15 @@ Comandos de `AGENTS.md`, na raiz do repositório, antes e depois (resultados gua
 | `python scripts/run_campaign.py --seeds 42,1337,2026 --output-root runs/campaign` | 87 casos, 324 invocações, aprovada | 87 casos, 324 invocações, aprovada |
 | `cargo fmt --check`, `cargo clippy ...`, `cargo test` em `desktop/` | 24 suítes, 168 aprovados (com a raiz, 37 suítes e 306 testes, como na 0.18.1); fmt e clippy limpos | idêntico |
 
-A diferença de testes ignorados sem `VV_GODOT` (135 contra 92) vem de testes que só são recolhidos quando existe `target/release`, que na primeira corrida ainda não existia; o par comparável é o das corridas com `VV_GODOT`, 443 contra 459, ou seja, mais 16 testes novos (13 de proteção em `tests/test_m191_honesty.py` e 3 de painéis da Cinematic em `tests/test_cinematic_cli.py`).
+A diferença de testes ignorados sem `VV_GODOT` (135 contra 92) não foi investigada na primeira corrida (sem `-v`); a explicação provável, não confirmada, é que a primeira corrida de Python precedeu o `cargo build --release` da raiz e a segunda já tinha o binário. Na segunda corrida os motivos são: 47 sem `VV_GODOT`, 39 por «vv-rocket release binary not built» (o `cargo build --release` do AGENTS.md não o constrói; estes testes não foram executados nem antes nem depois), 2 sem `VV_WORKBENCH_RUN`, 2 sem as bibliotecas do construtor de pacotes, 1 sem ligações simbólicas e 1 sem `CINEMATIC_CC0_STAGING`. O par comparável é o das corridas com `VV_GODOT`, 443 contra 459, ou seja, mais 16 testes novos (13 de proteção em `tests/test_m191_honesty.py` e 3 de painéis da Cinematic em `tests/test_cinematic_cli.py`).
 
 Testes acrescentados:
 
 - `tests/ui_requirements.test.mjs` (Node, 31 testes antes, 37 depois): veredicto `held`, frase de «sem falhas», `completionFacts`, `conditionsBrief`. Corridos contra as fontes de `bec7b3f`, falham logo no primeiro (`actual: 'pass', expected: 'held'`).
 - `tests/test_m191_honesty.py` (Python, 13): chip neutro e estilos, sentenças «met» partilhadas, chip da missão, pluma, ligação ao texto que o anfitrião terrestre escreve, pílulas sem reticências. Corridos contra as fontes de `bec7b3f`, falham 13 em 13.
 - `tests/test_cinematic_cli.py::HonestPanels` (3, precisam de `VV_GODOT`): frase do impacto do booster, leitura do fim da aterragem com e sem velocidades do verificador.
-- Percursos anteriores da Studio, contra um executável construído deste ramo (cópia `vv-studio-m191-after.exe`, biblioteca, configuração e perfil WebView2 em pastas temporárias): m15 48/48, ux 67/67 (sem Cinematic), ux2 90/90, m18 72/72, m17 Lab 34/34, m16 78/78, ui_smoke 80/80 (`journeys-after.txt`). Os de «ux» e Lab pararam primeiro com um erro de codificação da consola (seta em cp1252) e foram repetidos com `PYTHONIOENCODING=utf-8`.
-- `docs/evidence/m19/honesty/capture.py` regista factos do DOM e capturas; `evaluate-before.txt` e `evaluate-after.txt` aplicam-lhe as mesmas 11 verificações: 8 falham na 0.18.1 e 11 passam agora.
+- Percursos anteriores da Studio, contra um executável construído deste ramo (cópia `vv-studio-m191-after.exe`, biblioteca e configuração em pastas temporárias; **o perfil WebView2 não foi redirecionado**, ver «Quebra do passo 4»): m15 48/48, ux 67/67 (sem Cinematic), ux2 90/90, m18 72/72, m17 Lab 34/34, m16 78/78, ui_smoke 80/80 (`journeys-after.txt`). Os de «ux» e Lab pararam primeiro com um erro de codificação da consola (seta em cp1252) e foram repetidos com `PYTHONIOENCODING=utf-8`.
+- `docs/evidence/m19/honesty/capture.py` regista factos do DOM e capturas; `evaluate-before.txt` e `evaluate-after.txt` aplicam-lhes as mesmas 12 verificações: 9 falham na 0.18.1 (uma delas, «a pluma ainda se desenha pouco antes do contacto», falha só porque o ponto de leitura não existe nessa versão) e as 12 passam agora. Esta captura usou, ela sim, um perfil WebView2 temporário.
 
 ## Evidência antes e depois
 
@@ -90,6 +90,13 @@ Testes acrescentados:
 ## Limitações
 
 - Sem teste com pessoas e sem passagem por leitor de ecrã; o `held` neutro e as pílulas não foram avaliados quanto a contraste.
+- Não foram corridos `m17_cinematic_journey.py`, `review_captures.py` nem `installed_spotcheck.py` (precisam do módulo Cinematic instalado ou de um executável instalado). A Cinematic só foi exercitada pelos testes de `--policy-dump` e por capturas do Godot.
+- O `held` neutro foi visto numa captura da Library e no player (chips); no Flight console, na Compare e no Lab só se verificou por classes CSS e por testes de código, não visualmente.
+- 39 testes Python que precisam do binário `vv-rocket` de `crates/vv-rocket` ficam ignorados com o comando do AGENTS.md, antes e depois.
 - A pílula selecionada a 1024x640 ocupa quatro linhas (antes três) e o gráfico 2D perde alguns píxeis de altura; os percursos que medem a altura do gráfico e as sobreposições passaram (`ux2` 90/90).
-- Não foi construído nem testado o instalador, nem a reversão. A Studio 0.18.1 instalada não foi lançada nem alterada: as pastas de dados da instalação mantiveram a data da última escrita anterior à sessão.
+- Não foi construído nem testado o instalador, nem a reversão. A Studio 0.18.1 instalada não foi lançada nem alterada, mas ver «Quebra do passo 4».
 - A revisão de UX independente das correções não foi feita.
+
+## Quebra do passo 4
+
+Os percursos anteriores (m15, ux, ux2, m18, m17 Lab, m16 e ui_smoke) criam a sua própria biblioteca e configuração temporárias, mas não redirecionam o perfil do WebView2. O executável deste ramo tem o mesmo identificador (`org.vvlab.studio`) que a Studio instalada, por isso o WebView2 escreveu na cache do perfil da instalação, `%LOCALAPPDATA%\org.vvlab.studio\EBWebView` (`DIPS`, `GrShaderCache`, `ShaderCache`; a última escrita passou de 15/11/2026 08:30:18 para 23/11/2026 19:01:22). Não foi limpo nem reposto, porque a decisão é do responsável. As restantes pastas da instalação não mudaram: `modules` (15/11/2026 08:10:01), `logs` (02/11/2026 22:41:06), as preferências em `%APPDATA%\org.vvlab.studio` (06/11/2026 20:00:43) e a pasta de dados do Godot (`app_userdata`, 04/11/2026). A biblioteca de investigação em Documentos não foi tocada (a variável `VVLAB_LIBRARY` apontou sempre para uma pasta temporária). A captura de `capture.py` e as capturas do Godot não escreveram aí. Quem repetir os percursos deve definir antes `WEBVIEW2_USER_DATA_FOLDER` para uma pasta temporária.

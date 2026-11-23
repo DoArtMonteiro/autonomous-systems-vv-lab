@@ -8,4 +8,5 @@ FAIL the goal distance readout says it is not completion
 FAIL 1024x640: no pill has clipped text
 FAIL 1024x640: an unselected pill gives an exact count of conditions
 FAIL 1024x640: the tooltip of every pill has the whole identity
+FAIL the Library cell 'None broken' is neutral, never the green class
 PASS no script error
