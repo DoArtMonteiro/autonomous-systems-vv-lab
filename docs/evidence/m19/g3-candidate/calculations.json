@@ -93,16 +93,6 @@
       "n": 468
     }
   },
-  "budgets_fallback_E19": {
-    "E_points_per_family": 19,
-    "costed_only": "A_high at 168 seeds and E at 19 points; not adopted",
-    "invariants_cp99_upper_at_0": 0.009961,
-    "invariants_feasible_within_1pct": true,
-    "pairs_invariants_and_r2_r6": 460,
-    "r1_at_0s_pairs": 308,
-    "r2_r6_max_events_5pct": 12,
-    "seeds_total": 916
-  },
   "cell_tolerance": {
     "H1a": {
       "by_level": {
@@ -310,6 +300,22 @@
         "docs/review/g3-onset/reviewer-questions.md (question 25, 'por exemplo')"
       ]
     }
+  },
+  "exposure_rule": {
+    "basis": "model only (scripts/m14_masking_model.py gains, no vehicle, no noise)",
+    "bias_m_to_first_rejection_s_after_onset": {
+      "11.99": 0.58,
+      "12.0": 0.58,
+      "12.5": 0.38,
+      "13.5": 0.28,
+      "15.0": 0.18,
+      "22.0": 0.08,
+      "30.0": 0.08
+    },
+    "minimum_biased_gnss_fixes": 11,
+    "minimum_exposure_s": 1.0,
+    "residual_peak_s_after_onset": 0.3,
+    "slowest_s": 0.58
   },
   "families": {
     "alpha": {
@@ -1010,6 +1016,8 @@
       "0.01/2",
       "0.01"
     ],
+    "n_high": 140,
+    "n_low": 168,
     "scenarios": {
       "development-like": {
         "all_at_0.01_upper_bound": 0.996673,
@@ -1039,24 +1047,37 @@
           "3": 1.0
         },
         "gates": {
-          "G3_replicado_(Holm_and_McNemar_and_H1b)": 0.996352,
-          "R1_fails_late_headline_(Holm)": 0.996673,
+          "G3_replicado_(Holm_and_McNemar_and_H1b_pooled)": 0.996673,
+          "R1_worse_late_than_0s_(Holm_and_McNemar)": 0.996673,
           "frechet_G3_replicado": [
-            0.996351,
-            0.996673
-          ],
-          "frechet_mascaramento": [
             0.996673,
             0.996673
           ],
+          "frechet_R1_worse_late": [
+            0.996673,
+            0.996673
+          ],
+          "headline_R1_fails_late_(Holm)": 0.996673,
           "marginals": {
-            "H1b_alone_0.01": 0.999677,
+            "H1b_alone_0.01": 1.0,
+            "H1b_n": 308,
+            "H1b_threshold_0.01": 290,
             "holm": 0.996673,
             "mcnemar_alone_0.01": 1.0
-          },
-          "mascaramento_(Holm_and_McNemar)": 0.996673
+          }
         },
-        "holm_joint_power": 0.996673
+        "holm_joint_power": 0.996673,
+        "mascaramento_word": {
+          "S4_power": 1.0,
+          "S5_power": 1.0,
+          "S6_power_pi_equal_H2_pi": 0.986259,
+          "frechet_bounds": [
+            0.982932,
+            0.986259
+          ],
+          "independent_point": 0.982978,
+          "note": "S4 and S5 at predicted rate 0.95 with 1 % contrary pairs; S6 on the A_high seeds, positively dependent on H2 (same seeds), so only the bounds are free of an assumption"
+        }
       },
       "moderate": {
         "all_at_0.01_upper_bound": 0.754918,
@@ -1086,24 +1107,37 @@
           "3": 1.0
         },
         "gates": {
-          "G3_replicado_(Holm_and_McNemar_and_H1b)": 0.65346,
-          "R1_fails_late_headline_(Holm)": 0.754918,
+          "G3_replicado_(Holm_and_McNemar_and_H1b_pooled)": 0.752844,
+          "R1_worse_late_than_0s_(Holm_and_McNemar)": 0.754918,
           "frechet_G3_replicado": [
-            0.620522,
+            0.752171,
             0.754918
           ],
-          "frechet_mascaramento": [
+          "frechet_R1_worse_late": [
             0.754918,
             0.754918
           ],
+          "headline_R1_fails_late_(Holm)": 0.754918,
           "marginals": {
-            "H1b_alone_0.01": 0.865605,
+            "H1b_alone_0.01": 0.997253,
+            "H1b_n": 308,
+            "H1b_threshold_0.01": 290,
             "holm": 0.754918,
             "mcnemar_alone_0.01": 1.0
-          },
-          "mascaramento_(Holm_and_McNemar)": 0.754918
+          }
         },
-        "holm_joint_power": 0.754918
+        "holm_joint_power": 0.754918,
+        "mascaramento_word": {
+          "S4_power": 1.0,
+          "S5_power": 1.0,
+          "S6_power_pi_equal_H2_pi": 0.589245,
+          "frechet_bounds": [
+            0.344163,
+            0.589245
+          ],
+          "independent_point": 0.444831,
+          "note": "S4 and S5 at predicted rate 0.95 with 1 % contrary pairs; S6 on the A_high seeds, positively dependent on H2 (same seeds), so only the bounds are free of an assumption"
+        }
       },
       "optimistic": {
         "all_at_0.01_upper_bound": 1.0,
@@ -1133,24 +1167,37 @@
           "3": 1.0
         },
         "gates": {
-          "G3_replicado_(Holm_and_McNemar_and_H1b)": 1.0,
-          "R1_fails_late_headline_(Holm)": 1.0,
+          "G3_replicado_(Holm_and_McNemar_and_H1b_pooled)": 1.0,
+          "R1_worse_late_than_0s_(Holm_and_McNemar)": 1.0,
           "frechet_G3_replicado": [
             1.0,
             1.0
           ],
-          "frechet_mascaramento": [
+          "frechet_R1_worse_late": [
             1.0,
             1.0
           ],
+          "headline_R1_fails_late_(Holm)": 1.0,
           "marginals": {
             "H1b_alone_0.01": 1.0,
+            "H1b_n": 308,
+            "H1b_threshold_0.01": 290,
             "holm": 1.0,
             "mcnemar_alone_0.01": 1.0
-          },
-          "mascaramento_(Holm_and_McNemar)": 1.0
+          }
         },
-        "holm_joint_power": 1.0
+        "holm_joint_power": 1.0,
+        "mascaramento_word": {
+          "S4_power": 1.0,
+          "S5_power": 1.0,
+          "S6_power_pi_equal_H2_pi": 1.0,
+          "frechet_bounds": [
+            1.0,
+            1.0
+          ],
+          "independent_point": 1.0,
+          "note": "S4 and S5 at predicted rate 0.95 with 1 % contrary pairs; S6 on the A_high seeds, positively dependent on H2 (same seeds), so only the bounds are free of an assumption"
+        }
       },
       "pessimistic": {
         "all_at_0.01_upper_bound": 0.575411,
@@ -1180,33 +1227,46 @@
           "3": 0.669159
         },
         "gates": {
-          "G3_replicado_(Holm_and_McNemar_and_H1b)": 0.226649,
-          "R1_fails_late_headline_(Holm)": 0.575391,
+          "G3_replicado_(Holm_and_McNemar_and_H1b_pooled)": 0.457584,
+          "R1_worse_late_than_0s_(Holm_and_McNemar)": 0.575391,
           "frechet_G3_replicado": [
-            0.0,
-            0.393905
+            0.370648,
+            0.575391
           ],
-          "frechet_mascaramento": [
+          "frechet_R1_worse_late": [
             0.575391,
             0.575391
           ],
+          "headline_R1_fails_late_(Holm)": 0.575391,
           "marginals": {
-            "H1b_alone_0.01": 0.393905,
+            "H1b_alone_0.01": 0.795257,
+            "H1b_n": 308,
+            "H1b_threshold_0.01": 290,
             "holm": 0.575391,
             "mcnemar_alone_0.01": 1.0
-          },
-          "mascaramento_(Holm_and_McNemar)": 0.575391
+          }
         },
-        "holm_joint_power": 0.575391
+        "holm_joint_power": 0.575391,
+        "mascaramento_word": {
+          "S4_power": 1.0,
+          "S5_power": 1.0,
+          "S6_power_pi_equal_H2_pi": 0.589245,
+          "frechet_bounds": [
+            0.164636,
+            0.575391
+          ],
+          "independent_point": 0.339046,
+          "note": "S4 and S5 at predicted rate 0.95 with 1 % contrary pairs; S6 on the A_high seeds, positively dependent on H2 (same seeds), so only the bounds are free of an assumption"
+        }
       }
     },
     "thresholds": {
-      "H1a_H1b_n168": [
+      "H1a_n168": [
         162,
         161,
         161
       ],
-      "H1b_gate_0.01": 161,
+      "H1b_pooled_n308_0.01": 290,
       "H2_n140": [
         136,
         135,
@@ -1226,7 +1286,8 @@
           40
         ]
       ],
-      "mcnemar_min_discordant_0.01": 7
+      "S6_n140_0.01/7": 136,
+      "mcnemar_gate_min_discordant_0.01": 7
     }
   },
   "joint_rule": {
@@ -1720,6 +1781,514 @@
       }
     }
   },
+  "layout_option_B_E19_Ahigh168": {
+    "budgets": {
+      "invariants_cp99_upper_at_0": 0.009961,
+      "invariants_feasible_within_1pct": true,
+      "pairs_invariants_and_r2_r6": 460,
+      "r1_at_0s_pairs": 308,
+      "r2_r6_cp99_upper_at_max": 0.049028,
+      "r2_r6_max_events_5pct": 12
+    },
+    "cell_tolerance": {
+      "H1a": {
+        "by_level": {
+          "0.01": {
+            "failures_tolerated": 7,
+            "majority_contrary_cells_tolerated": 1,
+            "reject_if_at_least": 161,
+            "whole_cells_tolerated": 1
+          },
+          "0.01/2": {
+            "failures_tolerated": 7,
+            "majority_contrary_cells_tolerated": 1,
+            "reject_if_at_least": 161,
+            "whole_cells_tolerated": 1
+          },
+          "0.01/3": {
+            "failures_tolerated": 6,
+            "majority_contrary_cells_tolerated": 1,
+            "reject_if_at_least": 162,
+            "whole_cells_tolerated": 1
+          }
+        },
+        "majority_contrary_means_at_least": 4,
+        "n": 168,
+        "seeds_per_cell": 6
+      },
+      "H2": {
+        "by_level": {
+          "0.01": {
+            "failures_tolerated": 7,
+            "majority_contrary_cells_tolerated": 1,
+            "reject_if_at_least": 161,
+            "whole_cells_tolerated": 1
+          },
+          "0.01/2": {
+            "failures_tolerated": 7,
+            "majority_contrary_cells_tolerated": 1,
+            "reject_if_at_least": 161,
+            "whole_cells_tolerated": 1
+          },
+          "0.01/3": {
+            "failures_tolerated": 6,
+            "majority_contrary_cells_tolerated": 1,
+            "reject_if_at_least": 162,
+            "whole_cells_tolerated": 1
+          }
+        },
+        "majority_contrary_means_at_least": 4,
+        "n": 168,
+        "seeds_per_cell": 6
+      },
+      "not_acting_runs": {
+        "H1a_max_excluded": 8,
+        "H2_max_excluded": 8,
+        "definition": "runs whose verification.json lists the gnss_bias fault with acted = false (no biased GNSS fix before the run ended, for instance touchdown before the onset)",
+        "fraction": 0.05
+      }
+    },
+    "checks": {
+      "all_within_44000_44919": true,
+      "each_seed_one_condition": true,
+      "first_seed": 44000,
+      "last_seed": 44915,
+      "no_seed_in_reserve_44920_44999": true,
+      "overlap_with_spent_or_protected": {
+        "3000-3099 M10": 0,
+        "30001 M14 equivalence": 0,
+        "30017 M14 equivalence": 0,
+        "32000-32099 M14 fragility": 0,
+        "33500-33529 M14 review": 0,
+        "41000-41999 development": 0,
+        "42000-43999 M13 investigation": 0,
+        "45000-46999 development": 0,
+        "47000-47019 P1 and P2 test": 0,
+        "50000-59999 M14 split": 0,
+        "6000-6099 M10": 0
+      },
+      "reserve": [
+        44920,
+        44999
+      ],
+      "seeds_used": 916,
+      "stage_ranges_disjoint": true,
+      "total_runs": 5736,
+      "unassigned_first": 44916,
+      "unassigned_last": 44919,
+      "unassigned_seeds": 4
+    },
+    "holm_design": {
+      "illustrative": "Powers use the b_s distribution reconstructed from 20 seeds (shifted by the stated amount), independence between the arms of a seed, and, for the gate bounds, Frechet limits; they illustrate the risk of an inconclusive run and say nothing about the risk of a false claim, which the procedure controls",
+      "ladder": [
+        "0.01/3",
+        "0.01/2",
+        "0.01"
+      ],
+      "n_high": 168,
+      "n_low": 168,
+      "scenarios": {
+        "development-like": {
+          "all_at_0.01_upper_bound": 0.999354,
+          "assumptions": {
+            "H2_pi": 0.99,
+            "boundary_shift_m": 0.0,
+            "p0": 0.99,
+            "q": 0.99
+          },
+          "bonferroni_lower_bound_all_at_0.01/3": 0.996739,
+          "classes_H1a": {
+            "0": 0.000323,
+            "1": 0.0,
+            "2": 0.001309,
+            "3": 0.998368
+          },
+          "classes_H2": {
+            "0": 0.000323,
+            "1": 0.0,
+            "2": 0.001309,
+            "3": 0.998368
+          },
+          "classes_H3": {
+            "0": 0.0,
+            "1": 0.0,
+            "2": 0.0,
+            "3": 1.0
+          },
+          "gates": {
+            "G3_replicado_(Holm_and_McNemar_and_H1b_pooled)": 0.999354,
+            "R1_worse_late_than_0s_(Holm_and_McNemar)": 0.999354,
+            "frechet_G3_replicado": [
+              0.999354,
+              0.999354
+            ],
+            "frechet_R1_worse_late": [
+              0.999354,
+              0.999354
+            ],
+            "headline_R1_fails_late_(Holm)": 0.999354,
+            "marginals": {
+              "H1b_alone_0.01": 1.0,
+              "H1b_n": 336,
+              "H1b_threshold_0.01": 316,
+              "holm": 0.999354,
+              "mcnemar_alone_0.01": 1.0
+            }
+          },
+          "holm_joint_power": 0.999354,
+          "mascaramento_word": {
+            "S4_power": 1.0,
+            "S5_power": 1.0,
+            "S6_power_pi_equal_H2_pi": 0.992768,
+            "frechet_bounds": [
+              0.992122,
+              0.992768
+            ],
+            "independent_point": 0.992126,
+            "note": "S4 and S5 at predicted rate 0.95 with 1 % contrary pairs; S6 on the A_high seeds, positively dependent on H2 (same seeds), so only the bounds are free of an assumption"
+          }
+        },
+        "moderate": {
+          "all_at_0.01_upper_bound": 0.865325,
+          "assumptions": {
+            "H2_pi": 0.97,
+            "boundary_shift_m": 0.25,
+            "p0": 0.97,
+            "q": 0.99
+          },
+          "bonferroni_lower_bound_all_at_0.01/3": 0.757256,
+          "classes_H1a": {
+            "0": 0.000323,
+            "1": 0.0,
+            "2": 0.001309,
+            "3": 0.998368
+          },
+          "classes_H2": {
+            "0": 0.134395,
+            "1": 0.0,
+            "2": 0.10711,
+            "3": 0.758494
+          },
+          "classes_H3": {
+            "0": 0.0,
+            "1": 0.0,
+            "2": 0.0,
+            "3": 1.0
+          },
+          "gates": {
+            "G3_replicado_(Holm_and_McNemar_and_H1b_pooled)": 0.864064,
+            "R1_worse_late_than_0s_(Holm_and_McNemar)": 0.865325,
+            "frechet_G3_replicado": [
+              0.863868,
+              0.865325
+            ],
+            "frechet_R1_worse_late": [
+              0.865325,
+              0.865325
+            ],
+            "headline_R1_fails_late_(Holm)": 0.865325,
+            "marginals": {
+              "H1b_alone_0.01": 0.998543,
+              "H1b_n": 336,
+              "H1b_threshold_0.01": 316,
+              "holm": 0.865325,
+              "mcnemar_alone_0.01": 1.0
+            }
+          },
+          "holm_joint_power": 0.865325,
+          "mascaramento_word": {
+            "S4_power": 1.0,
+            "S5_power": 1.0,
+            "S6_power_pi_equal_H2_pi": 0.608848,
+            "frechet_bounds": [
+              0.474173,
+              0.608848
+            ],
+            "independent_point": 0.526851,
+            "note": "S4 and S5 at predicted rate 0.95 with 1 % contrary pairs; S6 on the A_high seeds, positively dependent on H2 (same seeds), so only the bounds are free of an assumption"
+          }
+        },
+        "optimistic": {
+          "all_at_0.01_upper_bound": 1.0,
+          "assumptions": {
+            "H2_pi": 1.0,
+            "boundary_shift_m": 0.0,
+            "p0": 1.0,
+            "q": 1.0
+          },
+          "bonferroni_lower_bound_all_at_0.01/3": 1.0,
+          "classes_H1a": {
+            "0": 0.0,
+            "1": 0.0,
+            "2": 0.0,
+            "3": 1.0
+          },
+          "classes_H2": {
+            "0": 0.0,
+            "1": 0.0,
+            "2": 0.0,
+            "3": 1.0
+          },
+          "classes_H3": {
+            "0": 0.0,
+            "1": 0.0,
+            "2": 0.0,
+            "3": 1.0
+          },
+          "gates": {
+            "G3_replicado_(Holm_and_McNemar_and_H1b_pooled)": 1.0,
+            "R1_worse_late_than_0s_(Holm_and_McNemar)": 1.0,
+            "frechet_G3_replicado": [
+              1.0,
+              1.0
+            ],
+            "frechet_R1_worse_late": [
+              1.0,
+              1.0
+            ],
+            "headline_R1_fails_late_(Holm)": 1.0,
+            "marginals": {
+              "H1b_alone_0.01": 1.0,
+              "H1b_n": 336,
+              "H1b_threshold_0.01": 316,
+              "holm": 1.0,
+              "mcnemar_alone_0.01": 1.0
+            }
+          },
+          "holm_joint_power": 1.0,
+          "mascaramento_word": {
+            "S4_power": 1.0,
+            "S5_power": 1.0,
+            "S6_power_pi_equal_H2_pi": 1.0,
+            "frechet_bounds": [
+              1.0,
+              1.0
+            ],
+            "independent_point": 1.0,
+            "note": "S4 and S5 at predicted rate 0.95 with 1 % contrary pairs; S6 on the A_high seeds, positively dependent on H2 (same seeds), so only the bounds are free of an assumption"
+          }
+        },
+        "pessimistic": {
+          "all_at_0.01_upper_bound": 0.659565,
+          "assumptions": {
+            "H2_pi": 0.97,
+            "boundary_shift_m": 0.75,
+            "p0": 0.95,
+            "q": 0.99
+          },
+          "bonferroni_lower_bound_all_at_0.01/3": 0.506725,
+          "classes_H1a": {
+            "0": 0.000323,
+            "1": 0.0,
+            "2": 0.001309,
+            "3": 0.998368
+          },
+          "classes_H2": {
+            "0": 0.134395,
+            "1": 0.0,
+            "2": 0.10711,
+            "3": 0.758494
+          },
+          "classes_H3": {
+            "0": 0.237783,
+            "1": 0.093058,
+            "2": 0.0,
+            "3": 0.669159
+          },
+          "gates": {
+            "G3_replicado_(Holm_and_McNemar_and_H1b_pooled)": 0.543857,
+            "R1_worse_late_than_0s_(Holm_and_McNemar)": 0.659552,
+            "frechet_G3_replicado": [
+              0.484137,
+              0.659552
+            ],
+            "frechet_R1_worse_late": [
+              0.659552,
+              0.659552
+            ],
+            "headline_R1_fails_late_(Holm)": 0.659552,
+            "marginals": {
+              "H1b_alone_0.01": 0.824585,
+              "H1b_n": 336,
+              "H1b_threshold_0.01": 316,
+              "holm": 0.659552,
+              "mcnemar_alone_0.01": 1.0
+            }
+          },
+          "holm_joint_power": 0.659552,
+          "mascaramento_word": {
+            "S4_power": 1.0,
+            "S5_power": 1.0,
+            "S6_power_pi_equal_H2_pi": 0.608848,
+            "frechet_bounds": [
+              0.2684,
+              0.608848
+            ],
+            "independent_point": 0.401567,
+            "note": "S4 and S5 at predicted rate 0.95 with 1 % contrary pairs; S6 on the A_high seeds, positively dependent on H2 (same seeds), so only the bounds are free of an assumption"
+          }
+        }
+      },
+      "thresholds": {
+        "H1a_n168": [
+          162,
+          161,
+          161
+        ],
+        "H1b_pooled_n336_0.01": 316,
+        "H2_n168": [
+          162,
+          161,
+          161
+        ],
+        "H3_order_statistic_positions_n60": [
+          [
+            20,
+            41
+          ],
+          [
+            20,
+            41
+          ],
+          [
+            21,
+            40
+          ]
+        ],
+        "S6_n168_0.01/7": 163,
+        "mcnemar_gate_min_discordant_0.01": 7
+      }
+    },
+    "n_high": 168,
+    "n_low": 168,
+    "stages": {
+      "A_high": {
+        "arms_per_seed": 2,
+        "contiguous": true,
+        "distinct_conditions": 28,
+        "first": 44168,
+        "formula": "44168 + 24*i + 6*j + r; i = onset index (0..6), j = magnitude index in {13.5, 17, 22, 30} (0..3), r = 0..5",
+        "last": 44335,
+        "runs": 336,
+        "seeds": 168,
+        "seeds_per_condition_max": 6,
+        "seeds_per_condition_min": 6
+      },
+      "A_low": {
+        "arms_per_seed": 2,
+        "contiguous": true,
+        "distinct_conditions": 28,
+        "first": 44000,
+        "formula": "44000 + 24*i + 6*j + r; i = onset index in ONSETS (0..6), j = magnitude index in {5, 7, 9, 10.5} (0..3), r = 0..5",
+        "last": 44167,
+        "runs": 336,
+        "seeds": 168,
+        "seeds_per_condition_max": 6,
+        "seeds_per_condition_min": 6
+      },
+      "B": {
+        "arms_per_seed": 34,
+        "contiguous": true,
+        "distinct_conditions": 1,
+        "first": 44336,
+        "formula": "44336 + s; s = 0..59; every seed runs all 17 magnitude levels at onsets 5 s and 15 s",
+        "last": 44395,
+        "runs": 2040,
+        "seeds": 60,
+        "seeds_per_condition_max": 60,
+        "seeds_per_condition_min": 60
+      },
+      "C": {
+        "arms_per_seed": 12,
+        "contiguous": true,
+        "distinct_conditions": 1,
+        "first": 44396,
+        "formula": "44396 + s; s = 0..59; every seed runs the 3 conditions x 4 arms",
+        "last": 44455,
+        "runs": 720,
+        "seeds": 60,
+        "seeds_per_condition_max": 60,
+        "seeds_per_condition_min": 60
+      },
+      "D": {
+        "arms_per_seed": 6,
+        "contiguous": true,
+        "distinct_conditions": 28,
+        "first": 44456,
+        "formula": "44456 + 44*i + 11*j + r; i = onset index (0..6), j = magnitude index in {5, 8, 10.5, 15} (0..3), r = 0..10",
+        "last": 44763,
+        "runs": 1848,
+        "seeds": 308,
+        "seeds_per_condition_max": 11,
+        "seeds_per_condition_min": 11
+      },
+      "E": {
+        "arms_per_seed": 3,
+        "contiguous": true,
+        "distinct_conditions": 152,
+        "first": 44764,
+        "formula": "44764 + 19*f + k; f = family in the order of g3-onset.json (0..7), k = Halton point 0..18",
+        "last": 44915,
+        "runs": 456,
+        "seeds": 152,
+        "seeds_per_condition_max": 1,
+        "seeds_per_condition_min": 1
+      }
+    },
+    "tests": {
+      "H2_late_holds_high_band": {
+        "alpha": 0.003333,
+        "failures_tolerated": 6,
+        "mde_pi_power_0.8": 0.972,
+        "mde_pi_power_0.9": 0.977,
+        "n": 168,
+        "power_at_pi": {
+          "0.90": 0.001595,
+          "0.93": 0.046542,
+          "0.95": 0.260238,
+          "0.97": 0.758494,
+          "0.99": 0.998368,
+          "1.00": 1.0
+        },
+        "reject_if_successes_at_least": 162,
+        "size": 0.001595
+      },
+      "S3_R5_fails_at_0s_high_band": {
+        "alpha": 0.001429,
+        "failures_tolerated": 5,
+        "mde_pi_power_0.8": 0.977,
+        "mde_pi_power_0.9": 0.982,
+        "n": 168,
+        "power_at_pi": {
+          "0.90": 0.000492,
+          "0.93": 0.02023,
+          "0.95": 0.150499,
+          "0.97": 0.608848,
+          "0.99": 0.992768,
+          "1.00": 1.0
+        },
+        "reject_if_successes_at_least": 163,
+        "size": 0.000492
+      },
+      "S6_first_rejection_in_window": {
+        "alpha": 0.001429,
+        "failures_tolerated": 5,
+        "mde_pi_power_0.8": 0.977,
+        "mde_pi_power_0.9": 0.982,
+        "n": 168,
+        "power_at_pi": {
+          "0.90": 0.000492,
+          "0.93": 0.02023,
+          "0.95": 0.150499,
+          "0.97": 0.608848,
+          "0.99": 0.992768,
+          "1.00": 1.0
+        },
+        "reject_if_successes_at_least": 163,
+        "size": 0.000492
+      }
+    }
+  },
   "median_tests": {
     "H3_tol_1.0": {
       "0.00": {
@@ -2130,13 +2699,14 @@
   },
   "s4_s5_mcnemar": {
     "alpha": 0.001429,
+    "floor_discordant_pairs": 10,
     "fraction_descriptive_cp99_lower": {
       "54_of_60": 0.774088,
       "57_of_60": 0.842143,
       "60_of_60": 0.926119
     },
-    "min_discordant_all_predicted": 10,
     "n_pairs": 60,
+    "natural_minimum_discordant_pairs_all_predicted": 10,
     "opposite_direction_rate_assumed": 0.01,
     "power_by_predicted_rate": {
       "0.50": {
@@ -2171,10 +2741,247 @@
         "both_conditions": 1.0,
         "one_condition": 1.0
       }
-    }
+    },
+    "rule": "exact one-sided sign test on the discordant pairs at 0.01/7, at least 10 discordant pairs; pairs with R1 not evaluated in either arm count as discordant in the contrary direction"
   },
   "schema": "vv-m19-g3-candidate-calculations.v1",
   "seed_independence": {
+    "against_seen_and_protected_ranges_case_40s": {
+      "distinct_new_seeds_affected": 258,
+      "draws_used_per_source": {
+        "1": 3,
+        "10": 24000,
+        "11": 24000,
+        "12": 24000,
+        "2": 3,
+        "3": 3,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 8000,
+        "8": 4800,
+        "9": 4800
+      },
+      "examples": [
+        [
+          44000,
+          1,
+          42016,
+          3,
+          "42000-43999 M13 investigation",
+          1
+        ],
+        [
+          44000,
+          3,
+          46176,
+          5,
+          "45000-46999 development",
+          1
+        ],
+        [
+          44001,
+          1,
+          42017,
+          3,
+          "42000-43999 M13 investigation",
+          1
+        ]
+      ],
+      "new_seeds_affected_by_stage": {
+        "A_high": 42,
+        "A_low": 116,
+        "E": 76,
+        "unassigned": 24
+      },
+      "pairs_by_source_pair_and_seen_range": {
+        "new source 1 x seen source 3 (42000-43999 M13 investigation)": 32,
+        "new source 10 x seen source 12 (41000-41999 development)": 42,
+        "new source 11 x seen source 9 (41000-41999 development)": 42,
+        "new source 12 x seen source 7 (30001 M14 equivalence)": 1,
+        "new source 12 x seen source 7 (30017 M14 equivalence)": 1,
+        "new source 3 x seen source 1 (41000-41999 development)": 42,
+        "new source 3 x seen source 5 (45000-46999 development)": 10,
+        "new source 5 x seen source 3 (45000-46999 development)": 42,
+        "new source 7 x seen source 11 (50000-59999 M14 split)": 76
+      },
+      "pairs_overlapping_in_the_outputs_actually_used": 288,
+      "seen_ranges": {
+        "2000-2029 M9.1 G3": [
+          2000,
+          2029
+        ],
+        "3000-3099 M10": [
+          3000,
+          3099
+        ],
+        "30001 M14 equivalence": [
+          30001,
+          30001
+        ],
+        "30017 M14 equivalence": [
+          30017,
+          30017
+        ],
+        "32000-32099 M14 fragility": [
+          32000,
+          32099
+        ],
+        "33500-33529 M14 review": [
+          33500,
+          33529
+        ],
+        "41000-41999 development": [
+          41000,
+          41999
+        ],
+        "42000-43999 M13 investigation": [
+          42000,
+          43999
+        ],
+        "45000-46999 development": [
+          45000,
+          46999
+        ],
+        "47000-47019 P1 and P2 test": [
+          47000,
+          47019
+        ],
+        "50000-59999 M14 split": [
+          50000,
+          59999
+        ],
+        "6000-6099 M10": [
+          6000,
+          6099
+        ]
+      },
+      "seen_seeds": 15382,
+      "shared_output_words_per_pair": {
+        "max": 23998,
+        "min": 1,
+        "total": 1833244
+      },
+      "streams_checked": 11040
+    },
+    "against_seen_and_protected_ranges_code_limit": {
+      "distinct_new_seeds_affected": 258,
+      "draws_used_per_source": {
+        "1": 3,
+        "10": 1200000,
+        "11": 1200000,
+        "12": 1200000,
+        "2": 3,
+        "3": 3,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 400000,
+        "8": 240000,
+        "9": 240000
+      },
+      "examples": [
+        [
+          44000,
+          1,
+          42016,
+          3,
+          "42000-43999 M13 investigation",
+          1
+        ],
+        [
+          44000,
+          3,
+          46176,
+          5,
+          "45000-46999 development",
+          1
+        ],
+        [
+          44001,
+          1,
+          42017,
+          3,
+          "42000-43999 M13 investigation",
+          1
+        ]
+      ],
+      "new_seeds_affected_by_stage": {
+        "A_high": 42,
+        "A_low": 116,
+        "E": 76,
+        "unassigned": 24
+      },
+      "pairs_by_source_pair_and_seen_range": {
+        "new source 1 x seen source 3 (42000-43999 M13 investigation)": 32,
+        "new source 10 x seen source 12 (41000-41999 development)": 42,
+        "new source 11 x seen source 9 (41000-41999 development)": 42,
+        "new source 12 x seen source 7 (30001 M14 equivalence)": 1,
+        "new source 12 x seen source 7 (30017 M14 equivalence)": 1,
+        "new source 3 x seen source 1 (41000-41999 development)": 42,
+        "new source 3 x seen source 5 (45000-46999 development)": 10,
+        "new source 5 x seen source 3 (45000-46999 development)": 42,
+        "new source 7 x seen source 11 (50000-59999 M14 split)": 76
+      },
+      "pairs_overlapping_in_the_outputs_actually_used": 288,
+      "seen_ranges": {
+        "2000-2029 M9.1 G3": [
+          2000,
+          2029
+        ],
+        "3000-3099 M10": [
+          3000,
+          3099
+        ],
+        "30001 M14 equivalence": [
+          30001,
+          30001
+        ],
+        "30017 M14 equivalence": [
+          30017,
+          30017
+        ],
+        "32000-32099 M14 fragility": [
+          32000,
+          32099
+        ],
+        "33500-33529 M14 review": [
+          33500,
+          33529
+        ],
+        "41000-41999 development": [
+          41000,
+          41999
+        ],
+        "42000-43999 M13 investigation": [
+          42000,
+          43999
+        ],
+        "45000-46999 development": [
+          45000,
+          46999
+        ],
+        "47000-47019 P1 and P2 test": [
+          47000,
+          47019
+        ],
+        "50000-59999 M14 split": [
+          50000,
+          59999
+        ],
+        "6000-6099 M10": [
+          6000,
+          6099
+        ]
+      },
+      "seen_seeds": 15382,
+      "shared_output_words_per_pair": {
+        "max": 1199998,
+        "min": 1,
+        "total": 91679644
+      },
+      "streams_checked": 11040
+    },
     "bound_derivation": {
       "case_40s": {
         "control_cycles": 2000,
@@ -2315,6 +3122,23 @@
       },
       "reject_if_successes_at_least": 162,
       "size": 0.001595
+    },
+    "H1b_pooled_zero_s_both_bands_0.01": {
+      "alpha": 0.01,
+      "failures_tolerated": 18,
+      "mde_pi_power_0.8": 0.951,
+      "mde_pi_power_0.9": 0.956,
+      "n": 308,
+      "power_at_pi": {
+        "0.90": 0.006618,
+        "0.93": 0.252667,
+        "0.95": 0.795257,
+        "0.97": 0.997253,
+        "0.99": 1.0,
+        "1.00": 1.0
+      },
+      "reject_if_successes_at_least": 290,
+      "size": 0.006618
     },
     "H1b_zero_s_holds_low_band": {
       "alpha": 0.003333,

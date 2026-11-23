@@ -350,28 +350,40 @@ def groups_for(onsets: list[float]) -> list[int]:
 # Seed maps (default layout) and their checks
 # ---------------------------------------------------------------------------------------------
 
-LAYOUT = {
-    "A_low": {"first": 44000, "onsets": 7, "magnitudes": 4, "reps": 6, "arms": 2},
-    "A_high": {"first": 44168, "onsets": 7, "magnitudes": 4, "reps": 5, "arms": 2},
-    "B": {"first": 44308, "seeds": 60, "arms": 17 * 2},
-    "C": {"first": 44368, "seeds": 60, "arms": 3 * 4},
-    "D": {"first": 44428, "onsets": 7, "magnitudes": 4, "reps": 11, "arms": 2 * 3},
-    "E": {"first": 44736, "families": 8, "points": 20, "arms": 3},
-}
+def layout(a_high_reps: int = 5, e_points: int = 20) -> dict:
+    """Stage sizes and first seeds, allocated contiguously from 44000 in the order A, B, C, D, E."""
+    stages: dict[str, dict] = {}
+    nxt = SEED_FIRST
+
+    def add(name: str, size: int, arms: int) -> None:
+        nonlocal nxt
+        stages[name] = {"first": nxt, "seeds": size, "arms": arms}
+        nxt += size
+
+    add("A_low", 7 * 4 * 6, 2)
+    add("A_high", 7 * 4 * a_high_reps, 2)
+    add("B", 60, 17 * 2)
+    add("C", 60, 3 * 4)
+    add("D", 7 * 4 * 11, 2 * 3)
+    add("E", 8 * e_points, 3)
+    return stages
 
 
-FORMULAS = {
-    "A_low": "44000 + 24*i + 6*j + r; i = onset index in ONSETS (0..6), j = magnitude index in {5, 7, 9, 10.5} (0..3), r = 0..5",
-    "A_high": "44168 + 20*i + 5*j + r; i = onset index (0..6), j = magnitude index in {13.5, 17, 22, 30} (0..3), r = 0..4",
-    "B": "44308 + s; s = 0..59; every seed runs all 17 magnitude levels at onsets 5 s and 15 s",
-    "C": "44368 + s; s = 0..59; every seed runs the 3 conditions x 4 arms",
-    "D": "44428 + 44*i + 11*j + r; i = onset index (0..6), j = magnitude index in {5, 8, 10.5, 15} (0..3), r = 0..10",
-    "E": "44736 + 20*f + k; f = family in the order of g3-onset.json (0..7), k = Halton point 0..19",
-}
+def formulas(st: dict, a_high_reps: int, e_points: int) -> dict:
+    return {
+        "A_low": f"{st['A_low']['first']} + 24*i + 6*j + r; i = onset index in ONSETS (0..6), j = magnitude index in {{5, 7, 9, 10.5}} (0..3), r = 0..5",
+        "A_high": f"{st['A_high']['first']} + {4 * a_high_reps}*i + {a_high_reps}*j + r; i = onset index (0..6), j = magnitude index in {{13.5, 17, 22, 30}} (0..3), r = 0..{a_high_reps - 1}",
+        "B": f"{st['B']['first']} + s; s = 0..59; every seed runs all 17 magnitude levels at onsets 5 s and 15 s",
+        "C": f"{st['C']['first']} + s; s = 0..59; every seed runs the 3 conditions x 4 arms",
+        "D": f"{st['D']['first']} + 44*i + 11*j + r; i = onset index (0..6), j = magnitude index in {{5, 8, 10.5, 15}} (0..3), r = 0..10",
+        "E": f"{st['E']['first']} + {e_points}*f + k; f = family in the order of g3-onset.json (0..7), k = Halton point 0..{e_points - 1}",
+    }
 
 
-def seed_map() -> tuple[dict[int, tuple], dict]:
+def seed_map(a_high_reps: int = 5, e_points: int = 20) -> tuple[dict[int, tuple], dict]:
     """seed -> condition for every stage, and a per-stage summary."""
+    st = layout(a_high_reps, e_points)
+    fm = formulas(st, a_high_reps, e_points)
     cond: dict[int, tuple] = {}
     summary: dict[str, dict] = {}
 
@@ -379,43 +391,38 @@ def seed_map() -> tuple[dict[int, tuple], dict]:
         assert seed not in cond, f"seed {seed} used twice"
         cond[seed] = (stage, *c)
 
-    a = LAYOUT["A_low"]
-    for i in range(a["onsets"]):
-        for j in range(a["magnitudes"]):
-            for r in range(a["reps"]):
-                put("A_low", a["first"] + 24 * i + 6 * j + r, (ONSETS[i], LOW_BAND[j]))
-    a = LAYOUT["A_high"]
-    for i in range(a["onsets"]):
-        for j in range(a["magnitudes"]):
-            for r in range(a["reps"]):
-                put("A_high", a["first"] + 20 * i + 5 * j + r, (ONSETS[i], HIGH_BAND[j]))
-    b = LAYOUT["B"]
-    for s in range(b["seeds"]):
-        put("B", b["first"] + s, ("all 17 levels 10.0..14.0 step 0.25", "onsets 5 and 15"))
-    c = LAYOUT["C"]
-    for s in range(c["seeds"]):
-        put("C", c["first"] + s, ("3 conditions x 4 arms",))
-    d = LAYOUT["D"]
-    for i in range(d["onsets"]):
-        for j in range(d["magnitudes"]):
-            for r in range(d["reps"]):
-                put("D", d["first"] + 44 * i + 11 * j + r, (ONSETS[i], MITIGATION_MAGNITUDES[j]))
-    e = LAYOUT["E"]
-    for f in range(e["families"]):
-        for k in range(e["points"]):
-            put("E", e["first"] + 20 * f + k, (f, k))
+    f0 = st["A_low"]["first"]
+    for i in range(7):
+        for j in range(4):
+            for r in range(6):
+                put("A_low", f0 + 24 * i + 6 * j + r, (ONSETS[i], LOW_BAND[j]))
+    f0 = st["A_high"]["first"]
+    for i in range(7):
+        for j in range(4):
+            for r in range(a_high_reps):
+                put("A_high", f0 + 4 * a_high_reps * i + a_high_reps * j + r, (ONSETS[i], HIGH_BAND[j]))
+    for s_ in range(60):
+        put("B", st["B"]["first"] + s_, ("all 17 levels 10.0..14.0 step 0.25", "onsets 5 and 15"))
+        put("C", st["C"]["first"] + s_, ("3 conditions x 4 arms",))
+    f0 = st["D"]["first"]
+    for i in range(7):
+        for j in range(4):
+            for r in range(11):
+                put("D", f0 + 44 * i + 11 * j + r, (ONSETS[i], MITIGATION_MAGNITUDES[j]))
+    f0 = st["E"]["first"]
+    for f in range(8):
+        for k in range(e_points):
+            put("E", f0 + e_points * f + k, (f, k))
 
     for stage in ("A_low", "A_high", "B", "C", "D", "E"):
-        seeds = sorted(s for s, v in cond.items() if v[0] == stage)
-        arms = LAYOUT[stage]["arms"]
+        seeds = sorted(sd for sd, v in cond.items() if v[0] == stage)
         per_condition: dict[tuple, int] = {}
         for sd in seeds:
             per_condition[cond[sd][1:]] = per_condition.get(cond[sd][1:], 0) + 1
         summary[stage] = {"first": seeds[0], "last": seeds[-1], "seeds": len(seeds),
-                          "arms_per_seed": arms, "runs": len(seeds) * arms,
+                          "arms_per_seed": st[stage]["arms"], "runs": len(seeds) * st[stage]["arms"],
                           "contiguous": seeds == list(range(seeds[0], seeds[-1] + 1)),
-                          "formula": FORMULAS[stage],
-                          "distinct_conditions": len(per_condition),
+                          "formula": fm[stage], "distinct_conditions": len(per_condition),
                           "seeds_per_condition_min": min(per_condition.values()),
                           "seeds_per_condition_max": max(per_condition.values())}
     return cond, summary
@@ -608,6 +615,7 @@ def tests_table(n_low: int, n_high: int, n_d_low: int, n_d_pair: int) -> dict:
         "S7_each_proportion": (n_d_pair, a7),
         "M1_threshold_1m": (n_d_low, a2),
         "M2_threshold_2m": (n_d_pair, a2),
+        "H1b_pooled_zero_s_both_bands_0.01": (n_low + n_high, F(1, 100)),
         "H2_if_E_has_19_points_and_n_high_168": (168, a3),
         "H1_and_H2_if_A_and_D_arms_are_pooled_n_low_399": (399, a3),
         "H2_if_A_and_D_arms_are_pooled_n_high_217": (217, a3),
@@ -1022,7 +1030,7 @@ def class_of(count: int, thr3, thr2, thr1) -> int:
     return 0
 
 
-def gates_power(n: int, p0, q, rest: dict[int, F]) -> dict:
+def gates_power(n: int, p0, q, rest: dict[int, F], n_zero_extra: int = 0) -> dict:
     """Exact power of the serial gates after the Holm family, arms of a seed independent.
 
     Seeds are the n of stage A (low band). F = seeds where R1 fails late (H1a), R = seeds where R1
@@ -1031,7 +1039,8 @@ def gates_power(n: int, p0, q, rest: dict[int, F]) -> dict:
     the exact one-sided sign test on (a, b) at 0.01; gate (ii) is H1b at 0.01."""
     p0, q = frac(p0), frac(q)
     t = [threshold(n, a) for a in LEVELS]
-    t_b = threshold(n, F(1, 100))
+    n_b = n + n_zero_extra  # H1b pools the 0 s arms of both bands
+    t_b = threshold(n_b, F(1, 100))
     sign = {d: sign_threshold(d, F(1, 100)) for d in range(n + 1)}
     holm = F(0)
     mask = F(0)
@@ -1057,46 +1066,62 @@ def gates_power(n: int, p0, q, rest: dict[int, F]) -> dict:
             if ok:
                 share = pr * F(ok, comb(n, f))
                 tot_m += share
-                if t_b is not None and r >= t_b:
-                    tot_c += share
+                if t_b is not None:
+                    need = t_b - r  # successes still needed from the extra 0 s seeds of the other band
+                    if need <= 0:
+                        tot_c += share
+                    elif need <= n_zero_extra:
+                        tot_c += share * sf(need, n_zero_extra, p0)
         mask += pf * rest[cf] * tot_m
         chain += pf * rest[cf] * tot_c
     # marginals for the Frechet bounds (no assumption about the dependence of the three events)
     terms, den = multinomial_terms(n, p0 * q, (1 - p0) * (1 - q))
     num = sum(x for (a, b, x) in terms if sign[a + b] is not None and a >= sign[a + b])
     p_m = F(num, den)
-    p_b = power(n, p0, F(1, 100))
+    p_b = power(n_b, p0, F(1, 100))
     lo2 = max(F(0), holm + p_m - 1)
     lo3 = max(F(0), holm + p_m + p_b - 2)
     return {
-        "R1_fails_late_headline_(Holm)": r6(holm),
-        "mascaramento_(Holm_and_McNemar)": r6(mask),
-        "G3_replicado_(Holm_and_McNemar_and_H1b)": r6(chain),
-        "frechet_mascaramento": [r6(lo2), r6(min(holm, p_m))],
+        "headline_R1_fails_late_(Holm)": r6(holm),
+        "R1_worse_late_than_0s_(Holm_and_McNemar)": r6(mask),
+        "G3_replicado_(Holm_and_McNemar_and_H1b_pooled)": r6(chain),
+        "frechet_R1_worse_late": [r6(lo2), r6(min(holm, p_m))],
         "frechet_G3_replicado": [r6(lo3), r6(min(holm, p_m, p_b))],
-        "marginals": {"holm": r6(holm), "mcnemar_alone_0.01": r6(p_m), "H1b_alone_0.01": r6(p_b)},
+        "marginals": {"holm": r6(holm), "mcnemar_alone_0.01": r6(p_m), "H1b_alone_0.01": r6(p_b),
+                      "H1b_n": n_b, "H1b_threshold_0.01": t_b},
     }
 
 
 def holm_design(n_low: int, n_high: int) -> dict:
     dist, bstar = bs_distribution()
+    n_b = n_low + n_high
     out = {
         "ladder": ["0.01/3", "0.01/2", "0.01"],
+        "n_low": n_low, "n_high": n_high,
         "thresholds": {
-            "H1a_H1b_n%d" % n_low: [threshold(n_low, a) for a in LEVELS],
+            "H1a_n%d" % n_low: [threshold(n_low, a) for a in LEVELS],
             "H2_n%d" % n_high: [threshold(n_high, a) for a in LEVELS],
             "H3_order_statistic_positions_n60": [list(os_positions(60, a)) for a in LEVELS],
-            "H1b_gate_0.01": threshold(n_low, F(1, 100)),
-            "mcnemar_min_discordant_0.01": sign_min_d(F(1, 100)),
+            "H1b_pooled_n%d_0.01" % n_b: threshold(n_b, F(1, 100)),
+            "S6_n%d_0.01/7" % n_high: threshold(n_high, F(1, 700)),
+            "mcnemar_gate_min_discordant_0.01": sign_min_d(F(1, 100)),
         },
         "scenarios": {},
     }
+    s45 = s4_s5_mcnemar()["power_by_predicted_rate"]["0.95"]["both_conditions"]
     for name, p0, q, h2, shift in JOINT_SCENARIOS:
         pa, pb = class_probs_binom(n_low, q), class_probs_binom(n_high, h2)
         pc = class_probs_h3(dist, bstar, 60, F(1), shift)
         joint = holm_joint(pa, pb, pc)
         lower = pa[3] * pb[3] * pc[3]
         upper = (1 - pa[0]) * (1 - pb[0]) * (1 - pc[0])
+        gates = gates_power(n_low, p0, q, holm_rest(pb, pc), n_zero_extra=n_high)
+        mc = F(str(gates["R1_worse_late_than_0s_(Holm_and_McNemar)"]))
+        p_s6 = power(n_high, h2, F(1, 700))
+        p_s4 = p_s5 = F(str(s45))  # each of S4 and S5 needs both of its conditions
+        word_ind = mc * p_s4 * p_s5 * p_s6
+        word_lo = max(F(0), mc + p_s4 + p_s5 + p_s6 - 3)
+        word_hi = min(mc, p_s4, p_s5, p_s6)
         out["scenarios"][name] = {
             "assumptions": {"p0": float(p0), "q": float(q), "H2_pi": float(h2), "boundary_shift_m": float(shift)},
             "classes_H1a": {str(k): r6(v) for k, v in pa.items()},
@@ -1105,13 +1130,76 @@ def holm_design(n_low: int, n_high: int) -> dict:
             "holm_joint_power": r6(joint),
             "bonferroni_lower_bound_all_at_0.01/3": r6(lower),
             "all_at_0.01_upper_bound": r6(upper),
-            "gates": gates_power(n_low, p0, q, holm_rest(pb, pc)),
+            "gates": gates,
+            "mascaramento_word": {
+                "S4_power": r6(p_s4), "S5_power": r6(p_s5), "S6_power_pi_equal_H2_pi": r6(p_s6),
+                "independent_point": r6(word_ind), "frechet_bounds": [r6(word_lo), r6(word_hi)],
+                "note": "S4 and S5 at predicted rate 0.95 with 1 % contrary pairs; S6 on the A_high seeds, "
+                        "positively dependent on H2 (same seeds), so only the bounds are free of an assumption"},
         }
     out["illustrative"] = ("Powers use the b_s distribution reconstructed from 20 seeds (shifted by the "
                            "stated amount), independence between the arms of a seed, and, for the gate "
                            "bounds, Frechet limits; they illustrate the risk of an inconclusive run and "
                            "say nothing about the risk of a false claim, which the procedure controls")
     return out
+
+
+def b_s_per_seed(levels: list[float], holds: list[bool]) -> tuple[float, str]:
+    """b_s of one seed: the smallest level from which R1 holds at that and every higher level.
+
+    Convention for the order statistics (stage B): a seed whose R1 does not hold at the highest level
+    gets +infinity (above every finite value, never below b* + tolerance); a seed whose R1 holds at the
+    lowest level and at every higher one gets that lowest level and the flag 'at_or_below' (counted at
+    or below the lowest level, so below every finite b* - tolerance). Non-monotone seeds keep their
+    b_s from this definition and are counted and reported."""
+    assert len(levels) == len(holds) and levels == sorted(levels)
+    if not holds[-1]:
+        return float("inf"), "above_highest"
+    k = len(levels) - 1
+    while k > 0 and holds[k - 1]:
+        k -= 1
+    return levels[k], ("at_or_below" if k == 0 else "exact")
+
+
+MIN_EXPOSED_FIXES = 11  # biased GNSS fixes before contact: the onset fix and ten more, 1.0 s
+
+
+def first_rejection_times() -> dict:
+    """Time from the onset to the first altimeter rejection in the estimator model (no simulator),
+    for biases above b*, with the gains of the base case. Used to justify the minimum exposure."""
+    case = json.loads(blob(BASE, "exec/cases/m13/g3-registered.json"))
+    g = case["controller"]["gains"]
+    dt = case["dt_s"] * case["sensors"]["control_period_steps"]
+    every = case["sensors"]["gnss_period_cycles"]
+    thr, need = g["altimeter_residual_threshold_m"], g["altimeter_rejection_cycles"]
+    out = {}
+    for bias in (11.99, 12.0, 12.5, 13.5, 15.0, 22.0, 30.0):
+        e = v = 0.0
+        exceed = 0
+        first = None
+        onset = 5.0
+        for k in range(1, 3000):
+            t = k * dt
+            b = bias if t >= onset else 0.0
+            e += v * dt
+            if k % every == 0:
+                e += g["gnss_position_gain"] * (b - e)
+                v += g["gnss_velocity_gain"] * (0.0 - v)
+            r = -e
+            if abs(r) > thr:
+                exceed += 1
+                if exceed >= need and first is None:
+                    first = t - onset
+            else:
+                exceed = 0
+                e += g["altimeter_position_gain"] * r
+                v += g["altimeter_velocity_gain"] * r / dt
+        out[f"{bias}"] = None if first is None else round(first, 2)
+    return {"bias_m_to_first_rejection_s_after_onset": out,
+            "slowest_s": max(x for x in out.values() if x is not None),
+            "minimum_exposure_s": 1.0, "minimum_biased_gnss_fixes": MIN_EXPOSED_FIXES,
+            "residual_peak_s_after_onset": 0.3,
+            "basis": "model only (scripts/m14_masking_model.py gains, no vehicle, no noise)"}
 
 
 def sign_min_d(alpha) -> int:
@@ -1121,25 +1209,33 @@ def sign_min_d(alpha) -> int:
     return d
 
 
+S4_S5_FLOOR = 10
+
+
 def s4_s5_mcnemar(n: int = 60) -> dict:
-    """Power of the exact paired test of S4 or S5 in one condition (0.01/7), opposite-direction pairs 1 %."""
+    """Power of the exact one-sided sign test on discordant pairs of S4 or S5 in one condition (0.01/7),
+    with a floor of 10 discordant pairs and 1 % pairs in the contrary direction."""
     a = F(1, 700)
-    sign = {d: sign_threshold(d, a) for d in range(n + 1)}
+    sign = {d: (None if d < S4_S5_FLOOR else sign_threshold(d, a)) for d in range(n + 1)}
     rows = {}
     for pa in ("0.50", "0.70", "0.80", "0.85", "0.90", "0.95", "0.97", "0.99"):
         terms, den = multinomial_terms(n, F(pa), F("0.01"))
         num = sum(x for (p, b, x) in terms if sign[p + b] is not None and p >= sign[p + b])
         one = F(num, den)
         rows[pa] = {"one_condition": r6(one), "both_conditions": r6(one * one)}
-    return {"alpha": r6(a), "min_discordant_all_predicted": sign_min_d(a), "n_pairs": n,
+    return {"alpha": r6(a), "floor_discordant_pairs": S4_S5_FLOOR,
+            "natural_minimum_discordant_pairs_all_predicted": sign_min_d(a),
+            "rule": "exact one-sided sign test on the discordant pairs at 0.01/7, at least 10 discordant pairs; "
+                    "pairs with R1 not evaluated in either arm count as discordant in the contrary direction",
+            "n_pairs": n,
             "opposite_direction_rate_assumed": 0.01, "power_by_predicted_rate": rows,
             "fraction_descriptive_cp99_lower": {"54_of_60": r6(cp_lower(54, 60)), "57_of_60": r6(cp_lower(57, 60)),
                                                 "60_of_60": r6(cp_lower(60, 60))}}
 
 
-def cell_tolerance(n_low: int, n_high: int) -> dict:
+def cell_tolerance(n_low: int, n_high: int, high_size: int = 5) -> dict:
     out = {}
-    for name, n, size in (("H1a", n_low, 6), ("H2", n_high, 5)):
+    for name, n, size in (("H1a", n_low, 6), ("H2", n_high, high_size)):
         rows = {}
         for label, a in zip(("0.01/3", "0.01/2", "0.01"), LEVELS):
             k = threshold(n, a)
@@ -1220,6 +1316,55 @@ def seed_independence(first: int, last: int, cycles: int, fixes: int) -> dict:
             "min_slack_between_next_stream_and_used_range": margin}
 
 
+def cross_independence(cycles: int, fixes: int) -> dict:
+    """Overlap between the used output ranges of the 44000-44919 streams and those of every seed of the
+    ranges the protocol lists as seen or protected (the same draw counts for both sides)."""
+    import bisect
+    used = used_draws(cycles, fixes)
+    ranges = dict(SPENT_OR_PROTECTED)
+    ranges["2000-2029 M9.1 G3"] = (2000, 2029)
+    seen = []
+    for name, (lo, hi) in ranges.items():
+        for sd in range(lo, hi + 1):
+            for src in SOURCES:
+                seen.append((stream_position(sd, src), used[src], sd, src, name))
+    seen.sort()
+    span = 1 << 64
+    keys = [x[0] - span for x in seen] + [x[0] for x in seen] + [x[0] + span for x in seen]
+    meta = seen * 3
+    reach = max(used.values())
+    cond, _ = seed_map()
+    found = []
+    for sd in range(SEED_FIRST, SEED_LAST + 1):
+        for src in SOURCES:
+            pi, ni = stream_position(sd, src), used[src]
+            lo = bisect.bisect_left(keys, pi - reach)
+            hi = bisect.bisect_right(keys, pi + reach)
+            for idx in range(lo, hi):
+                d = keys[idx] - pi
+                nj = meta[idx][1]
+                if -(nj - 1) <= d <= ni - 1:
+                    shared = min(pi + ni, pi + d + nj) - max(pi, pi + d)
+                    found.append((sd, src, meta[idx][2], meta[idx][3], meta[idx][4], shared))
+    by_pair: dict[str, int] = {}
+    by_stage: dict[str, set] = {}
+    for sd, src, sd2, src2, name, shared in found:
+        key = f"new source {src} x seen source {src2} ({name})"
+        by_pair[key] = by_pair.get(key, 0) + 1
+        by_stage.setdefault(cond.get(sd, ("unassigned",))[0], set()).add(sd)
+    shared_all = [f[5] for f in found]
+    return {"seen_ranges": {k: list(v) for k, v in ranges.items()},
+            "seen_seeds": sum(hi - lo + 1 for lo, hi in ranges.values()),
+            "streams_checked": 920 * 12, "draws_used_per_source": {str(k): v for k, v in used.items()},
+            "pairs_overlapping_in_the_outputs_actually_used": len(found),
+            "distinct_new_seeds_affected": len({f[0] for f in found}),
+            "new_seeds_affected_by_stage": {k: len(v) for k, v in sorted(by_stage.items())},
+            "pairs_by_source_pair_and_seen_range": dict(sorted(by_pair.items())),
+            "shared_output_words_per_pair": {"min": min(shared_all, default=0), "max": max(shared_all, default=0),
+                                             "total": sum(shared_all)},
+            "examples": [list(f) for f in sorted(found)[:3]]}
+
+
 def independence() -> dict:
     return {
         "method": "integer arithmetic on the SplitMix64 definition only (state0 = seed ^ source * G, state += G); "
@@ -1234,18 +1379,31 @@ def independence() -> dict:
             44000, 44919, MAX_STEPS // CONTROL_PERIOD, MAX_STEPS // CONTROL_PERIOD // GNSS_PERIOD_CYCLES),
         "seeds_44000_44999_code_limit": seed_independence(
             44000, 44999, MAX_STEPS // CONTROL_PERIOD, MAX_STEPS // CONTROL_PERIOD // GNSS_PERIOD_CYCLES),
+        "against_seen_and_protected_ranges_case_40s": cross_independence(2000, 400),
+        "against_seen_and_protected_ranges_code_limit": cross_independence(
+            MAX_STEPS // CONTROL_PERIOD, MAX_STEPS // CONTROL_PERIOD // GNSS_PERIOD_CYCLES),
     }
 
 
-def budgets_fallback(pairs_zero: int) -> dict:
-    pairs = 308 + 152
-    return {"pairs_invariants_and_r2_r6": pairs, "E_points_per_family": 19,
-            "invariants_cp99_upper_at_0": r6(cp_upper(0, pairs)),
-            "invariants_feasible_within_1pct": cp_upper(0, pairs) <= 0.01,
-            "r2_r6_max_events_5pct": max_events(pairs, 0.05),
-            "r1_at_0s_pairs": pairs_zero,
-            "seeds_total": 336 + 60 + 60 + 308 + 152,
-            "costed_only": "A_high at 168 seeds and E at 19 points; not adopted"}
+def layout_option_b() -> dict:
+    """Option B (costed, not adopted): E with 19 points per family and A_high with 6 repetitions."""
+    cond, summary = seed_map(a_high_reps=6, e_points=19)
+    checks = seed_checks(cond, summary)
+    n_low, n_high = summary["A_low"]["seeds"], summary["A_high"]["seeds"]
+    pairs = summary["D"]["seeds"] + summary["E"]["seeds"]
+    return {
+        "stages": summary, "checks": checks, "n_low": n_low, "n_high": n_high,
+        "tests": {k: v for k, v in tests_table(n_low, n_high, 231, 77).items()
+                  if k in ("H2_late_holds_high_band", "S3_R5_fails_at_0s_high_band", "S6_first_rejection_in_window")},
+        "holm_design": holm_design(n_low, n_high),
+        "cell_tolerance": cell_tolerance(n_low, n_high, 6),
+        "budgets": {"pairs_invariants_and_r2_r6": pairs,
+                    "invariants_cp99_upper_at_0": r6(cp_upper(0, pairs)),
+                    "invariants_feasible_within_1pct": cp_upper(0, pairs) <= 0.01,
+                    "r2_r6_max_events_5pct": max_events(pairs, 0.05),
+                    "r2_r6_cp99_upper_at_max": r6(cp_upper(max_events(pairs, 0.05), pairs)),
+                    "r1_at_0s_pairs": summary["D"]["seeds"]},
+    }
 
 
 # ---------------------------------------------------------------------------------------------
@@ -1278,6 +1436,7 @@ def build() -> dict:
         "evidence": evidence(),
         "tests": tests_table(n_low, n_high, n_d_low, n_d_pair),
         "s4_s5": s4_s5(),
+        "exposure_rule": first_rejection_times(),
         "h1_options": h1_options(n_low),
         "h1_options_pooled_A_and_D_n399": h1_options(3 * 7 * 11 + n_low, with_mcnemar=False),
         "h1_options_m15_n160_for_comparison": {
@@ -1287,7 +1446,7 @@ def build() -> dict:
         "joint_rule": joint_rule(n_low, n_high),
         "joint_rule_pooled_A_and_D": joint_rule(3 * 7 * 11 + n_low, 77 + n_high, with_mcnemar=False),
         "budgets": budgets(n_d + n_e, n_d),
-        "budgets_fallback_E19": budgets_fallback(n_d),
+        "layout_option_B_E19_Ahigh168": layout_option_b(),
         "holm_design": holm_design(n_low, n_high),
         "s4_s5_mcnemar": s4_s5_mcnemar(),
         "cell_tolerance": cell_tolerance(n_low, n_high),

@@ -19,7 +19,7 @@ import m19_g3_power as m  # noqa: E402
 DOC = ROOT / "docs" / "m19-g3-onset-protocol-candidate.md"
 CALC = ROOT / "docs" / "evidence" / "m19" / "g3-candidate" / "calculations.json"
 SCRIPT = ROOT / "scripts" / "m19_g3_power.py"
-EM_DASH = "—"
+EM_DASH = "\u2014"
 LABEL = (
     "**CORRECTED CANDIDATE " + EM_DASH + " NOT HUMAN-REVIEWED " + EM_DASH
     + " NOT APPROVED FOR EXECUTION**"
@@ -280,19 +280,21 @@ class HolmAndGates(unittest.TestCase):
 
     def test_ladder_thresholds_and_ordering_of_the_bounds(self):
         h = built()["holm_design"]
-        self.assertEqual(h["thresholds"]["H1a_H1b_n168"], [162, 161, 161])
+        self.assertEqual(h["thresholds"]["H1a_n168"], [162, 161, 161])
+        self.assertEqual(h["thresholds"]["H1b_pooled_n308_0.01"], 290)
+        self.assertEqual(h["thresholds"]["S6_n140_0.01/7"], 136)
         self.assertEqual(h["thresholds"]["H2_n140"], [136, 135, 135])
         self.assertEqual(h["thresholds"]["H3_order_statistic_positions_n60"], [[20, 41], [20, 41], [21, 40]])
-        self.assertEqual(h["thresholds"]["mcnemar_min_discordant_0.01"], 7)
+        self.assertEqual(h["thresholds"]["mcnemar_gate_min_discordant_0.01"], 7)
         for name, v in h["scenarios"].items():
             g = v["gates"]
             self.assertLessEqual(v["bonferroni_lower_bound_all_at_0.01/3"], v["holm_joint_power"] + 1e-6, name)
             self.assertLessEqual(v["holm_joint_power"], v["all_at_0.01_upper_bound"] + 1e-6, name)
-            self.assertLessEqual(g["G3_replicado_(Holm_and_McNemar_and_H1b)"], g["mascaramento_(Holm_and_McNemar)"] + 1e-6)
-            self.assertLessEqual(g["mascaramento_(Holm_and_McNemar)"], g["R1_fails_late_headline_(Holm)"] + 1e-6)
+            self.assertLessEqual(g["G3_replicado_(Holm_and_McNemar_and_H1b_pooled)"], g["R1_worse_late_than_0s_(Holm_and_McNemar)"] + 1e-6)
+            self.assertLessEqual(g["R1_worse_late_than_0s_(Holm_and_McNemar)"], g["headline_R1_fails_late_(Holm)"] + 1e-6)
             lo, hi = g["frechet_G3_replicado"]
-            self.assertLessEqual(lo - 1e-6, g["G3_replicado_(Holm_and_McNemar_and_H1b)"])
-            self.assertLessEqual(g["G3_replicado_(Holm_and_McNemar_and_H1b)"], hi + 1e-6)
+            self.assertLessEqual(lo - 1e-6, g["G3_replicado_(Holm_and_McNemar_and_H1b_pooled)"])
+            self.assertLessEqual(g["G3_replicado_(Holm_and_McNemar_and_H1b_pooled)"], hi + 1e-6)
             self.assertAlmostEqual(sum(v["classes_H1a"].values()), 1.0, places=5)
 
     def test_gates_agree_with_a_direct_enumeration_in_a_small_case(self):
@@ -302,8 +304,8 @@ class HolmAndGates(unittest.TestCase):
         rest = {c: F(1) for c in range(4)}
         got = m.gates_power(n, p0, q, rest)
         # with n = 12 no binomial threshold exists, so H1a never rejects and every gate is zero
-        self.assertEqual(got["G3_replicado_(Holm_and_McNemar_and_H1b)"], 0.0)
-        self.assertEqual(got["R1_fails_late_headline_(Holm)"], 0.0)
+        self.assertEqual(got["G3_replicado_(Holm_and_McNemar_and_H1b_pooled)"], 0.0)
+        self.assertEqual(got["headline_R1_fails_late_(Holm)"], 0.0)
 
     def test_cells_and_non_acting_rule(self):
         c = built()["cell_tolerance"]
@@ -314,7 +316,8 @@ class HolmAndGates(unittest.TestCase):
 
     def test_s4_s5_direction_test(self):
         s = built()["s4_s5_mcnemar"]
-        self.assertEqual(s["min_discordant_all_predicted"], 10)
+        self.assertEqual(s["floor_discordant_pairs"], 10)
+        self.assertEqual(s["natural_minimum_discordant_pairs_all_predicted"], 10)
         self.assertGreaterEqual(s["power_by_predicted_rate"]["0.50"]["both_conditions"], 0.9999)
         self.assertAlmostEqual(s["fraction_descriptive_cp99_lower"]["54_of_60"], 0.774088, places=5)
 
@@ -356,23 +359,70 @@ class RevisionTwoText(unittest.TestCase):
 
     def test_decisions_are_in_the_text(self):
         for needle in ("Holm de passo descendente", "Portas em série", "interseção-união",
-                       "161 de 168", "135 de 140", "direção confirmada (teste exato emparelhado a 0,01/7, mínimo 10 pares discordantes)",
-                       "nenhuma sobreposição nas saídas usadas", "acted = false", "fecha todas as portas a jusante"):
+                       "161 de 168", "135 de 140", "290 de 308",
+                       "teste de sinais exato unilateral sobre os pares discordantes",
+                       "R1 pior com início tardio do que com início 0 s, na mesma semente",
+                       "nenhuma simulação correu com essas sementes; a aritmética do PRNG e um teste leem os seus estados iniciais",
+                       "fecha todas as portas a jusante", "Por decidir pelo responsável",
+                       "Hoeffding", "novo confirmatório"):
             self.assertIn(needle, self.text, needle)
         self.assertNotIn("padrão provisório", self.text.lower())
-        self.assertNotIn("sem inferência», nunca", self.text)
+        self.assertNotIn("todos no sentido previsto", self.text)
+        self.assertNotIn("revisão 2", self.text.lower())
+        self.assertNotIn("(tomadas)", self.text)
 
     def test_holm_numbers_in_the_text(self):
         h = built()["holm_design"]["scenarios"]
         for name in ("development-like", "moderate", "pessimistic"):
             self.assertIn(pt(h[name]["holm_joint_power"], 3), self.text, name)
         g = h["moderate"]["gates"]
-        self.assertIn(pt(g["G3_replicado_(Holm_and_McNemar_and_H1b)"], 3), self.text)
-        self.assertIn(pt(h["pessimistic"]["gates"]["G3_replicado_(Holm_and_McNemar_and_H1b)"], 3), self.text)
-        fb = built()["budgets_fallback_E19"]
+        self.assertIn(pt(g["G3_replicado_(Holm_and_McNemar_and_H1b_pooled)"], 3), self.text)
+        self.assertIn(pt(h["pessimistic"]["gates"]["G3_replicado_(Holm_and_McNemar_and_H1b_pooled)"], 3), self.text)
+        fb = built()["layout_option_B_E19_Ahigh168"]["budgets"]
         self.assertIn(str(fb["pairs_invariants_and_r2_r6"]), self.text)
         self.assertIn(pt(fb["invariants_cp99_upper_at_0"] * 100, 3) + " %", self.text)
 
+
+
+class RevisionThree(unittest.TestCase):
+    def test_b_s_convention(self):
+        lv = [10.0, 10.25, 10.5, 10.75]
+        self.assertEqual(m.b_s_per_seed(lv, [False, False, True, True]), (10.5, "exact"))
+        self.assertEqual(m.b_s_per_seed(lv, [True, True, True, True]), (10.0, "at_or_below"))
+        self.assertEqual(m.b_s_per_seed(lv, [True, True, True, False]), (float("inf"), "above_highest"))
+        self.assertEqual(m.b_s_per_seed(lv, [True, False, True, True]), (10.5, "exact"))  # non-monotone
+
+    def test_exposure_rule_is_above_the_model_transient(self):
+        e = built()["exposure_rule"]
+        self.assertEqual(e["minimum_biased_gnss_fixes"], 11)
+        self.assertLess(e["slowest_s"], e["minimum_exposure_s"])
+        self.assertAlmostEqual(e["slowest_s"], 0.58)
+
+    def test_hoeffding_condition_for_the_pooled_binomials(self):
+        # thresholds must exceed n * 0.9 + 1 for the binomial tail to bound the heterogeneous one
+        for n, k in ((168, 162), (140, 136), (308, 290), (231, 220), (77, 76)):
+            self.assertGreater(k, n * 0.9 + 1, (n, k))
+
+    def test_layout_option_b(self):
+        b = built()["layout_option_B_E19_Ahigh168"]
+        self.assertTrue(b["checks"]["each_seed_one_condition"])
+        self.assertTrue(b["checks"]["no_seed_in_reserve_44920_44999"])
+        self.assertEqual((b["checks"]["seeds_used"], b["checks"]["unassigned_seeds"], b["checks"]["total_runs"]), (916, 4, 5736))
+        self.assertEqual(b["budgets"]["pairs_invariants_and_r2_r6"], 460)
+        self.assertTrue(b["budgets"]["invariants_feasible_within_1pct"])
+        self.assertEqual(b["holm_design"]["thresholds"]["H2_n168"], [162, 161, 161])
+
+    def test_cross_range_overlap_is_recorded_not_hidden(self):
+        r = built()["seed_independence"]["against_seen_and_protected_ranges_case_40s"]
+        self.assertEqual(r["pairs_overlapping_in_the_outputs_actually_used"], 288)
+        self.assertEqual(r["distinct_new_seeds_affected"], 258)
+        self.assertEqual(r["seen_seeds"], 15382)
+        for key in r["pairs_by_source_pair_and_seen_range"]:
+            a, b = key.split(" x seen source ")
+            self.assertNotEqual(a.split()[-1], b.split()[0], key)  # never the same source on both sides
+
+    def test_no_literal_dash_in_the_tests(self):
+        self.assertNotIn(EM_DASH, Path(__file__).read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
