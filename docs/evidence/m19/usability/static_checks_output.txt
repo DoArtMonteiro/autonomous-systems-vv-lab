@@ -1,0 +1,76 @@
+1. Contrast (WCAG 2.x relative luminance), from desktop/studio/ui/css/tokens.css, washes composited over the stated surface
+   Thresholds: 4.5:1 for text (the interface sets most text at 12 px, so the large-text 3:1 rule is not applied), 3:1 for non-text marks.
+   Theme dark:
+     pairs checked: 71; below threshold: 2
+       FAIL --rule-strong on --bg-0 = 1.54 (< 3), chart and scene lines, borders (non-text, 3:1)
+       FAIL --rule-strong on --bg-1 = 1.48 (< 3), chart and scene lines, borders (non-text, 3:1)
+   Theme light:
+     pairs checked: 71; below threshold: 11
+       FAIL --neutral on --bg-0 = 4.10 (< 4.5), status text
+       FAIL --neutral on --bg-2 = 4.28 (< 4.5), status text
+       FAIL --pass on --pass-wash over --bg-0 = 4.11 (< 4.5), verdict chips and badges
+       FAIL --fail on --fail-wash over --bg-0 = 4.10 (< 4.5), verdict chips and badges
+       FAIL --unsafe on --unsafe-wash over --bg-1 = 4.48 (< 4.5), verdict chips and badges
+       FAIL --unsafe on --unsafe-wash over --bg-0 = 4.07 (< 4.5), verdict chips and badges
+       FAIL --neutral on --neutral-wash over --bg-1 = 4.02 (< 4.5), verdict chips and badges
+       FAIL --neutral on --neutral-wash over --bg-0 = 3.66 (< 4.5), verdict chips and badges
+       FAIL --plume on --bg-0 = 2.84 (< 3), chart and scene lines, borders (non-text, 3:1)
+       FAIL --rule-strong on --bg-0 = 1.40 (< 3), chart and scene lines, borders (non-text, 3:1)
+       FAIL --rule-strong on --bg-1 = 1.55 (< 3), chart and scene lines, borders (non-text, 3:1)
+   Reference values:
+     dark: --fg-3 on --bg-1 = 6.64
+     dark: --fg-3 on --bg-3 = 5.72
+     dark: --pass on --pass-wash over --bg-1 = 6.72
+     dark: --fail on --fail-wash over --bg-1 = 7.02
+     dark: --unsafe on --unsafe-wash over --bg-1 = 5.28
+     dark: --neutral on --neutral-wash over --bg-1 = 5.38
+     dark: --grade-explore on --bg-1 = 9.04
+     dark: --pass against --fail, as the two adjacent hues of a chip pair = 1.05 (luminance ratio; low means the hues differ by hue, not by lightness)
+     light: --fg-3 on --bg-1 = 5.90
+     light: --fg-3 on --bg-3 = 5.06
+     light: --pass on --pass-wash over --bg-1 = 4.51
+     light: --fail on --fail-wash over --bg-1 = 4.50
+     light: --unsafe on --unsafe-wash over --bg-1 = 4.48
+     light: --neutral on --neutral-wash over --bg-1 = 4.02
+     light: --grade-explore on --bg-1 = 6.76
+     light: --pass against --fail, as the two adjacent hues of a chip pair = 1.01 (luminance ratio; low means the hues differ by hue, not by lightness)
+   Not computable from tokens: text over --hud or --glass on the 3D scene, geospatial imagery and the Cinematic View (depends on the picture behind).
+
+2. Markup and keyboard patterns in desktop/studio/ui/js (pattern counts over source text, not a rendered-DOM audit)
+   html lang attribute: lang="en" present
+   skip link to main: present; main has tabindex=-1: true
+   positive tabindex values: 0
+   <img> elements created in JS: 3; all with alt="" (decorative): true
+   role="radio" buttons: 15; aria-checked writes: 25
+   role="tab": 2; aria-selected writes: 6
+   aria-live regions: 17; role="alert": 7; role="status": 6
+   icon-only <button> elements: 4; without aria-label: 0
+   click handlers on non-interactive tags (div, span, li, p, ...): 1
+     js/ui.js: <div>  class: 'backdrop', onclick: (e) => { if (e.target === backd
+   role="slider" elements: 1; files that define one and also handle keydown: timeline.js
+   modal: role="dialog" with aria-modal: true; Escape handled: true; Tab trap: true
+   verdict chip with the safety note only in title= (player.js): yes
+   title= attributes in views (tooltip text, not available to touch or most keyboard users): 101
+
+3. CSS patterns in desktop/studio/ui/css
+   @keyframes defined: 8 (app.css:slide, app.css:spin, app.css:rise, control.css:mc-sweep, control.css:si-in, discover.css:dl-pulse, mission.css:pl-in, mission.css:pl-load)
+   files with a prefers-reduced-motion block: app.css, control.css, discover.css, lab.css, mission.css, tokens.css
+   keyframes in files with no reduced-motion block: none
+   smooth scroll guarded by a reduced-motion test (discover.js): true; playback autoplay guarded (player.js): true
+   global :focus-visible rule (app.css): true
+   rules that remove the outline: 4
+     app.css: .input:focus, .select:focus
+     app.css: .unit-input input
+     control.css: .mc-viewport canvas
+     mission.css: .pl-viewport canvas
+   declarations with text below 12 px: 9
+     control.css: .mct-tick -> 9.5px
+     discover.css: .dl-ax -> 10.5px
+     discover.css: .dl-axl -> 11px
+     discover.css: .dl-mk text -> 10.5px
+     discover.css: .dl-cell-n -> 10px
+     hub.css: .hm-art-t -> 10px
+     hub.css: .hm-step b::before -> 11px
+     mission.css: .home-steps li b::before -> 11px
+     mission.css: .ml-count -> 10.5px
+   mission.css, window height <= 720 px: .pl-hud-row:nth-child(4), .pl-hud-row:nth-child(5) { display: none; } .pl-hud-key { display: none; } .pl-head { padding: 4px 14px; row-gap: 3px; }

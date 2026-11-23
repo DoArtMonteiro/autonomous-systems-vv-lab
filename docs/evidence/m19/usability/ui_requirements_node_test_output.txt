@@ -1,0 +1,37 @@
+ok 1 unsafe with failing rows counts the evaluated rows
+ok 2 unsafe without any invariant row writes no number
+ok 3 a failing row is never neutral, even when the class says not evaluated
+ok 4 safe with all rows evaluated says how many were checked
+ok 5 safe with some rows not evaluated counts only the evaluated ones and says so
+ok 6 rows that were all not evaluated are neutral, not a pass
+ok 7 a record whose safety class is not_evaluated is neutral
+ok 8 safe with no rows at all writes no count
+ok 9 the safety note is generic and says requirements are judged separately
+ok 10 failureSentence names the failed requirements in plain words
+ok 11 a tilt recorded as a cosine is shown as an angle, derived
+ok 12 the published observed value is used, not the first number of the sentence
+ok 13 numbers in a recorded text are cut to four significant figures
+ok 14 the headline names the largest change with its numbers
+ok 15 requirementWording says all met only when every mission row passes
+ok 16 requirementWording puts failures first and counts every status
+ok 17 requirementWording never calls unevaluated rows met
+ok 18 requirementWording leaves declaration rows out of the count
+ok 19 statusLine joins the requirement and safety wording, failures first, without a bare status
+ok 20 heldText counts only evaluated rules and names the unevaluated
+ok 21 shortText leaves digits inside ids and tokens alone and short decimals as written
+ok 22 marginDerived marks a margin Studio worked out and not one the domain published
+ok 23 headlineChange returns null when nothing moved
+ok 24 conditionsName lists every non-default parameter and fault, and says default conditions otherwise
+ok 25 the same request always gets the same name, and different requests never share one
+ok 26 conditionsShared says what both runs share and what they differ in
+ok 27 displayRunLabel keeps a stored label and names an Experiment run by its parameters
+ok 28 the end chip is green only when the rules were judged and none broke
+ok 29 the end chip is neutral and says safety not evaluated when the rules were not judged
+ok 30 the end chip is bad when the record says unsafe even with no failing row
+ok 31 the end chip names the failed requirement and the broken rule
+31 tests passed
+✔ tests\ui_requirements.test.mjs (55.151ms)
+ℹ tests 1
+ℹ pass 1
+ℹ fail 0
+Command: node --test tests/ui_requirements.test.mjs (from the repository root, Node v24). Subtests are the numbered lines; the runner counts the file as one test.
