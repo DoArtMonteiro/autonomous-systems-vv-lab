@@ -49,7 +49,7 @@ export function initPlayer(el, nav) {
 export function playerState() {
   if (!pl) return null;
   return { experience: pl.exp.id, runs: pl.runs.map((r) => r.runId), active: pl.active, t: pl.cursor.t, t1: pl.cursor.t1, revealed: pl.revealed, analysis: !!pl.analysis, playing: pl.cursor.playing, scene: pl.scene ? (pl.scene.ok === false ? 'fallback' : pl.kind) : null,
-    view: pl.view, plumeM: pl.scene && Number.isFinite(pl.scene.plumeLength) ? pl.scene.plumeLength : null, environment: pl.envId, renderer: pl.renderer || null, geoError: pl.geoError || null, geoStats: pl.scene && pl.scene.stats ? pl.scene.stats() : null, mounts: pl.mounts || 0,
+    view: pl.view, plumeM: pl.scene && typeof pl.scene.plume === 'function' ? pl.scene.plume() : null, environment: pl.envId, renderer: pl.renderer || null, geoError: pl.geoError || null, geoStats: pl.scene && pl.scene.stats ? pl.scene.stats() : null, mounts: pl.mounts || 0,
     findings: pl.gated ? pl.gated.length : 0, findingsDrawn: pl.gated ? pl.gated.filter((m) => m.el).length : 0 };
 }
 

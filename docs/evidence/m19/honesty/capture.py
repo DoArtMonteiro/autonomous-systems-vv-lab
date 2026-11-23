@@ -75,11 +75,12 @@ CHIPS_JS = """() => [...document.querySelectorAll('.pl-run-result')].map((r) => 
 
 PILLS_JS = """() => [...document.querySelectorAll('.pl-runs .pl-run')].filter((e) => e.offsetParent !== null).map((e) => ({
   checked: e.getAttribute('aria-checked'), text: e.innerText.replace(/\\s+/g, ' ').trim(), title: e.title || null, aria: e.getAttribute('aria-label'),
-  clipped: [...e.querySelectorAll('span')].filter((x) => x.offsetParent !== null && x.scrollWidth > x.clientWidth + 1).map((x) => x.className),
+  clipped: [...e.querySelectorAll('span')].filter((x) => x.offsetParent !== null && x.clientWidth > 2 && x.scrollWidth > x.clientWidth + 1).map((x) => x.className),
+  visible: [...e.querySelectorAll('span')].filter((x) => x.offsetParent !== null && x.clientWidth > 2 && !x.querySelector('span')).map((x) => x.textContent.replace(/\\s+/g, ' ').trim()).join('|'),
   width: Math.round(e.getBoundingClientRect().width),
 }))"""
 
-PLUME_JS = """() => { const p = window.__studio.player(); return { view: p && p.view, t: p && p.t, plume: p && p.plume }; }"""
+PLUME_JS = """() => { const p = window.__studio.player(); return { view: p && p.view, t: p && p.t, t1: p && p.t1, plumeM: p ? p.plumeM : null }; }"""
 
 
 def main():
@@ -116,8 +117,16 @@ def main():
             open_mission(s, "late-gnss")
             pick_run(s, 0)
             to_end(s)
-            facts["plume_past_end"] = {"run": s.js("window.__studio.player().runs[0]"), "state": s.js(PLUME_JS)}
+            facts["plume_past_end"] = {"run": s.js("window.__studio.player().runs[0]"), "state": s.js(PLUME_JS), "run_ended_at_s": s.js("window.__studio.player().t1")}
             s.shot(f"{a.tag}-2-plume-past-end-1440x900")
+            # Just before the contact of the same run the plume is drawn, so it is not hidden everywhere.
+            ended = s.js("(() => { const e = document.querySelector('.pl-ended'); const m = e && /at ([0-9.]+) s/.exec(e.textContent); return m ? Number(m[1]) : null; })()")
+            facts["plume_before_contact"] = None
+            if ended:
+                s.js("(t) => { const r = document.querySelector('.pl-range'); r.value = String(t); r.dispatchEvent(new Event('input', { bubbles: true })); }", ended - 0.3)
+                time.sleep(0.8)
+                facts["plume_before_contact"] = {"t": s.js("window.__studio.player().t"), "plumeM": s.js("window.__studio.player().plumeM")}
+                s.shot(f"{a.tag}-2-plume-before-contact-1440x900")
             s.resize(1024, 640)
             s.shot(f"{a.tag}-2-plume-past-end-1024x640")
             facts["pills_late_gnss_1024x640"] = s.js(PILLS_JS)
@@ -128,7 +137,7 @@ def main():
             pick_run(s, 1)
             to_end(s)
             facts["corridor_second_run"] = s.js(CHIPS_JS)
-            facts["corridor_flight_readout"] = s.js("[...document.querySelectorAll('.pl-hud-row')].map((r) => r.innerText.replace(/\\s+/g, ' ').trim())")
+            facts["corridor_flight_readout"] = s.js("[...document.querySelectorAll('.pl-hud-row')].map((r) => ({ text: r.innerText.replace(/\\s+/g, ' ').trim(), title: r.title }))")
             s.shot(f"{a.tag}-3-corridor-completion-1440x900")
             s.resize(1024, 640)
             time.sleep(0.8)
@@ -156,6 +165,36 @@ def main():
         json.dump(facts, f, indent=1, sort_keys=True)
         f.write("\n")
     print("done", a.out)
+    if a.tag == "after":
+        sys.exit(0 if evaluate(facts) else 1)
+
+
+def evaluate(facts):
+    """The assertions of the corrected Studio on the facts collected above (the 0.18.1 facts fail the same ones)."""
+    green = "rgb(61, 191, 152)"
+    first = facts["safety_chip"][0]
+    safety = next(c for c in first["chips"] if c["text"].startswith("SAFETY"))
+    mission = next(c for c in first["chips"] if c["text"].startswith("MISSION"))
+    corridor = facts["corridor_second_run"][1]
+    unselected = [p for p in facts["pills_corridor_1024x640"] if p["checked"] == "false"]
+    checks = [
+        ("the safety chip beside failed requirements is neutral, not green", "v-held" in safety["cls"] and safety["colour"] != green),
+        ("the failed mission chip keeps its failure class", "v-warn" in mission["cls"] and "failed" in mission["text"]),
+        ("no 'Every requirement' sentence beside a failed requirement", not first["allMet"]),
+        ("the plume is not drawn after the last sample", facts["plume_past_end"]["state"]["plumeM"] == 0),
+        ("the plume is still drawn just before the contact", bool(facts.get("plume_before_contact")) and (facts["plume_before_contact"]["plumeM"] or 0) > 0),
+        ("the failed mission completion says what the record says and does not say", bool(corridor["clause"]) and "does not say which part" in corridor["clause"]),
+        ("the goal distance readout says it is not completion", any(r["text"].startswith("D To goal") and "Mission completion requirement" in r["title"] for r in facts["corridor_flight_readout"])),
+        ("1024x640: no pill has clipped text", all(not p["clipped"] for p in facts["pills_corridor_1024x640"] + facts["pills_corridor_first_selected_1024x640"])),
+        ("1024x640: an unselected pill gives an exact count of conditions", bool(unselected) and all("condition" in p["text"] for p in unselected)),
+        ("1024x640: the tooltip of every pill has the whole identity", all(p["title"] for p in facts["pills_corridor_1024x640"])),
+        ("no script error", not facts["errors"]),
+    ]
+    ok = True
+    for name, passed in checks:
+        print(("PASS " if passed else "FAIL ") + name)
+        ok = ok and passed
+    return ok
 
 
 if __name__ == "__main__":

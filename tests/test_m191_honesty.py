@@ -87,6 +87,8 @@ class NoPlumeAfterTheLastSample(unittest.TestCase):
 
     def test_the_player_state_exposes_the_plume_length_for_the_journeys(self):
         self.assertIn("plumeM:", read("js", "views", "player.js"))
+        for name in ("geo.js", "rocket-cinema.js"):
+            self.assertIn("plume: () => r3.plumeLength || 0", read("js", "scenes", name))
 
 
 class MissionCompletionIsNotTheDistanceToTheGoal(unittest.TestCase):

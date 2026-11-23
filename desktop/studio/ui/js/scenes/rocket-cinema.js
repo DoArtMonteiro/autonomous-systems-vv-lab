@@ -215,6 +215,8 @@ export function mountCinema(host, models, active, cursor, colours) {
     redraw: () => { r3.applyTheme(); r3.setTime(cursor.t); },
     preset: (m) => r3.preset(m),
     get mode() { return r3.mode; },
+    /** The plume length drawn now, in metres (0 when none): read by the journeys. */
+    plume: () => r3.plumeLength || 0,
     index: (t) => lowerIndex(ch.times, t),
   };
 }
