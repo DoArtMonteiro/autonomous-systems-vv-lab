@@ -107,5 +107,32 @@ class MissionCompletionIsNotTheDistanceToTheGoal(unittest.TestCase):
         self.assertIn("completionFacts(rec)", read("js", "views", "player.js"))
 
 
+class RunPillsNeverCutTheConditions(unittest.TestCase):
+    """0.18.1, at 1024x640, cut the name and the conditions of the pills that were not selected with an ellipsis."""
+
+    def compact_block(self):
+        css = read("css", "mission.css")
+        start = css.index("@media (max-width: 1100px) and (max-height: 700px)")
+        return css[start:css.index("\n}\n", start)]
+
+    def test_no_pill_text_is_cut_with_an_ellipsis_in_the_compact_layout(self):
+        block = self.compact_block()
+        for line in block.splitlines():
+            if ".pl-run" in line and not line.strip().startswith("/*"):
+                self.assertNotIn("text-overflow", line, line)
+        self.assertNotRegex(block, r"max-width: \d+ch")
+        self.assertIn(".pl-run-n", block)
+        self.assertRegex(block, r"\.pl-runs \{ overflow-x: auto;")
+
+    def test_the_conditions_stay_in_the_accessible_name_and_the_tooltip(self):
+        css = read("css", "mission.css")
+        # visually hidden, not display: none, so the accessible name keeps them
+        self.assertRegex(self.compact_block(), r"\.pl-run-c \{ position: absolute; width: 1px;")
+        player = read("js", "views", "player.js")
+        self.assertIn("title: `${runFullName(r)} · ${shortId(r)}`", player)
+        self.assertIn("conditionsBrief(r.record.request", player)
+        self.assertRegex(css, r"\.pl-run-n \{ display: none; \}")
+
+
 if __name__ == "__main__":
     unittest.main()

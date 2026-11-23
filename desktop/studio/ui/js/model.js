@@ -129,6 +129,12 @@ export function conditionsName(req, catalog) {
   return parts.length ? parts.map((p) => p.text).join(' · ') : 'default conditions';
 }
 
+/** How many conditions a run has beyond the defaults, as words ("default conditions", "2 conditions"): exact, for a place too narrow for the list. */
+export function conditionsBrief(req, catalog) {
+  const n = conditionParts(req, catalog).length;
+  return n === 0 ? 'default conditions' : `${n} condition${n === 1 ? '' : 's'}`;
+}
+
 /** What the runs share and what tells them apart: {shared: [text], differ: [label], text}. */
 export function conditionsShared(requests, catalog) {
   const lists = requests.map((r) => conditionParts(r, catalog));

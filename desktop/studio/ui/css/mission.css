@@ -143,6 +143,7 @@
 .pl-run:hover { color: var(--fg-1); }
 .pl-run[aria-checked="true"] { color: var(--fg-1); border-color: var(--fg-2); }
 .pl-run .pl-swatch { width: 14px; }
+.pl-run-n { display: none; }
 .pl-cams { position: absolute; right: 16px; bottom: 66px; background: var(--hud); backdrop-filter: blur(10px); }
 .pl-cams .seg-btn { height: 28px; }
 .pl-scene-note { position: absolute; left: 16px; right: 16px; bottom: 10px; margin: 0; font-size: 12px; color: var(--fg-3); pointer-events: none; }
@@ -341,11 +342,13 @@
   .pl:not(.pl-control):not(.pl-geo) .pl-run { flex: 0 1 auto; min-width: 0; }
   .pl:not(.pl-control):not(.pl-geo) .pl-run[aria-checked="true"] { flex: 1 1 auto; }
   .pl:not(.pl-control):not(.pl-geo) .pl-run[aria-checked="false"] { flex-shrink: 0; white-space: nowrap; }
-  /* A pill that is not the shown run keeps its conditions (cut short) and its short id; only the status is left out. */
+  /* A pill that is not the shown run keeps its whole name and its short id, never text cut with an ellipsis: the status is left out, and
+     the conditions are replaced by their exact count (the list stays in the accessible name and in the tooltip, and the shown run gives it in full). */
   .pl:not(.pl-control):not(.pl-geo) .pl-run[aria-checked="false"] .pl-run-v { display: none; }
-  .pl:not(.pl-control):not(.pl-geo) .pl-run[aria-checked="false"] .pl-run-l,
-  .pl:not(.pl-control):not(.pl-geo) .pl-run[aria-checked="false"] .pl-run-c { display: inline-block; vertical-align: bottom; max-width: 13ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .pl:not(.pl-control):not(.pl-geo) .pl-run[aria-checked="false"] .pl-run-c { max-width: 18ch; }
+  .pl:not(.pl-control):not(.pl-geo) .pl-run[aria-checked="false"] .pl-run-c { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .pl:not(.pl-control):not(.pl-geo) .pl-run[aria-checked="false"] .pl-run-n { display: inline; }
+  /* If the names are still wider than the window, the row scrolls; nothing is cut. */
+  .pl:not(.pl-control):not(.pl-geo) .pl-runs { overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
 }
 /* The player page scrolls up and down only; nothing in it may push it sideways. */
 #view-mission { overflow-x: hidden; }

@@ -29,7 +29,7 @@ import { sourcesInfo } from '../sources-info.js';
 import { openCatalogue } from '../env-catalogue.js';
 import { cinematicButton } from '../cinematic.js';
 import { reqView, safetyWording, SAFETY_NOTE, failureSentence, indexNumbers, statusLine, requirementWording, endChip, noFailureSentence, completionFacts } from '../requirements.js';
-import { conditionsName } from '../model.js';
+import { conditionsName, conditionsBrief } from '../model.js';
 
 let root;
 let navigate = () => {};
@@ -423,11 +423,13 @@ function build() {
   const hud = h('div', { class: 'pl-hud', role: 'group', 'aria-label': 'Readouts at the playback time' });
   const phaseTag = h('div', { class: ['pl-phase', rocket ? '' : 'is-2d'], 'aria-hidden': 'true' });
   const runBar = runs.length > 1 ? h('div', { class: 'pl-runs', role: 'radiogroup', 'aria-label': 'Run shown in the scene' },
-    runs.map((r, i) => h('button', { type: 'button', role: 'radio', class: 'pl-run', 'aria-checked': String(i === pl.active), dataset: { run: String(i) }, onclick: () => setActive(i) },
+    runs.map((r, i) => h('button', { type: 'button', role: 'radio', class: 'pl-run', 'aria-checked': String(i === pl.active), dataset: { run: String(i) }, title: `${runFullName(r)} · ${shortId(r)}`, onclick: () => setActive(i) },
       h('span', { class: 'pl-swatch', style: { background: r.colour } }),
       h('span', { class: 'pl-run-t' },
         h('span', { class: 'pl-run-l' }, r.label),
         runFullName(r) !== r.label ? h('span', { class: 'pl-run-c small' }, ` · ${runConditions(r)}`) : null,
+        // On a short, narrow window the conditions are kept for assistive technology and for the tooltip, and the pill shows their exact count, never a cut list.
+        runFullName(r) !== r.label ? h('span', { class: 'pl-run-n small', 'aria-hidden': 'true' }, ` · ${conditionsBrief(r.record.request, (domainById(r.record.request.domain) || {}).catalog)}`) : null,
         h('span', { class: 'pl-run-id mono small', title: `Run ${r.runId}` }, ` · ${shortId(r)}`),
         h('span', { class: 'pl-run-v small', dataset: { v: String(i) } }))))) : null;
   const note = sceneNote();
