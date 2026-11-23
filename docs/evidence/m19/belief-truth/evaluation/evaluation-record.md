@@ -17,3 +17,8 @@ Caveat: one answerer per iteration (n = 1 each); part of the gain may be answere
 Real residual defects: R2 nozzle-plane horizontal velocity not shown (0.61 vs CM 0.51); "Nothing guards x and y" untagged; card 4 blurs flag 8.18 s vs fusion cut-off 8.10 s; "sample N of 230" count; propellant margin label; GNSS velocity and IMU not shown.
 Key imprecisions found by scorer: 3.2 err_vz touchdown sample 0.129; 4.2 "latch" wording.
 UX critic (Fable 5.2) iteration 2: clarity 3, fidelity 4, interpretation 5, interaction 4, accessibility 3, performance 4, maintainability 4, five questions 4. Recommendation: ADOPT as candidate for the human gate, not installed. Renderer: Three.js no material advantage.
+
+# Final build (after the non-substantive correction pass; agent-based, not a human study)
+Fresh answerer and fresh scorer, same frozen key and questions. Comprehension 18.5/20 PASS (strict 15.5 FAIL; strict variant harsher than in iteration 2, partly scorer variance; lenient range 18.5 to 19.5). Traps 14.5/16 PASS (strict about 13.5). Core traps misled: 0. No factually wrong viewer statement found.
+Caveats: n = 1 answerer; the builder knew the failed questions from iteration 1; no baseline arm against the current Studio view.
+Known minor defects left (no further iteration allowed): a "Host error, vertical and horizontal" row placed under x, y, z columns (app.js:562); garbled "command step 3.6 s" wording for the ignition command.
