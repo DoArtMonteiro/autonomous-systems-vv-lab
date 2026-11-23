@@ -12,7 +12,7 @@
 <header id="evidence-bar" aria-label="Evidence: which run this is">
   <div class="bar-title">
     <h1>Belief vs Truth</h1>
-    <p class="bar-sub">One stored landing run. Prototype, first iteration: nothing here is simulated, and nothing is shown that the run did not record or that is not labelled as derived.</p>
+    <p class="bar-sub">One stored run. Nothing is simulated: every value is recorded, or derived and labelled, or read from source code and labelled.</p>
   </div>
   <ul class="chips" id="chips"></ul>
 </header>
@@ -20,31 +20,32 @@
 <main id="main">
 
 <section id="story" aria-labelledby="story-h">
-  <h2 id="story-h">What this run shows, in four steps</h2>
+  <h2 id="story-h" class="sr">What this run shows, in four steps</h2>
   <ol class="story-list">
-    <li>
+    <li id="card-1">
       <h3>What really happened</h3>
-      <p>The nozzle plane reached the ground at <span data-v="td.true_nozzle_x"></span> east and <span data-v="td.true_nozzle_y"></span> north of the pad centre, which is <span data-v="req.R5_position.value"></span> from it. Requirement R5 allows <span data-v="req.R5_position.limit"></span>. The host's verdict is recorded: R5 failed.</p>
+      <p>At touchdown the nozzle plane was at x = <span data-v="td.true_nozzle_x"></span> (<span data-v="frame.x" data-text="1"></span> positive) and y = <span data-v="td.true_nozzle_y"></span> (<span data-v="frame.y" data-text="1"></span> positive): <span data-v="req.R5_position.value"></span> from the pad centre, <span data-word="inside" data-v="td.true_inside_r5"></span> the <span data-v="case.r5_radius_m"></span> R5 radius, and the host's R5 verdict is <span data-word="verdict" data-v="req.R5_position.pass"></span>. <em>Inference, not recorded:</em> a <span data-v="case.fault_magnitude_m"></span> GNSS bias in x, followed by guidance, would put the vehicle on the negative x side, as observed.</p>
     </li>
-    <li>
+    <li id="card-2">
       <h3>What the controller believed</h3>
-      <p>Its last estimate before contact placed the nozzle plane <span data-v="td.believed_pad_distance"></span> from the pad centre, inside the R5 circle (approximate, derived by this view). That estimate sat <span data-v="td.err_est_x"></span> east of the true centre of mass, and <span data-v="td.err_z_host"></span> above it in z.</p>
+      <p>Its last estimate before contact put the nozzle plane <span data-v="td.believed_pad_distance"></span> from the pad centre, <span data-word="inside" data-v="td.believed_inside_r5"></span> the R5 radius. That estimate was <span data-v="td.err_est_x"></span> east of the true centre of mass in x and <span data-v="td.err_z_host"></span> above it in z.</p>
     </li>
-    <li>
+    <li id="card-3">
       <h3>When they diverged</h3>
-      <p>Before the fault the estimate stayed within <span data-v="pre.max_abs_err_x"></span> of the truth in x. The GNSS bias starts at <span data-v="run.fault_start_event_t_s"></span> (recorded event). At the first sample with the fault active the x error is already <span data-v="err_est_x" data-at="fault_first_sample"></span>, and at the last estimate it is <span data-v="td.err_est_x"></span>, close to the <span data-v="case.fault_magnitude_m"></span> bias. <button type="button" class="link" data-jump="fault">Show the fault onset</button></p>
+      <p>No divergence instant is recorded. The x error is <span data-v="err_est_x" data-at="pre_fault_last"></span> at the <span data-v="t_s" data-at="pre_fault_last"></span> sample and <span data-v="err_est_x" data-at="fault_first_sample"></span> at the <span data-v="t_s" data-at="fault_first_sample"></span> sample, where the fault starts. <button type="button" class="link" data-jump="fault">Show the fault onset</button></p>
     </li>
-    <li>
+    <li id="card-4">
       <h3>Why it mattered</h3>
-      <p>Guidance steers the believed position to the pad. The estimator checks only the altimeter: it was rejected at <span data-v="run.reject_first_t_s"></span> (controller flag, recorded), after which guidance read the lower of the estimator and the altimeter altitude (from source code, not recorded). Nothing similar guards x and y, so the biased belief was followed there. The sensor it rejected was the one close to the truth: at the last periodic sample the altimeter is <span data-v="err_altimeter" data-at="last_periodic"></span> from the true nozzle altitude, while GNSS z is <span data-v="err_gnss_z" data-at="last_periodic"></span> from the true z. At touchdown the true and the believed nozzle points are <span data-v="td.gap_m"></span> apart. This is consistent with the bias driving the miss; the run has no counterfactual, so it does not prove it.</p>
+      <p>From <span data-v="run.reject_first_t_s"></span> the altimeter stopped being fused and guidance read the lower of two altitudes (source code, not recorded); the altimeter was the lower in <span data-v="lane.altimeter_lower_samples"></span> of <span data-v="lane.flagged_samples"></span> flagged samples (approximate). That is consistent with R1 <span data-word="verdict" data-v="req.R1_vertical_speed.pass"></span> at <span data-v="req.R1_vertical_speed.value"></span> although z was <span data-v="td.err_z_host"></span> too high. Nothing guards x and y, so the biased belief was followed there; the true and believed nozzle points are <span data-v="td.gap_m"></span> apart, consistent with the bias driving the miss (no counterfactual run).</p>
     </li>
   </ol>
 </section>
 
 <div class="layout">
 <div class="main-col">
+
 <section id="timeline" aria-labelledby="timeline-h">
-  <h2 id="timeline-h">Time axis and cursor</h2>
+  <h2 id="timeline-h" class="sr">Time axis and cursor</h2>
   <div class="toolbar" role="toolbar" aria-label="Time view and event navigation">
     <span class="tb-group" role="group" aria-label="Zoom">
       <button type="button" data-zoom="full">Full run</button>
@@ -58,63 +59,102 @@
       <button type="button" id="to-touchdown">Touchdown sample</button>
     </span>
   </div>
+  <p id="cursor-status" class="cursor-status" aria-live="polite" data-layout="1"></p>
   <div id="slider" class="slider" role="slider" tabindex="0" aria-label="Sample cursor"
        aria-valuemin="0" aria-valuemax="0" aria-valuenow="0">
     <svg id="axis" role="img" aria-label="Time axis with one tick per recorded sample, event markers and the cursor"></svg>
   </div>
-  <p class="hint">Click or drag on any chart, or focus the axis and use Left and Right to step one sample, Shift with an arrow for ten, Home and End for the ends, Page Up and Page Down for the previous and next event. The cursor lands only on recorded samples and no value is interpolated.</p>
-  <ul id="event-list" class="event-list" aria-label="Events"></ul>
-  <p id="cursor-status" class="cursor-status" aria-live="polite" data-layout="1"></p>
+  <details class="hint"><summary>Keyboard and cursor help</summary><p>Click or drag on any chart, or focus the axis: Left and Right step one recorded sample, Shift with an arrow steps ten, Home and End go to the ends, Page Up and Page Down jump between events. The cursor lands only on recorded samples and no value is interpolated.</p></details>
 </section>
 
-  <section id="strips" aria-labelledby="strips-h">
-    <h2 id="strips-h">Estimate and observations against truth</h2>
-    <p class="strip-intro">Every strip is in error space: <strong>truth is the zero line</strong>. Estimates are lines (the controller reports one every control cycle). Observations are separate markers, never joined, because a sensor reading says nothing about what lies between two of them.</p>
-    <figure class="strip" id="fig-x">
-      <figcaption><h3>East (x): faulted axis</h3><ul class="legend" id="leg-x"></ul></figcaption>
-      <svg id="svg-x" role="img" aria-labelledby="fig-x-t"></svg>
-      <p id="fig-x-t" class="sr">East position error of the estimate and of the GNSS readings against truth. See the sample table for the numbers.</p>
-    </figure>
-    <figure class="strip" id="fig-y">
-      <figcaption><h3>North (y): control axis, no fault injected on y</h3><ul class="legend" id="leg-y"></ul></figcaption>
-      <svg id="svg-y" role="img" aria-labelledby="fig-y-t"></svg>
-      <p id="fig-y-t" class="sr">North position error of the estimate and of the GNSS readings against truth.</p>
-    </figure>
-    <figure class="strip" id="fig-z">
-      <figcaption><h3>Vertical (z): GNSS biased, altimeter not</h3><ul class="legend" id="leg-z"></ul>
-        <p class="fig-note">The estimate is a centre-of-mass position, and so is GNSS. The altimeter measures the nozzle plane, so its error is taken against the true nozzle altitude, not against the centre of mass.</p></figcaption>
-      <svg id="svg-z" role="img" aria-labelledby="fig-z-t"></svg>
-      <p id="fig-z-t" class="sr">Vertical error of the estimate, the GNSS readings and the altimeter readings against truth.</p>
-    </figure>
-    <figure class="strip" id="fig-r">
-      <figcaption><h3>Altimeter against the estimator, and the rejection threshold</h3><ul class="legend" id="leg-r"></ul>
-        <p class="fig-note"><span class="approx">Computed by this view, approximate.</span> The controller's own residual uses terms that are not recorded: its nominal propellant mass (so its centre-of-mass to nozzle offset), a pre-update estimate and a control cycle of <span data-v="case.control_period_s"></span>. This strip uses the recorded post-update estimate, the recorded true propellant as a proxy for s_cm, and samples every <span data-v="run.sample_interval_s"></span>. Read it as a guide, not as the controller's number. When the altimeter was rejected is taken only from the recorded flag.</p></figcaption>
-      <svg id="svg-r" role="img" aria-labelledby="fig-r-t"></svg>
-      <p id="fig-r-t" class="sr">Altimeter minus the estimated nozzle altitude, as separate markers, with the rejection threshold drawn as two dashed lines.</p>
-    </figure>
-    <figure class="strip" id="fig-l">
-      <figcaption><h3>Guidance altitude source</h3><ul class="legend" id="leg-l"></ul>
-        <p class="fig-note"><span class="approx">From source code, not recorded.</span> The run records that the altimeter was rejected, not which altitude the guidance used in each cycle. The lower row is derived by this view and approximate.</p></figcaption>
-      <svg id="svg-l" role="img" aria-labelledby="fig-l-t"></svg>
-      <p id="fig-l-t" class="sr">Lane showing the estimator as altitude source before the rejection and the lower of estimator and altimeter after it.</p>
-    </figure>
-  </section>
+<section id="strips" aria-labelledby="strips-h">
+  <h2 id="strips-h" class="sr">Estimate and observations against truth</h2>
+  <p class="strip-intro">Every strip is in error space: <strong>truth is the zero line</strong>. Estimates are recorded every <span data-v="run.sample_interval_s"></span> (one control cycle in <span data-v="cad.samples_per_cycle" data-nounit="1"></span>). Markers are recorded values; the thin connector is a reading aid. Observations are separate hollow markers and are never joined.</p>
+  <figure class="strip" id="fig-x">
+    <figcaption><h3>East (x): the faulted axis</h3><ul class="legend" id="leg-x"></ul></figcaption>
+    <svg id="svg-x" role="img" aria-labelledby="fig-x-t"></svg>
+    <p id="fig-x-t" class="sr">East position error of the estimate and of the GNSS readings against truth. See the sample table for the numbers.</p>
+  </figure>
+  <figure class="strip" id="fig-y">
+    <figcaption><h3>North (y): control axis, no fault injected on y</h3><ul class="legend" id="leg-y"></ul></figcaption>
+    <svg id="svg-y" role="img" aria-labelledby="fig-y-t"></svg>
+    <p id="fig-y-t" class="sr">North position error of the estimate and of the GNSS readings against truth.</p>
+  </figure>
+  <figure class="strip" id="fig-z">
+    <figcaption><h3>Vertical (z): GNSS biased, altimeter not</h3><ul class="legend" id="leg-z"></ul>
+      <p class="fig-note">The estimate and GNSS refer to the centre of mass; the altimeter measures the nozzle plane, so its error is taken against the true nozzle altitude. The altimeter stays near its own noise while GNSS z carries the bias.</p></figcaption>
+    <svg id="svg-z" role="img" aria-labelledby="fig-z-t"></svg>
+    <p id="fig-z-t" class="sr">Vertical error of the estimate, the GNSS readings and the altimeter readings against truth.</p>
+  </figure>
+  <figure class="strip" id="fig-v">
+    <figcaption><h3>Velocity error, estimate against truth</h3><ul class="legend" id="leg-v"></ul>
+      <p class="fig-note">Host metrics (D-host). The velocity estimate and the true velocity themselves are in the readout at the cursor.</p></figcaption>
+    <svg id="svg-v" role="img" aria-labelledby="fig-v-t"></svg>
+    <p id="fig-v-t" class="sr">Vertical and horizontal velocity error of the estimate against truth, host metrics.</p>
+  </figure>
+  <figure class="strip" id="fig-d">
+    <figcaption><h3>Distance of the nozzle plane from the pad centre</h3><ul class="legend" id="leg-d"></ul>
+      <p class="fig-note">Bars span the first to the last recorded sample within the R5 radius. They begin and end at recorded samples, not at interpolated crossings.</p></figcaption>
+    <svg id="svg-d" role="img" aria-labelledby="fig-d-t"></svg>
+    <p id="fig-d-t" class="sr">True and believed distance of the nozzle plane from the pad centre over time, with the R5 radius.</p>
+  </figure>
+  <figure class="strip" id="fig-a">
+    <figcaption><h3>True nozzle altitude</h3><ul class="legend" id="leg-a"></ul></figcaption>
+    <svg id="svg-a" role="img" aria-labelledby="fig-a-t"></svg>
+    <p id="fig-a-t" class="sr">True altitude of the nozzle plane over time.</p>
+  </figure>
+  <figure class="strip" id="fig-r">
+    <figcaption><h3>Altimeter against the estimator, and the rejection threshold</h3><ul class="legend" id="leg-r"></ul>
+      <p class="fig-note"><span class="approx">Computed by this view, approximate.</span> The controller's own residual uses terms that are not recorded: its nominal propellant mass (so its centre-of-mass to nozzle offset), a pre-update estimate and a control cycle of <span data-v="case.control_period_s"></span>. This strip uses the recorded post-update estimate, the recorded true propellant as a proxy for s_cm, and samples every <span data-v="run.sample_interval_s"></span>. Read it as a guide. When the altimeter was rejected is taken only from the recorded flag.</p></figcaption>
+    <svg id="svg-r" role="img" aria-labelledby="fig-r-t"></svg>
+    <p id="fig-r-t" class="sr">Altimeter minus the estimated nozzle altitude, as separate markers, with the rejection threshold drawn as two dashed lines.</p>
+  </figure>
+  <figure class="strip" id="fig-l">
+    <figcaption><h3>Guidance altitude source</h3><ul class="legend" id="leg-l"></ul>
+      <p class="fig-note"><span class="approx">From source code, not recorded.</span> The run records that the altimeter was rejected, not which altitude guidance used in each cycle. The lower row is derived by this view and approximate.</p></figcaption>
+    <svg id="svg-l" role="img" aria-labelledby="fig-l-t"></svg>
+    <p id="fig-l-t" class="sr">Lane showing the estimator as altitude source before the rejection and the lower of estimator and altimeter after it.</p>
+  </figure>
+</section>
+
 </div>
 
-  <aside id="side" aria-label="Values at the cursor and pad plan">
-    <section id="readout" aria-labelledby="readout-h">
-      <h2 id="readout-h">At the cursor</h2>
-      <div id="readout-body"></div>
-    </section>
-    <section id="plan" aria-labelledby="plan-h">
-      <h2 id="plan-h">Pad plan, true scale</h2>
-      <svg id="svg-plan" role="img" aria-labelledby="plan-t"></svg>
-      <p id="plan-t" class="sr">Plan of the pad area at true scale. The R5 circle, the true nozzle point at touchdown and the believed nozzle point from the last estimate are drawn.</p>
-      <ul class="legend" id="leg-plan"></ul>
-      <p class="fig-note">The window shows the area around the pad at one scale for both axes. The R5 radius is the circle. The true point is the nozzle plane (the point R5 judges). The believed point is the nozzle plane as the controller's last estimate placed it, derived by this view. The GNSS marker is a centre-of-mass reading and sits at a different reference point. <span id="plan-off"></span></p>
-    </section>
-  </aside>
+<aside id="side" aria-label="Pad plan and values at the cursor">
+  <section id="plan" aria-labelledby="plan-h" tabindex="-1">
+    <h2 id="plan-h">Pad plan, true scale</h2>
+    <div class="tb-group" role="group" aria-label="Plan extent">
+      <button type="button" data-plan="window" aria-pressed="true">Near the pad</button>
+      <button type="button" data-plan="track" aria-pressed="false">Whole track</button>
+    </div>
+    <svg id="svg-plan" role="img" aria-labelledby="plan-t"></svg>
+    <p id="plan-t" class="sr">Plan of the pad area at true scale. The R5 circle, the true nozzle point at touchdown and the believed nozzle point from the last estimate are drawn.</p>
+    <ul class="legend" id="leg-plan"></ul>
+    <p class="fig-note">Both axes share one scale, window <span id="plan-extent" data-layout="1"></span>. The true point is the nozzle plane, the point R5 judges. The believed point is the last estimate before contact moved to the nozzle plane, derived by this view. The GNSS marker is a centre-of-mass reading and sits at a different reference point. <span id="plan-off"></span></p>
+  </section>
+  <section id="readout" aria-labelledby="readout-h">
+    <h2 id="readout-h">At the cursor</h2>
+    <div id="readout-body"></div>
+  </section>
+</aside>
 </div>
+
+<section id="decisions" aria-labelledby="decisions-h">
+  <h2 id="decisions-h">Controller decisions</h2>
+  <dl class="facts" id="decision-list"></dl>
+  <h3>Events</h3>
+  <ul id="event-list" class="event-list" aria-label="Events"></ul>
+</section>
+
+<section id="divergence" aria-labelledby="div-h">
+  <h2 id="div-h">Divergence</h2>
+  <p><strong>No divergence instant is recorded.</strong> The run stores truth, estimates, observations and flags, not a time at which they stopped agreeing. What can be read is below.</p>
+  <div id="div-body"></div>
+</section>
+
+<section id="initial" aria-labelledby="init-h">
+  <h2 id="init-h">Initial state and fault window</h2>
+  <div id="init-body"></div>
+</section>
 
 <section id="verdicts" aria-labelledby="verdicts-h">
   <h2 id="verdicts-h">Verdicts</h2>
@@ -123,15 +163,20 @@
     <div>
       <h3>Mission requirements (R1 to R6)</h3>
       <table class="vt" id="req-table"><caption class="sr">Mission requirements with value, limit and verdict</caption></table>
-      <p class="fig-note">All six are evaluated at touchdown. <button type="button" class="link" id="req-to-td">Show the touchdown sample</button> The &ldquo;faults active&rdquo; column is the field <code>cause</code> as stored. It is the same on passing and failing rows, so it records which faults were active, not which one produced a result.</p>
+      <p class="fig-note">All six are evaluated at touchdown. The &ldquo;faults active&rdquo; column is the field <code>cause</code> as stored: the faults active at the contact step, filled in for every requirement row whatever its verdict, so it is not an attribution (<button type="button" class="link" data-fact="S_cause_active_faults">source</button>).</p>
     </div>
     <div>
       <h3>Safety invariants (S1 to S5)</h3>
       <table class="vt" id="inv-table"><caption class="sr">Safety invariants with worst value, limit and verdict</caption></table>
-      <p class="fig-note">Invariants keep a worst value and a first failure. They have no recorded time, so none is drawn on the time axis. They are separate from the mission requirements: the safety invariants held while R5 failed.</p>
+      <p class="fig-note" id="inv-note"></p>
     </div>
   </div>
   <div class="outcome" id="outcome"></div>
+</section>
+
+<section id="provenance" aria-labelledby="prov-h">
+  <h2 id="prov-h">Provenance</h2>
+  <div id="prov-body"></div>
 </section>
 
 <section id="uncertainty" aria-labelledby="u-h">
@@ -144,18 +189,18 @@
   <ul class="limits">
     <li>Idealised model: contact is the nozzle plane reaching the ground, with no contact dynamics, and nothing is validated against flight data.</li>
     <li>A single stored run. It shows one trajectory, not how often this happens.</li>
-    <li>Recorded by the earlier <span data-v="run.version"></span> host. The run still verifies under the current host (see the evidence document), but it was not produced by the current build.</li>
-    <li>Samples every <span data-v="run.sample_interval_s"></span>, while the controller runs every <span data-v="case.control_period_s"></span> and the host checks every step. Events between two samples are drawn at their recorded times; values between samples are not shown.</li>
-    <li>The touchdown sample is off the sampling grid. Its truth is interpolated by the host. Its estimate and observation are the last control cycle's, not the touchdown instant's.</li>
+    <li>Recorded by the earlier <span data-v="run.version"></span> host. The provenance section says what that does and does not establish.</li>
+    <li>Estimates and observations are recorded every <span data-v="run.sample_interval_s"></span>, one control cycle in <span data-v="cad.samples_per_cycle" data-nounit="1"></span>; the controller runs every <span data-v="case.control_period_s"></span> and the host checks every step. Markers are recorded values and the thin connector is a reading aid, not data: between two samples nothing is recorded. Events between samples are drawn at their recorded times.</li>
+    <li>The touchdown sample is off the sampling grid. Its truth is interpolated by the host. Its estimate and observation are those of the last control cycle before contact, not of the touchdown instant.</li>
     <li>No covariance exists, so no uncertainty is shown. No counterfactual run exists, so nothing here shows what would have happened without the fault.</li>
-    <li>Derived quantities tagged D-view are computed by this view's extractor from recorded values and, where tagged approximate, use a proxy for terms the run does not record.</li>
+    <li>Quantities tagged D-view are computed by this view's extractor from recorded values; where tagged approximate they use a proxy for terms the run does not record.</li>
   </ul>
 </section>
 
 <details id="table-alt" class="table-alt">
   <summary>Text alternative: every recorded sample as a table</summary>
-  <p class="fig-note">One row per sample. The row button moves the cursor. Values open their evidence when clicked.</p>
-  <div class="table-scroll" tabindex="0" role="region" aria-label="Sample table">
+  <p class="fig-note">One row per sample. The row button moves the cursor. Values are buttons that open their evidence; Arrow keys move between cells.</p>
+  <div class="table-scroll" role="region" aria-label="Sample table">
     <table id="sample-table" class="st"></table>
   </div>
 </details>

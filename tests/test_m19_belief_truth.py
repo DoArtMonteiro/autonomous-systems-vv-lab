@@ -45,7 +45,7 @@ PINNED = {
     "trace.json": "97783cfc791b52f67fd86c28f03a3c6c10d678ca2e1a6a8f1813d2bca6529d06",
     "verification.json": "3d6f543e417e78a211af335e093b11765dd7f7517b19388c7657b010be1a4e6d",
 }
-CLASSES = {"T", "E", "O", "D-host", "D-view", "S", "C"}
+CLASSES = {"T", "E", "O", "D-host", "D-view", "S", "C", "K"}
 
 
 def sha(path: Path) -> str:
@@ -75,6 +75,7 @@ def x_axis(q):
 class Fixture:
     def __init__(self):
         self.docs = {n: json.loads((FIXTURE / n).read_text(encoding="utf-8")) for n in PINNED}
+        self.docs["domain.json"] = json.loads((ROOT / "desktop/domain-rocket/domain.json").read_text(encoding="utf-8"))
         t = self.docs["trace.json"]
         self.samples = t["samples"]
         self.n = len(self.samples)
@@ -132,12 +133,20 @@ class Inputs(unittest.TestCase):
             subprocess.run(
                 [sys.executable, "-I", str(SPIKE / "extract.py"), "--output", str(out)], check=True, capture_output=True
             )
-            self.assertEqual(out.read_bytes(), (SPIKE / "data.json").read_bytes())
+            self.assertEqual(
+                out.read_bytes(), (SPIKE / "data.json").read_bytes(),
+                "data.json is stale: rerun python spikes/m19-belief-truth/extract.py and commit the result",
+            )
         self.assertNotIn(b"\r", (SPIKE / "data.json").read_bytes())
 
     def test_source_files_are_the_ones_the_facts_were_read_from(self):
         for rel, h in DATA["source_files"].items():
-            self.assertEqual(sha(ROOT / rel), h, rel)
+            text_hash = hashlib.sha256((ROOT / rel).read_bytes().replace(bytes([13, 10]), bytes([10]))).hexdigest()
+            self.assertEqual(
+                text_hash, h,
+                f"{rel} changed since data.json was extracted: rerun python spikes/m19-belief-truth/extract.py "
+                "and review the source facts (the view cites line ranges of this file).",
+            )
 
 
 class Provenance(unittest.TestCase):
@@ -160,20 +169,28 @@ class Provenance(unittest.TestCase):
                 self.assertEqual(e["values"][i], want, f"{sid}[{i}]")
         for sid, e in DATA["scalars"].items():
             if "ptr" in e:
-                self.assertEqual(e["v"], pointer(FX.docs, e["ptr"]), sid)
+                want = pointer(FX.docs, e["ptr"])
+                if e.get("reduce") == "len":
+                    want = len(want)
+                self.assertEqual(e["v"], want, sid)
 
     def test_pointer_files_are_declared_inputs(self):
         for e in list(DATA["series"].values()) + list(DATA["scalars"].values()):
             if "ptr" in e:
-                self.assertIn(e["ptr"].split("#")[0], DATA["inputs"])
+                name = e["ptr"].split("#")[0]
+                self.assertTrue(name in DATA["inputs"] or name in DATA["extra_inputs"], name)
 
     def test_the_touchdown_sample_is_tagged_as_host_interpolated(self):
         last = FX.n - 1
         self.assertEqual(FX.samples[last]["kind"], "touchdown")
         for sid in ("t_s", "truth_x", "truth_z", "base_x", "base_z", "prop_kg"):
             self.assertEqual(DATA["series"][sid]["cls_by_index"][str(last)], "D-host", sid)
-        for sid in ("est_x", "gnss_x", "altimeter"):
+        for sid in ("est_x", "gnss_x", "altimeter", "err_est_x", "err_est_y", "cmd_throttle", "engine"):
             self.assertNotIn("cls_by_index", DATA["series"][sid], sid)
+        # View-derived errors stay D-view at every sample, including the touchdown one.
+        for sid in ("err_est_x", "err_est_y", "err_gnss_x", "err_altimeter"):
+            self.assertEqual(DATA["series"][sid]["cls"], "D-view", sid)
+        self.assertEqual(DATA["scalars"]["td.err_est_x"]["cls"], "D-view")
 
     def test_derivation_inputs_exist_and_every_derivation_is_registered(self):
         names = set()
@@ -197,7 +214,11 @@ class Provenance(unittest.TestCase):
             a, b = f["lines"]
             window = "\n".join(lines[a - 1 : b])
             for anchor in f["anchors"]:
-                self.assertIn(anchor, window, f"{fid}: {anchor}")
+                self.assertIn(
+                    anchor, window,
+                    f"{fid}: {anchor!r} is no longer at the recorded lines of {f['file']}. The sources changed: "
+                    "rerun python spikes/m19-belief-truth/extract.py and review the source facts and the doc.",
+                )
             self.assertEqual(f["cls"], "S")
 
 
@@ -220,6 +241,28 @@ IMPLEMENTED = {
     "control_period",
     "touchdown_sample_value",
     "touchdown_gap",
+    "ratio_of_steps",
+    "gnss_period",
+    "count_where",
+    "null_only_at_touchdown",
+    "flags_identical",
+    "none_true",
+    "before",
+    "fault_active_at_last_sample",
+    "first_sample_above",
+    "first_inside_radius",
+    "last_inside_radius",
+    "inside_radius_runs",
+    "min_over_samples",
+    "inside_radius_at_touchdown",
+    "nozzle_reference_check",
+    "equals_check",
+    "first_fix_jump",
+    "source_tree_sha256",
+    "pinned_recording_commit",
+    "source_tree_diff",
+    "cited_sources_identical",
+    "evidence_file_line",
 }
 
 
@@ -546,7 +589,7 @@ class DomAudit(HTMLParser):
 def expected_text(e, i, digits):
     v = e["values"][i] if "values" in e else e["v"]
     if v is None:
-        return "none"
+        return e.get("null_text") or "none"
     if isinstance(v, bool):
         return "true" if v else "false"
     if isinstance(v, list):
@@ -612,7 +655,367 @@ class RenderedPage(unittest.TestCase):
     def test_no_observation_is_joined_in_the_drawn_svg(self):
         # Observation markers have their own classes; a polyline may only carry estimate classes.
         for cls in re.findall(r'<polyline[^>]*class="([^"]+)"', self.dom):
-            self.assertIn(cls, {"ln-est", "plan-trail-truth", "plan-trail-belief"})
+            self.assertIn(cls, {"connector", "plan-trail-truth", "plan-trail-belief"})
+
+
+class Iteration2Data(unittest.TestCase):
+    """Values added in iteration 2, recomputed from the fixture and the sources without the extractor."""
+
+    def setUp(self):
+        self.S = FX.samples
+        self.sc = DATA["scalars"]
+        self.t = [s["t_s"] for s in self.S]
+
+    def test_host_velocity_and_distance_metrics_equal_the_subtraction_at_every_sample(self):
+        ch = {c["id"]: c["values"] for c in FX.docs["record.json"]["channels"]}
+        pad = FX.case["requirements"]["pad_position_m"]
+        for i, s in enumerate(self.S):
+            tv, ev = s["truth"]["velocity_mps"], s["estimate"]["velocity_mps"]
+            tp, ep = s["truth"]["position_m"], s["estimate"]["position_m"]
+            self.assertTrue(approx(ch["err_vz"][i], ev[2] - tv[2]), i)
+            self.assertTrue(approx(ch["err_vh"][i], math.hypot(ev[0] - tv[0], ev[1] - tv[1])), i)
+            self.assertTrue(approx(ch["err_h"][i], math.hypot(ep[0] - tp[0], ep[1] - tp[1])), i)
+            bp = s["truth"]["base_position_m"]
+            self.assertTrue(approx(ch["pad_distance"][i], math.hypot(bp[0] - pad[0], bp[1] - pad[1])), i)
+        self.assertEqual(DATA["series"]["err_vz_host"]["values"], ch["err_vz"])
+        self.assertEqual(DATA["series"]["err_vh_host"]["values"], ch["err_vh"])
+        self.assertEqual(DATA["series"]["err_vz_host"]["cls"], "D-host")
+
+    def test_commands_are_their_own_class_and_the_two_flags_are_one_condition(self):
+        for sid in ("cmd_throttle", "cmd_gimbal_y", "cmd_gimbal_z"):
+            self.assertEqual(DATA["series"][sid]["cls"], "K")
+            self.assertTrue(DATA["series"][sid]["ptr"].split("#/")[1].split("/")[2] == "command")
+        flags = [s["estimate"]["altimeter_rejected"] for s in self.S]
+        dis = [s["estimate"]["sensor_disagreement"] for s in self.S]
+        self.assertEqual(flags, dis)
+        self.assertTrue(self.sc["check.detection_flags_identical"]["v"])
+        fl = FX.docs["verification.json"]["controller_flags"]
+        self.assertEqual(fl["altimeter_rejected_first"], fl["sensor_disagreement_first"])
+        # One detection in the event list, not two.
+        self.assertEqual([e["id"] for e in DATA["events"]].count("altimeter_rejected"), 1)
+        self.assertNotIn("sensor_disagreement", [e["id"] for e in DATA["events"]])
+
+    def test_no_cutoff_abort_or_relight(self):
+        run = FX.docs["run.json"]["summary"]
+        self.assertIsNone(self.sc["run.cutoff_t_s"]["v"])
+        self.assertIsNone(run["cutoff_t_s"])
+        self.assertIsNone(run["flameout_t_s"])
+        self.assertIsNone(self.sc["run.ascent_abort_first"]["v"])
+        self.assertTrue(self.sc["check.no_ascent_abort_flag"]["v"])
+        self.assertFalse(any(s["estimate"]["ascent_abort"] for s in self.S))
+        self.assertEqual(self.sc["inv.S4_no_relight.worst_value"]["v"], 1.0)
+        ign = [e for e in FX.docs["trace.json"]["events"] if e["kind"] == "ignition"]
+        self.assertEqual(len(ign), 1)
+        self.assertEqual(self.sc["run.ignition_command_t_s"]["v"], ign[0]["detail"]["command_t_s"])
+        self.assertTrue(self.sc["check.ignition_before_fault"]["v"])
+
+    def test_cadence_matches_the_case_and_the_trace(self):
+        sens = FX.case["sensors"]
+        ctl = sens["control_period_steps"] * FX.case["dt_s"]
+        self.assertTrue(approx(self.sc["case.control_period_s"]["v"], ctl))
+        self.assertTrue(approx(self.sc["cad.gnss_period_s"]["v"], sens["gnss_period_cycles"] * ctl))
+        self.assertEqual(self.sc["cad.samples_per_cycle"]["v"], FX.case["record_every"] / sens["control_period_steps"])
+        self.assertTrue(approx(self.sc["cad.gnss_period_s"]["v"], FX.docs["record.json"]["scene"]["sample_interval_s"]))
+        periodic = [s for s in self.S if s["kind"] == "periodic"]
+        self.assertTrue(all(s["observation"]["gnss_position_m"] is not None for s in periodic))
+        no_fix = [i for i, s in enumerate(self.S) if s["observation"]["gnss_position_m"] is None]
+        self.assertEqual(no_fix, [FX.n - 1])
+        self.assertEqual(self.sc["gnss.no_fix_samples"]["v"], 1)
+        self.assertEqual(self.sc["gnss.fix_samples"]["v"], FX.n - 1)
+        self.assertEqual(DATA["series"]["gnss_x"]["null_text"], "no fix on this cycle")
+        # step spacing of the periodic samples is the trace sampling
+        steps = [s["step"] for s in periodic]
+        self.assertTrue(all(b - a == FX.case["record_every"] for a, b in zip(steps, steps[1:])))
+
+    def test_divergence_thresholds_are_first_recorded_samples(self):
+        ch = {c["id"]: c["values"] for c in FX.docs["record.json"]["channels"]}
+        self.assertEqual(DATA["divergence"]["thresholds"], [1, 3, 5, 10])
+        for m in DATA["divergence"]["metrics"]:
+            vals = ch["err_h"] if m["series"] == "err_h_host" else ch["err_z"]
+            for th, sid in m["scalars"].items():
+                first = next((i for i, x in enumerate(vals) if abs(x) > float(th)), None)
+                e = self.sc[sid]
+                self.assertEqual(e["v"], None if first is None else self.t[first], sid)
+                if first is not None:
+                    self.assertEqual(e["derivation"]["at_index"], first)
+                    self.assertIn(self.t[first], self.t)  # a recorded sample time, never an interpolation
+        self.assertEqual(DATA["index"]["pre_fault_last"], DATA["index"]["fault_first_sample"] - 1)
+        t0 = FX.case["faults"][0]["start_s"]
+        self.assertLess(self.t[DATA["index"]["pre_fault_last"]], t0)
+        self.assertTrue(abs(self.t[DATA["index"]["fault_first_sample"]] - t0) < 1e-9)
+        jump = FX.case["controller"]["gains"]["gnss_position_gain"] * FX.case["faults"][0]["magnitude"]
+        self.assertTrue(approx(self.sc["lane.expected_first_fix_jump_m"]["v"], jump))
+
+    def test_r5_windows_are_first_and_last_recorded_samples_inside(self):
+        r5 = FX.case["requirements"]["r5_position_m"]
+        ch = {c["id"]: c["values"] for c in FX.docs["record.json"]["channels"]}
+        bel = DATA["series"]["believed_pad_distance"]["values"]
+        for key, vals in (("true", ch["pad_distance"]), ("believed", bel)):
+            inside = [i for i, d in enumerate(vals) if d <= r5]
+            self.assertEqual(self.sc[f"win.{key}.first_t"]["v"], self.t[inside[0]])
+            self.assertEqual(self.sc[f"win.{key}.last_t"]["v"], self.t[inside[-1]])
+            runs = sum(1 for i in range(FX.n) if vals[i] <= r5 and (i == 0 or vals[i - 1] > r5))
+            self.assertEqual(self.sc[f"win.{key}.runs"]["v"], runs)
+            self.assertTrue(approx(self.sc[f"win.{key}.min_m"]["v"], min(vals)))
+        self.assertFalse(self.sc["td.true_inside_r5"]["v"])
+        self.assertTrue(self.sc["td.believed_inside_r5"]["v"])
+        r5_row = [r for r in FX.docs["verification.json"]["requirements"] if r["id"] == "R5_position"][0]
+        self.assertEqual(self.sc["td.true_inside_r5"]["v"], r5_row["pass"])
+
+    def test_lane_counts(self):
+        flags = [s["estimate"]["altimeter_rejected"] for s in self.S]
+        self.assertEqual(self.sc["lane.flagged_samples"]["v"], sum(flags))
+        lower = DATA["series"]["lower_source"]["values"]
+        self.assertEqual(self.sc["lane.altimeter_lower_samples"]["v"], sum(1 for x in lower if x == "altimeter"))
+
+    def test_requirement_reference_and_s2(self):
+        ver = FX.docs["verification.json"]
+        bv = ver["touchdown"]["truth"]["base_velocity_mps"]
+        bp = ver["touchdown"]["truth"]["base_position_m"]
+        req = {r["id"]: r for r in ver["requirements"]}
+        self.assertTrue(approx(abs(bv[2]), req["R1_vertical_speed"]["value"]))
+        self.assertTrue(approx(math.hypot(bv[0], bv[1]), req["R2_horizontal_speed"]["value"]))
+        self.assertTrue(approx(math.hypot(bp[0], bp[1]), req["R5_position"]["value"]))
+        for rid in ("R1", "R2", "R5"):
+            self.assertTrue(self.sc[f"check.{rid}_nozzle"]["v"])
+        rows = {r["short"]: r for r in DATA["requirements"]}
+        self.assertEqual({k for k, r in rows.items() if r.get("reference")}, {"R1", "R2", "R5"})
+        s2 = [i for i in ver["invariants"] if i["id"] == "S2_keep_out"][0]
+        self.assertEqual(s2["worst_value"], req["R5_position"]["value"])
+        self.assertTrue(self.sc["check.s2_equals_r5"]["v"])
+
+    def test_initial_state_and_frame(self):
+        rec = FX.docs["record.json"]["scene"]
+        for k, ax in enumerate("xyz"):
+            self.assertEqual(self.sc[f"init.nominal_p{ax}"]["v"], FX.case["initial"]["position_m"][k])
+            self.assertEqual(self.sc[f"init.disp_p{ax}"]["v"], rec["initial"]["position_m"][k])
+            self.assertEqual(self.sc[f"init.disp_p{ax}"]["v"], self.S[0]["truth"]["position_m"][k])
+            self.assertEqual(self.sc[f"init.range_v{ax}"]["v"], FX.case["dispersion"]["velocity_mps"][k])
+            self.assertEqual(self.sc[f"frame.{ax}"]["v"], rec["frame"]["axes"][ax])
+        self.assertEqual((self.sc["frame.x"]["v"], self.sc["frame.y"]["v"]), ("east", "north"))
+        last_faults = self.S[-1]["active_faults"]
+        self.assertEqual(self.sc["fault.active_at_last_sample"]["v"], FX.case["faults"][0]["kind"] in last_faults)
+        self.assertTrue(self.sc["fault.active_at_last_sample"]["v"])
+        self.assertFalse(self.sc["fault.ended_before_touchdown"]["v"])
+
+    def test_every_new_class_tag_is_declared(self):
+        self.assertIn("K", DATA["classes"])
+        for e in list(DATA["series"].values()) + list(DATA["scalars"].values()):
+            self.assertIn(e["cls"], DATA["classes"])
+
+
+class BuildProvenance(unittest.TestCase):
+    """The recorded source hash against the current tree, checked with git when the commit is reachable."""
+
+    P = DATA["provenance"]
+
+    def git_show(self, rev, rel):
+        return subprocess.run(
+            ["git", "show", f"{rev}:crates/vv-rocket/{rel}"], cwd=ROOT, capture_output=True, check=True
+        ).stdout
+
+    def aggregate(self, files):
+        d = hashlib.sha256()
+        for rel in self.P["hashed_files"]:
+            d.update(rel.encode())
+            d.update(bytes([0]))
+            d.update(files[rel].replace(bytes([13, 10]), bytes([10])))
+            d.update(bytes([0]))
+        return d.hexdigest()
+
+    def test_current_tree_hash_and_differences(self):
+        files = {rel: (ROOT / "crates/vv-rocket" / rel).read_bytes() for rel in self.P["hashed_files"]}
+        self.assertEqual(len(files), 20)
+        cur = self.aggregate(files)
+        self.assertEqual(DATA["scalars"]["prov.current_sha"]["v"], cur)
+        recorded = FX.docs["run.json"]["source_sha256"]
+        self.assertEqual(DATA["scalars"]["run.hash.source"]["v"], recorded)
+        self.assertEqual(DATA["scalars"]["prov.hash_matches"]["v"], cur == recorded)
+        self.assertNotEqual(cur, recorded, "the current tree is expected to differ from the recording tree")
+        differing = [
+            rel for rel in self.P["hashed_files"]
+            if hashlib.sha256(files[rel].replace(bytes([13, 10]), bytes([10]))).hexdigest() != self.P["recording_file_sha256"][rel]
+        ]
+        self.assertEqual(differing, self.P["differing"])
+        self.assertEqual(differing, ["src/landing_model.rs"])
+        self.assertEqual(DATA["scalars"]["prov.differing_files"]["v"], "src/landing_model.rs")
+        self.assertTrue(DATA["scalars"]["prov.cited_sources_identical"]["v"])
+        for fid, f in DATA["source_facts"].items():
+            if f["identical_to_recording"] is not None:
+                self.assertTrue(f["identical_to_recording"], f"{fid}: a cited source differs from the recording tree")
+
+    def test_the_pinned_recording_tree_reproduces_the_recorded_hash(self):
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+        commit = self.P["recording_commit"]
+        if subprocess.run(["git", "cat-file", "-e", commit + "^{commit}"], cwd=ROOT, capture_output=True).returncode != 0:
+            self.skipTest(f"commit {commit} is not reachable in this clone")
+        files = {rel: self.git_show(commit, rel) for rel in self.P["hashed_files"]}
+        for rel, content in files.items():
+            h = hashlib.sha256(content.replace(bytes([13, 10]), bytes([10]))).hexdigest()
+            self.assertEqual(h, self.P["recording_file_sha256"][rel], f"pin of {rel} does not match git")
+        self.assertEqual(self.aggregate(files), FX.docs["run.json"]["source_sha256"])
+        self.assertEqual(DATA["scalars"]["prov.recording_commit"]["v"], commit)
+
+    def test_the_version_string_alone_does_not_identify_the_build(self):
+        self.assertEqual(DATA["scalars"]["run.version"]["v"], "0.15.0")
+        self.assertEqual(DATA["scalars"]["prov.current_domain_version"]["v"], FX.docs["domain.json"]["version"])
+        self.assertEqual(DATA["scalars"]["run.version"]["v"], DATA["scalars"]["prov.current_domain_version"]["v"])
+        self.assertEqual(DATA["scalars"]["prov.stored_parameters"]["v"], 6)
+        self.assertEqual(DATA["scalars"]["prov.stored_parameters"]["v"], len(FX.docs["record.json"]["request"]["parameters"]))
+
+    def test_the_replay_evidence_is_the_committed_result(self):
+        ev = ROOT / "docs/evidence/m19/belief-truth/iteration-2/cargo-earlier-build.txt"
+        text = ev.read_text(encoding="utf-8")
+        self.assertIn("a_run_written_by_the_0_15_0_host_verifies_against_its_record_under_the_current_host ... ok", text)
+        line = DATA["scalars"]["prov.earlier_build_result"]["v"]
+        self.assertTrue(line.startswith("test result: ok. 1 passed; 0 failed"))
+        self.assertIn(line, text.splitlines())
+        for fid in self.P["facts"]:
+            self.assertIn(fid, DATA["source_facts"])
+
+
+class WordsFromData(unittest.TestCase):
+    """No verdict word is typed into the page: it is chosen from a boolean in the data."""
+
+    FREE_WORD = re.compile(r"(?<![.\w-])(passed|failed|pass|fail|FAIL)(?![\w-])")
+    LITERAL_SCOPE = re.compile(r"\b(inside|outside)\b[^.<>]{0,24}\bR5\b|\bonly R5\b|\bR5 (passed|failed)\b")
+
+    def test_no_verdict_word_literals_in_the_page_sources(self):
+        for name in ("index.html", "js/app.js", "js/charts.js"):
+            src = (SPIKE / name).read_text(encoding="utf-8")
+            for m in self.FREE_WORD.finditer(src):
+                self.fail(f"{name}: literal verdict word {m.group(0)!r} near {src[max(0, m.start() - 40):m.end() + 20]!r}")
+            self.assertIsNone(self.LITERAL_SCOPE.search(src), f"{name}: inside/outside R5 or 'only R5' typed as text")
+
+    def test_the_words_are_defined_in_one_place_and_follow_the_booleans(self):
+        script = """
+import { word } from './js/model.js';
+const out = [word('verdict', true), word('verdict', false), word('inside', true), word('inside', false)];
+console.log(JSON.stringify(out));
+"""
+        if not shutil.which("node"):
+            self.skipTest("node not available")
+        res = subprocess.run(["node", "--input-type=module", "-e", script], cwd=SPIKE, capture_output=True, text=True)
+        self.assertEqual(res.returncode, 0, res.stderr)
+        self.assertEqual(json.loads(res.stdout), ["passed", "failed", "inside", "outside"])
+
+    def test_the_story_words_come_from_placeholders_bound_to_data(self):
+        html = (SPIKE / "index.html").read_text(encoding="utf-8")
+        for m in re.finditer(r'data-word="([a-z_]+)" data-v="([^"]+)"', html):
+            self.assertIn(m.group(1), ("verdict", "inside"))
+            e = DATA["scalars"][m.group(2)]
+            self.assertIsInstance(e["v"], bool, m.group(2))
+        for name in re.findall(r'data-at="([^"]+)"', html):
+            self.assertTrue(name.isdigit() or name in DATA["index"], name)
+
+
+class StaticPage(unittest.TestCase):
+    def test_estimate_strip_and_text_requirements(self):
+        html = (SPIKE / "index.html").read_text(encoding="utf-8")
+        app = (SPIKE / "js" / "app.js").read_text(encoding="utf-8")
+        charts = (SPIKE / "js" / "charts.js").read_text(encoding="utf-8")
+        self.assertIn("Markers are recorded values; the thin connector is a reading aid.", html)
+        self.assertIn("connector between recorded samples, not data", app)
+        self.assertIn("Estimates are recorded every", html)
+        self.assertIn("not a gradual rise", app)
+        self.assertIn("No divergence instant is recorded.", html)
+        self.assertIn("touch-action: pan-y", (SPIKE / "css" / "style.css").read_text(encoding="utf-8"))
+        self.assertIn("requestAnimationFrame", app)
+        # the connector is drawn thin and every sample gets a marker
+        self.assertIn('class: "connector"', charts)
+        self.assertIn('data-sample', charts)
+
+    def test_events_are_looked_up_by_kind(self):
+        ids = [e["id"] for e in DATA["events"]]
+        self.assertEqual(sorted(ids), ["altimeter_rejected", "fault_start", "ignition", "touchdown"])
+        by_kind = {e["id"]: e for e in DATA["events"]}
+        self.assertEqual(by_kind["touchdown"]["nav_index"], FX.n - 1)
+        for kind in ("ignition", "fault_start", "touchdown"):
+            ptr = DATA["scalars"][{"ignition": "run.ignition_t_s", "fault_start": "run.fault_start_event_t_s", "touchdown": "run.touchdown_t_s"}[kind]]["ptr"]
+            k = int(ptr.split("/")[2])
+            self.assertEqual(FX.docs["trace.json"]["events"][k]["kind"], kind)
+
+
+@unittest.skipUnless(find_browser(), "no headless Chromium-based browser found")
+class RenderedPageIteration2(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        class Quiet(http.server.SimpleHTTPRequestHandler):
+            def __init__(self, *a, **k):
+                super().__init__(*a, directory=str(SPIKE), **k)
+
+            def log_message(self, *a, **k):
+                pass
+
+        cls.httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Quiet)
+        threading.Thread(target=cls.httpd.serve_forever, daemon=True).start()
+        port = cls.httpd.server_address[1]
+
+        def dump(query):
+            res = subprocess.run(
+                [find_browser(), "--headless=new", "--disable-gpu", "--virtual-time-budget=15000", "--dump-dom",
+                 f"http://127.0.0.1:{port}/index.html{query}"],
+                capture_output=True, timeout=120,
+            )
+            return res.stdout.decode("utf-8", "replace")
+
+        cls.full = dump("")
+        cls.td = dump("?sample=230")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.httpd.shutdown()
+
+    def svg_block(self, dom, sid):
+        m = re.search(r'<svg id="' + sid + r'".*?</svg>', dom, re.S)
+        self.assertIsNotNone(m, sid)
+        return m.group(0)
+
+    def test_an_estimate_marker_exists_for_every_recorded_sample(self):
+        for sid, series_cls in (("svg-x", "ln-est"), ("svg-y", "ln-est"), ("svg-z", "ln-est")):
+            block = self.svg_block(self.full, sid)
+            idxs = [int(x) for x in re.findall(r'class="' + series_cls + r'" data-sample="(\d+)"', block)]
+            self.assertEqual(sorted(idxs), list(range(FX.n)), sid)
+        # observations are separate markers with their own class and never a polyline
+        block = self.svg_block(self.full, "svg-x")
+        gnss = re.findall(r'class="pt-gnss"', block)
+        self.assertEqual(len(gnss), FX.n - 1)
+        self.assertNotRegex(block, r'<polyline[^>]*class="pt-gnss"')
+        # the connector is a thin separate element, one polyline per unbroken run of the estimate
+        self.assertEqual(len(re.findall(r'class="connector"', block)), 1)
+
+    def test_the_touchdown_errors_are_tagged_d_view_not_d_host(self):
+        for dom in (self.td,):
+            for ref in ("err_est_x", "err_est_y"):
+                m = re.search(r'<button[^>]*data-ref="' + ref + r'"[^>]*data-i="230"[^>]*>(.*?)</button>', dom, re.S)
+                self.assertIsNotNone(m, ref)
+                self.assertIn("tag-Dview", m.group(1), ref)
+                self.assertNotIn("tag-Dhost", m.group(1), ref)
+            m = re.search(r'<button[^>]*data-ref="err_z_host"[^>]*data-i="230"[^>]*>(.*?)</button>', dom, re.S)
+            self.assertIsNotNone(m)
+            self.assertIn("tag-Dhost", m.group(1))
+            # the true position at the touchdown sample keeps the host-interpolated tag
+            self.assertIn('Truth <span class="tag tag-Dhost"', dom)
+
+    def test_no_fix_is_labelled_at_the_touchdown_sample(self):
+        m = re.search(r'<button[^>]*data-ref="gnss_x"[^>]*data-i="230"[^>]*>(.*?)</button>', self.td, re.S)
+        self.assertIsNotNone(m)
+        self.assertIn("no fix on this cycle", m.group(1))
+
+    def test_sample_table_cells_are_buttons_with_one_tab_stop(self):
+        table = re.search(r'<table id="sample-table".*?</table>', self.full, re.S).group(0)
+        self.assertEqual(table.count('class="cell"'), FX.n * 13)
+        self.assertEqual(len(re.findall(r'tabindex="0"', table)), 1)
+        self.assertNotRegex(table, r"<td[^>]*data-ref")
+
+    def test_cursor_starts_at_the_start_of_the_run_and_says_so(self):
+        self.assertIn("Cursor at recorded sample 0 of 230: t = 0.000 s, start of the run.", self.full)
+
+    def test_threshold_options_and_the_divergence_statement(self):
+        self.assertIn("No divergence instant is recorded.", self.full)
+        for th in (1, 3, 5, 10):
+            self.assertIn(f'<option value="{th}"', self.full)
 
 
 class Hygiene(unittest.TestCase):

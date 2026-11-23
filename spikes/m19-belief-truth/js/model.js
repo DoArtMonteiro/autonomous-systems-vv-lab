@@ -6,6 +6,22 @@
 
 export const MINUS = "−";
 
+/**
+ * Words for recorded or derived booleans. Verdict words are never typed into the page text: they
+ * come from here, chosen by a boolean in the data.
+ */
+export const WORDS = {
+  verdict: { true: "passed", false: "failed" },
+  inside: { true: "inside", false: "outside" },
+  equal: { true: "equal", false: "different" },
+  before: { true: "before", false: "after" },
+  until_end: { true: "active until the end of the run", false: "over before the end of the run" },
+};
+
+export function word(kind, flag) {
+  return WORDS[kind][String(Boolean(flag))];
+}
+
 /** Format a number with fixed digits. The only place where numbers become text. */
 export function formatNumber(v, digits) {
   if (typeof v !== "number") return String(v);
@@ -95,11 +111,19 @@ export class Model {
     return e.digits === undefined ? undefined : e.digits;
   }
 
-  /** Text of a value: numbers with their digits, null as "none", lists joined. */
+  /** Text of a value: numbers with their digits, null as the entry's null text (default "none"), lists joined. */
   text(ref, i, digitsOverride) {
     const v = this.value(ref, i);
     const d = digitsOverride === undefined ? this.digits(ref) : digitsOverride;
+    const e = this.entry(ref);
+    if ((v === null || v === undefined) && e.null_text) return e.null_text;
     return this.render(v, d);
+  }
+
+  /** Whether the entry is derived with an approximate derivation (proxy or unrecorded term). */
+  approx(ref) {
+    const e = this.entry(ref);
+    return Boolean(e.derivation && this.data.derivations[e.derivation.name].approx);
   }
 
   render(v, d) {

@@ -1,0 +1,12 @@
+Comando (em desktop/, alvo fora da árvore): CARGO_TARGET_DIR=<diretoria fora da árvore> cargo test -p vv-domain-rocket --test earlier_build a_run_written_by_the_0_15_0_host_verifies_against_its_record_under_the_current_host
+Máquina: Windows 11, rustc do rust-toolchain.toml do repositório. Data: 2026-11-23. Ramo prototype/m19.2-belief-truth sobre bec7b3f (iteração 2).
+Saída (linhas de compilação omitidas):
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.15s
+     Running tests\earlier_build.rs (D:/vvwt/m192-target\debug\deps\earlier_build-7c8d54c3cd01fbd2.exe)
+
+running 1 test
+test a_run_written_by_the_0_15_0_host_verifies_against_its_record_under_the_current_host ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.67s
+

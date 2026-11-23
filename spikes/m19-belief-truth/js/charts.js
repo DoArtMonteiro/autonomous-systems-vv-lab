@@ -80,10 +80,10 @@ function visible(xs, t0, t1) {
 
 /** Time axis: every sample as a tick, events at their exact times, the cursor sample marked. */
 export function drawTimeAxis(svg, { model, width, t0, t1, cursor }) {
-  const H = 114;
+  const H = 104;
   clear(svg, width, H);
   const X = xScale(width, t0, t1);
-  const base = 80;
+  const base = 70;
   const xs = model.t;
   const inView = visible(xs, t0, t1);
   const spacing = inView.length > 1 ? Math.abs(X(xs[inView[1]]) - X(xs[inView[0]])) : 99;
@@ -116,13 +116,13 @@ export function drawTimeAxis(svg, { model, width, t0, t1, cursor }) {
     const t = model.scalar(ev.t).v;
     if (t < t0 - 1e-9 || t > t1 + 1e-9) return;
     const x = X(t);
-    const row = k;
+    const row = { ignition: 0, fault_start: 1, altimeter_rejected: 2, touchdown: 3 }[ev.id] ?? k;
     const top = 6 + row * 15;
     el("line", { x1: x, y1: top + 7, x2: x, y2: base, class: `ev-line ev-${ev.dash}` }, svg);
     const kind = { ignition: "square", fault_start: "triangle", altimeter_rejected: "circle", touchdown: "diamond" }[ev.id];
     shape(svg, kind, x, top + 3, 4, `ev-mark ev-cls-${ev.cls.replace("-", "")}`);
     const right = x > width - 180;
-    text(svg, right ? x - 8 : x + 8, top + 7, ev.label, { class: "ev-label", "text-anchor": right ? "end" : "start" });
+    text(svg, right ? x - 8 : x + 8, top + 7, ev.short, { class: "ev-label", "text-anchor": right ? "end" : "start" });
   });
   // Cursor.
   const cx = X(xs[cursor]);
@@ -157,7 +157,7 @@ function autoDomain(values, extras, pad = 0.08) {
  * Truth is the zero line by construction. cfg.bands: horizontal reference lines {y, cls}.
  */
 export function drawStrip(svg, cfg) {
-  const { model, width, t0, t1, cursor, layers, height, bands = [], zero = true } = cfg;
+  const { model, width, t0, t1, cursor, layers, height, bands = [], spans = [], zero = true } = cfg;
   clear(svg, width, height);
   const X = xScale(width, t0, t1);
   const xs = model.t;
@@ -169,7 +169,7 @@ export function drawStrip(svg, cfg) {
     const s = model.series(L.series);
     for (const i of inView) vals.push(s.values[i]);
   }
-  const [y0, y1] = cfg.domain || autoDomain(vals, [...(zero ? [0] : []), ...bands.map((b) => b.y)]);
+  const [y0, y1] = cfg.domain || autoDomain(vals, [...(zero ? [0] : []), ...(cfg.extras || []), ...bands.map((b) => b.y)]);
   const Y = (v) => mt + (1 - (v - y0) / (y1 - y0)) * (height - mt - mb);
   // Grid and y labels.
   const step = niceStep(y1 - y0, 4);
@@ -191,15 +191,28 @@ export function drawStrip(svg, cfg) {
   for (const b of bands) {
     el("line", { x1: ML, y1: Y(b.y), x2: width - MR, y2: Y(b.y), class: b.cls }, svg);
   }
+  // Spans: stretches between two recorded sample times (never an interpolated crossing).
+  spans.forEach((sp, k) => {
+    const a0 = Math.max(t0, sp.t0);
+    const a1 = Math.min(t1, sp.t1);
+    if (a1 < a0) return;
+    el("rect", { x: X(a0), y: mt + 2 + k * 9, width: Math.max(2, X(a1) - X(a0)), height: 6, class: sp.cls }, svg);
+  });
   if (zero) el("line", { x1: ML, y1: Y(0), x2: width - MR, y2: Y(0), class: "zero-truth" }, svg);
   // Layers.
   for (const L of layers) {
     const s = model.series(L.series);
     if (L.kind === "line") {
+      // A recorded value at every sample (the markers); the thin connector is a reading aid only.
       for (const run of lineRuns(s, xs)) {
         const pts = run.filter(([t]) => t >= t0 - 1e-9 && t <= t1 + 1e-9);
-        if (pts.length < 2) continue;
-        el("polyline", { points: pts.map(([t, y]) => `${X(t).toFixed(1)},${Y(y).toFixed(1)}`).join(" "), class: L.cls }, svg);
+        if (pts.length >= 2) {
+          el("polyline", { points: pts.map(([t, y]) => `${X(t).toFixed(1)},${Y(y).toFixed(1)}`).join(" "), class: "connector" }, svg);
+        }
+        for (const [t, y, i] of pts) {
+          const m = shape(svg, L.shape || "square", X(t), Y(y), 2.2, L.cls);
+          m.setAttribute("data-sample", String(i));
+        }
       }
     } else {
       for (const [t, y] of pointList(s, xs)) {
@@ -273,13 +286,14 @@ export function drawPlan(svg, { model, size, half, cursor }) {
   const py = (y) => m + (half - y) * S;
   const inside = (x, y) => Math.abs(x) <= half && Math.abs(y) <= half;
   // Grid every 10 m in the pad frame.
-  for (let g = -half; g <= half; g += 10) {
+  const gridStep = half > 40 ? 20 : 10;
+  for (let g = -half; g <= half; g += gridStep) {
     el("line", { x1: px(g), y1: py(-half), x2: px(g), y2: py(half), class: "grid" }, svg);
     el("line", { x1: px(-half), y1: py(g), x2: px(half), y2: py(g), class: "grid" }, svg);
     text(svg, px(g), size - 10, formatNumber(g, 0), { class: "ax-label", "text-anchor": "middle" }, true);
     text(svg, m - 6, py(g) + 4, formatNumber(g, 0), { class: "ax-label", "text-anchor": "end" }, true);
   }
-  text(svg, size / 2, 12, "north (y) up, east (x) right, metres", { class: "ax-caption", "text-anchor": "middle" });
+  text(svg, size / 2, 12, "north (y) up, east (x) right, metres, recorded samples with a thin connector", { class: "ax-caption", "text-anchor": "middle" });
   const padX = model.scalar("case.pad_x_m").v;
   const padY = model.scalar("case.pad_y_m").v;
   const r5 = model.scalar("case.r5_radius_m").v;
@@ -296,8 +310,10 @@ export function drawPlan(svg, { model, size, half, cursor }) {
     for (let i = 0; i <= cursor; i++) {
       const x = model.value(sx, i);
       const y = model.value(sy, i);
-      if (inside(x - padX, y - padY)) run.push(`${px(x - padX).toFixed(1)},${py(y - padY).toFixed(1)}`);
-      else flush();
+      if (inside(x - padX, y - padY)) {
+        run.push(`${px(x - padX).toFixed(1)},${py(y - padY).toFixed(1)}`);
+        el("circle", { cx: px(x - padX), cy: py(y - padY), r: 1.6, class: cls + "-mk", "data-sample": i }, svg);
+      } else flush();
     }
     flush();
   };
