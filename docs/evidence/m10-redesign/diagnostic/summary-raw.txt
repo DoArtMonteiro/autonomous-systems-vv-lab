@@ -1,0 +1,26 @@
+m10_b: n=80 {'R': 9, 'T': 65, 'U': 6}
+  U por veredicto de isolamento: {'none': 6}
+  U com falha hv: 0; vertical: 0; posição horizontal: 0
+  U por requisito falhado (um U conta em todos os que falha): {'R5': 6}
+  U por conjunto de requisitos falhados: {'R5': 6}
+  U por invariante falhado: {'S2_keep_out': 6}; execuções U com invariante: 6
+  U com transição insegura: 0
+  atraso do isolamento depois do início nos U (s): []
+  início 4.5: classes {'T': 17, 'U': 3}; isolamento {'none': 20}
+  início 6.0: classes {'R': 1, 'T': 17, 'U': 2}; isolamento {'none': 20}
+  início 8.0: classes {'R': 1, 'T': 18, 'U': 1}; isolamento {'none': 20}
+  início 10.0: classes {'R': 7, 'T': 13}; isolamento {'none': 20}
+
+m10_b_plus: n=80 {'R': 10, 'T': 6, 'U': 64}
+  U por veredicto de isolamento: {'none': 58, 'wrong': 6}
+  U com falha hv: 4; vertical: 0; posição horizontal: 0
+  U por requisito falhado (um U conta em todos os que falha): {'R1': 64, 'R2': 5, 'R5': 55}
+  U por conjunto de requisitos falhados: {'R1,R5': 50, 'R1': 9, 'R1,R2,R5': 5}
+  U por invariante falhado: {'S2_keep_out': 2}; execuções U com invariante: 2
+  U com transição insegura: 0
+  atraso do isolamento depois do início nos U (s): [0.8, 0.9, 0.9, 1.0, 1.0, 1.1]
+  início 4.5: classes {'R': 7, 'T': 4, 'U': 9}; isolamento {'correct': 11, 'none': 7, 'wrong': 2}
+  início 6.0: classes {'R': 2, 'T': 1, 'U': 17}; isolamento {'correct': 3, 'none': 15, 'wrong': 2}
+  início 8.0: classes {'R': 1, 'T': 1, 'U': 18}; isolamento {'correct': 2, 'none': 18}
+  início 10.0: classes {'U': 20}; isolamento {'none': 18, 'wrong': 2}
+
