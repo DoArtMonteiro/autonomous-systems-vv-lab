@@ -1,8 +1,8 @@
-# M19.2: Belief vs Truth, protótipo de investigação (iteração 1)
+# M19.2: Belief vs Truth, protótipo de investigação
 
 Protótipo isolado, em `spikes/m19-belief-truth/`. Não altera o Studio nem nenhum crate. Não simula nada: lê uma corrida guardada e mostra, lado a lado, o que aconteceu, o que o controlador acreditava, quando os dois divergiram e porque isso importou.
 
-Estado: iteração 2 (a última substantiva) construída e verificada no ramo `prototype/m19.2-belief-truth`, só localmente. A iteração 1 foi avaliada por um crítico de UX independente e por uma verificação de compreensão feita por agentes (não é um estudo com pessoas). A iteração 2 responde a essa avaliação e ainda não foi reavaliada. As secções abaixo descrevem a iteração 1; a secção "Iteração 2", no fim, diz o que mudou e o que ficou por resolver e prevalece sobre elas quando divergem.
+Estado: duas iterações substantivas feitas e uma passagem final de correções, no ramo `prototype/m19.2-belief-truth`, só localmente. A iteração 1 foi avaliada por um crítico de UX independente e por uma verificação de compreensão feita por agentes (não é um estudo com pessoas). A iteração 2 respondeu a essa avaliação e foi reavaliada pelo mesmo método: compreensão 19,5/20 e armadilhas 15,5/16, ambas acima do limiar. Limites dessa avaliação: um só respondente por iteração (n = 1), a iteração 2 foi construída já a conhecer as perguntas que falharam na iteração 1, e não houve braço de base que comparasse a vista atual da Studio. A passagem final de correções veio depois da avaliação da iteração 2 e não foi avaliada de novo; não há registo de uma verificação por agentes da versão final em `docs/evidence/m19/belief-truth/evaluation/`. Recomendação: não refutada; mantém-se candidata ao portão humano. As secções abaixo descrevem a iteração 1; a secção "Iteração 2" e a secção "Correções finais", no fim, dizem o que mudou e prevalecem sobre elas quando divergem.
 
 ## Tese
 
@@ -159,7 +159,7 @@ O que fica por resolver:
 
 ## Correções finais (não substantivas)
 
-Passagem final depois da avaliação da iteração 2 (o crítico de UX recomenda adotar como candidato; a verificação de compreensão por agentes passou). Só redação, etiquetas, CSS e pequenos dados; sem vistas novas.
+Passagem final depois da avaliação da iteração 2 (a verificação de compreensão por agentes passou; o crítico de UX recomendou manter como candidato ao portão humano). Acrescentou a velocidade horizontal do plano do bocal no R2, as observações de velocidade do GNSS e reescritas de cartões, além de redação, etiquetas, CSS e pequenos dados. Não acrescentou vistas novas, mas acrescentou dados e conteúdo. Se isto conta como uma terceira iteração substantiva é uma decisão do responsável; este documento não a toma. A versão final não foi reavaliada.
 
 1. A etiqueta "approx." propaga-se agora a tudo o que deriva de um valor aproximado (o extrator calcula o fecho): aparece nos 3,29 m e no "inside" do cartão 2, na distância acreditada e nos limites "believed within R5" (15,6 s a 22,955 s).
 2. Células numéricas sem quebra de linha e com algarismos tabulares; as tabelas do cursor deslizam na horizontal.
