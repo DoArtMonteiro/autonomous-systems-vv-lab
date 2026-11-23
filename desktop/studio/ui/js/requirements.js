@@ -200,6 +200,27 @@ export function noFailureSentence(record, categories) {
   return `No ${what} failed, but ${unknown.length} ${unknown.length === 1 ? 'was' : 'were'} not evaluated: ${unknown.map(plainName).join(', ')}.`;
 }
 
+/**
+ * What the record says about a failed ground-vehicle "Mission completion" row, and what it leaves out. The row's
+ * observed text reads "<outcome code>; <n> of <m> waypoint(s) reached; <d> mm from the goal at the end". The record
+ * does not name the clause of the requirement that failed (waypoints reached, confirmed on the true position, no
+ * stall), so when every waypoint was reached the sentence says so instead of leaving a distance of 0 mm to read as
+ * a completed mission. Null when the row is absent, did not fail, or its text has another shape.
+ */
+export function completionFacts(record) {
+  const q = (record.requirements || []).find((x) => x.id === 'mission_completion' && x.status === 'fail');
+  const m = q && /^\s*([a-z_]+);\s*(\d+) of (\d+) waypoint\(s\) reached;\s*(-?\d+(?:\.\d+)?) mm from the goal at the end/.exec(q.observed || '');
+  if (!m) return null;
+  const [, code, done, total, mm] = m;
+  const all = done === total;
+  const goal = `${fmtSig(Number(mm))} mm from the goal at the end`;
+  const recorded = `Recorded: ${done} of ${total} waypoint${total === '1' ? '' : 's'} reached, ${goal}, outcome ${code}.`;
+  const gap = all && code !== 'stalled'
+    ? ` The record does not say which part of "${q.label}" failed (it expects ${q.expected}). Reaching the goal is not the same as completing the mission.`
+    : '';
+  return { allReached: all, code, text: `${recorded}${gap}` };
+}
+
 /** The combined status, failure first, with the two kinds of verdict kept apart: "2 of 6 requirements failed · 5 of 5 safety rules held". */
 export function statusLine(record) {
   return [requirementWording(record), safetyWording(record).heldText].filter(Boolean).join(' · ');

@@ -284,7 +284,10 @@ export class Rocket3D {
     this.vehicle.quaternion.copy(q);
     const thr = ch.throttle ? ch.throttle[i] : null;
     const on = ch.engine ? ch.engine[i] === 1 : thr > 0;
-    const len = on && thr ? 6 + 22 * thr : 0;
+    // The record ends at its last sample (the contact, for a landing). The playback of a longer run goes on, and the
+    // stage stays where it ended, but the record says nothing about the engine after that sample: no plume is drawn.
+    const ended = t > times[times.length - 1] + 1e-9;
+    const len = !ended && on && thr ? 6 + 22 * thr : 0;
     this.plumeLength = len;
     this.plume.visible = len > 0;
     this.plume.scale.set(len || 1, 1, 1);

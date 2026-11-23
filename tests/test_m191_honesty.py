@@ -74,5 +74,38 @@ class NothingIsMetByDefault(unittest.TestCase):
         self.assertRegex(player, r"metFail\.length \? 'fail' : !missionReqs\.length \|\| /not evaluated/\.test\(missionText\) \? 'neutral' : 'pass'")
 
 
+class NoPlumeAfterTheLastSample(unittest.TestCase):
+    """0.18.1 kept the plume of the last sample lit while the playback of a longer run went on after the contact."""
+
+    def test_the_stage_scene_draws_no_plume_past_the_last_sample(self):
+        text = read("js", "scenes", "rocket.js")
+        self.assertRegex(text, r"const ended = t > times\[times\.length - 1\] \+ 1e-9;")
+        self.assertRegex(text, r"const len = !ended && on && thr \? 6 \+ 22 \* thr : 0;")
+        # the geospatial and cinematic stage scenes inherit setTime and read this.plumeLength
+        for name in ("geo.js", "rocket-cinema.js"):
+            self.assertIn("super.setTime(t)", read("js", "scenes", name))
+
+    def test_the_player_state_exposes_the_plume_length_for_the_journeys(self):
+        self.assertIn("plumeM:", read("js", "views", "player.js"))
+
+
+class MissionCompletionIsNotTheDistanceToTheGoal(unittest.TestCase):
+    """0.18.1 showed "To goal 0.00 mm" beside "Mission incomplete" with nothing about the clause of mission_completion that failed."""
+
+    def test_the_reading_follows_the_text_the_ground_host_writes(self):
+        with open(os.path.join(REPO, "desktop", "domain-ground", "src", "record.rs"), encoding="utf-8") as f:
+            record = f.read()
+        # completionFacts (requirements.js) parses exactly this observed text; if the host changes it, change both.
+        self.assertIn('"{code}; {done} of {total} waypoint(s) reached; {final_distance} mm from the goal at the end"', record)
+        self.assertIn("export function completionFacts(", read("js", "requirements.js"))
+
+    def test_the_goal_distance_readouts_say_it_is_not_completion(self):
+        text = read("js", "session.js")
+        self.assertEqual(text.count("Mission completion requirement"), 2)
+
+    def test_the_player_result_shows_the_facts_under_the_verdict_chips(self):
+        self.assertIn("completionFacts(rec)", read("js", "views", "player.js"))
+
+
 if __name__ == "__main__":
     unittest.main()

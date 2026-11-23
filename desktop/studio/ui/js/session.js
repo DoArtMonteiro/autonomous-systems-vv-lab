@@ -108,7 +108,7 @@ export function readouts(run, t, rocket) {
     ['East', v('truth_x_mm'), 'mm', 'T', 'True position'],
     ['North', v('truth_y_mm'), 'mm', 'T', 'True position'],
     ['GPS north', v('gps_y_mm'), 'mm', 'O', 'GPS sample, empty when no sample arrived'],
-    ['To goal', v('goal_distance_mm'), 'mm', 'D', 'Manhattan distance to the goal'],
+    ['To goal', v('goal_distance_mm'), 'mm', 'D', 'Manhattan distance to the final goal at this tick. It does not say whether the mission completed: that is the Mission completion requirement.'],
     ['Confidence', v('confidence_permille'), 'permille', 'E', 'Confidence in the last accepted fix'],
     ['Mode', fb === null ? null : fb === 1 ? 'fallback' : 'normal', '', 'D', 'Safety fallback of the controller'],
   ];
@@ -194,7 +194,7 @@ export function telemetry(run, t, rocket, geo) {
   } else {
     const fb = value(run, 'fallback', t);
     groups.push({ id: 'motion', title: 'Vehicle', rows: [
-      r('truth_x_mm', 'East'), r('truth_y_mm', 'North'), r('moved_mm', 'Moved this tick'), r('goal_distance_mm', 'To goal', { note: 'Manhattan distance' }),
+      r('truth_x_mm', 'East'), r('truth_y_mm', 'North'), r('moved_mm', 'Moved this tick'), r('goal_distance_mm', 'To goal', { note: 'Manhattan distance; the mission is complete only when the Mission completion requirement is met' }),
     ] });
     groups.push({ id: 'control', title: 'Control', rows: [
       r('command_mm', 'Command'),

@@ -8,7 +8,7 @@ import path from 'node:path';
 // fileURLToPath keeps a path with spaces or '&' (for example "v&v lab") intact.
 const here = path.dirname(fileURLToPath(import.meta.url));
 const mod = await import(pathToFileURL(path.join(here, '..', 'desktop', 'studio', 'ui', 'js', 'requirements.js')).href);
-const { noFailureSentence, safetyWording, reqView, failureSentence, plainName, headlineChange, indexNumbers, shortText, SAFETY_NOTE, requirementWording, statusLine, endChip } = mod;
+const { completionFacts, noFailureSentence, safetyWording, reqView, failureSentence, plainName, headlineChange, indexNumbers, shortText, SAFETY_NOTE, requirementWording, statusLine, endChip } = mod;
 const model = await import(pathToFileURL(path.join(here, '..', 'desktop', 'studio', 'ui', 'js', 'model.js')).href);
 const { conditionsName, conditionsShared, displayRunLabel, verdictOfSafety, verdictOfOutcome } = model;
 
@@ -271,6 +271,26 @@ test('a record with a row that was not evaluated never says every requirement me
   assert.equal(noFailureSentence(rec('safe', null, [req('R1', 'pass'), inv('S1', 'pass')]), ['requirement', 'invariant']), 'Every requirement and safety rule met.');
   assert.equal(noFailureSentence(rec('safe', null, [req('R1', 'pass')]), ['requirement']), 'Every requirement met.');
   assert.equal(noFailureSentence(rec('safe', null, []), ['requirement', 'invariant']), 'The record lists no requirement and safety rule.');
+});
+// The two texts below are the ones the ground-vehicle host writes (corridor demonstration, 1 mm of GPS noise).
+const completion = (status, observed) => ({ id: 'mission_completion', label: 'Mission completion', category: 'requirement', status, expected: 'all 1 waypoint(s) reached, confirmed on the true position, with no stall of 8 ticks', observed });
+
+test('a failed mission completion at the goal says that the record does not name the failed clause', () => {
+  const r = rec('unsafe', null, [completion('fail', 'incomplete; 1 of 1 waypoint(s) reached; 0 mm from the goal at the end')]);
+  const f = completionFacts(r);
+  assert.equal(f.allReached, true);
+  assert.match(f.text, /^Recorded: 1 of 1 waypoint reached, 0 mm from the goal at the end, outcome incomplete\./);
+  assert.match(f.text, /does not say which part of "Mission completion" failed \(it expects all 1 waypoint\(s\) reached, confirmed on the true position, with no stall of 8 ticks\)/);
+  assert.match(f.text, /Reaching the goal is not the same as completing the mission\./);
+});
+
+test('a failed mission completion with waypoints missing needs no apology, and a pass or another shape gives nothing', () => {
+  const short = completionFacts(rec('safe', null, [completion('fail', 'stalled; 0 of 2 waypoint(s) reached; 2250 mm from the goal at the end')]));
+  assert.equal(short.allReached, false);
+  assert.equal(short.text, 'Recorded: 0 of 2 waypoints reached, 2250 mm from the goal at the end, outcome stalled.');
+  assert.equal(completionFacts(rec('safe', null, [completion('pass', 'completed; 1 of 1 waypoint(s) reached; 250 mm from the goal at the end')])), null);
+  assert.equal(completionFacts(rec('safe', null, [completion('fail', 'something else')])), null);
+  assert.equal(completionFacts(rec('safe', null, [])), null);
 });
 
 console.log(`${n} tests passed`);

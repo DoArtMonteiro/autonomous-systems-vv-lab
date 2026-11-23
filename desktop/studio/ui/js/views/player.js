@@ -28,7 +28,7 @@ import { buildControl } from './control.js';
 import { sourcesInfo } from '../sources-info.js';
 import { openCatalogue } from '../env-catalogue.js';
 import { cinematicButton } from '../cinematic.js';
-import { reqView, safetyWording, SAFETY_NOTE, failureSentence, indexNumbers, statusLine, requirementWording, endChip, noFailureSentence } from '../requirements.js';
+import { reqView, safetyWording, SAFETY_NOTE, failureSentence, indexNumbers, statusLine, requirementWording, endChip, noFailureSentence, completionFacts } from '../requirements.js';
 import { conditionsName } from '../model.js';
 
 let root;
@@ -49,7 +49,7 @@ export function initPlayer(el, nav) {
 export function playerState() {
   if (!pl) return null;
   return { experience: pl.exp.id, runs: pl.runs.map((r) => r.runId), active: pl.active, t: pl.cursor.t, t1: pl.cursor.t1, revealed: pl.revealed, analysis: !!pl.analysis, playing: pl.cursor.playing, scene: pl.scene ? (pl.scene.ok === false ? 'fallback' : pl.kind) : null,
-    view: pl.view, environment: pl.envId, renderer: pl.renderer || null, geoError: pl.geoError || null, geoStats: pl.scene && pl.scene.stats ? pl.scene.stats() : null, mounts: pl.mounts || 0,
+    view: pl.view, plumeM: pl.scene && Number.isFinite(pl.scene.plumeLength) ? pl.scene.plumeLength : null, environment: pl.envId, renderer: pl.renderer || null, geoError: pl.geoError || null, geoStats: pl.scene && pl.scene.stats ? pl.scene.stats() : null, mounts: pl.mounts || 0,
     findings: pl.gated ? pl.gated.length : 0, findingsDrawn: pl.gated ? pl.gated.filter((m) => m.el).length : 0 };
 }
 
@@ -813,6 +813,7 @@ function runResult(run) {
     h('div', { class: 'pl-verdicts' },
       verdictChip(missionText, metFail.length ? 'fail' : !missionReqs.length || /not evaluated/.test(missionText) ? 'neutral' : 'pass', 'Mission'),
       verdictChip(safetyText, safetyTone, 'Safety rules', SAFETY_NOTE)),
+    completionFacts(rec) ? h('p', { class: 'pl-run-clause small dim', dataset: { clause: '1' } }, completionFacts(rec).text) : null,
     metrics.length ? h('dl', { class: 'pl-metrics' }, metrics.map((m) => h('div', null, h('dt', null, m.label), h('dd', { class: 'mono' }, m.value === null ? '—' : `${hudNum(m.value)} ${m.unit}`)))) : null,
     failed.length ? h('ul', { class: 'pl-failed' }, failed.map((q) => h('li', null,
       h('button', { type: 'button', class: 'link', title: 'Move the playback to the decisive instant', onclick: () => { if (Number.isFinite(q.t)) { pl.cursor.pause(); pl.cursor.set(q.t); } } }, q.label),
