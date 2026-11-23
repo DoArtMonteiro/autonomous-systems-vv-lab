@@ -10,7 +10,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const mod = await import(pathToFileURL(path.join(here, '..', 'desktop', 'studio', 'ui', 'js', 'requirements.js')).href);
 const { completionFacts, noFailureSentence, safetyWording, reqView, failureSentence, plainName, headlineChange, indexNumbers, shortText, SAFETY_NOTE, requirementWording, statusLine, endChip } = mod;
 const model = await import(pathToFileURL(path.join(here, '..', 'desktop', 'studio', 'ui', 'js', 'model.js')).href);
-const { conditionsName, conditionsShared, displayRunLabel, verdictOfSafety, verdictOfOutcome } = model;
+const { conditionsName, conditionsShared, displayRunLabel, verdictOfSafety, verdictOfOutcome, conditionsBrief } = model;
 
 const inv = (id, status) => ({ id, label: `Rule ${id}`, category: 'invariant', status, expected: '<= 1 m', observed: '0.5 m' });
 const req = (id, status, label = `Req ${id}`) => ({ id, label, category: 'requirement', status, expected: '<= 3 m/s', observed: '1.654537 m/s' });
@@ -291,6 +291,15 @@ test('a failed mission completion with waypoints missing needs no apology, and a
   assert.equal(completionFacts(rec('safe', null, [completion('pass', 'completed; 1 of 1 waypoint(s) reached; 250 mm from the goal at the end')])), null);
   assert.equal(completionFacts(rec('safe', null, [completion('fail', 'something else')])), null);
   assert.equal(completionFacts(rec('safe', null, [])), null);
+});
+test('the compact run pill counts the conditions exactly and never lists a cut text', () => {
+  const catalog = { parameters: [{ id: 'arrival_radius_mm', label: 'Arrival radius', unit: 'mm', default: 0 }], faults: [], time: { unit: 'tick' } };
+  assert.equal(conditionsBrief({ parameters: {}, faults: [] }, catalog), 'default conditions');
+  assert.equal(conditionsBrief({ parameters: { arrival_radius_mm: 0 }, faults: [] }, catalog), 'default conditions');
+  assert.equal(conditionsBrief({ parameters: { arrival_radius_mm: 250 }, faults: [] }, catalog), '1 condition');
+  assert.equal(conditionsBrief({ parameters: { arrival_radius_mm: 250 }, faults: [{ kind: 'gps_noise', magnitude: 1, start: 0, end: 32 }] }, catalog), '2 conditions');
+  // the full text it stands for is the one name of the conditions
+  assert.match(conditionsName({ parameters: { arrival_radius_mm: 250 }, faults: [{ kind: 'gps_noise', magnitude: 1, start: 0, end: 32 }] }, catalog), /^Arrival radius 250 mm .* Gps noise 1/i);
 });
 
 console.log(`${n} tests passed`);

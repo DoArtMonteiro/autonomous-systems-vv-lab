@@ -170,32 +170,45 @@ def main():
 
 
 def evaluate(facts):
-    """The assertions of the corrected Studio on the facts collected above (the 0.18.1 facts fail the same ones)."""
+    """The assertions of the corrected Studio on the facts collected above. Facts of the 0.18.1 build fail the same ones
+    (python capture.py --evaluate before/before-facts.json): a fact that is missing or has another shape counts as a failure."""
     green = "rgb(61, 191, 152)"
-    first = facts["safety_chip"][0]
-    safety = next(c for c in first["chips"] if c["text"].startswith("SAFETY"))
-    mission = next(c for c in first["chips"] if c["text"].startswith("MISSION"))
-    corridor = facts["corridor_second_run"][1]
-    unselected = [p for p in facts["pills_corridor_1024x640"] if p["checked"] == "false"]
+
+    def chip(prefix):
+        return next(c for c in facts["safety_chip"][0]["chips"] if c["text"].startswith(prefix))
+
+    def corridor():
+        return facts["corridor_second_run"][1]
+
+    def unselected():
+        return [p for p in facts["pills_corridor_1024x640"] if p["checked"] == "false"]
+
     checks = [
-        ("the safety chip beside failed requirements is neutral, not green", "v-held" in safety["cls"] and safety["colour"] != green),
-        ("the failed mission chip keeps its failure class", "v-warn" in mission["cls"] and "failed" in mission["text"]),
-        ("no 'Every requirement' sentence beside a failed requirement", not first["allMet"]),
-        ("the plume is not drawn after the last sample", facts["plume_past_end"]["state"]["plumeM"] == 0),
-        ("the plume is still drawn just before the contact", bool(facts.get("plume_before_contact")) and (facts["plume_before_contact"]["plumeM"] or 0) > 0),
-        ("the failed mission completion says what the record says and does not say", bool(corridor["clause"]) and "does not say which part" in corridor["clause"]),
-        ("the goal distance readout says it is not completion", any(r["text"].startswith("D To goal") and "Mission completion requirement" in r["title"] for r in facts["corridor_flight_readout"])),
-        ("1024x640: no pill has clipped text", all(not p["clipped"] for p in facts["pills_corridor_1024x640"] + facts["pills_corridor_first_selected_1024x640"])),
-        ("1024x640: an unselected pill gives an exact count of conditions", bool(unselected) and all("condition" in p["text"] for p in unselected)),
-        ("1024x640: the tooltip of every pill has the whole identity", all(p["title"] for p in facts["pills_corridor_1024x640"])),
-        ("no script error", not facts["errors"]),
+        ("the safety chip beside failed requirements is neutral, not green", lambda: "v-held" in chip("SAFETY")["cls"] and chip("SAFETY")["colour"] != green),
+        ("the failed mission chip keeps its failure class", lambda: "v-warn" in chip("MISSION")["cls"] and "failed" in chip("MISSION")["text"]),
+        ("no 'Every requirement' sentence beside a failed requirement", lambda: not facts["safety_chip"][0]["allMet"]),
+        ("the plume is not drawn after the last sample", lambda: facts["plume_past_end"]["state"]["plumeM"] == 0),
+        ("the plume is still drawn just before the contact", lambda: (facts["plume_before_contact"]["plumeM"] or 0) > 0),
+        ("the failed mission completion says what the record says and does not say", lambda: bool(corridor()["clause"]) and "does not say which part" in corridor()["clause"]),
+        ("the goal distance readout says it is not completion", lambda: any(r["text"].startswith("D To goal") and "Mission completion requirement" in r["title"] for r in facts["corridor_flight_readout"])),
+        ("1024x640: no pill has clipped text", lambda: all(not p["clipped"] for p in facts["pills_corridor_1024x640"] + facts["pills_corridor_first_selected_1024x640"])),
+        ("1024x640: an unselected pill gives an exact count of conditions", lambda: bool(unselected()) and all("condition" in p["text"] for p in unselected())),
+        ("1024x640: the tooltip of every pill has the whole identity", lambda: all(p["title"] for p in facts["pills_corridor_1024x640"])),
+        ("no script error", lambda: not facts["errors"]),
     ]
     ok = True
-    for name, passed in checks:
+    for name, check in checks:
+        try:
+            passed = bool(check())
+        except (KeyError, TypeError, IndexError, StopIteration):
+            passed = False
         print(("PASS " if passed else "FAIL ") + name)
         ok = ok and passed
     return ok
 
 
 if __name__ == "__main__":
+    if len(sys.argv) == 3 and sys.argv[1] == "--evaluate":
+        with open(sys.argv[2], encoding="utf-8") as f:
+            sys.exit(0 if evaluate(json.load(f)) else 1)
     main()

@@ -1,0 +1,11 @@
+PASS the safety chip beside failed requirements is neutral, not green
+PASS the failed mission chip keeps its failure class
+PASS no 'Every requirement' sentence beside a failed requirement
+PASS the plume is not drawn after the last sample
+PASS the plume is still drawn just before the contact
+PASS the failed mission completion says what the record says and does not say
+PASS the goal distance readout says it is not completion
+PASS 1024x640: no pill has clipped text
+PASS 1024x640: an unselected pill gives an exact count of conditions
+PASS 1024x640: the tooltip of every pill has the whole identity
+PASS no script error
