@@ -626,6 +626,22 @@ pub fn prepare_landing(case: &LandingCase, seed: u64) -> Result<PreparedLanding,
     prepare_unpinned(case, seed)
 }
 
+/// Research (docs/m10-redesign-preregistration.md, adenda 2): the four noise sigmas that the
+/// navigation filter models are all exactly `NOISE_STRESS` times the registered values.
+const NOISE_STRESS: f64 = 1.5;
+
+fn noise_stress(s: &Sensors) -> bool {
+    let r = Sensors::registered();
+    [
+        (s.altimeter_sigma_m, r.altimeter_sigma_m),
+        (s.gnss_position_sigma_m, r.gnss_position_sigma_m),
+        (s.gnss_velocity_sigma_mps, r.gnss_velocity_sigma_mps),
+        (s.imu_accel_sigma_mps2, r.imu_accel_sigma_mps2),
+    ]
+    .iter()
+    .all(|&(got, want)| (got - NOISE_STRESS * want).abs() <= 1e-12 * want)
+}
+
 /// Rejects every pre-registered value that differs, naming the field.
 fn check_registered(case: &LandingCase) -> Result<(), String> {
     require_equal(&case.dispersion, &Dispersion::registered(), "dispersion")?;
@@ -639,16 +655,25 @@ fn check_registered(case: &LandingCase) -> Result<(), String> {
         Sensors::registered(),
         "sensors",
         [
-            altimeter_sigma_m,
-            gnss_position_sigma_m,
-            gnss_velocity_sigma_mps,
             imu_attitude_sigma_rad,
             imu_rate_sigma_radps,
-            imu_accel_sigma_mps2,
             control_period_steps,
             gnss_period_cycles,
         ]
     );
+    if !(case.schema == LANDING_SCHEMA_V2 && noise_stress(&case.sensors)) {
+        pin_fields!(
+            case.sensors,
+            Sensors::registered(),
+            "sensors",
+            [
+                altimeter_sigma_m,
+                gnss_position_sigma_m,
+                gnss_velocity_sigma_mps,
+                imu_accel_sigma_mps2,
+            ]
+        );
+    }
     // The vehicle, its actuator limits and the environment are those of the specification.
     pin_fields!(
         case.vehicle,

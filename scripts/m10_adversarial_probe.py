@@ -8,7 +8,9 @@ verdict and the alert failures of the three navigation channels.
     python scripts/m10_adversarial_probe.py ignition --binary <vv-rocket> --output <file.json>
     python scripts/m10_adversarial_probe.py summary <file.json>
 
-Plans: ignition, ramp, rampbase, steps, chase. Seeds default to 5000-5019. Any seed outside
+Plans: ignition, ramp, rampbase, steps, chase, and the pre-registered redesign plans ramps, ramps15
+and onset (docs/m10-redesign-preregistration.md): the arms are named B, B+, B+G, robust, guarded
+(`--arms`). Seeds default to 5000-5019. Any seed outside
 5000-5099, any protected seed (scripts/m10_campaign.py) and 100-129 are refused before running.
 The bounded-chase arm is the approved template with controller.nav.bounded_chase_when_untrusted
 = true.
@@ -30,10 +32,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 import m10_campaign as camp  # noqa: E402
+import m10_onset_sweep as osw  # noqa: E402
 
 DEV = range(5000, 5100)
 MAX_PLAN = 6000
-PLANS = ("ignition", "ramp", "rampbase", "steps", "chase")
+PLANS = ("ignition", "ramp", "rampbase", "steps", "chase", "ramps", "ramps15", "onset")
+REDESIGN_PLANS = ("ramps", "ramps15", "onset")
+# Redesign arms: label -> (template, policy). `15` templates scale four sensor sigmas by 1.5.
+ARM_LABELS = {"B": ("approved", "m10_b"), "B+": ("approved", "m10_b_plus"), "B+G": ("gate", "m10_b_plus"),
+              "robust": ("approved", "robust"), "guarded": ("approved", "guarded")}
+RAMP_MAGS = (0.2, 0.3, 0.5, 0.8)
+RAMP_ONSETS = tuple(round(3.0 + 0.25 * k, 2) for k in range(13)) + (8.0, 10.0, 12.0)
+NOISE_KEYS = ("altimeter_sigma_m", "gnss_position_sigma_m", "gnss_velocity_sigma_mps", "imu_accel_sigma_mps2")
+NOISE_SCALE = 1.5
 
 
 def guard(seeds: list[int]) -> None:
@@ -62,7 +73,9 @@ def run(binary: Path, template: dict, arm: str, faults: list, seed: int, work: P
     v = json.loads((out / "verification.json").read_text(encoding="utf-8"))
     nav = v.get("navigation") or {}
     reqs = {r["id"].split("_")[0]: r["pass"] for r in v["requirements"]}
+    summary = json.loads((out / "run.json").read_text(encoding="utf-8")).get("summary") or {}
     return {
+        "ign": summary.get("ignition_t_s"), "gate": nav.get("gate"),
         "tag": tag, "arm": arm, "seed": seed, "cls": nav.get("physical_class"),
         "outcome": v["outcome"], "fail": [k for k, ok in reqs.items() if not ok],
         "inv_fail": [i["id"] for i in v["invariants"] if not i["pass"]],
@@ -75,10 +88,23 @@ def run(binary: Path, template: dict, arm: str, faults: list, seed: int, work: P
     }
 
 
-def jobs_for(plan: str) -> list[tuple[str, str, list, str]]:
+def jobs_for(plan: str, arms: tuple[str, ...] = ("B", "B+", "B+G", "robust", "guarded")) -> list[tuple[str, str, list, str]]:
     F = fault
     jobs: list[tuple[str, str, list, str]] = []
-    if plan == "ignition":
+    if plan in REDESIGN_PLANS:
+        noisy = "15" if plan == "ramps15" else ""
+        for label in arms:
+            tpl, policy = ARM_LABELS[label]
+            if plan == "onset":
+                for kind in osw.FAULTS:
+                    for t in range(2, 21):
+                        jobs.append((tpl, policy, [osw.fault_at(kind, float(t))], f"{label}~{kind}@{float(t)}"))
+            else:
+                mags = (0.3, 0.5) if plan == "ramps15" else RAMP_MAGS
+                for m in mags:
+                    for t in RAMP_ONSETS:
+                        jobs.append((tpl + noisy, policy, [F("gnss_coherent_ramp", t, 40, m)], f"{label}~ramp{m}@{t}"))
+    elif plan == "ignition":
         for k in range(0, 51):
             t = round(3.0 + 0.05 * k, 2)
             jobs += [("approved", "m10_b_plus", [F("altimeter_stuck", t, t + 3.0)], f"stuck@{t}"),
@@ -155,6 +181,7 @@ def main() -> int:
     ap.add_argument("--output", type=Path)
     ap.add_argument("--seeds", default="5000-5019")
     ap.add_argument("--jobs", type=int, default=8)
+    ap.add_argument("--arms", default="B,B+,B+G,robust,guarded", help="redesign plans only")
     a = ap.parse_args()
     if a.plan == "summary":
         summary(Path(a.path))
@@ -166,8 +193,18 @@ def main() -> int:
     approved, _ = camp.load_template(ROOT / "crates/vv-rocket/landing/m10-nominal.json")
     bounded = copy.deepcopy(approved)
     bounded["controller"]["nav"]["bounded_chase_when_untrusted"] = True
-    templates = {"approved": approved, "bounded": bounded}
-    plan = [(j, s) for j in jobs_for(a.plan) for s in seeds]
+    gate = copy.deepcopy(approved)
+    gate["controller"]["nav"]["ambiguity_gate"] = True
+    templates = {"approved": approved, "bounded": bounded, "gate": gate}
+    for name in ("approved", "gate"):
+        noisy = copy.deepcopy(templates[name])
+        for key in NOISE_KEYS:
+            noisy["sensors"][key] = noisy["sensors"][key] * NOISE_SCALE
+        templates[name + "15"] = noisy
+    arms = tuple(x for x in a.arms.split(",") if x)
+    if any(x not in ARM_LABELS for x in arms):
+        raise SystemExit(f"unknown arm in {arms}")
+    plan = [(j, s) for j in jobs_for(a.plan, arms) for s in seeds]
     if len(plan) > MAX_PLAN:
         raise SystemExit(f"plan has {len(plan)} runs; the limit is {MAX_PLAN}")
     started = time.monotonic()
@@ -184,6 +221,9 @@ def main() -> int:
         with ThreadPoolExecutor(max_workers=max(1, min(a.jobs, 16))) as pool:
             recs = list(pool.map(one, plan))
     a.output.write_text(json.dumps({"plan": a.plan, "seeds": a.seeds, "records": recs}, indent=0), encoding="utf-8")
+    if a.plan in REDESIGN_PLANS:
+        print("templates sha256:", {k: __import__("hashlib").sha256(json.dumps(v, sort_keys=True).encode()).hexdigest()[:16]
+                                    for k, v in templates.items()})
     print(len(recs), "runs", round(time.monotonic() - started, 1), "s ->", a.output)
     return 0
 

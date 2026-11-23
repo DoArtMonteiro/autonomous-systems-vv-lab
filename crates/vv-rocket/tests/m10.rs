@@ -464,6 +464,31 @@ fn the_ambiguity_gate_needs_the_anchored_witness_and_is_off_when_omitted_or_fals
     assert!(v["navigation"].get("gate").is_none());
 }
 
+fn stressed(mut c: Value) -> Value {
+    for key in [
+        "altimeter_sigma_m",
+        "gnss_position_sigma_m",
+        "gnss_velocity_sigma_mps",
+        "imu_accel_sigma_mps2",
+    ] {
+        let v = c["sensors"][key].as_f64().unwrap();
+        c["sensors"][key] = json!(v * 1.5);
+    }
+    c
+}
+
+#[test]
+fn only_the_pre_registered_noise_stress_of_all_four_sigmas_is_accepted_in_v2() {
+    // Trial seed 5091 (adenda 2), nominal case, gate off.
+    let mut ok = stressed(with("m10_b_plus", json!([])));
+    assert!(verification(&ok, 5091)["navigation"]["cycles"].is_u64());
+    ok["sensors"]["altimeter_sigma_m"] = json!(0.2);
+    assert!(input_error(&ok).contains("altimeter_sigma_m"));
+    let mut one = with("m10_b_plus", json!([]));
+    one["sensors"]["gnss_position_sigma_m"] = json!(0.75);
+    assert!(input_error(&one).contains("sensors"));
+}
+
 #[test]
 fn the_ambiguity_gate_is_deterministic_acts_on_a_slow_ramp_and_reports_its_streaks() {
     let off = with("m10_b_plus", gate_ramp());
