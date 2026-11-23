@@ -239,6 +239,12 @@ export const DERIVED_NOTE = 'D: derived by Studio from the recorded values (the 
 
 export const SAFETY_NOTE = 'Safety rules are judged on the true state throughout the run. Mission requirements are judged separately: a requirement can fail without any safety rule being broken.';
 
+/** Said next to the safety chip of a run that failed a requirement: the scope of "no safety rule broken". */
+export const SAFETY_SCOPE = 'Safety rules are judged on the true state throughout the run and are not the mission result: a requirement can fail without any safety rule being broken.';
+
+/** Said under a demonstration text written by a domain, whose words about safety mean only that no safety rule was broken. */
+export const EXPECTATION_GLOSS = 'Words about safety in this text mean only that no safety rule was broken; the mission requirements are separate verdicts.';
+
 /** The name of a requirement for people: the label, never the id ("R1_vertical_speed"). */
 export function plainName(q) {
   return q.label || String(q.id || '').replace(/^[a-z_]+\./, '').replace(/^[A-Z]\d+_/, '').replace(/_/g, ' ');

@@ -70,6 +70,7 @@
 .lab-gen { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .lab-gen p { margin: 0; }
 .lab-gen-n { font: 600 26px/1.1 var(--mono); color: var(--fg-1); }
+.lab-gen-caveat { margin: 0 0 6px; font-size: 13.5px; font-weight: 600; color: var(--fg-1); }
 .lab-sweep-ctl .select { width: auto; max-width: 240px; }
 .lab-chart { width: 100%; max-width: 520px; height: auto; display: block; }
 .lab-chart-zero { stroke: var(--fail); stroke-dasharray: 4 3; stroke-width: 1; }

@@ -12,4 +12,9 @@ FAIL the Library cell 'None broken' is neutral, never the green class
 FAIL the Safety rules section of the run workspace has held rows and no green row
 FAIL the Compare matrix has held (neutral) safety cells
 FAIL the Lab verdict pills for safety are held
+FAIL the safety scope sentence sits in the run's result next to the chip
+FAIL the jump button names the instant
+FAIL the Compare banner carries the gloss on words about safety
+FAIL the ground HUD keeps To goal and Confidence at 1024x640
+FAIL the replay verdict is evidence integrity, neutral
 PASS no script error

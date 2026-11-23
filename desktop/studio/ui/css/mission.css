@@ -243,8 +243,10 @@
   .pl-runs { max-width: calc(100% - 32px); bottom: 74px; }
 }
 @media (max-height: 720px) {
-  .pl-hud-row:nth-child(4), .pl-hud-row:nth-child(5) { display: none; }
-  .pl-hud-key { display: none; }
+  /* Only the stage's tilt and throttle rows and the tag key are left out of a short window. The ground vehicle's readings (To goal,
+     Confidence) are the key to a failed mission completion, so they stay. */
+  .pl-hud-row.is-minor { display: none; }
+  .pl-hud.is-rocket .pl-hud-key { display: none; }
   .pl-head { padding: 4px 14px; row-gap: 3px; }
 }
 @media (max-width: 760px) {

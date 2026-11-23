@@ -467,7 +467,7 @@
   "exec/claims/m13/corridor-noise.json": "330a3adbca9a39bd26d2a66ea0da3ffb06062b9a9b0e59c6fb2c073df91ac6bc",
   "exec/claims/m13/g3-onset.json": "f9e6154c8df0a9288cd2eea6ab634cd735a83e1feee0689525cabb93d6d6d319"
  },
- "git_head": "cb88fdc6a5c1c9410c85937ba4c2534e813e0b89",
+ "git_head": "d35a38ba33e1231c76be6b43d3c6dab29fd57c57",
  "m1_and_test_fixtures": {
   "crates/vv-ascent/tests/golden/medium-leo-5000.json": "203df0fe3822bacf74db9c480d1a2cc203a85bd136049438236f13079099f3bf",
   "crates/vv-ascent/tests/golden/small-leo-42.json": "20dc7293b659d5c109a3ab6406f0362259adc038c06f12ace6b9b19cb65280dd",

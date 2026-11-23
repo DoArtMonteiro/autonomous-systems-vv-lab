@@ -30,6 +30,7 @@
 
 .dl-chip { display: inline-flex; align-items: center; gap: 5px; padding: 1px 8px 1px 6px; border-radius: 999px; font-size: 12px; line-height: 18px; border: 1px solid var(--rule-strong); color: var(--fg-2); background: var(--bg-2); white-space: nowrap; }
 .dl-chip.ok { color: var(--pass); border-color: color-mix(in srgb, var(--pass) 45%, transparent); background: var(--pass-wash); }
+.dl-chip.held { color: var(--fg-1); border-color: var(--rule-strong); background: transparent; }
 .dl-chip.bad { color: var(--unsafe); border-color: color-mix(in srgb, var(--unsafe) 45%, transparent); background: var(--unsafe-wash); }
 .dl-chip.warn { color: var(--fail); border-color: color-mix(in srgb, var(--fail) 45%, transparent); background: var(--fail-wash); }
 .dl-glyph { font-size: 12px; line-height: 1; }
@@ -38,6 +39,7 @@
 .dl-tile { border: 1px solid var(--rule); border-radius: var(--r); padding: 12px; background: var(--bg-1); display: grid; gap: 6px; align-content: start; position: relative; overflow: hidden; }
 .dl-tile::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: var(--rule-strong); }
 .dl-tile.ok::before { background: var(--pass); }
+.dl-tile.held::before { background: var(--fg-3); }
 .dl-tile.bad::before { background: var(--unsafe); }
 .dl-tile.warn::before { background: var(--fail); }
 .dl-tile-k { font-size: 12px; text-transform: uppercase; letter-spacing: .09em; color: var(--fg-3); font-weight: 600; }

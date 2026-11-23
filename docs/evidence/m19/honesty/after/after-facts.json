@@ -1,4 +1,5 @@
 {
+ "compare_gloss": "Words about safety in this text mean only that no safety rule was broken; the mission requirements are separate verdicts.",
  "corridor_flight_readout": [
   {
    "text": "T East 5000 mm",
@@ -46,7 +47,8 @@
    ],
    "clause": null,
    "failed": [],
-   "run": "Exact GPS"
+   "run": "Exact GPS",
+   "scope": null
   },
   {
    "allMet": [],
@@ -70,7 +72,8 @@
     "Restricted zone stays clear (contract) requirement: limit restricted zone clear holds at every tick, observed predicate false; violated at tick 21",
     "Mission completion requirement: limit all 1 waypoint(s) reached, confirmed on the true position, with no stall of 8 ticks, observed incomplete; 1 of 1 waypoint(s) reached; 0 mm from the goal at the end"
    ],
-   "run": "1 mm of GPS noise"
+   "run": "1 mm of GPS noise",
+   "scope": null
   },
   {
    "allMet": [
@@ -92,11 +95,15 @@
    ],
    "clause": null,
    "failed": [],
-   "run": "1 mm noise, 250 mm arrival radius"
+   "run": "1 mm noise, 250 mm arrival radius",
+   "scope": null
   }
  ],
  "errors": [],
  "exe": "vv-studio-m191-review.exe",
+ "go_to_buttons": [
+  "Go to 4.70 s"
+ ],
  "held_rows_compare": {
   "cells": [
    {
@@ -218,6 +225,14 @@
    ],
    "title": "Mission requirements"
   }
+ ],
+ "hud_rows_1024x640": [
+  "T East 5000 mm",
+  "T North 2000 mm",
+  "O GPS north 2001 mm",
+  "D To goal 0.00 mm",
+  "E Confidence 500.0 permille",
+  "D Mode normal"
  ],
  "library_safety_cells": [
   {
@@ -361,16 +376,6 @@
    "text": "None broken"
   },
   {
-   "cls": "cell v-partial",
-   "colour": "rgb(228, 233, 239)",
-   "text": "Mission incomplete"
-  },
-  {
-   "cls": "cell v-unsafe",
-   "colour": "rgb(228, 233, 239)",
-   "text": "1 safety rule broken"
-  },
-  {
    "cls": "cell v-pass",
    "colour": "rgb(228, 233, 239)",
    "text": "Mission completed"
@@ -379,6 +384,16 @@
    "cls": "cell v-held",
    "colour": "rgb(228, 233, 239)",
    "text": "None broken"
+  },
+  {
+   "cls": "cell v-partial",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Mission incomplete"
+  },
+  {
+   "cls": "cell v-unsafe",
+   "colour": "rgb(228, 233, 239)",
+   "text": "1 safety rule broken"
   },
   {
    "cls": "cell v-fail",
@@ -513,6 +528,11 @@
    "view": "engineering"
   }
  },
+ "replay_verdict": {
+  "cls": "replay-verdict v-held",
+  "colour": "rgb(42, 50, 60)",
+  "text": "EVIDENCE INTEGRITY: VERIFIED THE RUN WAS RECOMPUTED FROM ITS INPUTS AND EVERY CHECK PASSED."
+ },
  "safety_chip": [
   {
    "allMet": [],
@@ -535,7 +555,8 @@
     "Vertical speed at contact requirement: limit <= 3 m/s, observed 33.03 m/s",
     "Horizontal speed at contact requirement: limit <= 1 m/s, observed 1.151 m/s"
    ],
-   "run": "Baseline: trusts the altimeter"
+   "run": "Baseline: trusts the altimeter",
+   "scope": "Safety rules are judged on the true state throughout the run and are not the mission result: a requirement can fail without any safety rule being broken."
   },
   {
    "allMet": [
@@ -557,7 +578,8 @@
    ],
    "clause": null,
    "failed": [],
-   "run": "Robust: cross-checks it"
+   "run": "Robust: cross-checks it",
+   "scope": null
   }
  ],
  "tag": "after"

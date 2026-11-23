@@ -164,5 +164,59 @@ class FocusRingsOfThePillsAreNotClipped(unittest.TestCase):
         self.assertRegex(css, r"\.pl-run \{ position: relative; \}")
 
 
+class WalkthroughFollowUp(unittest.TestCase):
+    """The expert walkthrough of 0.18.1 (F01 to F04, F06, F07, F10, F11): structural checks on the sources."""
+
+    def test_f01_f02_the_scope_of_the_safety_chip_is_next_to_it_and_not_at_the_end_of_the_card(self):
+        player = read("js", "views", "player.js")
+        run_result = player[player.index("function runResult(run)"):player.index("function changeSummary()")]
+        self.assertIn("SAFETY_SCOPE", run_result)
+        self.assertRegex(run_result, r"sw\.verdict === 'held' && missionTone\(rec\) === 'fail'")
+        fill = player[player.index("function fillResult()"):player.index("function fillAfter()")]
+        self.assertNotIn("A requirement can fail without any safety rule being broken", fill)
+        self.assertNotIn("pl-fine", fill)
+
+    def test_f03_the_domain_expectation_texts_carry_the_gloss(self):
+        for rel in (("js", "views", "compare.js"), ("js", "views", "run.js"), ("js", "views", "prepare.js")):
+            self.assertIn("EXPECTATION_GLOSS", read(*rel), rel[-1])
+
+    def test_f10_the_ground_readings_stay_on_a_short_window(self):
+        css = read("css", "mission.css")
+        short = css[css.index("@media (max-height: 720px)"):css.index("@media (max-width: 760px)")]
+        self.assertNotIn("nth-child", short)
+        self.assertIn(".pl-hud-row.is-minor { display: none; }", short)
+        self.assertIn(".pl-hud.is-rocket .pl-hud-key { display: none; }", short)
+        player = read("js", "views", "player.js")
+        self.assertIn("rocket && (i === 3 || i === 4) ? 'is-minor' : ''", player)
+        self.assertIn("rocket ? 'is-rocket' : 'is-ground'", player)
+
+    def test_f04_f06_evidence_integrity_is_neutral_and_named(self):
+        discover = read("js", "views", "discover.js")
+        self.assertNotIn("vr.pass ? 'ok'", discover)
+        self.assertIn("vr.pass ? 'Evidence integrity: recomputed'", discover)
+        self.assertIn("verified ? 'held' : 'bad'", discover)
+        css = read("css", "discover.css")
+        for rule in re.findall(r"[^{}]*\.dl-(?:chip|tile)\.held[^{}]*\{[^}]*\}", css):
+            self.assertNotIn("--pass", rule)
+        self.assertRegex(css, r"\.dl-chip\.held")
+        prov = read("js", "provenance.js")
+        self.assertNotIn("ok ? 'v-pass'", prov)
+        self.assertIn("'Evidence integrity: verified'", prov)
+        self.assertNotRegex(read("css", "app.css"), r"\.replay-verdict\.v-held[^}]*--pass")
+
+    def test_f07_the_caveat_is_at_the_level_of_the_figure_and_the_figure_is_named(self):
+        lab = read("js", "views", "lab.js")
+        i = lab.index("lab-gen-caveat")
+        self.assertLess(i, lab.index("class: 'lab-gen'"))
+        self.assertIn("`${kb}/${n} seeds`", lab)
+        self.assertNotIn("It is not a reliability figure", lab)
+        self.assertRegex(read("css", "lab.css"), r"\.lab-gen-caveat \{[^}]*font-size: 13\.5px")
+
+    def test_f11_the_jump_button_names_the_instant(self):
+        player = read("js", "views", "player.js")
+        self.assertNotIn("'Go there'", player)
+        self.assertIn("`Go to ${timeText(d.t, pl.unit)}`", player)
+
+
 if __name__ == "__main__":
     unittest.main()

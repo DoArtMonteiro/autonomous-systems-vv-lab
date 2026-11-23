@@ -70,6 +70,7 @@ CHIPS_JS = """() => [...document.querySelectorAll('.pl-run-result')].map((r) => 
   chips: [...r.querySelectorAll('.vchip')].map((c) => ({ text: c.innerText.replace(/\\s+/g, ' ').trim(), cls: c.className, colour: getComputedStyle(c).color, border: getComputedStyle(c).borderColor })),
   failed: [...r.querySelectorAll('.pl-failed li')].map((l) => l.innerText.replace(/\\s+/g, ' ').trim()),
   clause: r.querySelector('.pl-run-clause') ? r.querySelector('.pl-run-clause').innerText.replace(/\\s+/g, ' ').trim() : null,
+  scope: r.querySelector('.pl-scope') ? r.querySelector('.pl-scope').innerText.replace(/\\s+/g, ' ').trim() : null,
   allMet: [...r.querySelectorAll('p')].map((p) => p.innerText.trim()).filter((t) => /Every requirement/.test(t)),
 }))"""
 
@@ -128,6 +129,26 @@ def main():
             facts["held_rows_compare"] = view_facts("compare", "compare", """() => ({ cells: [...document.querySelectorAll('.matrix tbody tr')].map((tr) => ({ row: tr.dataset.row || tr.querySelector('th').innerText.trim().slice(0, 40), cells: [...tr.querySelectorAll('.cell')].map((c) => c.className) })).slice(0, 14) })""", "1c-compare-safety-rows")
             facts["held_rows_lab"] = view_facts("lab", "configure", """() => ({ pills: [...document.querySelectorAll('.lab-verdicts .mini')].map((m) => m.className) })""", "1d-lab-verdict-pills")
 
+            # 1e. Walkthrough follow-up: the Compare gloss, the jump button, the ground HUD on a short window, the replay verdict.
+            open_mission(s, "lying-altimeter")
+            to_end(s)
+            facts["go_to_buttons"] = s.js("[...document.querySelectorAll('.pl-why, .pl-after, .pl-card button.link')].map((b) => b.innerText.trim()).filter((t) => /^Go /.test(t))")
+            s.page.click(".pl-head [data-action='compare']")
+            s.wait("window.__studio.view() === 'compare'", 60, "compare")
+            time.sleep(1.5)
+            facts["compare_gloss"] = s.js("(() => { const g = document.querySelector('.demo-banner .demo-gloss'); return g ? g.innerText : null; })()")
+            s.shot(f"{a.tag}-1e-compare-banner-1440x900")
+            open_mission(s, "lying-altimeter")
+            s.page.click(".pl-head [data-action='analyse']")
+            s.wait("window.__studio.view() === 'run'", 60, "run")
+            s.page.click("[data-tab='prov']")
+            s.page.click("[data-action='replay']")
+            s.wait("document.querySelector('.replay-verdict')", 120, "replay verdict")
+            time.sleep(1.0)
+            facts["replay_verdict"] = s.js("(() => { const v = document.querySelector('.replay-verdict'); return { cls: v.className, text: v.innerText.replace(/\\s+/g, ' ').trim(), colour: getComputedStyle(v).borderColor }; })()")
+            s.js("document.querySelector('.replay-verdict').scrollIntoView({ block: 'center' })")
+            s.shot(f"{a.tag}-1f-replay-integrity-1440x900")
+
             # 2. The plume at the end of a run that ended before the other one.
             open_mission(s, "late-gnss")
             pick_run(s, 0)
@@ -157,7 +178,9 @@ def main():
             s.resize(1024, 640)
             time.sleep(0.8)
             facts["pills_corridor_1024x640"] = s.js(PILLS_JS)
+            s.resize(1024, 640)
             s.shot(f"{a.tag}-3-corridor-pills-1024x640")
+            facts["hud_rows_1024x640"] = s.js("[...document.querySelectorAll('.pl-hud-row')].filter((r) => r.offsetParent !== null).map((r) => r.innerText.replace(/\\s+/g, ' ').trim())")
             pick_run(s, 0)
             s.shot(f"{a.tag}-3-corridor-pills-first-selected-1024x640")
             facts["pills_corridor_first_selected_1024x640"] = s.js(PILLS_JS)
@@ -213,6 +236,11 @@ def evaluate(facts):
         ("the Safety rules section of the run workspace has held rows and no green row", lambda: any(sec["title"] == "Safety rules" and any("v-held" in r for r in sec["rows"]) and not any("v-pass" in r for r in sec["rows"]) for sec in facts["held_rows_run"])),
         ("the Compare matrix has held (neutral) safety cells", lambda: any("v-held" in c for row in facts["held_rows_compare"]["cells"] for c in row["cells"])),
         ("the Lab verdict pills for safety are held", lambda: any("v-held" in m for m in facts["held_rows_lab"]["pills"])),
+        ("the safety scope sentence sits in the run's result next to the chip", lambda: bool(facts["safety_chip"][0]["scope"]) and "not the mission result" in facts["safety_chip"][0]["scope"]),
+        ("the jump button names the instant", lambda: bool(facts["go_to_buttons"]) and all(t.startswith("Go to ") for t in facts["go_to_buttons"])),
+        ("the Compare banner carries the gloss on words about safety", lambda: "no safety rule was broken" in (facts["compare_gloss"] or "")),
+        ("the ground HUD keeps To goal and Confidence at 1024x640", lambda: any("To goal" in r for r in facts["hud_rows_1024x640"]) and any("Confidence" in r for r in facts["hud_rows_1024x640"])),
+        ("the replay verdict is evidence integrity, neutral", lambda: "v-held" in facts["replay_verdict"]["cls"] and "evidence integrity" in facts["replay_verdict"]["text"].lower()),
         ("no script error", lambda: not facts["errors"]),
     ]
     ok = True

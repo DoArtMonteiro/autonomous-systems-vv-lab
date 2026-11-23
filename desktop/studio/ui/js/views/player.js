@@ -28,7 +28,7 @@ import { buildControl } from './control.js';
 import { sourcesInfo } from '../sources-info.js';
 import { openCatalogue } from '../env-catalogue.js';
 import { cinematicButton } from '../cinematic.js';
-import { reqView, safetyWording, SAFETY_NOTE, failureSentence, indexNumbers, statusLine, requirementWording, endChip, noFailureSentence, completionFacts, missionTone } from '../requirements.js';
+import { reqView, safetyWording, SAFETY_NOTE, failureSentence, indexNumbers, statusLine, requirementWording, endChip, noFailureSentence, completionFacts, missionTone, SAFETY_SCOPE } from '../requirements.js';
 import { conditionsName, conditionsBrief } from '../model.js';
 
 let root;
@@ -420,7 +420,7 @@ function build() {
 
   const stage = h('div', { class: 'pl-stage', id: 'pl-stage' });
   const viewport = h('div', { class: ['pl-viewport', rocket ? 'is-3d' : 'is-2d'], id: 'pl-viewport' });
-  const hud = h('div', { class: 'pl-hud', role: 'group', 'aria-label': 'Readouts at the playback time' });
+  const hud = h('div', { class: ['pl-hud', rocket ? 'is-rocket' : 'is-ground'], role: 'group', 'aria-label': 'Readouts at the playback time' });
   const phaseTag = h('div', { class: ['pl-phase', rocket ? '' : 'is-2d'], 'aria-hidden': 'true' });
   const runBar = runs.length > 1 ? h('div', { class: 'pl-runs', role: 'radiogroup', 'aria-label': 'Run shown in the scene' },
     runs.map((r, i) => h('button', { type: 'button', role: 'radio', class: 'pl-run', 'aria-checked': String(i === pl.active), dataset: { run: String(i) }, title: `${runFullName(r)} · ${shortId(r)}`, onclick: () => setActive(i) },
@@ -594,7 +594,7 @@ function onTime(t) {
   if (pl.dom.hud.hidden) { updateTransport(t); return; }
   pl.dom.hud.replaceChildren(
     h('p', { class: 'pl-hud-h' }, h('span', { class: 'pl-swatch', style: { background: run.colour } }), runFullName(run), ph.end && td ? h('span', { class: 'pl-hud-at' }, 'at contact') : null),
-    h('dl', null, readouts(run, t, rocket).map(([k, v, u, kind, title]) => h('div', { class: 'pl-hud-row', title },
+    h('dl', null, readouts(run, t, rocket).map(([k, v, u, kind, title], i) => h('div', { class: ['pl-hud-row', rocket && (i === 3 || i === 4) ? 'is-minor' : ''], title },
       h('dt', null, h('abbr', { class: `kind kind-${kind}`, title: KIND_WORD[kind] }, kind), k),
       h('dd', { class: 'mono' }, v === null ? '—' : typeof v === 'string' ? v : `${hudNum(v)}${u ? ` ${u}` : ''}`)))),
     h('p', { class: 'pl-hud-key' }, 'T true state · E controller estimate · O sensor · D derived'));
@@ -814,6 +814,8 @@ function runResult(run) {
     h('div', { class: 'pl-verdicts' },
       verdictChip(missionText, missionTone(rec), 'Mission'),
       verdictChip(safetyText, safetyTone, 'Safety rules', SAFETY_NOTE)),
+    // The scope of the safety chip, next to it: a mission requirement failed while no safety rule was broken.
+    sw.verdict === 'held' && missionTone(rec) === 'fail' ? h('p', { class: 'pl-fine pl-scope', dataset: { scope: '1' } }, SAFETY_SCOPE) : null,
     completionFacts(rec) ? h('p', { class: 'pl-run-clause small dim', dataset: { clause: '1' } }, completionFacts(rec).text) : null,
     metrics.length ? h('dl', { class: 'pl-metrics' }, metrics.map((m) => h('div', null, h('dt', null, m.label), h('dd', { class: 'mono' }, m.value === null ? '—' : `${hudNum(m.value)} ${m.unit}`)))) : null,
     failed.length ? h('ul', { class: 'pl-failed' }, failed.map((q) => h('li', null,
@@ -831,7 +833,7 @@ function changeSummary() {
       ? `${pl.runs[i].label} stays within ${d.tol} ${d.unit} of ${pl.runs[0].label} for the whole run.`
       : `${pl.runs[i].label} departs from ${pl.runs[0].label} by more than ${d.tol} ${d.unit} at ${timeText(d.t, pl.unit)}.`,
     d.t !== null ? ' ' : null,
-    d.t !== null ? h('button', { type: 'button', class: 'link small', onclick: () => { pl.cursor.pause(); pl.cursor.set(d.t); } }, 'Go there') : null));
+    d.t !== null ? h('button', { type: 'button', class: 'link small', title: 'Move the playback to the instant where the runs part', onclick: () => { pl.cursor.pause(); pl.cursor.set(d.t); } }, `Go to ${timeText(d.t, pl.unit)}`) : null));
   }
   return rows.length ? h('section', { class: 'pl-card' }, h('h2', null, 'Where the runs part'), h('ul', { class: 'pl-list' }, rows),
     h('p', { class: 'pl-fine' }, 'Derived from the recorded true positions, sample by sample. It marks where the motion differs, not why.')) : null;
@@ -846,11 +848,9 @@ function fillResult() {
       h('button', { type: 'button', class: 'btn', dataset: { action: 'reveal' }, onclick: () => revealNow() }, 'Show the result now')));
     return;
   }
-  const reqOnly = pl.runs.some((r) => r.record.safety.status === 'safe' && (r.record.requirements || []).some((q) => q.status === 'fail'));
   const heading = h('h2', { id: 'pl-result-h', tabindex: '-1' }, 'Result');
   pl.dom.resultHeading = heading;
-  clear(live).append(h('section', { class: 'pl-card pl-result', 'aria-labelledby': 'pl-result-h' }, heading, pl.runs.map((r) => runResult(r)),
-    reqOnly ? h('p', { class: 'pl-fine' }, 'A requirement can fail without any safety rule being broken. Mission requirements judge the landing or the goal; safety rules are judged on the true state throughout the run, so a hard or off-target landing can fail a requirement and still break no safety rule.') : null));
+  clear(live).append(h('section', { class: 'pl-card pl-result', 'aria-labelledby': 'pl-result-h' }, heading, pl.runs.map((r) => runResult(r))));
 }
 
 /** What follows the result: where the runs part and why it happened. Empty until the result is shown. */

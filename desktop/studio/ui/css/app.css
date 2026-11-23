@@ -395,6 +395,7 @@ span.req-t { border-color: transparent; color: var(--fg-3); cursor: default; }
 .cmds code { display: block; background: var(--bg-2); border: 1px solid var(--rule); border-radius: var(--r); padding: 5px 8px; overflow-wrap: anywhere; font-size: 12px; }
 .replay-verdict { display: flex; gap: 8px; align-items: center; padding: 8px 10px; border-radius: var(--r); border: 1px solid var(--rule); }
 .replay-verdict.v-pass { border-color: var(--pass); background: var(--pass-wash); }
+.replay-verdict.v-held { border-color: var(--rule-strong); background: transparent; }
 .replay-verdict.v-unsafe { border-color: var(--unsafe); background: var(--unsafe-wash); }
 .replay-verdict.v-partial { border-color: var(--fail); background: var(--fail-wash); }
 .replay-reeval { margin: 6px 0 0; padding: 6px 10px; border-left: 3px solid var(--fail); background: var(--fail-wash); font-size: 13px; }

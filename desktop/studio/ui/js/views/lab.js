@@ -654,14 +654,14 @@ function renderGeneralisation(el) {
   const fe = failsBy(g.exp);
   const labels = [...new Set([...fb.keys(), ...fe.keys()])];
   add(box, 
+    h('p', { class: 'lab-gen-caveat', dataset: { caveat: '1' } }, `An estimate on ${n} development seeds of an idealised model: not a reliability figure, and it does not validate the change.`),
     h('div', { class: 'lab-gen' },
-      h('div', null, h('p', { class: 'lab-gen-n' }, `${kb}/${n}`), h('p', { class: 'small' }, `baseline conditions meet every requirement and safety rule (95 % interval ${lb.toFixed(0)} to ${ub.toFixed(0)} %)`)),
-      h('div', null, h('p', { class: 'lab-gen-n' }, `${ke}/${n}`), h('p', { class: 'small' }, `your conditions meet every requirement and safety rule (95 % interval ${le.toFixed(0)} to ${ue.toFixed(0)} %)`))),
+      h('div', null, h('p', { class: 'lab-gen-n' }, `${kb}/${n} seeds`), h('p', { class: 'small' }, `with the baseline conditions meet every requirement and safety rule (95 % interval ${lb.toFixed(0)} to ${ub.toFixed(0)} %)`)),
+      h('div', null, h('p', { class: 'lab-gen-n' }, `${ke}/${n} seeds`), h('p', { class: 'small' }, `with your conditions meet every requirement and safety rule (95 % interval ${le.toFixed(0)} to ${ue.toFixed(0)} %)`))),
     h('p', { class: 'small' }, `Seed by seed: ${better} improved, ${worse} got worse, ${n - better - worse} unchanged. Seeds ${g.seeds[0]} to ${g.seeds[n - 1]}.`),
     labels.length ? h('table', { class: 'grid-table lab-table' }, h('thead', null, h('tr', null, h('th', null, 'Requirement not met'), h('th', null, 'Baseline runs'), h('th', null, 'Your runs'))),
       h('tbody', null, labels.map((l) => h('tr', null, h('td', null, l), h('td', { class: 'mono' }, String(fb.get(l) || 0)), h('td', { class: 'mono' }, String(fe.get(l) || 0)))))) : null,
     g.errors.length ? h('p', { class: 'small error-text' }, `${g.errors.length} run${g.errors.length > 1 ? 's' : ''} could not be computed: ${g.errors[0]}`) : null,
-    h('p', { class: 'small dim' }, `An estimate on ${n} development seeds of this idealised model. It is not a reliability figure and does not validate the change.`),
     h('div', { class: 'row' }, h('button', { type: 'button', class: 'btn btn-quiet', onclick: () => { lab.gen = null; renderResult(); } }, 'Clear')));
 }
 

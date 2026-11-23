@@ -8,7 +8,7 @@ import path from 'node:path';
 // fileURLToPath keeps a path with spaces or '&' (for example "v&v lab") intact.
 const here = path.dirname(fileURLToPath(import.meta.url));
 const mod = await import(pathToFileURL(path.join(here, '..', 'desktop', 'studio', 'ui', 'js', 'requirements.js')).href);
-const { missionTone, completionFacts, noFailureSentence, safetyWording, reqView, failureSentence, plainName, headlineChange, indexNumbers, shortText, SAFETY_NOTE, requirementWording, statusLine, endChip } = mod;
+const { SAFETY_SCOPE, EXPECTATION_GLOSS, missionTone, completionFacts, noFailureSentence, safetyWording, reqView, failureSentence, plainName, headlineChange, indexNumbers, shortText, SAFETY_NOTE, requirementWording, statusLine, endChip } = mod;
 const model = await import(pathToFileURL(path.join(here, '..', 'desktop', 'studio', 'ui', 'js', 'model.js')).href);
 const { conditionsName, conditionsShared, displayRunLabel, verdictOfSafety, verdictOfOutcome, conditionsBrief, verdictOfRequirement, statusClassOf, plumeLengthAt } = model;
 
@@ -340,6 +340,14 @@ test('no plume is drawn after the last sample, and it is drawn at and before it'
   assert.equal(plumeLengthAt({ times: [0, 1], throttle: [0.5, 0.5], engine: [1, 2] }, 1), 0);   // engine off
   assert.equal(plumeLengthAt({ times: [0, 1], throttle: [0.5, 0.5] }, 0.5), 6 + 22 * 0.5);     // no engine channel: throttle decides
   assert.equal(plumeLengthAt({ times: [] }, 0), 0);
+});
+
+test('the two scope sentences name safety rules and requirements apart and never write a bare safe', () => {
+  assert.match(SAFETY_SCOPE, /not the mission result/);
+  assert.match(SAFETY_SCOPE, /a requirement can fail without any safety rule being broken/);
+  assert.match(EXPECTATION_GLOSS, /no safety rule was broken/);
+  assert.match(EXPECTATION_GLOSS, /mission requirements are separate verdicts/);
+  for (const t of [SAFETY_SCOPE, EXPECTATION_GLOSS]) assert.doesNotMatch(t, /safe/i);
 });
 
 console.log(`${n} tests passed`);
