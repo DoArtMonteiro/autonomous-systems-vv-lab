@@ -2,7 +2,7 @@
 
 Agent role: `fable-strategic-advisor`. Agent-based review or consultation, not human review. Final report recorded verbatim, with paths anonymised and backslashes shown as forward slashes.
 
-**Decision.** Whether and how to run the single permitted M10 redesign. The risk is spending the one attempt on a design whose mechanism is unverified, or softening owner-fixed criteria after predicting they fail. All three items are owner decisions required in writing before stage 1; this is advice to Opus, not approval.
+**Decision.** Whether and how to run the single permitted M10 redesign. The risk is spending the one attempt on a design whose mechanism is unverified, or softening pre-registered criteria after predicting they fail. All three items are owner decisions required in writing before stage 1; this is advice to Opus, not approval.
 
 **Framing problems**
 - **Mechanism unverified.** The pre-registration says the 58 U are "compatível, mas não demonstrada" with missing NIS rejection (sections 1.1, 2).
@@ -21,7 +21,7 @@ Owner option: an abstention-only ablation arm on G1, declared now and report-onl
 **2. Regression limits**
 - **Keep strict.** Relaxing a limit after predicting its failure is the standard-lowering the owner excluded.
 - **Narrow it to one cell.** Strategy line 85 treats `gnss_bias` as an accepted `E0` limit, always shown in U. I cannot tell whether that row is owner-approved or only a recommendation; confirm it.
-- **The binding failure.** If the row stands, only `altimeter_bias` + `gnss_dropout` (+19 U) fails in advance. The directive names it, no decision accepted it, and its only fix (bounded chase) is rejected.
+- **The binding failure.** If the row stands, only `altimeter_bias` + `gnss_dropout` (+19 U) fails in advance. The owner mandate names it, no decision accepted it, and its only fix (bounded chase) is rejected.
 - **Consequence.** No V1 result changes any owner decision. Tell the owner the global verdict is no-go in advance and the run is a V1-only closing experiment.
 - **Still run it** (judgement). The real cost is implementation and review, not the 13 minutes. It delivers the single-binary rerun, per-seed records, the never-executed test 9, and a closed finding instead of a recorded symptom.
 
