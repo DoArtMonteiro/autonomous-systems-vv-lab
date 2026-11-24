@@ -244,7 +244,7 @@ def player_and_cinematic(s, ids, shots):
     return chooser
 
 
-def cinematic_checks(s, studio_pid, ids, shots):
+def cinematic_checks(s, proc, ids, shots):
     base, exp = ids
     out = {}
     for index, (name, rid) in enumerate((("experiment", exp), ("baseline", base))):
@@ -254,7 +254,7 @@ def cinematic_checks(s, studio_pid, ids, shots):
         s.page.click(".pl-head [data-action='cinematic']")
         kids = []
         while time.time() - t0 < 40 and not kids:
-            kids = godot_children(studio_pid)
+            kids = godot_children(proc.pid)
             time.sleep(0.25)
         check(f"Cinematic ({name}): the module started", bool(kids))
         if not kids:
@@ -273,14 +273,14 @@ def cinematic_checks(s, studio_pid, ids, shots):
             first = None
             text = ""
             while time.time() - t0 < 90:
-                log = newest_log()
+                log = newest_log(proc)
                 text = open(log, encoding="utf-8", errors="replace").read() if log and os.path.getmtime(log) >= t0 - 1 else ""
                 if "FIRST_FRAME" in text:
                     first = time.time() - t0
                     break
                 time.sleep(0.5)
             check("Cinematic (experiment): the first frame was drawn and Direct3D 12 is the renderer", first is not None and "D3D12" in text and "ERROR" not in text, f"{first and round(first, 1)} s")
-            for k in godot_children(studio_pid):
+            for k in godot_children(proc.pid):
                 subprocess.run(["taskkill", "/F", "/PID", str(k["pid"])], capture_output=True)
             time.sleep(1.5)
             exe = cmd.split('"')[1] if cmd.startswith('"') else cmd.split()[0]
@@ -291,7 +291,7 @@ def cinematic_checks(s, studio_pid, ids, shots):
             r = godot_launch.run([console] + args + ["--t", f"{0.55 * span:.1f}", "--shot", shot], capture_output=True, text=True, timeout=240)
             check("Cinematic (experiment): the module's own --shot wrote the picture with those arguments", os.path.isfile(shot) and os.path.getsize(shot) > 50_000 and "SHOT" in r.stdout, f"{os.path.getsize(shot) if os.path.isfile(shot) else 0} bytes")
         else:
-            for k in godot_children(studio_pid):
+            for k in godot_children(proc.pid):
                 subprocess.run(["taskkill", "/F", "/PID", str(k["pid"])], capture_output=True)
             time.sleep(1.5)
     FACTS["cinematic_args"] = out
@@ -427,7 +427,7 @@ def main():
                 reference_chip(s)
                 player_and_cinematic(s, ids, a.shots)
                 if not a.no_cinematic:
-                    cinematic_checks(s, proc.pid, ids, a.shots)
+                    cinematic_checks(s, proc, ids, a.shots)
                 narrow_player(s)
                 geo_1024(s)
             except Exception as e:  # noqa: BLE001

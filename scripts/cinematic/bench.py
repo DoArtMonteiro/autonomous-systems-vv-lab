@@ -20,7 +20,6 @@ import argparse
 import json
 import os
 import platform
-import shutil
 import subprocess
 import sys
 import threading
@@ -52,48 +51,55 @@ def run_one(a, profile):
     cmd = [a.godot, *driver, "--path", a.project, "--resolution", "1440x900", "--", "--run", a.run, "--env", a.env,
            "--profile", profile, "--camera", "director", "--bench", out_json, "--bench-seconds", str(a.seconds)]
     t0 = time.perf_counter()
+    # godot_launch gives every run its own empty user data and cache folders, so each run starts with empty
+    # shader and pipeline caches. Cold-start numbers are therefore not comparable with measurements made
+    # before this change, which reused the caches of the real user data folder.
     proc = godot_launch.popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
-    gp = godot_process(proc)
-    peak = {"rss": 0, "private": 0}
-    done = threading.Event()
+    try:
+        gp = godot_process(proc)
+        peak = {"rss": 0, "private": 0}
+        done = threading.Event()
 
-    def sample():
-        while not done.is_set():
-            try:
-                m = gp.memory_info()
-                peak["rss"] = max(peak["rss"], m.rss)
-                peak["private"] = max(peak["private"], getattr(m, "private", 0))
-            except psutil.Error:
-                pass
-            time.sleep(0.1)
+        def sample():
+            while not done.is_set():
+                try:
+                    m = gp.memory_info()
+                    peak["rss"] = max(peak["rss"], m.rss)
+                    peak["private"] = max(peak["private"], getattr(m, "private", 0))
+                except psutil.Error:
+                    pass
+                time.sleep(0.1)
 
-    th = threading.Thread(target=sample, daemon=True)
-    th.start()
-    first = None
-    lines = []
-    for line in proc.stdout:
-        lines.append(line.rstrip())
-        if line.startswith("FIRST_FRAME") and first is None:
-            first = time.perf_counter() - t0
-    proc.wait(timeout=600)
-    done.set()
-    th.join()
-    for folder in proc.godot_plan.scratch.values():  # the scratch user data of this run
-        shutil.rmtree(folder, ignore_errors=True)
-    with open(out_json, encoding="utf-8") as f:
-        r = json.load(f)
-    r["harness"] = {
-        "command": " ".join(cmd[1:]).replace(REPO, "<repo>"),
-        "wall_s_to_first_frame": round(first, 3) if first is not None else None,
-        "engine_ms_to_first_frame": next((int(l.split()[1]) for l in lines if l.startswith("FIRST_FRAME")), None),
-        "peak_working_set_bytes": peak["rss"],
-        "peak_private_bytes": peak["private"],
-        "exit": proc.returncode,
-        "log_tail": [l for l in lines if l.startswith("cinematic")][-3:],
-    }
-    with open(out_json, "w", encoding="utf-8") as f:
-        json.dump(r, f, indent=1)
-    return r
+        th = threading.Thread(target=sample, daemon=True)
+        th.start()
+        first = None
+        lines = []
+        for line in proc.stdout:
+            lines.append(line.rstrip())
+            if line.startswith("FIRST_FRAME") and first is None:
+                first = time.perf_counter() - t0
+        proc.wait(timeout=600)
+        done.set()
+        th.join()
+        with open(out_json, encoding="utf-8") as f:
+            r = json.load(f)
+        r["harness"] = {
+            "command": " ".join(cmd[1:]).replace(REPO, "<repo>"),
+            "wall_s_to_first_frame": round(first, 3) if first is not None else None,
+            "engine_ms_to_first_frame": next((int(l.split()[1]) for l in lines if l.startswith("FIRST_FRAME")), None),
+            "peak_working_set_bytes": peak["rss"],
+            "peak_private_bytes": peak["private"],
+            "exit": proc.returncode,
+            "log_tail": [l for l in lines if l.startswith("cinematic")][-3:],
+        }
+        with open(out_json, "w", encoding="utf-8") as f:
+            json.dump(r, f, indent=1)
+        return r
+    finally:
+        if proc.poll() is None:
+            proc.kill()  # only the process started here
+        for folder in proc.godot_plan.scratch.values():  # the scratch user data and cache of this run
+            godot_launch.remove_scratch(folder)
 
 
 def main():

@@ -189,10 +189,41 @@ def _mentions(value, roots, environ):
     return False
 
 
+def remove_scratch(folder):
+    """Removes a scratch folder this module's helpers created. It refuses (returns False) anything that is
+    not a folder whose first component under the temporary folder starts with `vv-`: a drive or profile
+    root, the temporary folder itself, a path elsewhere. Returns True when it removed the folder."""
+    try:
+        real = os.path.normcase(os.path.realpath(folder))
+        temp = os.path.normcase(os.path.realpath(tempfile.gettempdir()))
+    except (OSError, ValueError, TypeError):
+        return False
+    rel = os.path.relpath(real, temp) if os.path.splitdrive(real)[0] == os.path.splitdrive(temp)[0] else ".."
+    parts = [p for p in rel.replace("\\", "/").split("/") if p]
+    if not parts or parts[0] in (".", "..") or not parts[0].startswith("vv-"):
+        return False
+    for protected in (os.environ.get("USERPROFILE"), os.environ.get("APPDATA"), os.environ.get("LOCALAPPDATA"), os.path.expanduser("~")):
+        if protected and real == os.path.normcase(os.path.realpath(protected)):
+            return False
+    shutil.rmtree(real, ignore_errors=True)
+    return True
+
+
 def plan_launch(exe, environ, local_appdata, appdata, *, port=None, allow_release=False,
                 documents=None, identifier_reader=embedded_identifiers, make_scratch=None):
     """Decides how to start `exe`, or raises IsolationError. Touches no real profile; with the default
-    arguments it reads `exe` once and creates scratch folders for the variables `environ` leaves unset."""
+    arguments it reads `exe` once and creates scratch folders for the variables `environ` leaves unset.
+    When it refuses after creating folders, it removes them."""
+    created = []
+    try:
+        return _plan_launch(exe, environ, local_appdata, appdata, port, allow_release, documents, identifier_reader, make_scratch, created)
+    except BaseException:
+        for folder in created:
+            remove_scratch(folder)
+        raise
+
+
+def _plan_launch(exe, environ, local_appdata, appdata, port, allow_release, documents, identifier_reader, make_scratch, created):
     if not local_appdata or not appdata:
         raise IsolationError("LOCALAPPDATA and APPDATA must be known to check the launch")
     roots = protected_roots(local_appdata, appdata, documents)
@@ -227,6 +258,7 @@ def plan_launch(exe, environ, local_appdata, appdata, *, port=None, allow_releas
         if env.get(name):
             continue
         folder = make_scratch(name) if make_scratch else tempfile.mkdtemp(prefix=f"vv-{name.lower().replace('_', '-')}-")
+        created.append(folder)
         env[name] = folder
         scratch[name] = folder
     for name in SCRATCH_VARIABLES:
@@ -241,9 +273,11 @@ def plan_launch(exe, environ, local_appdata, appdata, *, port=None, allow_releas
     redirects = {}
     for name in ("APPDATA", "LOCALAPPDATA"):
         redirects[name] = make_scratch(name) if make_scratch else tempfile.mkdtemp(prefix=f"vv-{name.lower()}-")
+        created.append(redirects[name])
         env[name] = redirects[name]
         for real in (appdata, local_appdata):
-            if is_under(redirects[name], ntpath.join(real, CINEMATIC_FOLDER)) or normalise(redirects[name]) in (normalise(appdata), normalise(local_appdata)):
+            if (is_under(redirects[name], ntpath.join(real, CINEMATIC_FOLDER)) or any(is_under(redirects[name], r) for r in roots)
+                    or normalise(redirects[name]) in (normalise(appdata), normalise(local_appdata))):
                 raise IsolationError(f"{name} for the child resolves to {redirects[name]}, the installed data or the real profile root")
     return LaunchPlan(os.path.abspath(exe), env, scratch, ids, redirects)
 
@@ -304,7 +338,7 @@ def stop(proc):
         except subprocess.TimeoutExpired:
             pass
     for folder in getattr(proc, "redirect_dirs", []):
-        shutil.rmtree(folder, ignore_errors=True)
+        remove_scratch(folder)
 
 
 def child_pids(parent_pid, name_prefix):

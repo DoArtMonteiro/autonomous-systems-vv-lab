@@ -61,25 +61,51 @@ def plan_godot(argv, environ, appdata, local_appdata, *, make_scratch=None, app_
     if not argv:
         raise sl.IsolationError("empty Godot command line")
     make = make_scratch or (lambda name: tempfile.mkdtemp(prefix=f"vv-godot-{name.lower()}-"))
-    env = dict(environ)
-    scratch = {}
-    for name in ("APPDATA", "LOCALAPPDATA") + (POSIX_REDIRECTS if os.name != "nt" else ()):
-        scratch[name] = make(name)
-        env[name] = scratch[name]
-    roots = protected_godot_roots(appdata, local_appdata, app_names)
-    user_dirs = {}
-    for name in app_names:
-        user = ntpath.join(env["APPDATA"], name)
-        user_dirs[name] = user
-        for folder in (user, ntpath.join(env["LOCALAPPDATA"], name), env["APPDATA"], env["LOCALAPPDATA"]):
-            if any(sl.is_under(folder, r) for r in roots) or sl.normalise(folder) in (sl.normalise(appdata), sl.normalise(local_appdata)):
-                raise sl.IsolationError(f"Godot's user folder would resolve to {folder}, the installed module's data or the real profile root")
-    return GodotPlan(list(argv), env, scratch, user_dirs)
+    created = []
+    try:
+        env = dict(environ)
+        scratch = {}
+        for name in ("APPDATA", "LOCALAPPDATA") + (POSIX_REDIRECTS if os.name != "nt" else ()):
+            scratch[name] = make(name)
+            created.append(scratch[name])
+            env[name] = scratch[name]
+        roots = protected_godot_roots(appdata, local_appdata, app_names)
+        # Where Godot keeps user data and cache: APPDATA and LOCALAPPDATA on Windows, the XDG folders elsewhere.
+        data_var, cache_var = ("APPDATA", "LOCALAPPDATA") if os.name == "nt" else ("XDG_DATA_HOME", "XDG_CACHE_HOME")
+        user_dirs = {}
+        for name in app_names:
+            user = ntpath.join(env[data_var], name)
+            user_dirs[name] = user
+            for folder in (user, ntpath.join(env[cache_var], name), env[data_var], env[cache_var]):
+                if any(sl.is_under(folder, r) for r in roots) or sl.normalise(folder) in (sl.normalise(appdata), sl.normalise(local_appdata)):
+                    raise sl.IsolationError(f"Godot's user folder would resolve to {folder}, the installed module's data or the real profile root")
+        return GodotPlan(list(argv), env, scratch, user_dirs)
+    except BaseException:
+        for folder in created:
+            sl.remove_scratch(folder)
+        raise
+
+
+def real_roots(environ=None):
+    """The real user data and cache roots: APPDATA and LOCALAPPDATA on Windows; off Windows the XDG data
+    and cache folders, or their defaults under the home folder."""
+    environ = os.environ if environ is None else environ
+    if os.name == "nt":
+        return environ.get("APPDATA", ""), environ.get("LOCALAPPDATA", "")
+    home = os.path.expanduser("~")
+    return (environ.get("XDG_DATA_HOME") or os.path.join(home, ".local", "share"),
+            environ.get("XDG_CACHE_HOME") or os.path.join(home, ".cache"))
 
 
 def _plan(argv, kw):
     environ = kw.pop("env", None)
-    return plan_godot(argv, os.environ if environ is None else environ, os.environ.get("APPDATA", ""), os.environ.get("LOCALAPPDATA", ""))
+    appdata, local_appdata = real_roots()
+    return plan_godot(argv, os.environ if environ is None else environ, appdata, local_appdata)
+
+
+def remove_scratch(folder):
+    """Removes a scratch folder of a plan (only a `vv-` folder under the temporary folder)."""
+    return sl.remove_scratch(folder)
 
 
 def run(argv, **kw):
@@ -93,10 +119,8 @@ def run(argv, **kw):
         return result
     finally:
         if not keep:
-            import shutil
-
             for folder in plan.scratch.values():
-                shutil.rmtree(folder, ignore_errors=True)
+                sl.remove_scratch(folder)
 
 
 def popen(argv, **kw):

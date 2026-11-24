@@ -13,6 +13,7 @@ import ast
 import json
 import os
 import re
+import shutil
 import sys
 import tempfile
 import unittest
@@ -385,6 +386,11 @@ class GodotLaunch(unittest.TestCase):
             "import subprocess\nsubprocess.run([self.godot, '--headless', '--path', P])\n",
             "import subprocess\nsubprocess.Popen(cmd_godot)\n",
             "import subprocess\nsubprocess.run([console] + args)\n",
+            "import subprocess as sp\n# godot\nsp.run(['x'])\n",
+            "from subprocess import run\n# godot\nrun(['x'])\n",
+            "import subprocess\n# VV_GODOT\ncmd = [g, '--headless']\nsubprocess.run(cmd)\n",
+            "import os\n# godot\nos.spawnv(os.P_WAIT, g, [g])\n",
+            "import subprocess\n# godot\nsubprocess.Popen(cmd)\n",
             "import subprocess\nsubprocess.check_output(['Godot_v4.7.2.exe'])\n",
         ]
         for src in bad:
@@ -407,6 +413,225 @@ class GodotLaunch(unittest.TestCase):
                 with self.subTest(file=path.name):
                     if "--headless" in text or "Popen" in text or "godot_launch.run" in text:
                         self.assertIn("import godot_launch", text)
+
+
+def _signatures(tree):
+    out = {}
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef):
+            a = node.args
+            pos = [x.arg for x in a.posonlyargs + a.args]
+            required = pos[:len(pos) - len(a.defaults)]
+            kwonly = [x.arg for x in a.kwonlyargs]
+            kw_required = [x.arg for x, d in zip(a.kwonlyargs, a.kw_defaults) if d is None]
+            out[node.name] = {"pos": pos, "required": required, "varargs": a.vararg is not None, "kwonly": kwonly,
+                              "kw_required": kw_required, "kwargs": a.kwarg is not None}
+    return out
+
+
+def _fits(sig, call):
+    if any(isinstance(x, ast.Starred) for x in call.args) or any(k.arg is None for k in call.keywords):
+        return True  # arguments unpacked at run time: not decidable here
+    n = len(call.args)
+    names = {k.arg for k in call.keywords}
+    if n > len(sig["pos"]) and not sig["varargs"]:
+        return False
+    if not sig["kwargs"] and not names <= set(sig["pos"][n:]) | set(sig["kwonly"]):
+        return False
+    given = set(sig["pos"][:n]) | names
+    return set(sig["required"]) <= given and set(sig["kw_required"]) <= names
+
+
+def arity_errors(source: str, modules: dict) -> list[str]:
+    """Calls whose arguments do not fit the signature of the function they name, for functions defined in
+    this file, imported with `from module import name` or called as `module.name` from the helper modules
+    (`modules`: module name -> signatures). py_compile cannot see these: a changed signature that leaves a
+    caller behind fails only when that caller runs."""
+    tree = ast.parse(source)
+    local = _signatures(tree)
+    imported = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module in modules:
+            for alias in node.names:
+                if alias.name in modules[node.module]:
+                    imported[alias.asname or alias.name] = modules[node.module][alias.name]
+    found = []
+    for call in _calls(tree):
+        sig = None
+        if isinstance(call.func, ast.Name):
+            sig = local.get(call.func.id) or imported.get(call.func.id)
+        elif isinstance(call.func, ast.Attribute) and isinstance(call.func.value, ast.Name) and call.func.value.id in modules:
+            sig = modules[call.func.value.id].get(call.func.attr)
+        if sig is not None and not _fits(sig, call):
+            found.append(f"line {call.lineno}: {ast.unparse(call.func)}({len(call.args)} positional, {sorted(k.arg for k in call.keywords if k.arg)}) does not fit its signature")
+    return found
+
+
+class HelperArity(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.modules = {p.stem: _signatures(ast.parse(p.read_text(encoding="utf-8"))) for p in STUDIO_TESTS.glob("*.py")}
+
+    def test_the_checker_catches_a_stale_call(self):
+        modules = {"helper": _signatures(ast.parse("def newest_log(proc):\n    pass\ndef launch(exe, env, port, *, allow_release=False):\n    pass\n"))}
+        for src in ("from helper import newest_log\nnewest_log()\n", "from helper import newest_log\nnewest_log(1, 2)\n",
+                    "from helper import launch\nlaunch(1, 2)\n", "from helper import launch\nlaunch(1, 2, 3, 4)\n",
+                    "from helper import launch\nlaunch(1, 2, 3, other=True)\n", "import helper\nhelper.launch(1)\n",
+                    "def f(a):\n    pass\nf()\n"):
+            with self.subTest(src=src):
+                self.assertTrue(arity_errors(src, modules), src)
+        for src in ("from helper import newest_log\nnewest_log(p)\n", "from helper import launch\nlaunch(1, 2, 3, allow_release=True)\n",
+                    "from helper import launch\nlaunch(*a)\n", "import helper\nhelper.launch(1, 2, port=3)\n"):
+            with self.subTest(src=src):
+                self.assertEqual(arity_errors(src, modules), [], src)
+
+    def test_every_call_of_a_helper_function_fits_its_signature(self):
+        files = (sorted(STUDIO_TESTS.glob("*.py")) + sorted((ROOT / "tests").glob("test_cinematic_*.py"))
+                 + sorted((ROOT / "scripts" / "cinematic").glob("*.py")))
+        self.assertGreater(len(files), 15)
+        for path in files:
+            with self.subTest(file=str(path.relative_to(ROOT))):
+                self.assertEqual(arity_errors(path.read_text(encoding="utf-8"), self.modules), [])
+
+    def test_newest_log_takes_the_studio_process(self):
+        self.assertEqual(self.modules["installed_spotcheck"]["newest_log"]["required"], ["proc"])
+        for name in ("ux_journeys", "installed_spotcheck"):
+            text = (STUDIO_TESTS / f"{name}.py").read_text(encoding="utf-8")
+            for call in _calls(ast.parse(text)):
+                if _dotted(call.func) == "newest_log":
+                    self.assertEqual([_dotted(a) for a in call.args], ["proc"], name)
+
+
+class ScratchRemoval(unittest.TestCase):
+    def test_only_vv_folders_directly_under_the_temp_folder_are_removed(self):
+        temp = tempfile.gettempdir()
+        with tempfile.TemporaryDirectory() as outside:
+            mine = tempfile.mkdtemp(prefix="vv-test-removal-")
+            nested = os.path.join(tempfile.mkdtemp(prefix="vv-test-removal-"), "inner")
+            os.makedirs(nested)
+            other = tempfile.mkdtemp(prefix="other-")
+            try:
+                self.assertTrue(sl.remove_scratch(mine))
+                self.assertFalse(os.path.exists(mine))
+                self.assertTrue(sl.remove_scratch(nested))  # a folder inside a vv- folder is removed too
+                self.assertFalse(os.path.exists(nested))
+                self.assertFalse(sl.remove_scratch(other), "no vv- prefix")
+                self.assertTrue(os.path.isdir(other))
+                self.assertFalse(sl.remove_scratch(outside), "not under the temporary folder")
+                self.assertTrue(os.path.isdir(outside))
+                self.assertFalse(sl.remove_scratch(temp), "the temporary folder itself")
+                self.assertTrue(os.path.isdir(temp))
+                for refused in (os.path.dirname(temp), os.path.abspath(os.sep), os.path.expanduser("~"), "", "relative-vv-x"):
+                    with self.subTest(path=refused):
+                        self.assertFalse(sl.remove_scratch(refused))
+                self.assertTrue(os.path.isdir(os.path.expanduser("~")))
+            finally:
+                for d in (mine, os.path.dirname(nested), other):
+                    shutil.rmtree(d, ignore_errors=True)
+
+    def test_a_profile_root_under_a_vv_name_is_not_removed(self):
+        from unittest import mock
+
+        folder = tempfile.mkdtemp(prefix="vv-test-profile-")
+        try:
+            with mock.patch.dict("os.environ", {"USERPROFILE": folder}):
+                self.assertFalse(sl.remove_scratch(folder))
+            self.assertTrue(os.path.isdir(folder))
+        finally:
+            shutil.rmtree(folder, ignore_errors=True)
+
+    def test_a_refused_studio_plan_removes_the_folders_it_made(self):
+        made = []
+
+        def make(name):
+            if name == "LOCALAPPDATA":  # asked for last: the hostile child folder
+                return rf"{LOCAL}\{RELEASE}\x"
+            folder = tempfile.mkdtemp(prefix="vv-test-plan-")
+            made.append(folder)
+            return folder
+
+        try:
+            with self.assertRaises(sl.IsolationError):
+                sl.plan_launch(EXE, {}, LOCAL, ROAM, identifier_reader=lambda _e: {DEV}, make_scratch=make)
+            self.assertTrue(made)
+            self.assertFalse([d for d in made if os.path.exists(d)])
+        finally:
+            for d in made:
+                shutil.rmtree(d, ignore_errors=True)
+
+    def test_a_refused_godot_plan_removes_the_folders_it_made(self):
+        made = []
+
+        def make(name):
+            if name == "LOCALAPPDATA":  # asked for second: the hostile folder
+                return CINEMATIC_USER
+            folder = tempfile.mkdtemp(prefix="vv-test-godot-")
+            made.append(folder)
+            return folder
+
+        try:
+            with self.assertRaises(sl.IsolationError):
+                gl.plan_godot([GODOT], {}, ROAM, LOCAL, make_scratch=make)
+            self.assertTrue(made)
+            self.assertFalse([d for d in made if os.path.exists(d)])
+        finally:
+            for d in made:
+                shutil.rmtree(d, ignore_errors=True)
+
+    def test_godot_run_removes_its_scratch_folders(self):
+        import sys
+
+        result = gl.run([sys.executable, "-c", "import os; print(os.environ['APPDATA'])"], capture_output=True, text=True)
+        folder = result.stdout.strip()
+        self.assertTrue(os.path.basename(folder).startswith("vv-godot-"), folder)
+        self.assertFalse(os.path.exists(folder))
+        self.assertTrue(all(not os.path.exists(f) for f in result.godot_plan.scratch.values()))
+
+    def test_stop_removes_the_child_redirect_folders_and_only_those(self):
+        from types import SimpleNamespace
+
+        mine = tempfile.mkdtemp(prefix="vv-test-stop-")
+        other = tempfile.mkdtemp(prefix="notmine-")
+        try:
+            proc = SimpleNamespace(poll=lambda: 0, redirect_dirs=[mine, other, os.path.expanduser("~")])
+            sl.stop(proc)
+            self.assertFalse(os.path.exists(mine))
+            self.assertTrue(os.path.isdir(other))
+            self.assertTrue(os.path.isdir(os.path.expanduser("~")))
+        finally:
+            shutil.rmtree(mine, ignore_errors=True)
+            shutil.rmtree(other, ignore_errors=True)
+
+
+class GodotOffWindows(unittest.TestCase):
+    def shim(self, environ):
+        from types import SimpleNamespace
+
+        return SimpleNamespace(name="posix", environ=environ, path=os.path)
+
+    def test_real_roots_use_the_xdg_folders_or_the_home_defaults(self):
+        from unittest import mock
+
+        with mock.patch.object(gl, "os", self.shim({})):
+            home = os.path.expanduser("~")
+            self.assertEqual(gl.real_roots(), (os.path.join(home, ".local", "share"), os.path.join(home, ".cache")))
+        with mock.patch.object(gl, "os", self.shim({"XDG_DATA_HOME": "/x/data", "XDG_CACHE_HOME": "/x/cache"})):
+            self.assertEqual(gl.real_roots(), ("/x/data", "/x/cache"))
+
+    def test_the_plan_redirects_the_xdg_folders_and_refuses_the_real_installed_one(self):
+        from unittest import mock
+
+        with mock.patch.object(gl, "os", self.shim({})):
+            p = gl.plan_godot([GODOT], {}, "/home/u/.local/share", "/home/u/.cache", make_scratch=lambda name: f"/scratch/{name.lower()}")
+            self.assertEqual(set(p.scratch), {"APPDATA", "LOCALAPPDATA", *gl.POSIX_REDIRECTS})
+            self.assertEqual(p.env["XDG_DATA_HOME"], "/scratch/xdg_data_home")
+            self.assertEqual(sl.normalise(p.user_dir), sl.normalise("/scratch/xdg_data_home/VV Lab Cinematic"))
+            with self.assertRaises(sl.IsolationError):
+                gl.plan_godot([GODOT], {}, "/home/u/.local/share", "/home/u/.cache",
+                              make_scratch=lambda name: "/home/u/.local/share/VV Lab Cinematic" if name == "XDG_DATA_HOME" else f"/scratch/{name.lower()}")
+            with self.assertRaises(sl.IsolationError):
+                gl.plan_godot([GODOT], {}, "/home/u/.local/share", "/home/u/.cache",
+                              make_scratch=lambda name: "/home/u/.local/share" if name == "XDG_DATA_HOME" else f"/scratch/{name.lower()}")
 
 
 class NetworkPathsAndDocuments(unittest.TestCase):
@@ -678,9 +903,14 @@ def launch_violations(source: str) -> list[str]:
 
 def godot_violations(source: str) -> list[str]:
     """A process start whose command mentions Godot (or a variable called console, the Godot console
-    executable) outside godot_launch: Godot started that way keeps its user data in the real profile."""
+    executable) outside godot_launch: Godot started that way keeps its user data in the real profile.
+    A file that mentions Godot at all is also held to launch_violations: no Popen, no aliases or
+    from-imports of subprocess/os spawners, no os.spawn*, and every other subprocess call must be on
+    the closed allowlist (so a command held in a variable cannot start Godot unseen)."""
     tree = ast.parse(source)
     found = []
+    if "godot" in source.lower():
+        found += [f"mentions Godot: {v}" for v in launch_violations(source)]
     for call in _calls(tree):
         name = _dotted(call.func)
         if name in SPAWNERS or name.endswith("Popen"):

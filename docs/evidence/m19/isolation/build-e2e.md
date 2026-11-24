@@ -1,6 +1,6 @@
 # Construção de ponta a ponta com as verificações de identidade
 
-Executada em 2026-11-24, em `D:\vvwt\safe` (ramo `feat/m19-studio-isolation`), numa máquina Windows 11 Pro 10.0.26300, com PowerShell 5.1 e Node 24.18.0 (npm 12.0.2). `TAURI_CONFIG` não estava definida. Nenhum executável nem instalador produzido foi lançado ou instalado; a Studio instalada estava fechada e não foi tocada.
+Executada em 2026-11-24, numa cópia de trabalho do repositório, `<worktree>` (ramo `feat/m19-studio-isolation`), numa máquina Windows 11 Pro 10.0.26300, com PowerShell 5.1 e Node 24.18.0 (npm 12.0.2). `TAURI_CONFIG` não estava definida. Nenhum executável nem instalador produzido foi lançado ou instalado; a Studio instalada estava fechada e não foi tocada.
 
 ## Comandos e resultados
 
@@ -19,9 +19,9 @@ Construção de desenvolvimento (2):
 ...
 ==> Tauri build, development identity, no installer
     Finished `release` profile [optimized] target(s) in 2m 31s
-       Built application at: D:\vvwt\safe\desktop\target\release\vv-studio.exe
+       Built application at: <worktree>\desktop\target\release\vv-studio.exe
     vv-studio.exe carries: org.vvlab.devstudio
-==> Development build: D:\vvwt\safe\desktop\target\release\vv-studio.exe (no installer; use -Release for one)
+==> Development build: <worktree>\desktop\target\release\vv-studio.exe (no installer; use -Release for one)
 ```
 
 Construção de lançamento (3):
@@ -31,11 +31,11 @@ Construção de lançamento (3):
 ...
 ==> Tauri bundle (NSIS installer), release identity from tauri.release.conf.json
     Finished `release` profile [optimized] target(s) in 2m 08s
-        Info Patching D:\vvwt\safe\desktop\target\release\vv-studio.exe with bundle type information: nsis
-     Running makensis to produce D:\vvwt\safe\desktop\target\release\bundle\nsis\VV Lab Studio_0.18.1_x64-setup.exe
+        Info Patching <worktree>\desktop\target\release\vv-studio.exe with bundle type information: nsis
+     Running makensis to produce <worktree>\desktop\target\release\bundle\nsis\VV Lab Studio_0.18.1_x64-setup.exe
     vv-studio.exe carries: org.vvlab.studio
 ==> Installer:
-    D:\vvwt\safe\desktop\target\release\bundle\nsis\VV Lab Studio_0.18.1_x64-setup.exe
+    <worktree>\desktop\target\release\bundle\nsis\VV Lab Studio_0.18.1_x64-setup.exe
     sha256 05e4bc0e1d1cacbd301f04ebaedc15fe2770c11cd132a4d8b35db0063e37981b
 ```
 
