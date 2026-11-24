@@ -38,7 +38,7 @@ I found no blocker. The only fixes are the inconsistent green on per-row safety 
 - **Req 5:** `rocket.js` no longer draws a plume after the last sample. The landing readout at the contact names its speed source, with a "record has no contact speed" branch.
 - **Req 6:** `git diff --name-status` shows only M and A entries. The only modified files are Studio JS/CSS, Cinematic `.gd` and two test files. There are no edits in `crates/`, `src/`, `exec/`, `scenarios/` or `docs/evidence/` outside `m19/`, and no `.rs` file changed. `hash-comparison.json` reports 542 identical values, which is consistent with that.
 - **Req 8:** There is no U+2014 in the changed text files. The prose is European Portuguese in AO1990 spelling, as far as I can judge. The unverified items are stated honestly.
-- **Req 9:** The only hit for personal-path patterns is `%LOCALAPPDATA%` and `%APPDATA%` as environment-variable forms in the doc. There is no `C:/Users`, `D:/vvwt` or user name in committed text files.
+- **Req 9:** The only hit for personal-path patterns is `%LOCALAPPDATA%` and `%APPDATA%` as environment-variable forms in the doc. There is no `C:/Users`, `<worktree root>` or user name in committed text files.
 
 **CHECKED:**
 - Ran `python -m unittest tests.test_m191_honesty -v`: 13 OK.
