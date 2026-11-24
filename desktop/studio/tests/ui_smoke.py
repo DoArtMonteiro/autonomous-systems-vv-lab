@@ -11,7 +11,9 @@ Usage (from the repository root, after `cargo build -p vv-studio` in desktop/):
 
     python desktop/studio/tests/ui_smoke.py [--exe PATH] [--domains DIR] [--shots DIR] [--port N]
 
-Against the installed application, using the domain hosts installed next to it:
+Owner only, audited as safe in this mode (the suite never starts or reads the Cinematic module): against the installed
+application, using the domain hosts installed next to it. The library, the preferences and the WebView2 profile are
+scratch folders; the Cinematic module folder resolves to the installed profile. Not for development:
 
     python desktop/studio/tests/ui_smoke.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --owner-allow-release-exe --domains ""
 

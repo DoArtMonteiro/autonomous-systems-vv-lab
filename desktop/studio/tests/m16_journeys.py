@@ -5,6 +5,11 @@ geospatial renderer when the player is left, and the behaviour with no environme
 tampered one. Screenshots go to --shots. It uses a scratch library and configuration.
 
     python desktop/studio/tests/m16_journeys.py --exe desktop/target/release/vv-studio.exe --domains desktop/target/release/domains --environments desktop/environments
+
+    Owner only, for suites audited as safe in this mode (this one never starts or reads the Cinematic module): against the
+    installed Studio. The library, the preferences and the WebView2 profile are scratch folders, but the Cinematic module
+    folder resolves to the installed profile. Not for development:
+
     python desktop/studio/tests/m16_journeys.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --owner-allow-release-exe --domains "" --environments ""
 
 These are scripted checks of what the screen shows. They are not observations of people using it.

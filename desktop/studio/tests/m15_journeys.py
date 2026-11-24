@@ -4,6 +4,11 @@ behind it, the ground-vehicle mission, the library filters, keyboard playback an
 Screenshots go to --shots. It uses a scratch library and configuration (VVLAB_LIBRARY, VVLAB_CONFIG).
 
     python desktop/studio/tests/m15_journeys.py --exe desktop/target/release/vv-studio.exe --domains desktop/target/release/domains
+
+    Owner only, for suites audited as safe in this mode (this one never starts or reads the Cinematic module): against the
+    installed Studio. The library, the preferences and the WebView2 profile are scratch folders, but the Cinematic module
+    folder resolves to the installed profile. Not for development:
+
     python desktop/studio/tests/m15_journeys.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --owner-allow-release-exe --domains ""
 
 These are scripted checks of what the screen shows. They are not observations of people using it.

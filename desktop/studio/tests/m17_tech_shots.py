@@ -3,6 +3,12 @@ geospatial view of the mission "A sensor that lies" on one environment, at given
 camera presets, 1440x900. Started through studio_launch, which refuses to start while the same
 executable is already running (the single-instance plugin would hand the launch to it) and never kills it.
 
+    python desktop/studio/tests/m17_tech_shots.py --exe desktop\target\debug\vv-studio.exe --out docs/evidence/m17/cinematic --shots follow:7.31,follow:16.29,closeup:23.336
+
+    Owner only, for suites audited as safe in this mode (this one never starts or reads the Cinematic module): against the
+    installed Studio. The library, the preferences and the WebView2 profile are scratch folders, but the Cinematic module
+    folder resolves to the installed profile. Not for development:
+
     python desktop/studio/tests/m17_tech_shots.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --owner-allow-release-exe --out docs/evidence/m17/cinematic --shots follow:7.31,follow:16.29,closeup:23.336
 
 Also writes the run's record to --record-out (when given), so the Cinematic View can be shown the

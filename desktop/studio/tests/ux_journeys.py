@@ -5,7 +5,7 @@ narrow-window navigation (More menu, keyboard), the Lab's run bar, numbers and t
 environments page, one colour for Exploratory, text size and the 1024x640 player. It uses a scratch
 library; page screenshots go to --shots (they show the Studio window, keep them out of the repository).
 
-    python desktop/studio/tests/ux_journeys.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --owner-allow-release-exe --shots <scratch folder>
+    python desktop/studio/tests/ux_journeys.py --exe desktop\target\debug\vv-studio.exe --shots <scratch folder>
 
 Scripted checks of what the screen and the process list show, not observations of people.
 """

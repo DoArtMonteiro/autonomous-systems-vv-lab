@@ -22,6 +22,8 @@ $stage = Join-Path $desktop "target\release\domains"
 
 $DevIdentifier = "org.vvlab.devstudio"
 $ReleaseIdentifier = "org.vvlab.studio"
+$DevProductName = "VV Lab Studio (dev)"
+$ReleaseProductName = "VV Lab Studio"
 $studio = Join-Path $desktop "studio"
 $baseConfig = Join-Path $studio "tauri.conf.json"
 $releaseConfig = Join-Path $studio "tauri.release.conf.json"
@@ -37,7 +39,13 @@ function Get-EmbeddedIdentifiers($exe) {
     $text = [System.Text.Encoding]::GetEncoding(28591).GetString([System.IO.File]::ReadAllBytes($exe))
     return @($DevIdentifier, $ReleaseIdentifier | Where-Object { $text.Contains($_) })
 }
+# A string as it appears in an executable: UTF-8 (compiled-in configuration) or UTF-16 (version resource).
+function Test-Text($text, $value) {
+    return $text.Contains($value) -or $text.Contains(($value.ToCharArray() -join [char]0))
+}
+function Get-ExeText($exe) { return [System.Text.Encoding]::GetEncoding(28591).GetString([System.IO.File]::ReadAllBytes($exe)) }
 $wanted = if ($Release) { $ReleaseIdentifier } else { $DevIdentifier }
+$wantedProduct = if ($Release) { $ReleaseProductName } else { $DevProductName }
 function Run($exe, [string[]]$arguments, $cwd) {
     Push-Location $cwd
     # Native tools write progress to stderr; only the exit code decides failure.
@@ -55,6 +63,12 @@ if ($Release) {
     $overlayIdentifier = Get-ConfigValue $releaseConfig "identifier"
     if ($overlayIdentifier) { $mergedIdentifier = $overlayIdentifier }
 }
+$mergedProduct = Get-ConfigValue $baseConfig "productName"
+if ($Release) {
+    $overlayProduct = Get-ConfigValue $releaseConfig "productName"
+    if ($overlayProduct) { $mergedProduct = $overlayProduct }
+}
+if ($mergedProduct -cne $wantedProduct) { throw "identity check failed: the merged Tauri productName is '$mergedProduct', expected '$wantedProduct'" }
 if ($mergedIdentifier -cne $wanted) { throw "identity check failed: the merged Tauri identifier is '$mergedIdentifier', expected '$wanted'" }
 # An inherited TAURI_CONFIG would merge on top of both files.
 if ($env:TAURI_CONFIG) { throw "TAURI_CONFIG is set in this environment; unset it, the build identity comes from the two config files only" }
@@ -123,6 +137,11 @@ $studioExe = Join-Path $desktop "target\release\vv-studio.exe"
 $embedded = @(Get-EmbeddedIdentifiers $studioExe)
 Write-Host "    vv-studio.exe carries: $($embedded -join ', ')"
 if ($embedded.Count -ne 1 -or $embedded[0] -cne $wanted) { throw "identity check failed: vv-studio.exe carries '$($embedded -join ', ')', expected only '$wanted'" }
+$exeText = Get-ExeText $studioExe
+$hasDevName = Test-Text $exeText $DevProductName
+$hasReleaseName = Test-Text $exeText $ReleaseProductName
+if ($Release -and ($hasDevName -or -not $hasReleaseName)) { throw "identity check failed: vv-studio.exe does not carry the release product name '$ReleaseProductName' alone" }
+if (-not $Release -and -not $hasDevName) { throw "identity check failed: vv-studio.exe does not carry the development product name '$DevProductName'" }
 if (-not $Release) { Step "Development build: $studioExe (no installer; use -Release for one)"; exit 0 }
 
 $bundle = Join-Path $desktop "target\release\bundle\nsis"

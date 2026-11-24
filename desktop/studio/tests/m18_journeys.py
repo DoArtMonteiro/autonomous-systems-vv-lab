@@ -6,7 +6,6 @@ part does the same with a launch vehicle (payload). Every number printed comes f
 platform wrote; the numbers go to <shots>/m18-numbers.json. It uses a scratch library.
 
     python desktop/studio/tests/m18_journeys.py --exe desktop/target/release/vv-studio.exe --domains desktop/target/release/domains
-    python desktop/studio/tests/m18_journeys.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --owner-allow-release-exe --domains "" --environments ""
 
 These are scripted checks of what the screen shows. They are not observations of people using it.
 """
@@ -390,8 +389,8 @@ def main():
             check("No page error or console error", not errors, "; ".join(errors)[:300])
             browser.close()
     finally:
-        studio_launch.stop(proc)
         kill_godot()
+        studio_launch.stop(proc)
     with open(os.path.join(a.shots, "m18-numbers.json"), "w", encoding="utf-8") as f:
         json.dump(NUMBERS, f, indent=1, sort_keys=True)
     failed = [r for r in results if not r[1]]

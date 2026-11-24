@@ -4,8 +4,13 @@ r"""Measures V&V Lab Studio from the outside: cold start, the path to the first 
 Nothing here runs inside the simulation; every number is wall-clock time or operating-system memory
 of the desktop shell on the machine that runs the script. The script prints one JSON document.
 
-    python desktop/studio/tests/perf_probe.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --owner-allow-release-exe --flow m11
     python desktop/studio/tests/perf_probe.py --exe desktop/target/release/vv-studio.exe --domains desktop/target/release/domains --flow m15
+
+    Owner only, for suites audited as safe in this mode (this one never starts or reads the Cinematic module): against the
+    installed Studio. The library, the preferences and the WebView2 profile are scratch folders, but the Cinematic module
+    folder resolves to the installed profile. Not for development:
+
+    python desktop/studio/tests/perf_probe.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --owner-allow-release-exe --flow m11
 
 `--flow m11` drives the 0.11 interface (Prepare, rocket domain, nominal demonstration). `--flow m15`
 drives the M15 home screen (one click on the first showcase mission). Each click is counted.

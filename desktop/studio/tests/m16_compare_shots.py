@@ -1,8 +1,13 @@
 r"""Fixed-framing screenshots of the geospatial view, for a fair before-and-after comparison between
 Studio versions: the same mission, environment, playback time, camera preset and window size.
 
-    python desktop/studio/tests/m16_compare_shots.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --owner-allow-release-exe --out docs/evidence/m16/before
     python desktop/studio/tests/m16_compare_shots.py --exe desktop/target/release/vv-studio.exe --domains desktop/target/release/domains --environments desktop/environments --out docs/evidence/m16/after
+
+    Owner only, for suites audited as safe in this mode (this one never starts or reads the Cinematic module): against the
+    installed Studio. The library, the preferences and the WebView2 profile are scratch folders, but the Cinematic module
+    folder resolves to the installed profile. Not for development:
+
+    python desktop/studio/tests/m16_compare_shots.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --owner-allow-release-exe --out docs/evidence/m16/before
 
 Each shot is named <environment>-<camera>-<time>-<w>x<h>.jpg (JPEG quality 85). The script writes shots.json with
 what each shot shows (version, environment, time, camera and, when the Studio exposes it, the

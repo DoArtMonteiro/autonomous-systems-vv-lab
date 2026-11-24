@@ -69,9 +69,16 @@ def _expand(value, environ):
 
 def normalise(path, environ=None):
     """A comparable form of a Windows path: absolute, real, lower case, single backslashes, no
-    trailing separator, no `\\\\?\\` prefix, no trailing dots or spaces in any component."""
+    trailing separator, no device prefix, no trailing dots or spaces in any component. A network path
+    (double backslash or double slash followed by a server, or the device prefix followed by UNC) raises
+    IsolationError: it could name the installed profile by another route (localhost and an
+    administrative share) and is never a scratch folder."""
     if environ is not None:
         path = _expand(path, environ)
+    unc = path.replace("/", "\\")
+    device = unc[:4] in ("\\\\?\\", "\\\\.\\")
+    if unc.startswith("\\\\") and (not device or unc[4:8].upper() == "UNC\\"):
+        raise IsolationError(f"network path refused: {path}")
     if os.name == "nt":
         path = os.path.realpath(path)
     path = ntpath.normpath(ntpath.abspath(path))
@@ -88,11 +95,38 @@ def is_under(path, root):
 
 
 def protected_roots(local_appdata, appdata, documents=None):
-    """The data of the installed application: the two profile folders and the research library."""
+    """The data of the installed application: the two profile folders and the research library.
+    `documents` is one Documents folder or several (the known folder can be redirected)."""
     roots = [ntpath.join(local_appdata, RELEASE_IDENTIFIER), ntpath.join(appdata, RELEASE_IDENTIFIER)]
-    if documents:
-        roots.append(ntpath.join(documents, LIBRARY_FOLDER))
+    if isinstance(documents, str):
+        documents = [documents]
+    for folder in documents or ():
+        if folder:
+            roots.append(ntpath.join(folder, LIBRARY_FOLDER))
     return roots
+
+
+def documents_folders():
+    """The Documents folder the Studio uses for its library: the Windows known folder (it can be
+    redirected, to OneDrive for example), plus the default under the user profile as a second guard."""
+    found = []
+    if os.name == "nt":
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            folder_id = (ctypes.c_byte * 16)(*bytes.fromhex("D039DDFD8F23AF46ADB46C85480369C7"))  # FOLDERID_Documents
+            out = ctypes.c_wchar_p()
+            get = ctypes.windll.shell32.SHGetKnownFolderPath
+            get.argtypes = [ctypes.c_void_p, wintypes.DWORD, wintypes.HANDLE, ctypes.POINTER(ctypes.c_wchar_p)]
+            if get(ctypes.byref(folder_id), 0, None, ctypes.byref(out)) == 0 and out.value:
+                found.append(out.value)
+            ctypes.windll.ole32.CoTaskMemFree(out)
+        except Exception:  # noqa: BLE001
+            pass
+    if os.environ.get("USERPROFILE"):
+        found.append(os.path.join(os.environ["USERPROFILE"], "Documents"))
+    return list(dict.fromkeys(found))
 
 
 def embedded_identifiers(exe):
@@ -205,7 +239,7 @@ def launch(exe, env, port, *, allow_release=False, wait_seconds=20):
         os.path.abspath(os.path.expandvars(exe)), env,
         os.environ.get("LOCALAPPDATA", ""), os.environ.get("APPDATA", ""),
         port=port, allow_release=allow_release,
-        documents=os.path.join(os.environ["USERPROFILE"], "Documents") if os.environ.get("USERPROFILE") else None,
+        documents=documents_folders(),
     )
     running = same_exe_running(plan.exe)
     if running:

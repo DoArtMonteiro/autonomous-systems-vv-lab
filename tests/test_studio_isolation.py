@@ -100,7 +100,7 @@ class BuildScript(unittest.TestCase):
     def test_overlay_is_applied_only_under_release(self):
         self.assertIn("[switch]$Release", self.text)
         self.assertEqual(self.text.count('Join-Path $studio "tauri.release.conf.json"'), 1)
-        self.assertEqual(self.text.count("$releaseConfig"), 3)  # the definition, the identity check, the --config argument
+        self.assertEqual(self.text.count("$releaseConfig"), 4)  # definition, identifier and productName checks, --config argument
         self.assertEqual(len(re.findall(r'"--config"', self.text)), 1)
         m = re.search(r"if \(\$Release\) \{(?P<yes>.*?)\n\} else \{(?P<no>.*?)\n\}", self.text, re.S)
         self.assertIsNotNone(m, "the tauri invocation must be split on $Release")
@@ -293,6 +293,77 @@ class PlanLaunch(unittest.TestCase):
             self.assertEqual(sl.plan_launch(str(exe), {}, LOCAL, ROAM, make_scratch=fake_scratch).identifiers, {DEV})
 
 
+class NetworkPathsAndDocuments(unittest.TestCase):
+    def test_network_paths_are_refused_in_every_spelling(self):
+        for value in (
+            rf"\\localhost\c$\FakeUser\AppData\Local\{RELEASE}\EBWebView",
+            rf"//localhost/c$/FakeUser/AppData/Local/{RELEASE}/EBWebView",
+            r"\\server\share\scratch",
+            rf"\\?\UNC\localhost\c$\FakeUser\AppData\Local\{RELEASE}",
+            rf"\\?\unc\server\share",
+        ):
+            with self.subTest(value=value):
+                with self.assertRaises(sl.IsolationError):
+                    sl.normalise(value)
+                for name in sl.SCRATCH_VARIABLES:
+                    with self.assertRaises(sl.IsolationError):
+                        plan({name: value})
+
+    def test_a_network_executable_is_refused(self):
+        with self.assertRaises(sl.IsolationError):
+            plan(exe=r"\\server\share\vv-studio.exe")
+
+    def test_device_prefixes_on_a_drive_are_accepted(self):
+        self.assertEqual(sl.normalise(r"\\?\C:\Scratch\x"), sl.normalise(r"C:\Scratch\x"))
+        self.assertEqual(sl.normalise(r"\\.\C:\Scratch\x"), sl.normalise(r"C:\Scratch\x"))
+        with self.assertRaises(sl.IsolationError):
+            plan({"VVLAB_CONFIG": rf"\\?\{LOCAL}\{RELEASE}\x"})
+
+    def test_every_given_documents_folder_protects_its_library(self):
+        redirected = r"D:\Redirected\Documents"
+        for documents in ([DOCS, redirected], (DOCS, redirected)):
+            for folder in (DOCS, redirected):
+                with self.subTest(documents=documents, folder=folder):
+                    with self.assertRaises(sl.IsolationError):
+                        sl.plan_launch(EXE, {"VVLAB_LIBRARY": rf"{folder}\VV Lab Library\runs"}, LOCAL, ROAM, documents=documents,
+                                       identifier_reader=lambda _e: {DEV}, make_scratch=fake_scratch)
+        self.assertEqual(len(sl.protected_roots(LOCAL, ROAM, [DOCS, redirected, ""])), 4)
+        self.assertEqual(len(sl.protected_roots(LOCAL, ROAM, DOCS)), 3)
+        self.assertEqual(len(sl.protected_roots(LOCAL, ROAM)), 2)
+
+    def test_the_documents_guess_from_the_user_profile_is_always_included(self):
+        from unittest import mock
+
+        with mock.patch.dict("os.environ", {"USERPROFILE": r"C:\FakeUser"}):
+            self.assertIn(r"C:\FakeUser\Documents", sl.documents_folders())
+        self.assertEqual(len(sl.documents_folders()), len(set(sl.documents_folders())))
+
+    def test_the_default_launch_uses_the_known_folder_helper(self):
+        text = (STUDIO_TESTS / "studio_launch.py").read_text(encoding="utf-8")
+        self.assertIn("documents=documents_folders()", text)
+        self.assertIn("SHGetKnownFolderPath", text)
+
+
+class BuildScriptProductName(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.text = (ROOT / "desktop" / "build.ps1").read_text(encoding="utf-8")
+
+    def test_product_names_match_the_configuration_files(self):
+        self.assertIn(f'$DevProductName = "{read_json(STUDIO / "tauri.conf.json")["productName"]}"', self.text)
+        self.assertIn(f'$ReleaseProductName = "{read_json(STUDIO / "tauri.release.conf.json")["productName"]}"', self.text)
+
+    def test_the_product_name_is_asserted_before_and_after_the_build(self):
+        self.assertIn("$wantedProduct = if ($Release) { $ReleaseProductName } else { $DevProductName }", self.text)
+        before = self.text.index("$mergedProduct -cne $wantedProduct")
+        build = self.text.index('Run "node"')
+        after = self.text.index("$hasReleaseName")
+        self.assertLess(before, build)
+        self.assertLess(build, after)
+        self.assertRegex(self.text, r"if \(\$Release -and \(\$hasDevName -or -not \$hasReleaseName\)\) \{ throw")
+        self.assertRegex(self.text, r"if \(-not \$Release -and -not \$hasDevName\) \{ throw")
+
+
 def _calls(tree):
     return [n for n in ast.walk(tree) if isinstance(n, ast.Call)]
 
@@ -307,11 +378,38 @@ def _dotted(node) -> str:
 
 SPAWNERS = {"subprocess.Popen", "subprocess.run", "subprocess.call", "subprocess.check_call", "subprocess.check_output",
             "os.system", "os.startfile", "os.popen", "asyncio.create_subprocess_exec", "asyncio.create_subprocess_shell"}
+ALWAYS_FORBIDDEN = {"subprocess.Popen", "os.system", "os.startfile", "os.popen",
+                    "asyncio.create_subprocess_exec", "asyncio.create_subprocess_shell"}
+
+
+def _allowed_spawn(call) -> str | None:
+    """The reason a subprocess call in a UI test script is allowed, or None. The allowlist is closed:
+    a call that is not one of these four shapes is a violation, whatever it runs.
+      1. taskkill /F /PID <pid>: ends one process by its PID.
+      2. powershell with a fixed command line (the script text is checked by the text rules).
+      3. tasklist, a read-only listing.
+      4. `[console] + args + [...]`: the Cinematic module's own console executable (Godot), not a Studio.
+    """
+    if not call.args:
+        return None
+    first = call.args[0]
+    if isinstance(first, ast.List) and first.elts and isinstance(first.elts[0], ast.Constant):
+        head = str(first.elts[0].value).lower()
+        consts = [e.value for e in first.elts if isinstance(e, ast.Constant)]
+        if head == "taskkill" and consts[1:3] == ["/F", "/PID"]:
+            return "taskkill by PID"
+        if head == "powershell" and consts[1:2] == ["-NoProfile"]:
+            return "powershell, fixed command line"
+        if head == "tasklist":
+            return "read-only listing"
+    if (isinstance(first, ast.BinOp) and isinstance(first.left, ast.BinOp) and isinstance(first.left.left, ast.List)
+            and [_dotted(e) for e in first.left.left.elts] == ["console"]):
+        return "Godot console of the Cinematic module"
+    return None
 
 
 def launch_violations(source: str) -> list[str]:
-    """Ways a script could start a Studio without the helper: any Popen; a spawn whose first argument
-    mentions an executable variable; spawners imported under another name."""
+    """Ways a UI test script could start a Studio, or end a process, outside the helper."""
     tree = ast.parse(source)
     found = []
     for node in ast.walk(tree):
@@ -323,16 +421,69 @@ def launch_violations(source: str) -> list[str]:
             for alias in node.names:
                 if alias.name in ("subprocess", "os", "asyncio") and alias.asname:
                     found.append(f"line {node.lineno}: aliases {alias.name}")
+        if isinstance(node, (ast.Assign, ast.AnnAssign)) and node.value is not None:
+            value = _dotted(node.value)
+            if value in SPAWNERS or value.endswith("Popen") or re.match(r"os\.(spawn|exec)", value):
+                found.append(f"line {node.lineno}: {value} bound to a name")
     for call in _calls(tree):
         name = _dotted(call.func)
-        if name.endswith("Popen"):
-            found.append(f"line {call.lineno}: Popen outside the helper")
-        elif name in SPAWNERS or re.match(r"os\.(spawn|exec)", name):
-            first = call.args[0] if call.args else None
-            idents = {_dotted(n).split(".")[-1].lower() for n in ast.walk(first)} if first is not None else set()
-            if idents & {"exe", "studio_exe", "studio"} or name.startswith(("os.spawn", "os.exec", "os.startfile", "os.system")):
-                found.append(f"line {call.lineno}: {name} of an executable outside the helper")
+        if name == "getattr" and call.args and _dotted(call.args[0]) in ("subprocess", "os", "asyncio"):
+            found.append(f"line {call.lineno}: getattr on {_dotted(call.args[0])}")
+        if name == "__import__":
+            found.append(f"line {call.lineno}: __import__")
+        for k in call.keywords:
+            if k.arg == "allow_release" and isinstance(k.value, ast.Constant) and k.value.value is True:
+                found.append(f"line {call.lineno}: literal allow_release=True")
+            if k.arg == "shell" and isinstance(k.value, ast.Constant) and k.value.value is True:
+                found.append(f"line {call.lineno}: shell=True")
+        if name in ALWAYS_FORBIDDEN or name.endswith("Popen") or re.match(r"os\.(spawn|exec)", name):
+            found.append(f"line {call.lineno}: {name} outside the helper")
+        elif name in SPAWNERS and _allowed_spawn(call) is None:
+            found.append(f"line {call.lineno}: {name}({ast.unparse(call.args[0])[:60] if call.args else ''}) is not on the allowlist")
     return found
+
+
+def studio_launch_violations(source: str) -> list[str]:
+    """For code outside the UI test folder (scripts/, evidence programs), where subprocess has many
+    legitimate uses: a spawn whose arguments mention a Studio executable, or a literal allow_release=True."""
+    tree = ast.parse(source)
+    found = []
+    for call in _calls(tree):
+        name = _dotted(call.func)
+        if name in SPAWNERS or name.endswith("Popen"):
+            args = " ".join(ast.unparse(a) for a in call.args).lower()
+            query = call.args and ast.unparse(call.args[0]).lower().startswith("['powershell', '-noprofile'")
+            if "studio" in args and not query:
+                found.append(f"line {call.lineno}: {name} of {ast.unparse(call.args[0])[:60]}")
+        for k in call.keywords:
+            if k.arg == "allow_release" and isinstance(k.value, ast.Constant) and k.value.value is True:
+                found.append(f"line {call.lineno}: literal allow_release=True")
+    return found
+
+
+# Text rules over scripts, workflows and build tooling. Killing by name can end the owner's installed Studio.
+KILL_PATTERNS = [
+    (re.compile(r"(?<![\w.])/IM(?![\w])", re.I), "taskkill /IM"),
+    (re.compile(r"Stop-Process", re.I), "Stop-Process"),
+    (re.compile(r"(?<![\w-])(spps|saps)(?![\w-])", re.I), "Stop-Process/Start-Process alias"),
+    (re.compile(r"\|\s*kill\b", re.I), "piped kill alias"),
+    (re.compile(r"Get-Process[^\n]*\.Kill\s*\(", re.I), "Get-Process .Kill()"),
+    (re.compile(r"\.Terminate\s*\(|Invoke-CimMethod[^\n]*Terminate", re.I), "CIM Terminate"),
+    (re.compile(r"wmic[^\n]*\b(delete|terminate)\b", re.I), "wmic delete"),
+    (re.compile(r"psutil\.process_iter|psutil[^\n]*\.name\(\)", re.I), "psutil name matching"),
+    (re.compile(r"\b(pkill|killall)\b"), "pkill/killall"),
+    (re.compile(r"taskkill[^\n]*/FI", re.I), "taskkill /FI"),
+]
+START_PATTERN = re.compile(r"Start-Process", re.I)
+
+
+def tree_files(bases, suffixes):
+    files = []
+    for base in bases:
+        for folder, dirs, names in os.walk(base):
+            dirs[:] = [d for d in dirs if d not in ("target", "node_modules", ".git", "__pycache__")]
+            files += [Path(folder) / n for n in names if n.endswith(suffixes)]
+    return sorted(files)
 
 
 class LaunchDiscipline(unittest.TestCase):
@@ -345,9 +496,17 @@ class LaunchDiscipline(unittest.TestCase):
             "import subprocess\nsubprocess.Popen([a.exe])\n",
             "import subprocess\nsubprocess.run([a.exe, '--self-test'])\n",
             "import subprocess\nsubprocess.check_output([os.path.abspath(exe)])\n",
+            "import subprocess\nsubprocess.run(cmd)\n",
+            "import subprocess\nsubprocess.run(['cmd', '/c', 'x'])\n",
+            "import subprocess\nsubprocess.run(['taskkill', '/F', '/IM', 'x'])\n",
+            "import subprocess\nsubprocess.run('x', shell=True)\n",
+            "import subprocess\nrunner = subprocess.Popen\nrunner([exe])\n",
+            "import subprocess\nrun = subprocess.run\nrun([exe])\n",
+            "import subprocess\ngetattr(subprocess, 'Pop' + 'en')([exe])\n",
             "from subprocess import Popen\nPopen(['x'])\n",
             "import subprocess as sp\nsp.run(['x'])\n",
             "import os\nos.startfile(exe)\n",
+            "import studio_launch\nstudio_launch.launch(exe, env, 1, allow_release=True)\n",
         ]
         for src in bad:
             with self.subTest(src=src):
@@ -355,17 +514,32 @@ class LaunchDiscipline(unittest.TestCase):
         good = [
             "import subprocess\nsubprocess.run(['taskkill', '/F', '/PID', str(pid)], capture_output=True)\n",
             "import subprocess\nsubprocess.run(['powershell', '-NoProfile', '-Command', ps])\n",
+            "import subprocess\nsubprocess.run(['tasklist', '/FO', 'CSV', '/NH'], capture_output=True)\n",
             "import subprocess\nsubprocess.run([console] + args + ['--t', '1'])\n",
-            "import studio_launch\nproc = studio_launch.launch(exe, env, 1, allow_release=False)\n",
+            "import studio_launch\nproc = studio_launch.launch(exe, env, 1, allow_release=a.owner_allow_release_exe)\n",
         ]
         for src in good:
             with self.subTest(src=src):
                 self.assertEqual(launch_violations(src), [], src)
 
+    def test_the_lint_for_code_outside_the_ui_tests(self):
+        for src in ("import subprocess\nsubprocess.Popen([studio_exe])\n", "import subprocess\nsubprocess.run([studio.exe])\n",
+                    "import subprocess\nsubprocess.run(['vv-studio.exe'])\n", "x(allow_release=True)\n"):
+            with self.subTest(src=src):
+                self.assertTrue(studio_launch_violations(src), src)
+        self.assertEqual(studio_launch_violations("import subprocess\nsubprocess.run(['cargo', 'build'])\n"), [])
+
     def test_no_script_starts_a_studio_outside_the_helper(self):
         for path in self.scripts():
             with self.subTest(script=path.name):
                 self.assertEqual(launch_violations(path.read_text(encoding="utf-8")), [])
+
+    def test_no_other_program_in_the_repository_starts_a_studio(self):
+        files = tree_files([ROOT / "scripts", ROOT / "docs" / "evidence"], (".py",))
+        self.assertTrue(files)
+        for path in files:
+            with self.subTest(file=str(path.relative_to(ROOT))):
+                self.assertEqual(studio_launch_violations(path.read_text(encoding="utf-8")), [])
 
     def test_the_helper_starts_a_process_in_one_place_and_only_after_the_plan(self):
         tree = ast.parse((STUDIO_TESTS / "studio_launch.py").read_text(encoding="utf-8"))
@@ -401,24 +575,58 @@ class LaunchDiscipline(unittest.TestCase):
                     self.assertIn("studio_launch.add_arguments(ap)", text)
                     self.assertIn("a.owner_allow_release_exe", text)
 
-    def test_no_image_name_kill_anywhere_in_the_test_scripts_or_build_tooling(self):
-        files = []
-        for base in (STUDIO_TESTS, ROOT / "scripts", ROOT / ".github" / "workflows", ROOT / "desktop"):
-            for folder, dirs, names in os.walk(base):
-                dirs[:] = [d for d in dirs if d not in ("target", "node_modules", ".git", "__pycache__")]
-                files += [Path(folder) / n for n in names if n.endswith((".py", ".ps1", ".yml", ".sh", ".cmd", ".bat"))]
+    def test_the_module_lifecycle_suite_refuses_the_installed_exe_without_a_second_flag(self):
+        text = (STUDIO_TESTS / "m17_cinematic_journey.py").read_text(encoding="utf-8")
+        self.assertIn("--i-accept-installed-module-uninstall", text)
+        refuse = text.index("if a.owner_allow_release_exe:")
+        self.assertIn("sys.exit(", text[refuse:refuse + 400])
+        self.assertLess(refuse, text.index("launch(os.path.abspath"))
+
+    def test_docstrings_show_the_development_build_and_keep_the_installed_form_for_audited_suites_only(self):
+        audited = {"ui_smoke", "m15_journeys", "m16_journeys", "m17_lab_journeys", "perf_probe", "m16_compare_shots", "m17_tech_shots"}
+        for path in self.scripts():
+            doc = ast.get_docstring(ast.parse(path.read_text(encoding="utf-8"))) or ""
+            flagged = [ln.strip() for ln in doc.splitlines() if ln.strip().startswith("python ") and "owner-allow-release-exe" in ln]
+            if flagged:
+                with self.subTest(script=path.name):
+                    self.assertIn(path.stem, audited)
+                    self.assertIn("Owner only", doc)
+                    self.assertLess(doc.index("Owner only"), doc.index(flagged[0]))
+                    dev = re.search(r"--exe (desktop[/\\]target|PATH)", doc)
+                    self.assertIsNotNone(dev, "a development form is documented")
+                    self.assertLess(dev.start(), doc.index("Owner only"), "the development form comes first")
+        for name in ("m17_cinematic_journey", "m18_journeys", "ux_journeys", "ux2_journeys", "review_captures", "installed_spotcheck"):
+            doc = ast.get_docstring(ast.parse((STUDIO_TESTS / f"{name}.py").read_text(encoding="utf-8"))) or ""
+            with self.subTest(script=name):
+                self.assertNotIn("VV Lab Studio" + chr(92) + "vv-studio.exe", doc)
+
+    def test_no_kill_by_name_anywhere_in_the_test_scripts_or_build_tooling(self):
+        files = tree_files([STUDIO_TESTS, ROOT / "scripts", ROOT / ".github" / "workflows", ROOT / "desktop"],
+                           (".py", ".ps1", ".yml", ".sh", ".cmd", ".bat"))
         self.assertTrue(files)
-        forbidden = [
-            (re.compile(r"(?<![\w.])/IM(?![\w])", re.I), "taskkill /IM"),
-            (re.compile(r"Stop-Process", re.I), "Stop-Process"),
-            (re.compile(r"\b(pkill|killall)\b"), "pkill/killall"),
-            (re.compile(r"taskkill[^\n]*/FI", re.I), "taskkill /FI"),
-        ]
         for path in files:
             text = path.read_text(encoding="utf-8", errors="replace")
-            for pattern, what in forbidden:
+            for pattern, what in KILL_PATTERNS:
                 with self.subTest(file=str(path.relative_to(ROOT)), rule=what):
                     self.assertIsNone(pattern.search(text))
+
+    def test_the_kill_patterns_catch_the_spellings_they_are_meant_to(self):
+        for text in (
+            "taskkill /F /IM vv-studio.exe", "Stop-Process -Name vv-studio", "spps -n vv-studio", "Get-Process vv-studio | kill",
+            "(Get-Process vv-studio).Kill()", "wmic process where name='vv-studio.exe' delete", "psutil.process_iter(['name'])",
+            "p = psutil.Process(1); p.name() == 'vv-studio.exe'", "taskkill /FI \"IMAGENAME eq vv-studio.exe\"", "pkill vv-studio",
+            "Invoke-CimMethod -MethodName Terminate",
+        ):
+            with self.subTest(text=text):
+                self.assertTrue(any(p.search(text) for p, _ in KILL_PATTERNS), text)
+        for text in ("taskkill /F /PID 123", "proc.kill()", "docs/images/x.png", "psutil.Process(proc.pid)"):
+            with self.subTest(text=text):
+                self.assertFalse(any(p.search(text) for p, _ in KILL_PATTERNS), text)
+
+    def test_no_start_process_in_the_ui_test_scripts(self):
+        for path in self.scripts() + sorted(STUDIO_TESTS.glob("*.ps1")):
+            with self.subTest(file=path.name):
+                self.assertIsNone(START_PATTERN.search(path.read_text(encoding="utf-8")))
 
     def test_every_taskkill_names_a_pid(self):
         for path in self.scripts():

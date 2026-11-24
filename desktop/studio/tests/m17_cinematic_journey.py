@@ -3,7 +3,12 @@ the real file dialog, read its verified status, launch it on a stored run from t
 its window and process, close it, uninstall it and check the player falls back. The native dialog
 is answered with keystrokes. Screenshots go to --shots.
 
-    python desktop/studio/tests/m17_cinematic_journey.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --owner-allow-release-exe --zip <vv-cinematic-x.y.z.zip>
+It installs and uninstalls the Cinematic module, so it is meant for a development build, whose module
+folder is a scratch folder. With --owner-allow-release-exe the module folder is the installed profile's
+(`%LOCALAPPDATA%\org.vvlab.studio\modules`) and the run uninstalls and reinstalls the owner's module; that
+is refused unless --i-accept-installed-module-uninstall is also given.
+
+    python desktop/studio/tests/m17_cinematic_journey.py --exe desktop\target\debug\vv-studio.exe --zip <vv-cinematic-x.y.z.zip>
 
 Scripted checks of what the screen and the process list show, not observations of people.
 """
@@ -87,8 +92,14 @@ def main():
     ap.add_argument("--shots", default=os.path.join(REPO, "docs", "images", "m17-studio"))
     ap.add_argument("--port", type=int, default=9291)
     ap.add_argument("--preinstalled", action="store_true", help="the module was installed by the Studio's install code (modules.rs test with VV_CINEMATIC_INSTALL_TO); skip the native dialog")
+    ap.add_argument("--i-accept-installed-module-uninstall", action="store_true",
+                    help="only with --owner-allow-release-exe: accept that the installed Studio's Cinematic module is uninstalled and reinstalled")
     studio_launch.add_arguments(ap)
     a = ap.parse_args()
+    if a.owner_allow_release_exe:
+        if not a.i_accept_installed_module_uninstall:
+            sys.exit("refused: with --owner-allow-release-exe this suite uninstalls and reinstalls the Cinematic module in the installed profile; add --i-accept-installed-module-uninstall to accept that")
+        print("WARNING: the installed Studio's Cinematic module will be uninstalled and reinstalled", flush=True)
     os.makedirs(a.shots, exist_ok=True)
     env = dict(os.environ)
     for k in ("VVLAB_DOMAINS", "VVLAB_EXTRA_DOMAINS", "VVLAB_EXEC", "VVLAB_CLAIMS", "VVLAB_ENVIRONMENTS"):

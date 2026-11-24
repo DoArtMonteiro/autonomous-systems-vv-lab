@@ -9,7 +9,7 @@ Studio-started process), written to --shots. The page screenshots that the share
 --shots/desktop-not-committed (they show the Studio window; keep them out of the repository). It uses a
 scratch library and configuration.
 
-    python desktop/studio/tests/installed_spotcheck.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --owner-allow-release-exe --shots <scratch folder>
+    python desktop/studio/tests/installed_spotcheck.py --exe desktop\target\debug\vv-studio.exe --shots <scratch folder>
 
 Scripted checks of what the screen and the process list show, not observations of people.
 """

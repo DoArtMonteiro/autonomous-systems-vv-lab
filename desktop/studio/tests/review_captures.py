@@ -5,7 +5,7 @@ theme and in the light theme at 1440x900. It checks that the pills, the caption 
 not overlap and that no run pill is cut. It uses a scratch library; the pictures show the Studio window,
 so they stay out of the repository.
 
-    python desktop/studio/tests/review_captures.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --owner-allow-release-exe --shots <scratch folder>
+    python desktop/studio/tests/review_captures.py --exe desktop\target\debug\vv-studio.exe --shots <scratch folder>
 """
 
 import argparse
