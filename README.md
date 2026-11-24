@@ -89,8 +89,11 @@ An expected safety violation can make a `run` command exit with code `2`; that i
 A Windows 11 application that packages the simulators behind a versioned domain contract (`vv-domain` 1.0): mission preparation, a 3D rocket scene and a 2D ground-vehicle scene, time-synchronised telemetry, requirement and invariant verdicts, controller comparison, replay by recomputation, evidence export and a persistent library. It installs per user and needs no Rust, Python or Node.js at run time. The rocket domain offers the M9 and M9.1 policies and faults only; it refuses the protected rocket seeds (3000 to 3099 and 6000 to 6099) and the M6 held-out ground seeds (101 to 112) before any simulation starts. Domains are separate host executables discovered at start; a benign reference domain shows that a new domain needs no change to the platform or the interface.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File desktop\build.ps1   # builds the NSIS installer in desktop\target\release\bundle\nsis
+powershell -ExecutionPolicy Bypass -File desktop\build.ps1 -Release   # builds the NSIS installer in desktop\target\release\bundle\nsis
+powershell -ExecutionPolicy Bypass -File desktop\build.ps1            # development build, no installer
 ```
+
+Only `-Release` gives the executable the identifier of the installed application (`org.vvlab.studio`). A development build has its own (`org.vvlab.devstudio`) and so can never write into the installed profile. The UI tests start executables only through `desktop/studio/tests/studio_launch.py`; see [docs/incidents/2026-11-23-webview2-profile.md](docs/incidents/2026-11-23-webview2-profile.md).
 
 See [docs/m11-desktop.md](docs/m11-desktop.md) for the architecture and how to add a domain, and [docs/m11-acceptance.md](docs/m11-acceptance.md) for installation and acceptance. The UI tests (`desktop/studio/tests/ui_smoke.py`, `desktop/studio/tests/m15_journeys.py`) drive the real window. The developer CLI and the local Mission Control remain supported.
 

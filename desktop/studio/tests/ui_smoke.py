@@ -13,7 +13,7 @@ Usage (from the repository root, after `cargo build -p vv-studio` in desktop/):
 
 Against the installed application, using the domain hosts installed next to it:
 
-    python desktop/studio/tests/ui_smoke.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --domains ""
+    python desktop/studio/tests/ui_smoke.py --exe desktop\target\debug\vv-studio.exe --domains ""
 
 `--domains ""` leaves VVLAB_DOMAINS unset, so the studio uses its own resource directory.
 Window sizes are set on the real window (Tauri setSize); DevTools viewport emulation is used only
@@ -33,6 +33,9 @@ import traceback
 import urllib.request
 
 from playwright.sync_api import sync_playwright
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import studio_launch  # noqa: E402
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
@@ -590,6 +593,7 @@ def main():
     ap.add_argument("--shots", default=os.path.join(REPO, "docs", "images", "m11-studio"))
     ap.add_argument("--port", type=int, default=9222)
     ap.add_argument("--keep-library", action="store_true")
+    studio_launch.add_arguments(ap)
     a = ap.parse_args()
     a.exe = os.path.expandvars(a.exe)
     if not os.path.isfile(a.exe):
@@ -614,9 +618,9 @@ def main():
     env["VVLAB_CONFIG"] = config
     print(f"exe {a.exe}\ndomains {a.domains or '(installed resource directory)'}\nlibrary {library}\nconfig {config}")
     env["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = f"--remote-debugging-port={a.port}"
-    # A running instance would swallow the launch (single-instance plugin) and keep its own library.
-    subprocess.run(["taskkill", "/F", "/IM", os.path.basename(a.exe)], capture_output=True)
-    proc = subprocess.Popen([a.exe], env=env)
+    # A running instance of this executable would swallow the launch (single-instance plugin) and
+    # keep its own library: the helper refuses to start, it never kills it.
+    proc = studio_launch.launch(a.exe, env, a.port, allow_release=a.owner_allow_release_exe, wait_seconds=0)
     page = None
     try:
         for _ in range(120):

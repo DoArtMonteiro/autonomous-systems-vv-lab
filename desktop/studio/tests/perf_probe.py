@@ -4,7 +4,7 @@ r"""Measures V&V Lab Studio from the outside: cold start, the path to the first 
 Nothing here runs inside the simulation; every number is wall-clock time or operating-system memory
 of the desktop shell on the machine that runs the script. The script prints one JSON document.
 
-    python desktop/studio/tests/perf_probe.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --flow m11
+    python desktop/studio/tests/perf_probe.py --exe desktop\target\debug\vv-studio.exe --flow m11
     python desktop/studio/tests/perf_probe.py --exe desktop/target/release/vv-studio.exe --domains desktop/target/release/domains --flow m15
 
 `--flow m11` drives the 0.11 interface (Prepare, rocket domain, nominal demonstration). `--flow m15`
@@ -21,11 +21,15 @@ import os
 import platform
 import statistics
 import subprocess
+import sys
 import tempfile
 import time
 import urllib.request
 
 from playwright.sync_api import sync_playwright
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import studio_launch  # noqa: E402
 
 FLOWS = {
     # Selectors clicked, in order, from the first ready screen to a playing rocket landing.
@@ -233,6 +237,7 @@ def main():
     ap.add_argument("--port", type=int, default=9333)
     ap.add_argument("--size", default="1440x900")
     ap.add_argument("--environments", default="", help="packs folder for a build-folder run; empty uses the installed packs")
+    studio_launch.add_arguments(ap)
     a = ap.parse_args()
     exe = os.path.abspath(os.path.expandvars(a.exe))
     w, h = (int(x) for x in a.size.split("x"))
@@ -249,11 +254,9 @@ def main():
     env["VVLAB_LIBRARY"] = tempfile.mkdtemp(prefix="vv-perf-lib-")
     env["VVLAB_CONFIG"] = tempfile.mkdtemp(prefix="vv-perf-cfg-")
     env["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = f"--remote-debugging-port={a.port}"
-    subprocess.run(["taskkill", "/F", "/IM", os.path.basename(exe)], capture_output=True)
-    time.sleep(0.5)
     report = {"flow": a.flow, "exe": os.path.basename(exe), "machine": {"cpu": platform.processor(), "os": platform.platform(), "python": platform.python_version()}}
     t_launch = time.time()
-    proc = subprocess.Popen([exe], env=env)
+    proc = studio_launch.launch(exe, env, a.port, allow_release=a.owner_allow_release_exe, wait_seconds=0)
     try:
         for _ in range(400):
             try:

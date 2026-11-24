@@ -107,10 +107,24 @@ Requisitos de construção (não de instalação): a cadeia Rust de `rust-toolch
 
 ```powershell
 cd desktop\studio; npm ci; cd ..\..
-powershell -ExecutionPolicy Bypass -File desktop\build.ps1
+powershell -ExecutionPolicy Bypass -File desktop\build.ps1 -Release   # instalador
+powershell -ExecutionPolicy Bypass -File desktop\build.ps1            # construção de desenvolvimento, sem instalador
 ```
 
-O script constrói `vv-lab.exe` (pacote da raiz), os três anfitriões, monta `desktop\target\release\domains\`, corre `tauri build` e mostra o caminho e o SHA-256 do instalador em `desktop\target\release\bundle\nsis\`. A CLI do Tauri é chamada com `node` diretamente, porque o atalho `npx` falha em caminhos com `&`.
+O script constrói `vv-lab.exe` (pacote da raiz), os anfitriões, monta `desktop\target\release\domains\`, corre `tauri build` e, com `-Release`, mostra o caminho e o SHA-256 do instalador em `desktop\target\release\bundle\nsis\`. Sem `-Release` corre `tauri build --no-bundle` e não produz instalador. A CLI do Tauri é chamada com `node` diretamente, porque o atalho `npx` falha em caminhos com `&`.
+
+### Identificador da aplicação e isolamento dos testes
+
+**Mudança no procedimento de lançamento de uma versão: o instalador só se constrói com `-Release`.** Antes, `build.ps1` sem argumentos construía o instalador; agora constrói uma versão de desenvolvimento sem instalador, e o fluxo da CI usa `-Release`.
+
+- `desktop/studio/tauri.conf.json` tem o identificador de desenvolvimento `org.vvlab.devstudio` e o nome de produto `VV Lab Studio (dev)`. O identificador não contém o de lançamento como prefixo.
+- `desktop/studio/tauri.release.conf.json` repõe `org.vvlab.studio` e `VV Lab Studio`. Só `build.ps1 -Release` o aplica (`tauri build --config`). O script confirma o identificador resultante antes de compilar (`-Release`: exatamente `org.vvlab.studio`; caso contrário: não pode ser esse) e confirma depois que o `vv-studio.exe` compilado só contém o identificador esperado. Recusa-se a correr com `TAURI_CONFIG` definido no ambiente.
+- Os caminhos de dados do Tauri (`%LOCALAPPDATA%\<identificador>`, `%APPDATA%\<identificador>`, incluindo o perfil do WebView2 em `EBWebView`) derivam do identificador. Uma construção de desenvolvimento usa, por isso, as pastas `org.vvlab.devstudio`. O instalador usa o nome de produto para a pasta de instalação, que continua `%LOCALAPPDATA%\VV Lab Studio\`.
+- Os testes de interface em `desktop/studio/tests/` só lançam um executável através de `studio_launch.py`. O auxiliar redireciona `WEBVIEW2_USER_DATA_FOLDER`, `VVLAB_LIBRARY`, `VVLAB_CONFIG` e `VVLAB_MODULES` para pastas temporárias, recusa qualquer caminho dentro de `%LOCALAPPDATA%\org.vvlab.studio`, de `%APPDATA%\org.vvlab.studio` ou da biblioteca `Documentos\VV Lab Library`, recusa o executável instalado e qualquer executável com o identificador de lançamento, e só termina o processo que ele próprio lançou, por PID.
+- Só o responsável pode usar `--owner-allow-release-exe` (aceite por todos os percursos) para lançar o executável instalado ou de lançamento. Nesse modo o executável de lançamento ignora `VVLAB_MODULES` (é só de depuração) e a pasta do módulo Cinematic continua a ser a do perfil instalado. A CI usa a opção num executor descartável, depois de instalar o instalador acabado de construir.
+- `tests/test_studio_isolation.py` verifica estas regras sem lançar a aplicação e entra no comando de testes Python do `AGENTS.md`.
+
+O registo do incidente que motivou isto está em `docs/incidents/2026-11-23-webview2-profile.md`.
 
 Verificações do espaço de trabalho do produto:
 

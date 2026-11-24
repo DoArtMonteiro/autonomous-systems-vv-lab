@@ -1,7 +1,7 @@
 r"""Fixed-framing screenshots of the geospatial view, for a fair before-and-after comparison between
 Studio versions: the same mission, environment, playback time, camera preset and window size.
 
-    python desktop/studio/tests/m16_compare_shots.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --out docs/evidence/m16/before
+    python desktop/studio/tests/m16_compare_shots.py --exe desktop\target\debug\vv-studio.exe --out docs/evidence/m16/before
     python desktop/studio/tests/m16_compare_shots.py --exe desktop/target/release/vv-studio.exe --domains desktop/target/release/domains --environments desktop/environments --out docs/evidence/m16/after
 
 Each shot is named <environment>-<camera>-<time>-<w>x<h>.jpg (JPEG quality 85). The script writes shots.json with
@@ -19,6 +19,7 @@ import time
 from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import studio_launch  # noqa: E402
 from m16_journeys import launch, open_mission  # noqa: E402
 from m15_journeys import S  # noqa: E402
 
@@ -47,6 +48,7 @@ def main():
     ap.add_argument("--port", type=int, default=9244)
     ap.add_argument("--envs", default="santa-maria-azores,cape-canaveral")
     ap.add_argument("--all-sizes-camera", default="follow", help="camera shot at every window size")
+    studio_launch.add_arguments(ap)
     a = ap.parse_args()
     exe = os.path.abspath(os.path.expandvars(a.exe))
     out = os.path.abspath(a.out)
@@ -65,7 +67,7 @@ def main():
     env["VVLAB_CONFIG"] = tempfile.mkdtemp(prefix="vv-shots-cfg-")
     env["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = f"--remote-debugging-port={a.port}"
     meta = {"exe": os.path.basename(exe), "mission": MISSION, "shots": []}
-    proc = launch(exe, env, a.port)
+    proc = launch(exe, env, a.port, allow_release=a.owner_allow_release_exe)
     try:
         with sync_playwright() as pw:
             browser = pw.chromium.connect_over_cdp(f"http://127.0.0.1:{a.port}")

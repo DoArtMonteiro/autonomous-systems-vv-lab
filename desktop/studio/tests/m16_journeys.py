@@ -5,7 +5,7 @@ geospatial renderer when the player is left, and the behaviour with no environme
 tampered one. Screenshots go to --shots. It uses a scratch library and configuration.
 
     python desktop/studio/tests/m16_journeys.py --exe desktop/target/release/vv-studio.exe --domains desktop/target/release/domains --environments desktop/environments
-    python desktop/studio/tests/m16_journeys.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --domains "" --environments ""
+    python desktop/studio/tests/m16_journeys.py --exe desktop\target\debug\vv-studio.exe --domains "" --environments ""
 
 These are scripted checks of what the screen shows. They are not observations of people using it.
 """
@@ -24,6 +24,7 @@ import urllib.request
 from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import studio_launch  # noqa: E402
 from m15_journeys import S, check, errors, results  # noqa: E402
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
@@ -345,17 +346,8 @@ def layout(s):
     s.resize(1440, 900)
 
 
-def launch(exe, env, port):
-    subprocess.run(["taskkill", "/F", "/IM", os.path.basename(exe)], capture_output=True)
-    time.sleep(0.5)
-    proc = subprocess.Popen([exe], env=env)
-    for _ in range(400):
-        try:
-            urllib.request.urlopen(f"http://127.0.0.1:{port}/json/version", timeout=1)
-            break
-        except Exception:  # noqa: BLE001
-            time.sleep(0.05)
-    return proc
+def launch(exe, env, port, allow_release=False):
+    return studio_launch.launch(exe, env, port, allow_release=allow_release, wait_seconds=20)
 
 
 def session(pw, port, shots):
@@ -394,6 +386,7 @@ def main():
     ap.add_argument("--shots", default=os.path.join(REPO, "docs", "images", "m16-studio"))
     ap.add_argument("--port", type=int, default=9243)
     ap.add_argument("--only", default="", help="comma-separated parts, e.g. geospatial,fallback")
+    studio_launch.add_arguments(ap)
     a = ap.parse_args()
     exe = os.path.abspath(os.path.expandvars(a.exe))
     os.makedirs(a.shots, exist_ok=True)
@@ -413,7 +406,7 @@ def main():
     only = [x for x in a.only.split(",") if x]
     parts = [p for p in (home_and_library, geospatial, gating, control_rocket, control_ground, layout) if not only or p.__name__ in only]
     if parts:
-        proc = launch(exe, env, a.port)
+        proc = launch(exe, env, a.port, allow_release=a.owner_allow_release_exe)
         try:
             with sync_playwright() as pw:
                 browser, s = session(pw, a.port, a.shots)
@@ -447,7 +440,7 @@ def main():
             env2 = dict(env)
             env2["VVLAB_ENVIRONMENTS"] = folder
             env2["VVLAB_CONFIG"] = tempfile.mkdtemp(prefix="vv-m16-cfg-")
-            proc = launch(exe, env2, a.port)
+            proc = launch(exe, env2, a.port, allow_release=a.owner_allow_release_exe)
             try:
                 with sync_playwright() as pw:
                     browser, s = session(pw, a.port, a.shots)

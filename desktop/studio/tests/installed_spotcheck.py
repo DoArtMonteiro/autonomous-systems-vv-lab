@@ -9,7 +9,7 @@ Studio-started process), written to --shots. The page screenshots that the share
 --shots/desktop-not-committed (they show the Studio window; keep them out of the repository). It uses a
 scratch library and configuration.
 
-    python desktop/studio/tests/installed_spotcheck.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --shots <scratch folder>
+    python desktop/studio/tests/installed_spotcheck.py --exe desktop\target\debug\vv-studio.exe --shots <scratch folder>
 
 Scripted checks of what the screen and the process list show, not observations of people.
 """
@@ -25,6 +25,7 @@ import time
 from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import studio_launch  # noqa: E402
 import m18_journeys as m18  # noqa: E402
 from m15_journeys import check, errors, results  # noqa: E402
 from m16_journeys import launch, session  # noqa: E402
@@ -122,6 +123,7 @@ def main():
     ap.add_argument("--exe", required=True)
     ap.add_argument("--shots", required=True)
     ap.add_argument("--port", type=int, default=9265)
+    studio_launch.add_arguments(ap)
     a = ap.parse_args()
     os.makedirs(a.shots, exist_ok=True)
     m18.NUMBERS.clear()
@@ -131,7 +133,7 @@ def main():
     env["VVLAB_LIBRARY"] = tempfile.mkdtemp(prefix="vv-spot-lib-")
     env["VVLAB_CONFIG"] = tempfile.mkdtemp(prefix="vv-spot-cfg-")
     env["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = f"--remote-debugging-port={a.port}"
-    proc = launch(os.path.abspath(os.path.expandvars(a.exe)), env, a.port)
+    proc = launch(os.path.abspath(os.path.expandvars(a.exe)), env, a.port, allow_release=a.owner_allow_release_exe)
     try:
         with sync_playwright() as pw:
             browser, s = session(pw, a.port, os.path.join(a.shots, "desktop-not-committed"))
