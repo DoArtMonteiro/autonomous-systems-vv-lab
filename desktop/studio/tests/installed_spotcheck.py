@@ -25,6 +25,7 @@ import time
 from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import godot_launch  # noqa: E402
 import studio_launch  # noqa: E402
 import m18_journeys as m18  # noqa: E402
 from m15_journeys import check, errors, results  # noqa: E402
@@ -54,8 +55,8 @@ def module_args(cmd):
     return [p.strip('"') for p in parts[1:]]
 
 
-def newest_log():
-    logs = os.path.join(os.environ.get("APPDATA", ""), "VV Lab Cinematic", "logs")
+def newest_log(proc):
+    logs = os.path.join(proc.godot_appdata, "VV Lab Cinematic", "logs")  # the Godot user data of this Studio: a scratch folder
     files = [os.path.join(logs, f) for f in os.listdir(logs)] if os.path.isdir(logs) else []
     return max(files, key=os.path.getmtime) if files else None
 
@@ -77,7 +78,7 @@ def cinematic(s, proc, tag, shots):
     first = None
     text = ""
     while time.time() - t0 < 90:
-        log = newest_log()
+        log = newest_log(proc)
         text = open(log, encoding="utf-8", errors="replace").read() if log else ""
         if "FIRST_FRAME" in text:
             first = time.time() - t0
@@ -98,7 +99,7 @@ def cinematic(s, proc, tag, shots):
     rec = json.load(open(os.path.join(run_dir, "record.json"), encoding="utf-8"))
     span = max((tb[-1] for tb in rec["timebases"].values() if tb), default=10.0)
     out = os.path.join(shots, f"cinematic-{tag}.png")
-    r = subprocess.run([console] + args + ["--t", f"{0.55 * span:.1f}", "--shot", out], capture_output=True, text=True, timeout=240)
+    r = godot_launch.run([console] + args + ["--t", f"{0.55 * span:.1f}", "--shot", out], capture_output=True, text=True, timeout=240)
     shot_line = next((ln for ln in r.stdout.splitlines() if ln.startswith("SHOT")), "")
     ok = os.path.isfile(out) and os.path.getsize(out) > 50_000
     check(f"Cinematic {tag}: the module's own --shot wrote a picture of this run", ok, f"{os.path.getsize(out) if os.path.isfile(out) else 0} bytes at t = {0.55 * span:.1f} s")

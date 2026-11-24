@@ -31,6 +31,7 @@ starts a Studio executable anywhere else or uses an image-name kill.
 import ntpath
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 import time
@@ -41,6 +42,7 @@ RELEASE_IDENTIFIER = "org.vvlab.studio"
 DEV_IDENTIFIER = "org.vvlab.devstudio"
 INSTALL_FOLDER = "VV Lab Studio"
 LIBRARY_FOLDER = "VV Lab Library"
+CINEMATIC_FOLDER = "VV Lab Cinematic"  # Godot user data of the Cinematic module
 OWNER_FLAG = "--owner-allow-release-exe"
 
 # Folders the Studio writes, by the variable that redirects them.
@@ -164,11 +166,12 @@ def embedded_identifiers(exe):
 
 
 class LaunchPlan:
-    def __init__(self, exe, env, scratch, identifiers):
+    def __init__(self, exe, env, scratch, identifiers, redirects=None):
         self.exe = exe
         self.env = env
         self.scratch = scratch
         self.identifiers = identifiers
+        self.redirects = redirects or {}  # APPDATA and LOCALAPPDATA of the child, for Godot's user data
 
 
 def _mentions(value, roots, environ):
@@ -231,7 +234,18 @@ def plan_launch(exe, environ, local_appdata, appdata, *, port=None, allow_releas
             raise IsolationError(f"{name} resolves into the installed application's data: {env[name]}")
     if port is not None and BROWSER_ARGUMENTS not in env:
         env[BROWSER_ARGUMENTS] = f"--remote-debugging-port={port}"
-    return LaunchPlan(os.path.abspath(exe), env, scratch, ids)
+    # Godot, when the Studio starts the Cinematic View, keeps its user data under APPDATA and its cache
+    # under LOCALAPPDATA (read from the environment). The Studio and WebView2 take their folders from the
+    # known-folder API and from the variables above, so redirecting these two for the child only sends
+    # the Cinematic View's user data to scratch folders. See godot_launch.py.
+    redirects = {}
+    for name in ("APPDATA", "LOCALAPPDATA"):
+        redirects[name] = make_scratch(name) if make_scratch else tempfile.mkdtemp(prefix=f"vv-{name.lower()}-")
+        env[name] = redirects[name]
+        for real in (appdata, local_appdata):
+            if is_under(redirects[name], ntpath.join(real, CINEMATIC_FOLDER)) or normalise(redirects[name]) in (normalise(appdata), normalise(local_appdata)):
+                raise IsolationError(f"{name} for the child resolves to {redirects[name]}, the installed data or the real profile root")
+    return LaunchPlan(os.path.abspath(exe), env, scratch, ids, redirects)
 
 
 def same_exe_running(exe):
@@ -266,6 +280,8 @@ def launch(exe, env, port, *, allow_release=False, wait_seconds=20):
     if running:
         raise IsolationError(f"{plan.exe} is already running (PID {', '.join(map(str, running))}); close it, this script never kills it")
     proc = subprocess.Popen([plan.exe], env=plan.env)
+    proc.redirect_dirs = list(plan.redirects.values())  # temporary APPDATA and LOCALAPPDATA of the child, removed by stop()
+    proc.godot_appdata = plan.redirects.get("APPDATA")  # where a Godot started by this Studio writes its user data
     proc.spawn_time = time.time()  # for start-up measurements: the checks above are not part of the start
     deadline = time.time() + wait_seconds
     while time.time() < deadline:
@@ -278,13 +294,17 @@ def launch(exe, env, port, *, allow_release=False, wait_seconds=20):
 
 
 def stop(proc):
-    """Ends the process this module started, and only that one."""
-    if proc is not None and proc.poll() is None:
+    """Ends the process this module started, and only that one, and removes its temporary folders."""
+    if proc is None:
+        return
+    if proc.poll() is None:
         proc.kill()
         try:
             proc.wait(timeout=30)
         except subprocess.TimeoutExpired:
             pass
+    for folder in getattr(proc, "redirect_dirs", []):
+        shutil.rmtree(folder, ignore_errors=True)
 
 
 def child_pids(parent_pid, name_prefix):

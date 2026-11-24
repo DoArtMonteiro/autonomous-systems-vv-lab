@@ -153,7 +153,7 @@ def main():
                 # The first frame takes about 12 to 15 s after the click on the reference PC (the module
                 # decodes its CC0 assets at start), so wait for it instead of sleeping a fixed time.
                 # Only a log written after the click counts: an older one may hold an earlier FIRST_FRAME.
-                logs = os.path.join(os.environ.get("APPDATA", ""), "VV Lab Cinematic", "logs")
+                logs = os.path.join(proc.godot_appdata, "VV Lab Cinematic", "logs")  # the Godot user data of this Studio: a scratch folder
                 text = ""
                 newest = None
                 t0 = time.time()

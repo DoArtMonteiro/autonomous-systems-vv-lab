@@ -20,12 +20,16 @@ import argparse
 import json
 import os
 import platform
+import shutil
 import subprocess
 import sys
 import threading
 import time
 
 import psutil
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "desktop", "studio", "tests"))
+import godot_launch  # noqa: E402
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 PROJECT = os.path.join(REPO, "desktop", "cinematic")  # --project overrides (e.g. an exported older revision)
@@ -48,7 +52,7 @@ def run_one(a, profile):
     cmd = [a.godot, *driver, "--path", a.project, "--resolution", "1440x900", "--", "--run", a.run, "--env", a.env,
            "--profile", profile, "--camera", "director", "--bench", out_json, "--bench-seconds", str(a.seconds)]
     t0 = time.perf_counter()
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
+    proc = godot_launch.popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
     gp = godot_process(proc)
     peak = {"rss": 0, "private": 0}
     done = threading.Event()
@@ -74,6 +78,8 @@ def run_one(a, profile):
     proc.wait(timeout=600)
     done.set()
     th.join()
+    for folder in proc.godot_plan.scratch.values():  # the scratch user data of this run
+        shutil.rmtree(folder, ignore_errors=True)
     with open(out_json, encoding="utf-8") as f:
         r = json.load(f)
     r["harness"] = {

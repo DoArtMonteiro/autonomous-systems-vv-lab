@@ -22,6 +22,7 @@ import time
 from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import godot_launch  # noqa: E402
 import studio_launch  # noqa: E402
 import m18_journeys as m18  # noqa: E402
 from installed_spotcheck import godot_children, module_args, newest_log  # noqa: E402
@@ -287,7 +288,7 @@ def cinematic_checks(s, studio_pid, ids, shots):
             shot = os.path.join(shots, "cinematic-hud-experiment.png")
             rec = json.load(open(os.path.join(run_dir, "record.json"), encoding="utf-8"))
             span = max((tb[-1] for tb in rec["timebases"].values() if tb), default=10.0)
-            r = subprocess.run([console] + args + ["--t", f"{0.55 * span:.1f}", "--shot", shot], capture_output=True, text=True, timeout=240)
+            r = godot_launch.run([console] + args + ["--t", f"{0.55 * span:.1f}", "--shot", shot], capture_output=True, text=True, timeout=240)
             check("Cinematic (experiment): the module's own --shot wrote the picture with those arguments", os.path.isfile(shot) and os.path.getsize(shot) > 50_000 and "SHOT" in r.stdout, f"{os.path.getsize(shot) if os.path.isfile(shot) else 0} bytes")
         else:
             for k in godot_children(studio_pid):

@@ -10,7 +10,10 @@ import json
 import os
 import shutil
 import struct
-import subprocess
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "desktop", "studio", "tests"))
+import godot_launch  # noqa: E402
 import tempfile
 import unittest
 
@@ -42,7 +45,7 @@ class PackLimits(unittest.TestCase):
             edit(m, dst)
             with open(mp, "w", encoding="utf-8") as f:
                 json.dump(m, f)
-            return subprocess.run([self.godot, "--headless", "--path", PROJECT, "--", "--run", RUN, "--env", dst],
+            return godot_launch.run([self.godot, "--headless", "--path", PROJECT, "--", "--run", RUN, "--env", dst],
                                   capture_output=True, text=True, timeout=180, encoding="utf-8", errors="replace")
 
     def refused(self, out, needle):

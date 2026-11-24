@@ -19,6 +19,7 @@ import time
 from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import godot_launch  # noqa: E402
 import studio_launch  # noqa: E402
 import installed_spotcheck as spot  # noqa: E402
 import m18_journeys as m18  # noqa: E402
@@ -90,7 +91,7 @@ def studio_panel(s, proc, tag, shots, expect, at="100"):
     exe = cmd.split('"')[1] if cmd.startswith('"') else cmd.split()[0]
     console = os.path.join(os.path.dirname(exe), "Godot_v4.7.2-stable_win64_console.exe")
     out = os.path.join(shots, f"cinematic-panel-{tag}.png")
-    r = subprocess.run([console] + args + ["--t", at, "--shot", out], capture_output=True, text=True, timeout=300)
+    r = godot_launch.run([console] + args + ["--t", at, "--shot", out], capture_output=True, text=True, timeout=300)
     check(f"Cinematic {tag}: the module's own --shot drew the panel of this run", os.path.isfile(out) and os.path.getsize(out) > 10000, f"{os.path.isfile(out) and os.path.getsize(out)} bytes, exit {r.returncode}")
 
 

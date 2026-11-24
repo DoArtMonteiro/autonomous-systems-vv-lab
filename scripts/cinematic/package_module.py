@@ -23,10 +23,12 @@ import hashlib
 import json
 import os
 import shutil
-import subprocess
 import sys
 import tempfile
 import zipfile
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "desktop", "studio", "tests"))
+import godot_launch  # noqa: E402
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 PROJECT = os.path.join(REPO, "desktop", "cinematic")
@@ -84,7 +86,7 @@ def stage(godot_dir, root):
     lic = os.path.join(root, "LICENSES")
     os.makedirs(lic)
     console = os.path.join(godot_dir, GODOT_CONSOLE)
-    out = subprocess.run([console, "--headless", "--path", PROJECT, "-s", "res://tools/licence_dump.gd", "--", lic],
+    out = godot_launch.run([console, "--headless", "--path", PROJECT, "-s", "res://tools/licence_dump.gd", "--", lic],
                          capture_output=True, text=True, timeout=120)
     if out.returncode != 0 or not os.path.isfile(os.path.join(lic, "godot-LICENSE.txt")):
         sys.exit("could not dump the Godot licence texts: " + out.stderr[-500:])

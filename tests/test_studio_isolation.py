@@ -23,6 +23,7 @@ STUDIO = ROOT / "desktop" / "studio"
 STUDIO_TESTS = STUDIO / "tests"
 sys.path.insert(0, str(STUDIO_TESTS))
 
+import godot_launch as gl  # noqa: E402
 import studio_launch as sl  # noqa: E402
 
 RELEASE = "org.vvlab.studio"
@@ -293,6 +294,121 @@ class PlanLaunch(unittest.TestCase):
             self.assertEqual(sl.plan_launch(str(exe), {}, LOCAL, ROAM, make_scratch=fake_scratch).identifiers, {DEV})
 
 
+GODOT = r"D:\tools\Godot_v4.7.2-stable_win64_console.exe"
+CINEMATIC_USER = rf"{ROAM}\VV Lab Cinematic"
+
+
+def fake_godot_scratch(name: str) -> str:
+    return rf"C:\FakeScratch\godot-{name.lower()}"
+
+
+def godot_plan(environ=None, appdata=ROAM, local=LOCAL, **kw):
+    return gl.plan_godot([GODOT, "--headless", "--path", "x"], environ if environ is not None else {"PATH": "p"}, appdata, local,
+                         make_scratch=fake_godot_scratch, **kw)
+
+
+class GodotLaunch(unittest.TestCase):
+    def test_the_child_gets_scratch_user_data_and_cache_folders(self):
+        p = godot_plan({"PATH": "p", "APPDATA": ROAM, "LOCALAPPDATA": LOCAL})
+        self.assertEqual(p.env["APPDATA"], fake_godot_scratch("APPDATA"))
+        self.assertEqual(p.env["LOCALAPPDATA"], fake_godot_scratch("LOCALAPPDATA"))
+        self.assertEqual(p.user_dir, rf"{fake_godot_scratch('APPDATA')}\VV Lab Cinematic")
+        self.assertEqual(p.env["PATH"], "p")
+        self.assertEqual(p.argv[0], GODOT)
+        self.assertFalse(sl.is_under(p.user_dir, CINEMATIC_USER))
+
+    def test_the_caller_environment_is_not_modified(self):
+        environ = {"APPDATA": ROAM, "LOCALAPPDATA": LOCAL}
+        godot_plan(environ)
+        self.assertEqual(environ, {"APPDATA": ROAM, "LOCALAPPDATA": LOCAL})
+
+    def test_a_scratch_folder_in_the_installed_module_data_is_refused(self):
+        hostile = [
+            CINEMATIC_USER, CINEMATIC_USER + "\\", CINEMATIC_USER.lower(), CINEMATIC_USER.replace("\\", "/"),
+            rf"{ROAM}\Temp\..\VV Lab Cinematic", rf"{LOCAL}\VV Lab Cinematic", rf"{LOCAL}\VV Lab Cinematic\cache",
+        ]
+        for value in hostile:
+            with self.subTest(scratch=value):
+                with self.assertRaises(sl.IsolationError):
+                    gl.plan_godot([GODOT], {}, ROAM, LOCAL, make_scratch=lambda name, v=value: v)
+
+    def test_the_real_profile_roots_are_refused_as_scratch(self):
+        for roam, local in ((ROAM, fake_godot_scratch("LOCALAPPDATA")), (fake_godot_scratch("APPDATA"), LOCAL)):
+            with self.subTest(roam=roam):
+                with self.assertRaises(sl.IsolationError):
+                    gl.plan_godot([GODOT], {}, ROAM, LOCAL, make_scratch=lambda name, r=roam, l=local: r if name == "APPDATA" else l)
+
+    def test_a_child_user_dir_resolving_under_the_real_one_via_a_nested_scratch_is_refused(self):
+        with self.assertRaises(sl.IsolationError):
+            gl.plan_godot([GODOT], {}, ROAM, LOCAL, make_scratch=lambda name: rf"{ROAM}\VV Lab Cinematic\x" if name == "APPDATA" else fake_godot_scratch(name))
+
+    def test_neighbouring_scratch_names_are_accepted(self):
+        p = gl.plan_godot([GODOT], {}, ROAM, LOCAL, make_scratch=lambda name: rf"{ROAM}\VV Lab Cinematic.scratch\{name}")
+        self.assertTrue(p.user_dir.endswith("VV Lab Cinematic"))
+
+    def test_missing_or_empty_inputs_refuse(self):
+        with self.assertRaises(sl.IsolationError):
+            gl.plan_godot([GODOT], {}, "", LOCAL, make_scratch=fake_godot_scratch)
+        with self.assertRaises(sl.IsolationError):
+            gl.plan_godot([], {}, ROAM, LOCAL, make_scratch=fake_godot_scratch)
+
+    def test_the_run_and_popen_wrappers_use_only_the_plan(self):
+        tree = ast.parse((STUDIO_TESTS / "godot_launch.py").read_text(encoding="utf-8"))
+        names = {}
+        for fn in ast.walk(tree):
+            if isinstance(fn, ast.FunctionDef):
+                for c in _calls(fn):
+                    if _dotted(c.func) in ("subprocess.run", "subprocess.Popen"):
+                        names[fn.name] = c
+        self.assertEqual(sorted(names), ["popen", "run"])
+        for fn_name, call in names.items():
+            self.assertEqual(_dotted(call.args[0]), "plan.argv", fn_name)
+            self.assertEqual([k.arg for k in call.keywords if k.arg == "env"], ["env"], fn_name)
+            self.assertEqual(_dotted([k for k in call.keywords if k.arg == "env"][0].value), "plan.env", fn_name)
+            fn = next(f for f in ast.walk(tree) if isinstance(f, ast.FunctionDef) and f.name == fn_name)
+            plan_line = min(c.lineno for c in _calls(fn) if _dotted(c.func) == "_plan")
+            self.assertLess(plan_line, call.lineno)
+
+    def test_the_studio_child_is_redirected_the_same_way(self):
+        p = plan({"APPDATA": ROAM, "LOCALAPPDATA": LOCAL})
+        self.assertEqual(p.env["APPDATA"], fake_scratch("APPDATA"))
+        self.assertEqual(p.env["LOCALAPPDATA"], fake_scratch("LOCALAPPDATA"))
+        self.assertEqual(set(p.redirects), {"APPDATA", "LOCALAPPDATA"})
+        for hostile in ({"APPDATA": CINEMATIC_USER}, {"LOCALAPPDATA": CINEMATIC_USER}):
+            with self.assertRaises(sl.IsolationError):
+                sl.plan_launch(EXE, {}, LOCAL, ROAM, identifier_reader=lambda _e: {DEV},
+                               make_scratch=lambda name, h=hostile: next(iter(h.values())) if name in h else fake_scratch(name))
+
+    def test_godot_is_started_only_through_the_helper(self):
+        bad = [
+            "import subprocess\nsubprocess.run([godot, '--headless'])\n",
+            "import subprocess\nsubprocess.run([self.godot, '--headless', '--path', P])\n",
+            "import subprocess\nsubprocess.Popen(cmd_godot)\n",
+            "import subprocess\nsubprocess.run([console] + args)\n",
+            "import subprocess\nsubprocess.check_output(['Godot_v4.7.2.exe'])\n",
+        ]
+        for src in bad:
+            with self.subTest(src=src):
+                self.assertTrue(godot_violations(src), src)
+        for src in ("import godot_launch\ngodot_launch.run([godot, '--headless'])\n", "import subprocess\nsubprocess.run(['git', 'status'])\n"):
+            self.assertEqual(godot_violations(src), [], src)
+        files = (sorted(p for p in (ROOT / "tests").glob("*.py") if p.name != "test_studio_isolation.py")
+                 + tree_files([ROOT / "scripts", ROOT / "docs" / "evidence", STUDIO_TESTS], (".py",)))
+        files = [p for p in files if p.name not in ("godot_launch.py", "studio_launch.py")]
+        self.assertTrue(any(p.name == "test_cinematic_cli.py" for p in files))
+        for path in files:
+            with self.subTest(file=str(path.relative_to(ROOT))):
+                self.assertEqual(godot_violations(path.read_text(encoding="utf-8")), [])
+
+    def test_every_script_that_uses_godot_imports_the_helper(self):
+        for path in sorted((ROOT / "tests").glob("test_cinematic_*.py")) + [ROOT / "scripts" / "cinematic" / "bench.py", ROOT / "scripts" / "cinematic" / "package_module.py"]:
+            text = path.read_text(encoding="utf-8")
+            if "VV_GODOT" in text or "--headless" in text or "godot_launch" in text:
+                with self.subTest(file=path.name):
+                    if "--headless" in text or "Popen" in text or "godot_launch.run" in text:
+                        self.assertIn("import godot_launch", text)
+
+
 class NetworkPathsAndDocuments(unittest.TestCase):
     def test_network_paths_are_refused_in_every_spelling(self):
         for value in (
@@ -490,12 +606,12 @@ def _literal_text(node, facts, depth=0):
 
 def _allowed_spawn(call, facts) -> str | None:
     """The reason a subprocess call in a UI test script is allowed, or None. The allowlist is closed:
-    a call that is not one of these four shapes is a violation, whatever it runs.
+    a call that is not one of these three shapes is a violation, whatever it runs.
       1. taskkill /F /PID <pid>: ends one process by its PID.
       2. powershell with a literal command (-Command) containing none of POWERSHELL_FORBIDDEN, or -File
          with a script named *.ps1 (the file itself is covered by the text rules).
       3. tasklist, a read-only listing.
-      4. `[console] + args + [...]`: the Cinematic module's own console executable (Godot), not a Studio.
+    Godot is never started here: godot_launch.run/popen only (see godot_violations).
     """
     if not call.args:
         return None
@@ -519,9 +635,6 @@ def _allowed_spawn(call, facts) -> str | None:
                         return "powershell, script file"
         if head == "tasklist":
             return "read-only listing"
-    if (isinstance(first, ast.BinOp) and isinstance(first.left, ast.BinOp) and isinstance(first.left.left, ast.List)
-            and [_dotted(e) for e in first.left.left.elts] == ["console"]):
-        return "Godot console of the Cinematic module"
     return None
 
 
@@ -560,6 +673,20 @@ def launch_violations(source: str) -> list[str]:
             found.append(f"line {call.lineno}: {name} outside the helper")
         elif name in SPAWNERS and _allowed_spawn(call, facts) is None:
             found.append(f"line {call.lineno}: {name}({ast.unparse(call.args[0])[:60] if call.args else ''}) is not on the allowlist")
+    return found
+
+
+def godot_violations(source: str) -> list[str]:
+    """A process start whose command mentions Godot (or a variable called console, the Godot console
+    executable) outside godot_launch: Godot started that way keeps its user data in the real profile."""
+    tree = ast.parse(source)
+    found = []
+    for call in _calls(tree):
+        name = _dotted(call.func)
+        if name in SPAWNERS or name.endswith("Popen"):
+            first = ast.unparse(call.args[0]).lower() if call.args else ""
+            if "godot" in first or re.search(r"\bconsole\b", first):
+                found.append(f"line {call.lineno}: {name}({first[:50]}) starts Godot outside godot_launch")
     return found
 
 
@@ -608,7 +735,7 @@ def tree_files(bases, suffixes):
 
 class LaunchDiscipline(unittest.TestCase):
     def scripts(self):
-        return sorted(p for p in STUDIO_TESTS.glob("*.py") if p.name != "studio_launch.py")
+        return sorted(p for p in STUDIO_TESTS.glob("*.py") if p.name not in ("studio_launch.py", "godot_launch.py"))
 
     def test_the_lint_catches_what_it_is_meant_to(self):
         bad = [
@@ -627,6 +754,8 @@ class LaunchDiscipline(unittest.TestCase):
             "import subprocess as sp\nsp.run(['x'])\n",
             "import os\nos.startfile(exe)\n",
             "import studio_launch\nstudio_launch.launch(exe, env, 1, allow_release=True)\n",
+            "import subprocess\nsubprocess.run([console] + args + ['--shot', 'x'])\n",
+            "import subprocess\nsubprocess.run([godot, '--headless'])\n",
             "import subprocess\nsubprocess.getoutput(cmd)\n",
             "import subprocess\nsubprocess.getstatusoutput('x')\n",
             "import importlib\nimportlib.import_module('subprocess').run(['x'])\n",
@@ -651,7 +780,6 @@ class LaunchDiscipline(unittest.TestCase):
             "import subprocess\ndef tree(x):\n    return 'Get-CimInstance Win32_Process'\nsubprocess.run(['powershell', '-NoProfile', '-Command', tree(1) + '; 1'])\n",
             "import subprocess\nscript = os.path.join(d, 'x.ps1')\nsubprocess.run(['powershell', '-NoProfile', '-File', script])\n",
             "import subprocess\nsubprocess.run(['tasklist', '/FO', 'CSV', '/NH'], capture_output=True)\n",
-            "import subprocess\nsubprocess.run([console] + args + ['--t', '1'])\n",
             "import studio_launch\nproc = studio_launch.launch(exe, env, 1, allow_release=a.owner_allow_release_exe)\n",
         ]
         for src in good:
