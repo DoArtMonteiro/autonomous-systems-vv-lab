@@ -1,0 +1,16 @@
+{
+  "files": {
+    "spikes/m19-belief-truth/css/style.css": "d3e2eea2e99173be6a83c5d4fafd2cc6f9499d23b7dfbd75eece569c213c78de",
+    "spikes/m19-belief-truth/data.json": "a69da8661741e56a6ab844d3c86579e93180052f6102c4ca9ac6f58a4c503f78",
+    "spikes/m19-belief-truth/extract.py": "f6da0e3be755939e0afcf9a06573383e041719659136d90bc5c7d03cc74eb8e6",
+    "spikes/m19-belief-truth/index.html": "093c032a0082a61ccbeae43ef32ace7df21d5c4b954718c5e665c45d9c8b16ba",
+    "spikes/m19-belief-truth/js/app.js": "09e61278e807061032b60d36bbf8744977823037313bcdcdfb910385268bf5e0",
+    "spikes/m19-belief-truth/js/charts.js": "84d734bc6a58f17e55b9d78cff65d2eadde4f98814a473ff5ad5f51661dcd78d",
+    "spikes/m19-belief-truth/js/model.js": "35c12fbfcf1f0aebfb12c93fff668c04fc561f8665d9a04b82c4531b64a881cf"
+  },
+  "frozen_on": "2026-11-24",
+  "hash_note": "sha256 of file bytes with CRLF normalised to LF",
+  "iteration_limit": 2,
+  "iterations": 3,
+  "status": "frozen experimental candidate pending human testing; not an accepted usability improvement"
+}
