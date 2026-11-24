@@ -681,7 +681,6 @@ def s4_s5() -> dict:
 # ---------------------------------------------------------------------------------------------
 
 SCENARIOS = [
-    ("p0=1.00 q=1.00", F(1), F(1)),
     ("p0=0.99 q=0.99", F("0.99"), F("0.99")),
     ("p0=0.98 q=0.99", F("0.98"), F("0.99")),
     ("p0=0.97 q=0.99", F("0.97"), F("0.99")),
@@ -1311,9 +1310,9 @@ def used_draws(cycles: int, fixes: int) -> dict[int, int]:
             10: 12 * cycles, 11: 12 * cycles, 12: 12 * cycles}
 
 
-def seed_independence(first: int, last: int, cycles: int, fixes: int) -> dict:
+def seed_independence(first: int, last: int, cycles: int, fixes: int, used: dict | None = None) -> dict:
     """Overlap of the output ranges [position + 1, position + draws] of every stream of every seed."""
-    used = used_draws(cycles, fixes)
+    used = used or used_draws(cycles, fixes)
     uniform = max(used.values())
     pos = sorted((stream_position(s, src), s, src) for s in range(first, last + 1) for src in SOURCES)
     n = len(pos)
@@ -1601,12 +1600,48 @@ def block_verification(inv: dict) -> dict:
                         "integers_above_scan_top": sorted(s for s in inv["ints"] if s >= SCAN_TOP)[:50]}
     targets = {"block": (BLOCK_FIRST, BLOCK_LAST), "reserve": RESERVE}
     out["exhaustive_partner_scan_code_limit"] = partner_scan(targets, used_draws(*code), inv)
+    out["stress_4000000_draws_per_stream"] = stress_check(inv, protocol_ranges)
     out["not_established"] = [
         "seeds derived in code from other numbers (offsets, hashes, loops) that appear in no text line with the word",
         "seeds in untracked files (for example runs/), in other branches or worktrees, in pull-request text or in notes",
         "binary files",
         "seeds at or above 2^24 that are not integers on a seed line"]
     return out
+
+
+STRESS_DRAWS = 4_000_000
+
+
+def min_position_distance(block: tuple, ranges: dict) -> int:
+    """Smallest cyclic distance between the position of a block stream and that of a stream of `ranges`."""
+    import bisect
+    other = sorted(stream_position(sd, src) for lo, hi in ranges.values() for sd in range(lo, hi + 1) for src in SOURCES)
+    best = 1 << 64
+    for sd in range(block[0], block[1] + 1):
+        for src in SOURCES:
+            p = stream_position(sd, src)
+            i = bisect.bisect_left(other, p)
+            for j in (i - 1, i % len(other)):
+                d = (p - other[j]) & MASK64
+                best = min(best, d, (1 << 64) - d)
+    return best
+
+
+def stress_check(inv: dict, declared: dict) -> dict:
+    """Extra check with 4,000,000 draws on every stream (more than any stream of the rocket or the ascent
+    simulation can take, see the notes in the protocol), position arithmetic only."""
+    used = {src: STRESS_DRAWS for src in SOURCES}
+    own = seed_independence(BLOCK_FIRST, BLOCK_LAST, 0, 0, used=used)
+    idx = _seen_index(declared, used)
+    scan = partner_scan({"block": (BLOCK_FIRST, BLOCK_LAST), "reserve": RESERVE}, used, inv)
+    return {"draws_per_stream": STRESS_DRAWS,
+            "within_block_overlapping_pairs": own["pairs_overlapping_in_the_outputs_actually_used"],
+            "within_block_min_slack": own["min_slack_between_next_stream_and_used_range"],
+            "block_against_declared_overlapping_pairs": len(_block_vs_index(BLOCK_FIRST, BLOCK_LAST, idx, used)),
+            "block_to_declared_min_position_distance": min_position_distance((BLOCK_FIRST, BLOCK_LAST), declared),
+            "partner_seeds_0_to_2^24": scan.get("partner_seeds"),
+            "inventory_integers_in_partner_set": scan.get("inventory_integers_in_partner_set"),
+            "inventory_ranges_meeting_partner_set": scan.get("inventory_ranges_meeting_partner_set")}
 
 
 def synthetic_arithmetic_check() -> dict:
@@ -1650,8 +1685,9 @@ RNG_OPERATIONS_DISCLOSED = [
     {"revision": "4", "operation": "test generating explicit output words for the pairs (44000, 1) and (42016, 3) (3 and 1 words) and "
                                     "(44804, 10) and (41212, 12) (7 and 5 words) on every run; asserted equal, not printed or stored",
      "protected_seeds": True, "words_generated_per_test_run": 16, "stored_in_files": False, "printed": False},
-    {"revision": "5", "operation": "position arithmetic only for 81000-81999, 80920-80999 and the candidate blocks scanned from 60000; "
-                                    "no output word of those seeds; tests generate words only on the synthetic block 90000-91999",
+    {"revision": "5 and 6", "operation": "position arithmetic only for 81000-81999, the reserve 80904-80983, the rejected reserve candidates "
+                                          "(80920-80999, 80912-80991 and 81920-81999) and the candidate blocks scanned from 60000; no output word "
+                                          "of those seeds; tests generate words only on the synthetic block 90000-99999",
      "protected_seeds": False, "output_words": 0},
 ]
 

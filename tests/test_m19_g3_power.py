@@ -400,6 +400,14 @@ class SeedIndependence(unittest.TestCase):
         self.assertGreater(len(m._block_vs_index(80920, 80999, idx, used)), 0)
         self.assertEqual(len(m._block_vs_index(80904, 80983, idx, used)), 0)
 
+    def test_stress_check_with_four_million_draws(self):
+        e = built()["seed_independence"]["stress_4000000_draws_per_stream"]
+        self.assertEqual(e["within_block_overlapping_pairs"], 0)
+        self.assertEqual(e["block_against_declared_overlapping_pairs"], 0)
+        self.assertGreater(e["block_to_declared_min_position_distance"], 4_000_000)
+        self.assertEqual(e["inventory_integers_in_partner_set"], [])
+        self.assertEqual(e["partner_seeds_0_to_2^24"], 59961)
+
     def test_synthetic_check_is_recorded(self):
         s = built()["synthetic_arithmetic_check"]
         self.assertEqual(s["block"], [90000, 99999])
@@ -488,7 +496,8 @@ class Candidate(unittest.TestCase):
                        "nenhuma palavra de saída de nenhuma semente protegida ou confirmatória é gerada",
                        "Nenhuma taxa se toma como exatamente 100 %",
                        "fecha todas as portas a jusante", "Hoeffding", "novo confirmatório",
-                       "estreitar a guarda a 81000 a 81919", "pendentes de verificação metodológica e de revisão humana"):
+                       "estreitar a guarda a 81000 a 81919", "XorShift64Star", "nenhuma aprovação é pedida agora",
+                       "ainda não protege", "evidência transportada para condições não testadas", "pendentes de verificação metodológica e de revisão humana"):
             self.assertIn(needle, self.text, needle)
         self.assertNotIn("padrão provisório", self.text.lower())
         self.assertNotIn("todos no sentido previsto", self.text)

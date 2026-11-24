@@ -363,10 +363,6 @@
       "p0=1.00 q=0.93 (one onset in seven fails half the time)": {
         "alpha_0.01": 900,
         "alpha_0.01/3": 1130
-      },
-      "p0=1.00 q=1.00": {
-        "alpha_0.01": 50,
-        "alpha_0.01/3": 60
       }
     },
     "reallocation_n_needed_O1_each_proportion_power_0.8_alpha_0.01/3": {
@@ -615,36 +611,6 @@
           "O3_mcnemar_sign_test": 1.0,
           "O5_null_0.8_for_H1b_with_O1": 0.046542
         }
-      },
-      "p0=1.00 q=1.00": {
-        "alpha_0.01": {
-          "O0_conjunction": 1.0,
-          "O1_each": {
-            "late_fails": 1.0,
-            "zero_s_holds": 1.0
-          },
-          "O1_split_frechet_high": 1.0,
-          "O1_split_frechet_low": 1.0,
-          "O1_split_independent": 1.0,
-          "O2_conditional_only": 1.0,
-          "O2_conditional_with_H1b": 1.0,
-          "O3_mcnemar_sign_test": 1.0,
-          "O5_null_0.8_for_H1b_with_O1": 1.0
-        },
-        "alpha_0.01/3": {
-          "O0_conjunction": 1.0,
-          "O1_each": {
-            "late_fails": 1.0,
-            "zero_s_holds": 1.0
-          },
-          "O1_split_frechet_high": 1.0,
-          "O1_split_frechet_low": 1.0,
-          "O1_split_independent": 1.0,
-          "O2_conditional_only": 1.0,
-          "O2_conditional_with_H1b": 1.0,
-          "O3_mcnemar_sign_test": 1.0,
-          "O5_null_0.8_for_H1b_with_O1": 1.0
-        }
       }
     },
     "thresholds": {
@@ -689,10 +655,6 @@
       "p0=1.00 q=0.93 (one onset in seven fails half the time)": {
         "alpha_0.01": 900,
         "alpha_0.01/3": 1130
-      },
-      "p0=1.00 q=1.00": {
-        "alpha_0.01": 50,
-        "alpha_0.01/3": 60
       }
     },
     "reallocation_n_needed_O1_each_proportion_power_0.8_alpha_0.01/3": {
@@ -940,36 +902,6 @@
           "O2_conditional_with_H1b": 0.255438,
           "O3_mcnemar_sign_test": null,
           "O5_null_0.8_for_H1b_with_O1": 0.255438
-        }
-      },
-      "p0=1.00 q=1.00": {
-        "alpha_0.01": {
-          "O0_conjunction": 1.0,
-          "O1_each": {
-            "late_fails": 1.0,
-            "zero_s_holds": 1.0
-          },
-          "O1_split_frechet_high": 1.0,
-          "O1_split_frechet_low": 1.0,
-          "O1_split_independent": 1.0,
-          "O2_conditional_only": 1.0,
-          "O2_conditional_with_H1b": 1.0,
-          "O3_mcnemar_sign_test": null,
-          "O5_null_0.8_for_H1b_with_O1": 1.0
-        },
-        "alpha_0.01/3": {
-          "O0_conjunction": 1.0,
-          "O1_each": {
-            "late_fails": 1.0,
-            "zero_s_holds": 1.0
-          },
-          "O1_split_frechet_high": 1.0,
-          "O1_split_frechet_low": 1.0,
-          "O1_split_independent": 1.0,
-          "O2_conditional_only": 1.0,
-          "O2_conditional_with_H1b": 1.0,
-          "O3_mcnemar_sign_test": null,
-          "O5_null_0.8_for_H1b_with_O1": 1.0
         }
       }
     },
@@ -3001,10 +2933,10 @@
       "words_generated_per_test_run": 16
     },
     {
-      "operation": "position arithmetic only for 81000-81999, 80920-80999 and the candidate blocks scanned from 60000; no output word of those seeds; tests generate words only on the synthetic block 90000-91999",
+      "operation": "position arithmetic only for 81000-81999, the reserve 80904-80983, the rejected reserve candidates (80920-80999, 80912-80991 and 81920-81999) and the candidate blocks scanned from 60000; no output word of those seeds; tests generate words only on the synthetic block 90000-99999",
       "output_words": 0,
       "protected_seeds": false,
-      "revision": "5"
+      "revision": "5 and 6"
     }
   ],
   "s4_s5": {
@@ -4237,6 +4169,16 @@
     "reserve_against_declared_ranges_case_40s": 0,
     "reserve_against_declared_ranges_code_limit": 0,
     "same_seed_pairing": "the two or more arms of one seed use the identical streams (same positions): intentional pairing inside an experiment; the checks above compare different seeds, and different sources of one seed, so they exclude it",
+    "stress_4000000_draws_per_stream": {
+      "block_against_declared_overlapping_pairs": 0,
+      "block_to_declared_min_position_distance": 8694272044025,
+      "draws_per_stream": 4000000,
+      "inventory_integers_in_partner_set": [],
+      "inventory_ranges_meeting_partner_set": [],
+      "partner_seeds_0_to_2^24": 59961,
+      "within_block_min_slack": 51441353195046,
+      "within_block_overlapping_pairs": 0
+    },
     "within_block_case_40s": {
       "distinct_positions": 11040,
       "draws_used_per_source": {
