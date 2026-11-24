@@ -60,7 +60,7 @@ Revisão adversária (`02-adversarial-review-of-m10-no-go-result.md`): **o resul
 - Iniciar outra reformulação do M10 no âmbito do M19.
 - Usar as sementes 3000 a 3099 e 6000 a 6099, e ainda 44000 a 44999 e 50000 a 59999.
 - Congelar a configuração: `m10-freeze.json` não existe e não se cria.
-- Integrar a PR #15 ou este ramo em `main` ou no Studio, e enviar o ramo, sem decisão nova do responsável.
+- Integrar a PR #15 ou este ramo em `main` ou no Studio sem decisão nova do responsável. (O envio do ramo para o GitHub, como cópia de segurança, foi autorizado pelo responsável em 2026-11-24.)
 
 ## Ponteiros
 
