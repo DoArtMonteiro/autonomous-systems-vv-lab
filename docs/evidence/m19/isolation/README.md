@@ -21,6 +21,8 @@ As somas completas estão em `result.json`. As listagens em si não são publica
 
 - Compilar a mesma árvore com a sobreposição de lançamento (`TAURI_CONFIG` com o conteúdo de `desktop/studio/tauri.release.conf.json`) dá um executável que contém só `org.vvlab.studio`; voltar a compilar sem ela volta a dar só `org.vvlab.devstudio`. Cada compilação voltou a compilar o `vv-studio` (4 s), por isso uma alteração do identificador não deixa um executável antigo.
 
+- A CLI do Tauri 2.11.5, chamada como `build.ps1` a chama, sem instalador: `tauri build --no-bundle` deu um `vv-studio.exe` de lançamento (perfil de compilação `release`) que contém só `org.vvlab.devstudio`; `tauri build --no-bundle --config desktop/studio/tauri.release.conf.json` deu um que contém só `org.vvlab.studio`. As construções de lançamento já existentes noutras árvores (`m16`, `m18`, `rel`) contêm só `org.vvlab.studio`, e o leitor de identificador diz o mesmo. O `build.ps1` em si, sem o `npm ci` (a árvore não tem `node_modules`), foi executado só até à guarda de `TAURI_CONFIG`, com e sem `-Release`: sai com erro antes de qualquer compilação. Não foram executados o `build.ps1` completo nem o empacotamento do instalador (`-Release` sem `--no-bundle`).
+
 ## Limitações e história da medição
 
 - Uma máquina (Windows 11 Pro 10.0.26300, Python 3.14.6), cerca de 14 s por lançamento, sem domínios nem ficheiros de missão. Não prova que nenhum percurso longo escreve fora das pastas temporárias; prova que o arranque e o encerramento não tocam no perfil instalado.
