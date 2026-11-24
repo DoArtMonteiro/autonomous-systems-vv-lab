@@ -170,6 +170,7 @@ def _load_manifest(campaign_id: str, repo: Path) -> Manifest:
     data = _parse_json(blob, rel)
     manifest = _validate_manifest(data, campaign_id, rel, hashlib.sha256(blob).hexdigest(), head)
     _check_history(repo, rel, data)
+    _check_closed_elsewhere(repo, rel, manifest)
     _check_other_manifests(repo, manifest)
     return manifest
 
@@ -263,11 +264,26 @@ def _check_history(repo: Path, rel: str, current: dict[str, Any]) -> None:
         newer = old
 
 
+def _check_closed_elsewhere(repo: Path, rel: str, manifest: Manifest) -> None:
+    """Uma campanha fechada em qualquer referência (ramo, etiqueta, worktree) não pode estar aberta em HEAD."""
+    if manifest.status == "closed":
+        return
+    shas = _git(repo, "log", "--all", "--full-history", "--format=%H", "--", rel).decode("utf-8").split()
+    for sha in shas:
+        try:
+            blob = _git(repo, "cat-file", "blob", f"{sha}:{rel}")
+        except BudgetError:
+            continue  # versão em que o ficheiro foi apagado
+        old = _parse_json(blob, f"{rel} em {sha[:9]}")
+        if isinstance(old, dict) and old.get("status") == "closed":
+            raise BudgetError(f"a campanha {rel} está fechada na versão {sha[:9]} de outra referência: reaberta em HEAD")
+
+
 def _check_other_manifests(repo: Path, manifest: Manifest) -> None:
     """Outro identificador não pode reaproveitar o pré-registo nem as sementes de uma campanha."""
     own = f"{MANIFEST_DIR}/{manifest.campaign_id}.json"
     gone = _git(repo, "log", "--full-history", "--no-renames", "--diff-filter=D", "--name-only", "--format=", "HEAD",
-                "--", f"{MANIFEST_DIR}/").decode("utf-8").split()
+                "--", f"{MANIFEST_DIR}/*.json").decode("utf-8").split()
     if gone:
         raise BudgetError(f"o histórico apaga ou renomeia manifestos ({sorted(set(gone))[:3]}); "
                           "um identificador novo não repõe o registo de outra campanha")
@@ -295,7 +311,14 @@ def _check_other_ledgers(paths: _Paths, manifest: Manifest) -> None:
     for other in sorted(paths.ledger.parent.glob("*.jsonl")):
         if other == paths.ledger:
             continue
-        for number, line in enumerate(other.read_bytes().splitlines(), start=1):
+        try:
+            raw = other.read_bytes()
+        except OSError as error:
+            raise BudgetError(f"registo vizinho {other.name} ilegível; a recusar: {error!r}") from error
+        lines = raw.splitlines()
+        if lines and not raw.endswith(bytes([10])):
+            lines.pop()  # linha final truncada: ignorada na verificação de sobreposição
+        for number, line in enumerate(lines, start=1):
             if not line:
                 continue
             try:
@@ -490,6 +513,9 @@ def _state(campaign_id: str, repo: Path | None, ledger_dir: Path | None, need_ma
     with _locked(paths.lock):
         manifest = _load_manifest(campaign_id, repo) if need_manifest else None
         entries, hashes = _read_ledger(paths, campaign_id)
+        if manifest is not None and manifest.status == "closed" and not any(e.get("event") == "closed" for e in entries):
+            _write_entry(paths, entries, hashes, manifest, 0, "closed", [], "closed")  # o fecho fica no registo
+            entries, hashes = _read_ledger(paths, campaign_id)
         yield manifest, entries, hashes, paths
 
 
@@ -530,8 +556,6 @@ def _reserve(campaign_id: str, planned: Iterable[Any], label: str = "", repo: Pa
     with _state(campaign_id, repo, ledger_dir) as (manifest, entries, hashes, paths):
         closed_before = any(e.get("event") == "closed" for e in entries)
         if manifest.status == "closed":
-            if not closed_before:  # o fecho fica no registo: um histórico reescrito não o reabre
-                _write_entry(paths, entries, hashes, manifest, 0, "closed", [], "closed")
             raise BudgetError(f"a campanha {campaign_id} está fechada: nenhuma reserva é possível")
         if closed_before:
             raise BudgetError(f"a campanha {campaign_id} foi fechada segundo o registo e o manifesto não o diz: reaberta")

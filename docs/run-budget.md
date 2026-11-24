@@ -2,6 +2,10 @@
 
 `scripts/run_budget.py` impede que um erro de um agente ou da orquestração ultrapasse o orçamento aprovado de uma campanha pré-registada. O limite é verificado **antes** de cada lançamento, sobre o **tamanho do plano**, e acumula entre invocações, pastas de saída e worktrees. Nasceu do incidente descrito em [`docs/incidents/2026-11-23-m10-run-cap.md`](incidents/2026-11-23-m10-run-cap.md).
 
+## Estado atual
+
+Nenhum manifesto `budgets/*.json` existe e nenhum script chama `run_budgeted`. **A salvaguarda não protege nada enquanto não houver um manifesto registado em commit e um script de campanha migrado.** A próxima campanha pré-registada tem de a adotar antes da primeira execução.
+
 ## Âmbito
 
 - Aplica-se às campanhas pré-registadas, cada uma com um identificador (`campaign_id`) e um limite total.
@@ -84,9 +88,9 @@ Uma campanha encerra-se por adenda, nunca por apagar o manifesto: acrescentar um
 "amendments": [{"max_runs": 50000, "reason": "encerrada: não avançar", "date": "2026-11-24", "closes": true}]
 ```
 
-Uma campanha fechada recusa todas as reservas (e portanto todo o lançamento); `guard_report` continua a funcionar. A mudança só vai de aberta para fechada: `status: closed` sem a adenda de fecho, ou o inverso, é inválido; uma versão posterior que reabra é recusada pelo histórico git; e a primeira tentativa de reserva numa campanha fechada grava no registo um evento `closed`, que recusa um manifesto «reaberto» em histórico reescrito ou órfão. O evento só fica gravado se alguém tentar reservar depois do fecho.
+Uma campanha fechada recusa todas as reservas (e portanto todo o lançamento); `guard_report` continua a funcionar. A mudança só vai de aberta para fechada: `status: closed` sem a adenda de fecho, ou o inverso, é inválido; uma versão posterior que reabra é recusada pelo histórico git; qualquer versão `closed` do manifesto em **qualquer referência** (`git log --all --full-history`, o que inclui ramos desatualizados, órfãos, etiquetas e worktrees do mesmo repositório) recusa um HEAD aberto; e a primeira leitura de um manifesto fechado (reserva, `recount` ou `guard_report`) grava no registo um evento `closed`, que recusa um manifesto «reaberto» mesmo que a referência com o fecho desapareça. Não cobre história reescrita cujos commits já foram recolhidos pelo `git gc` e cuja referência foi apagada, antes de o evento `closed` ser gravado.
 
-**Apagar ou renomear um manifesto bloqueia todas as campanhas, por desenho.** Qualquer `budgets/*.json` apagado ou renomeado no histórico faz recusar todas as reservas; não há exceção, porque seria a via para repor um orçamento. Quem quiser retirar uma campanha usa a adenda de fecho.
+**Apagar ou renomear um manifesto bloqueia todas as campanhas, por desenho.** Qualquer `budgets/*.json` apagado ou renomeado no histórico (outros ficheiros de `budgets/`, como um `README.md`, não contam) faz recusar todas as reservas; não há exceção, porque seria a via para repor um orçamento. Quem quiser retirar uma campanha usa a adenda de fecho.
 
 ## Contagem a partir dos artefactos
 
@@ -110,5 +114,6 @@ Uma falha a meio da escrita pode deixar a última linha do registo ou da ponta s
 - A aprovação de um manifesto ou de uma adenda: o commit prova que o ficheiro existe, não quem o aprovou. Alargar `allowed_seeds` num commit posterior só é visível na revisão.
 - A contagem nos artefactos não vê execuções cujos artefactos foram apagados, a menos que sejam declaradas com os seus identificadores, e a lista declarada é dita pelo chamador.
 - O teste de lançamento só vê importações e chamadas diretas em `scripts/` (com propagação por importação de módulos locais). Não vê `desktop/`, comandos de shell, execuções à mão, `getattr` ou strings avaliadas com `exec`/`eval`, nem as chamadas feitas dentro de módulos locais importados por quem usa `run_budget`.
+- Históricos fundidos com edições conflituosas das adendas falham fechados (a verificação de adendas recusa), mas isto não está testado.
 - O registo vive no repositório local: outra máquina ou clone tem o seu próprio.
 - Uma história git reescrita (por exemplo com `push --force` e novo clone) apaga as versões anteriores do manifesto que a verificação de adendas usa.

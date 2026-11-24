@@ -342,6 +342,42 @@ class RenameAndHistoryTests(BudgetCase):
         with self.assertRaisesRegex(rb.BudgetError, "apaga ou renomeia"):
             rb._reserve("renamed", [5000], "", self.repo, self.ledger)
 
+    def test_deleting_a_non_manifest_file_in_budgets_does_not_block(self):
+        readme = self.repo / "budgets" / "README.md"
+        readme.write_text("nota", encoding="utf-8")
+        commit(self.repo, "readme")
+        readme.unlink()
+        commit(self.repo, "remove readme")
+        self.assertEqual(self.reserve([5000]).runs, 1)
+
+    def fresh_repo(self, campaign="newid", prereg="docs/new.md"):
+        fresh = self.tmp / f"fresh-{campaign}"
+        subprocess.run(["git", "init", "-q", str(fresh)], check=True)
+        git(fresh, "config", "core.autocrlf", "false")
+        (fresh / "exec" / "src").mkdir(parents=True)
+        shutil.copy(self.seeds_rs, fresh / "exec" / "src" / "seeds.rs")
+        write_manifest(fresh, manifest_data(campaign=campaign, prereg=prereg))
+        commit(fresh, "new")
+        return fresh
+
+    def test_unreadable_neighbour_ledger_is_refused_as_budget_error(self):
+        (self.ledger / "broken.jsonl").mkdir(parents=True)
+        with self.assertRaises(rb.BudgetError):
+            self.reserve([5000])
+
+    def test_torn_final_line_of_a_neighbour_is_ignored_for_the_overlap_scan(self):
+        self.reserve([5000])
+        self.reserve([5001])
+        neighbour = self.ledger / f"{CAMPAIGN}.jsonl"
+        raw = neighbour.read_bytes()
+        neighbour.write_bytes(raw[:-10])  # linha final truncada
+        fresh = self.fresh_repo()
+        with self.assertRaisesRegex(rb.BudgetError, "sobrepõem-se"):  # a primeira linha completa continua a contar
+            rb._reserve("newid", [5000], "", fresh, self.ledger)
+        first_line = raw.splitlines()[0]
+        neighbour.write_bytes(first_line[:-10])  # só uma linha truncada: nada a comparar, sem exceção
+        self.assertEqual(rb._reserve("newid", [5000], "", fresh, self.ledger).runs, 1)
+
     def test_ledger_scan_refuses_an_id_that_reuses_seeds_of_an_existing_ledger(self):
         self.reserve([5000])
         fresh = self.tmp / "fresh"
@@ -429,6 +465,36 @@ class ClosureTests(BudgetCase):
         self.amend(manifest_data(max_runs=20, amendments=[amendment(20), closing(20)], status="closed"))
         with self.assertRaisesRegex(rb.BudgetError, "fechada"):
             self.reserve([5000])
+
+
+    def test_closure_on_another_branch_blocks_a_stale_branch_before_any_attempt(self):
+        base = subprocess.run(["git", "-C", str(self.repo), "rev-parse", "--abbrev-ref", "HEAD"],
+                              capture_output=True, text=True, check=True).stdout.strip()
+        git(self.repo, "checkout", "-q", "-b", "closer")
+        self.close()
+        git(self.repo, "checkout", "-q", base)  # ramo desatualizado, manifesto ainda aberto
+        with self.assertRaisesRegex(rb.BudgetError, "outra referência"):
+            self.reserve([5000])
+
+    def test_closure_blocks_an_orphan_history_before_any_attempt(self):
+        self.close()
+        git(self.repo, "checkout", "-q", "--orphan", "orphan")
+        write_manifest(self.repo, manifest_data())
+        git(self.repo, "add", "-A")
+        git(self.repo, "commit", "-m", "orphan without the closure")
+        with self.assertRaisesRegex(rb.BudgetError, "outra referência"):
+            self.reserve([5000])
+
+    def test_reading_a_closed_manifest_records_the_closure_even_for_the_report_guard(self):
+        self.reserve([5000])
+        self.close()
+        (self.tmp / "a" / "r0").mkdir(parents=True)
+        (self.tmp / "a" / "r0" / "verification.json").write_text("{}")
+        rb._guard_report(CAMPAIGN, self.tmp / "a", repo=self.repo, ledger_dir=self.ledger)
+        events = [json.loads(line).get("event") for line in (self.ledger / f"{CAMPAIGN}.jsonl").read_text().splitlines()]
+        self.assertEqual(events, [None, "closed"])
+        rb._guard_report(CAMPAIGN, self.tmp / "a", repo=self.repo, ledger_dir=self.ledger)  # não repete o evento
+        self.assertEqual(len((self.ledger / f"{CAMPAIGN}.jsonl").read_text().splitlines()), 2)
 
 
 class SeedTests(BudgetCase):
