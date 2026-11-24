@@ -323,6 +323,45 @@ class ManifestTests(BudgetCase):
             self.reserve([5000])
 
 
+class RenameAndHistoryTests(BudgetCase):
+    def rename_manifest(self, new_id: str, **changes):
+        data = manifest_data(campaign=new_id, **changes)
+        git(self.repo, "mv", f"budgets/{CAMPAIGN}.json", f"budgets/{new_id}.json")
+        write_manifest(self.repo, data)
+        commit(self.repo, "rename")
+
+    def test_renaming_the_manifest_does_not_reset_the_budget(self):
+        self.reserve([5000 + i for i in range(10)])  # 10 de 10
+        self.rename_manifest("renamed")
+        with self.assertRaisesRegex(rb.BudgetError, "apaga ou renomeia"):
+            rb._reserve("renamed", [5000], "", self.repo, self.ledger)
+
+    def test_ledger_scan_refuses_an_id_that_reuses_seeds_of_an_existing_ledger(self):
+        self.reserve([5000])
+        fresh = self.tmp / "fresh"
+        subprocess.run(["git", "init", "-q", str(fresh)], check=True)
+        git(fresh, "config", "core.autocrlf", "false")
+        (fresh / "exec" / "src").mkdir(parents=True)
+        shutil.copy(self.seeds_rs, fresh / "exec" / "src" / "seeds.rs")
+        write_manifest(fresh, manifest_data(campaign="newid", prereg="docs/new.md"))
+        commit(fresh, "new")
+        with self.assertRaisesRegex(rb.BudgetError, "sobrepõem-se"):  # o mesmo diretório de registos, sem manifesto irmão
+            rb._reserve("newid", [5000], "", fresh, self.ledger)
+
+    def test_rise_without_amendment_on_an_orphan_history_is_refused_by_the_ledger(self):
+        self.reserve([5000 + i for i in range(10)])
+        git(self.repo, "checkout", "-q", "--orphan", "orphan")
+        write_manifest(self.repo, manifest_data(max_runs=20))
+        git(self.repo, "add", "-A")
+        git(self.repo, "commit", "-m", "orphan with a higher cap")
+        with self.assertRaisesRegex(rb.BudgetError, "sem adenda nova face ao último registo"):
+            self.reserve([5000])
+        write_manifest(self.repo, manifest_data(max_runs=20, amendments=[amendment(20)]))
+        git(self.repo, "add", "-A")
+        git(self.repo, "commit", "-m", "orphan with an amendment")
+        self.assertEqual(self.reserve([5000]).total_after, 11)
+
+
 class SeedTests(BudgetCase):
     def source(self) -> str:
         return (ROOT / "exec" / "src" / "seeds.rs").read_text(encoding="utf-8")

@@ -231,7 +231,7 @@ def _validate_manifest(data: Any, campaign_id: str, rel: str, sha: str, head: st
 
 def _check_history(repo: Path, rel: str, current: dict[str, Any]) -> None:
     """As adendas só crescem: cada versão anterior no histórico é prefixo da seguinte."""
-    shas = _git(repo, "log", "--format=%H", "HEAD", "--", rel).decode("utf-8").split()
+    shas = _git(repo, "log", "--full-history", "--format=%H", "HEAD", "--", rel).decode("utf-8").split()
     newer = current
     for sha in shas[1:]:
         try:
@@ -254,6 +254,11 @@ def _check_history(repo: Path, rel: str, current: dict[str, Any]) -> None:
 def _check_other_manifests(repo: Path, manifest: Manifest) -> None:
     """Outro identificador não pode reaproveitar o pré-registo nem as sementes de uma campanha."""
     own = f"{MANIFEST_DIR}/{manifest.campaign_id}.json"
+    gone = _git(repo, "log", "--full-history", "--no-renames", "--diff-filter=D", "--name-only", "--format=", "HEAD",
+                "--", f"{MANIFEST_DIR}/").decode("utf-8").split()
+    if gone:
+        raise BudgetError(f"o histórico apaga ou renomeia manifestos ({sorted(set(gone))[:3]}); "
+                          "um identificador novo não repõe o registo de outra campanha")
     listing = _git(repo, "ls-tree", "--name-only", "HEAD", f"{MANIFEST_DIR}/").decode("utf-8").split("\n")
     for rel in (line.strip() for line in listing):
         if not rel.endswith(".json") or rel == own:
@@ -271,6 +276,26 @@ def _check_other_manifests(repo: Path, manifest: Manifest) -> None:
                 if lo <= ohi and olo <= hi:
                     raise BudgetError(f"as sementes {lo}-{hi} sobrepõem-se às de {rel} ({olo}-{ohi}); "
                                       "uma campanha nova não repõe o registo de outra")
+
+
+def _check_other_ledgers(paths: _Paths, manifest: Manifest) -> None:
+    """Um identificador novo não pode herdar o pré-registo nem as sementes de um registo existente."""
+    for other in sorted(paths.ledger.parent.glob("*.jsonl")):
+        if other == paths.ledger:
+            continue
+        for number, line in enumerate(other.read_bytes().splitlines(), start=1):
+            if not line:
+                continue
+            try:
+                entry = json.loads(line.decode("utf-8"))
+                path, ranges = entry["prereg_path"], [(lo, hi) for lo, hi in entry["allowed_seeds"]]
+            except (UnicodeDecodeError, json.JSONDecodeError, KeyError, TypeError, ValueError) as error:
+                raise BudgetError(f"registo vizinho {other.name} linha {number} ilegível; a recusar: {error!r}") from error
+            if path == manifest.preregistration_path:
+                raise BudgetError(f"o pré-registo {path} já tem o registo {other.name}")
+            for lo, hi in manifest.allowed_seeds:
+                if any(lo <= ohi and olo <= hi for olo, ohi in ranges):
+                    raise BudgetError(f"as sementes {lo}-{hi} sobrepõem-se às do registo {other.name}")
 
 
 def _protected_ranges(repo: Path) -> list[tuple[int, int, str]]:
@@ -470,6 +495,10 @@ def _reserve(campaign_id: str, planned: Iterable[Any], label: str = "", repo: Pa
     with _state(campaign_id, repo, ledger_dir) as (manifest, entries, hashes, paths):
         _check_seeds(seeds, manifest, _protected_ranges(repo_path))
         before = entries[-1]["total_after"] if entries else 0
+        _check_other_ledgers(paths, manifest)
+        if entries and manifest.max_runs > entries[-1]["max_runs"] and len(manifest.amendments) <= entries[-1]["n_amendments"]:
+            raise BudgetError(f"max_runs subiu de {entries[-1]['max_runs']} para {manifest.max_runs} sem adenda nova "
+                              "face ao último registo")
         if before + len(items) > manifest.max_runs:
             raise BudgetExceeded(
                 f"campanha {campaign_id}: já reservadas {before}, pedidas {len(items)}, limite {manifest.max_runs}")
@@ -477,6 +506,8 @@ def _reserve(campaign_id: str, planned: Iterable[Any], label: str = "", repo: Pa
             "schema": LEDGER_SCHEMA, "seq": len(entries) + 1, "campaign_id": campaign_id, "label": str(label),
             "runs": len(items), "total_after": before + len(items), "max_runs": manifest.max_runs,
             "seed_min": min(seeds), "seed_max": max(seeds), "manifest_sha256": manifest.sha256,
+            "prereg_path": manifest.preregistration_path, "allowed_seeds": [list(r) for r in manifest.allowed_seeds],
+            "n_amendments": len(manifest.amendments),
             "head": manifest.head, "pid": os.getpid(),
             "utc": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "prev_sha256": hashes[-1] if hashes else GENESIS,

@@ -28,7 +28,7 @@ A reserva recusa quando:
 
 - o manifesto não existe em HEAD ou não é byte a byte igual ao blob de HEAD (alteração por registar em commit);
 - falta um campo, há um campo desconhecido ou um valor inválido;
-- outro manifesto em `budgets/` (em HEAD) tem o mesmo `preregistration.path` ou intervalos de sementes que se sobrepõem. Um identificador novo não repõe o registo de outra campanha; campanhas que partilham sementes são uma só campanha, alterada por adenda. Um manifesto vizinho ilegível também recusa;
+- outro manifesto em `budgets/` (em HEAD) tem o mesmo `preregistration.path` ou intervalos de sementes que se sobrepõem. Cada entrada do registo guarda o caminho do pré-registo, os intervalos de sementes e o número de adendas, e a reserva recusa um identificador cujo pré-registo ou sementes coincidam com os de outro registo do mesmo diretório. Um histórico que apague ou renomeie qualquer `budgets/*.json` (`git log --full-history`) recusa todas as campanhas, sem exceção prevista: um identificador novo não repõe o registo de outra campanha. Campanhas que partilham sementes são uma só campanha, alterada por adenda. Um manifesto ou registo vizinho ilegível também recusa;
 - uma semente está fora de `allowed_seeds`, ou dentro de um intervalo protegido. Os intervalos de `exec/src/seeds.rs` são lidos do blob em HEAD, por análise estrita: todos os literais `Protected { start, end, reason }` têm de ter inteiros decimais com `start <= end`; um formato diferente (hexadecimal, expressão, campos trocados), nenhum literal ou a falta de 3000-3099, 6000-6099 ou 44000-44999 recusa. A isto juntam-se 3000-3099, 6000-6099, 44000-44999 (reserva M13), 50000-59999 (M14, gasta) e 81000-81999 (bloco candidato do G3), fixos no módulo. Um intervalo permitido que cubra um protegido não o liberta;
 - o total já reservado mais o pedido excede `max_runs`.
 
@@ -72,7 +72,7 @@ Para subir o limite, fazer um novo commit do manifesto com `max_runs` maior e um
 "amendments": [{"max_runs": 50000, "reason": "razão concreta", "date": "2026-11-25"}]
 ```
 
-Os `max_runs` das adendas têm de crescer, o último tem de coincidir com `max_runs` e a razão não pode estar vazia. O histórico git do ficheiro é verificado em cada reserva: cada versão anterior tem de ser prefixo da seguinte, `max_runs` não pode descer e só pode subir com uma adenda nova. Apagar e recriar o manifesto, ou reescrever uma adenda, é recusado. O total acumulado transita; só o teto muda. O responsável pode proteger `budgets/**` com uma regra de permissões ou com proteção de ramo; esta salvaguarda **não consegue verificar** que o commit de uma adenda foi aprovado por ele.
+Os `max_runs` das adendas têm de crescer, o último tem de coincidir com `max_runs` e a razão não pode estar vazia. O histórico git do ficheiro (`--full-history`) é verificado em cada reserva, e o último registo guarda `max_runs` e o número de adendas: um `max_runs` maior só é aceite com mais adendas do que as registadas, o que cobre históricos órfãos, superficiais ou reescritos. Em cada reserva: cada versão anterior tem de ser prefixo da seguinte, `max_runs` não pode descer e só pode subir com uma adenda nova. Apagar e recriar o manifesto, ou reescrever uma adenda, é recusado. O total acumulado transita; só o teto muda. O responsável pode proteger `budgets/**` com uma regra de permissões ou com proteção de ramo; esta salvaguarda **não consegue verificar** que o commit de uma adenda foi aprovado por ele.
 
 ## Contagem a partir dos artefactos
 
@@ -92,7 +92,7 @@ Uma falha a meio da escrita pode deixar a última linha do registo ou da ponta s
 ## O que não protege
 
 - Um agente que edite `scripts/run_budget.py`, os testes, o registo ou a pasta `vvlab-budget`, ou que lance `vv-rocket` e outros binários diretamente, sem passar por `run_budget`.
-- **Apagar o registo e a ponta, os dois, repõe o orçamento sem aviso.** Apagar só as linhas finais ou só um dos ficheiros é detetado pela ponta; reescrever o meio é detetado pela cadeia de hashes. Qualquer destas alterações também só se vê pela contagem nos artefactos, se `guard_report` for chamado.
+- **Apagar o registo e a ponta, os dois, repõe o orçamento sem aviso.** O mesmo vale para truncar as mesmas linhas finais do registo e da ponta, ou apagar a ponta e depois truncar o registo; só a contagem nos artefactos o pode apanhar. Apagar só as linhas finais ou só um dos ficheiros é detetado pela ponta; reescrever o meio é detetado pela cadeia de hashes. Qualquer destas alterações também só se vê pela contagem nos artefactos, se `guard_report` for chamado.
 - A aprovação de um manifesto ou de uma adenda: o commit prova que o ficheiro existe, não quem o aprovou. Alargar `allowed_seeds` num commit posterior só é visível na revisão.
 - A contagem nos artefactos não vê execuções cujos artefactos foram apagados, a menos que sejam declaradas com os seus identificadores, e a lista declarada é dita pelo chamador.
 - O teste de lançamento só vê importações e chamadas diretas em `scripts/` (com propagação por importação de módulos locais). Não vê `desktop/`, comandos de shell, execuções à mão, `getattr` ou strings avaliadas com `exec`/`eval`, nem as chamadas feitas dentro de módulos locais importados por quem usa `run_budget`.
