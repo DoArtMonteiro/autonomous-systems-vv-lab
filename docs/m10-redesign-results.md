@@ -1,5 +1,7 @@
 # M10: resultados da reformulação do isolamento (tentativa única)
 
+> Investigação encerrada em 2026-11-24: ver `docs/m10-closure.md`.
+
 Estado: **tentativa executada; veredicto «não avançar».** Só sementes de desenvolvimento 5000 a 5099, um só binário, sem `m10-freeze.json`, sem envio. Esta é uma experiência de fecho só de V1 (adenda 1, secção 13.2 de `docs/m10-redesign-preregistration.md`): nenhum resultado aqui altera, por si, uma decisão do responsável. Todos os números vêm de `docs/evidence/m10-redesign/results/analysis.md` e `analysis.json` (gerados por `scripts/m10_redesign_analysis.py`); os registos por execução estão em `records.jsonl.gz` (colunas: etapa, célula, braço, semente, classe física, requisitos e invariantes falhados, isolamento, falhas de alerta vertical, `hv` e posição, `gate`, instante de ignição).
 
 ## 1. Veredicto
