@@ -159,7 +159,7 @@ O que fica por resolver:
 
 ## Iteração 3 (antes chamada «correções finais»)
 
-Passagem final depois da avaliação da iteração 2 (a verificação de compreensão por agentes passou; o crítico de UX recomendou manter como candidato ao portão humano). Acrescentou a velocidade horizontal do plano do bocal no R2, as observações de velocidade do GNSS e reescritas de cartões, além de redação, etiquetas, CSS e pequenos dados. Não acrescentou vistas novas, mas acrescentou dados e conteúdo. Se isto conta como uma terceira iteração substantiva é uma decisão do responsável; este documento não a toma. A versão final não foi reavaliada.
+Passagem feita depois da avaliação da iteração 2. Uma classificação independente, com critérios fixados antes, concluiu que é uma terceira iteração substantiva (ver «Estado» no início e `docs/evidence/m19/reviews/06-classification-of-the-final-pass.md`). Foi avaliada por agentes com a mesma chave: 18,5/20 (15,5 em leitura estrita), armadilhas 14,5/16, sem melhoria sobre a iteração 2. O congelamento fixa esta versão (iteração 3), porque o responsável pediu que se congelasse o protótipo atual; a iteração 2, dentro do limite, continua recuperável no commit `dae67fa`. Alterações:
 
 1. A etiqueta "approx." propaga-se agora a tudo o que deriva de um valor aproximado (o extrator calcula o fecho): aparece nos 3,29 m e no "inside" do cartão 2, na distância acreditada e nos limites "believed within R5" (15,6 s a 22,955 s).
 2. Células numéricas sem quebra de linha e com algarismos tabulares; as tabelas do cursor deslizam na horizontal.
