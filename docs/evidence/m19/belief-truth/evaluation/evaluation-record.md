@@ -24,3 +24,6 @@ An independent classification with criteria fixed before the review found that t
 Fresh answerer and fresh scorer, same frozen key and questions. Comprehension 18.5/20 PASS (strict 15.5 FAIL; strict variant harsher than in iteration 2, partly scorer variance; lenient range 18.5 to 19.5). Traps 14.5/16 PASS (strict about 13.5). Core traps misled: 0. No factually wrong viewer statement found.
 Caveats: n = 1 answerer; the builder knew the failed questions from iteration 1; no baseline arm against the current Studio view.
 Known minor defects left (no further iteration allowed): a "Host error, vertical and horizontal" row placed under x, y, z columns (app.js:562); garbled "command step 3.6 s" wording for the ignition command.
+
+# Publication notes
+The answer key and question files are kept byte-identical to their frozen sha256 values, so they still contain local working paths of the build machine; these paths identify no person. Because the key and questions are now public, the future human comprehension test must use a new, unpublished question set; these files must not be reused as its instrument.

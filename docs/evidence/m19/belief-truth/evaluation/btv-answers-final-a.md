@@ -1,6 +1,6 @@
 # Answers: Belief vs Truth viewer (final), investigator A
 
-Sources used: rendered viewer at `D:\vvwt\m192\spikes\m19-belief-truth\` (served locally, headless Edge DOM dumps at ?sample=0, 100, 150, 230), its data.json for series values the viewer renders, and the screenshots in `final\`. Evidence class tags as labelled in the viewer: C config, T truth (recorded), E estimate (recorded), O observation, K command, S source code, D-host (host-computed, stored), D-view (computed by this view, some "approx.").
+Sources used: rendered viewer at `spikes\m19-belief-truth\` (served locally, headless Edge DOM dumps at ?sample=0, 100, 150, 230), its data.json for series values the viewer renders, and the screenshots in `final\`. Evidence class tags as labelled in the viewer: C config, T truth (recorded), E estimate (recorded), O observation, K command, S source code, D-host (host-computed, stored), D-view (computed by this view, some "approx.").
 Samples are every 0.1 s (231 samples, last is the off-grid touchdown sample at 22.955 s). Times below are sample times unless stated.
 
 ## Q1. True trajectory and outcome
