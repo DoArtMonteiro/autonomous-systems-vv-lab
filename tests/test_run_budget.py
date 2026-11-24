@@ -39,7 +39,7 @@ except rb.BudgetExceeded as error:
 
 
 def manifest_data(max_runs: int = 10, allowed=((5000, 5099),), amendments=None, campaign=CAMPAIGN,
-                  prereg="docs/prereg.md") -> dict:
+                  prereg="docs/prereg.md", status=None) -> dict:
     data = {
         "schema": rb.MANIFEST_SCHEMA, "campaign_id": campaign, "max_runs": max_runs,
         "allowed_seeds": [list(r) for r in allowed],
@@ -47,11 +47,17 @@ def manifest_data(max_runs: int = 10, allowed=((5000, 5099),), amendments=None, 
     }
     if amendments is not None:
         data["amendments"] = amendments
+    if status is not None:
+        data["status"] = status
     return data
 
 
 def amendment(max_runs: int, reason: str = "repetição prevista") -> dict:
     return {"max_runs": max_runs, "reason": reason, "date": "2026-11-25"}
+
+
+def closing(max_runs: int, reason: str = "campanha encerrada") -> dict:
+    return {**amendment(max_runs, reason), "closes": True}
 
 
 def write_manifest(repo: Path, data: dict) -> Path:
@@ -360,6 +366,69 @@ class RenameAndHistoryTests(BudgetCase):
         git(self.repo, "add", "-A")
         git(self.repo, "commit", "-m", "orphan with an amendment")
         self.assertEqual(self.reserve([5000]).total_after, 11)
+
+
+class ClosureTests(BudgetCase):
+    def close(self, max_runs=10, amendments=()):
+        self.amend(manifest_data(max_runs=max_runs, amendments=[*amendments, closing(max_runs)], status="closed"))
+
+    def test_a_closed_campaign_refuses_every_reservation_and_spawn(self):
+        self.reserve([5000, 5001])
+        self.close()
+        calls = []
+        with self.assertRaisesRegex(rb.BudgetError, "fechada"):
+            self.run_budgeted([5002], calls.append)
+        self.assertEqual(calls, [])
+        self.assertEqual(self.total(), 2)  # o registo de fecho não conta execuções
+
+    def test_closing_needs_a_closing_amendment_with_a_reason(self):
+        self.amend(manifest_data(status="closed"))
+        with self.assertRaisesRegex(rb.BudgetError, "não há reabertura"):
+            self.reserve([5000])
+        self.amend(manifest_data(max_runs=10, amendments=[closing(10, " ")], status="closed"))
+        with self.assertRaisesRegex(rb.BudgetError, "reason"):
+            self.reserve([5000])
+
+    def test_closing_amendment_without_status_closed_is_refused(self):
+        self.amend(manifest_data(max_runs=10, amendments=[closing(10)]))
+        with self.assertRaisesRegex(rb.BudgetError, "não há reabertura"):
+            self.reserve([5000])
+
+    def test_a_closed_campaign_cannot_be_reopened_by_a_later_commit(self):
+        self.close()
+        self.amend(manifest_data(max_runs=10, amendments=[amendment(11)]))
+        with self.assertRaises(rb.BudgetError):
+            self.reserve([5000])
+        self.amend(manifest_data(max_runs=10))
+        with self.assertRaisesRegex(rb.BudgetError, "só de acréscimo|reaberta"):
+            self.reserve([5000])
+
+    def test_reopening_on_a_rewritten_history_is_caught_by_the_ledger(self):
+        self.reserve([5000])
+        self.close()
+        with self.assertRaises(rb.BudgetError):
+            self.reserve([5001])  # grava o registo de fecho
+        git(self.repo, "checkout", "-q", "--orphan", "orphan")
+        write_manifest(self.repo, manifest_data())
+        git(self.repo, "add", "-A")
+        git(self.repo, "commit", "-m", "orphan without the closure")
+        with self.assertRaisesRegex(rb.BudgetError, "reaberta"):
+            self.reserve([5001])
+
+    def test_a_closed_campaign_can_still_be_recounted(self):
+        self.reserve([5000, 5001])
+        self.close()
+        for i in range(2):
+            (self.tmp / "a" / f"r{i}").mkdir(parents=True)
+            (self.tmp / "a" / f"r{i}" / "verification.json").write_text("{}")
+        self.assertEqual(rb._guard_report(CAMPAIGN, self.tmp / "a", repo=self.repo, ledger_dir=self.ledger).runs, 2)
+
+    def test_amendment_then_closure_keeps_a_valid_history(self):
+        self.amend(manifest_data(max_runs=20, amendments=[amendment(20)]))
+        self.assertEqual(self.reserve([5000]).runs, 1)
+        self.amend(manifest_data(max_runs=20, amendments=[amendment(20), closing(20)], status="closed"))
+        with self.assertRaisesRegex(rb.BudgetError, "fechada"):
+            self.reserve([5000])
 
 
 class SeedTests(BudgetCase):

@@ -63,8 +63,8 @@ _RS_ANY = re.compile(r"\bProtected\s*\{")
 _RS_LITERAL = re.compile(r"\bProtected\s*\{([^{}]*)\}")
 _RS_BODY = re.compile(
     r'^\s*start:\s*(\d+(?:_\d+)*)\s*,\s*end:\s*(\d+(?:_\d+)*)\s*,\s*reason:\s*""\s*,?\s*$')
-_MANIFEST_KEYS = {"schema", "campaign_id", "max_runs", "allowed_seeds", "preregistration", "created", "amendments"}
-_AMENDMENT_KEYS = {"max_runs", "reason", "date"}
+_MANIFEST_KEYS = {"schema", "campaign_id", "max_runs", "allowed_seeds", "preregistration", "created", "amendments", "status"}
+_AMENDMENT_KEYS = {"max_runs", "reason", "date"}  # mais `closes`, só na adenda que fecha
 
 
 class BudgetError(Exception):
@@ -86,6 +86,7 @@ class Manifest:
     amendments: tuple[dict[str, Any], ...]
     sha256: str
     head: str
+    status: str = "open"
 
 
 @dataclass(frozen=True)
@@ -215,18 +216,27 @@ def _validate_manifest(data: Any, campaign_id: str, rel: str, sha: str, head: st
     if not isinstance(amendments, list):
         raise bad("amendments tem de ser uma lista")
     previous = 0
-    for item in amendments:
-        if not (isinstance(item, dict) and set(item) == _AMENDMENT_KEYS and _is_int(item["max_runs"])
+    for position, item in enumerate(amendments):
+        closes = isinstance(item, dict) and "closes" in item
+        keys = _AMENDMENT_KEYS | ({"closes"} if closes else set())
+        if not (isinstance(item, dict) and set(item) == keys and _is_int(item["max_runs"])
                 and isinstance(item["reason"], str) and item["reason"].strip()
-                and isinstance(item["date"], str) and _DATE.match(item["date"])):
+                and isinstance(item["date"], str) and _DATE.match(item["date"])
+                and (not closes or item["closes"] is True)):
             raise bad("cada adenda tem de ter max_runs, reason (não vazio) e date")
-        if item["max_runs"] <= previous:
+        if item["max_runs"] < previous or (item["max_runs"] == previous and not closes):
             raise bad("os max_runs das adendas têm de crescer")
+        if closes and position != len(amendments) - 1:
+            raise bad("a adenda que fecha a campanha tem de ser a última")
         previous = item["max_runs"]
     if amendments and amendments[-1]["max_runs"] != max_runs:
         raise bad("max_runs tem de ser o da última adenda")
+    closed = bool(amendments) and "closes" in amendments[-1]
+    status = data.get("status", "open")
+    if status not in ("open", "closed") or (status == "closed") != closed:
+        raise bad("status closed exige, e só admite, uma última adenda com closes e razão; não há reabertura")
     return Manifest(campaign_id, max_runs, tuple(allowed), pre["path"], pre["commit"], created,
-                    tuple(amendments), sha, head)
+                    tuple(amendments), sha, head, status)
 
 
 def _check_history(repo: Path, rel: str, current: dict[str, Any]) -> None:
@@ -241,6 +251,8 @@ def _check_history(repo: Path, rel: str, current: dict[str, Any]) -> None:
         old = _parse_json(blob, f"{rel} em {sha[:9]}")
         if not isinstance(old, dict) or not _is_int(old.get("max_runs")) or not isinstance(old.get("amendments", []), list):
             raise BudgetError(f"o manifesto {rel} em {sha[:9]} é ilegível")
+        if old.get("status") == "closed" and newer.get("status") != "closed":
+            raise BudgetError(f"a campanha {rel} foi fechada em {sha[:9]} e não pode ser reaberta")
         old_amendments, new_amendments = old.get("amendments", []), newer.get("amendments", [])
         if new_amendments[:len(old_amendments)] != old_amendments:
             raise BudgetError(f"as adendas de {rel} não são só de acréscimo (versão {sha[:9]})")
@@ -434,7 +446,8 @@ def _read_ledger(paths: _Paths, campaign_id: str) -> tuple[list[dict[str, Any]],
             raise BudgetError(f"registo {name}: linha {number} ilegível: {error}") from error
         if (not isinstance(entry, dict) or entry.get("schema") != LEDGER_SCHEMA or entry.get("seq") != number
                 or entry.get("campaign_id") != campaign_id or entry.get("prev_sha256") != previous
-                or not _is_int(entry.get("runs")) or entry["runs"] < 1):
+                or not _is_int(entry.get("runs")) or entry["runs"] < (0 if entry.get("event") == "closed" else 1)
+                or (entry["runs"] != 0 and entry.get("event") == "closed")):
             raise BudgetError(f"registo {name}: linha {number} inconsistente com a cadeia")
         total += entry["runs"]
         if entry.get("total_after") != total:
@@ -485,6 +498,28 @@ def _ledger_total(campaign_id: str, repo: Path | None = None, ledger_dir: Path |
         return entries[-1]["total_after"] if entries else 0
 
 
+def _write_entry(paths: _Paths, entries: list[dict[str, Any]], hashes: list[str], manifest: Manifest, runs: int,
+                 label: str, seeds: Sequence[int], event: str | None = None) -> dict[str, Any]:
+    before = entries[-1]["total_after"] if entries else 0
+    entry = {
+        "schema": LEDGER_SCHEMA, "seq": len(entries) + 1, "campaign_id": manifest.campaign_id, "label": str(label),
+        "runs": runs, "total_after": before + runs, "max_runs": manifest.max_runs,
+        "seed_min": min(seeds) if seeds else None, "seed_max": max(seeds) if seeds else None,
+        "manifest_sha256": manifest.sha256, "prereg_path": manifest.preregistration_path,
+        "allowed_seeds": [list(r) for r in manifest.allowed_seeds], "n_amendments": len(manifest.amendments),
+        "head": manifest.head, "pid": os.getpid(),
+        "utc": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "prev_sha256": hashes[-1] if hashes else GENESIS,
+    }
+    if event:
+        entry["event"] = event
+    line = json.dumps(entry, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    _append(paths.ledger, line + b"\n")
+    tip = {"seq": entry["seq"], "sha256": hashlib.sha256(line).hexdigest()}
+    _append(paths.tip, json.dumps(tip, sort_keys=True, separators=(",", ":")).encode("utf-8") + b"\n")
+    return entry
+
+
 def _reserve(campaign_id: str, planned: Iterable[Any], label: str = "", repo: Path | None = None,
              ledger_dir: Path | None = None) -> Reservation:
     items = tuple(planned)
@@ -493,29 +528,25 @@ def _reserve(campaign_id: str, planned: Iterable[Any], label: str = "", repo: Pa
     seeds = [_seed_of(item) for item in items]
     repo_path = Path(repo) if repo is not None else ROOT
     with _state(campaign_id, repo, ledger_dir) as (manifest, entries, hashes, paths):
+        closed_before = any(e.get("event") == "closed" for e in entries)
+        if manifest.status == "closed":
+            if not closed_before:  # o fecho fica no registo: um histórico reescrito não o reabre
+                _write_entry(paths, entries, hashes, manifest, 0, "closed", [], "closed")
+            raise BudgetError(f"a campanha {campaign_id} está fechada: nenhuma reserva é possível")
+        if closed_before:
+            raise BudgetError(f"a campanha {campaign_id} foi fechada segundo o registo e o manifesto não o diz: reaberta")
         _check_seeds(seeds, manifest, _protected_ranges(repo_path))
         before = entries[-1]["total_after"] if entries else 0
         _check_other_ledgers(paths, manifest)
+        if entries and len(manifest.amendments) < entries[-1]["n_amendments"]:
+            raise BudgetError("o manifesto tem menos adendas do que as registadas no último registo")
         if entries and manifest.max_runs > entries[-1]["max_runs"] and len(manifest.amendments) <= entries[-1]["n_amendments"]:
             raise BudgetError(f"max_runs subiu de {entries[-1]['max_runs']} para {manifest.max_runs} sem adenda nova "
                               "face ao último registo")
         if before + len(items) > manifest.max_runs:
             raise BudgetExceeded(
                 f"campanha {campaign_id}: já reservadas {before}, pedidas {len(items)}, limite {manifest.max_runs}")
-        entry = {
-            "schema": LEDGER_SCHEMA, "seq": len(entries) + 1, "campaign_id": campaign_id, "label": str(label),
-            "runs": len(items), "total_after": before + len(items), "max_runs": manifest.max_runs,
-            "seed_min": min(seeds), "seed_max": max(seeds), "manifest_sha256": manifest.sha256,
-            "prereg_path": manifest.preregistration_path, "allowed_seeds": [list(r) for r in manifest.allowed_seeds],
-            "n_amendments": len(manifest.amendments),
-            "head": manifest.head, "pid": os.getpid(),
-            "utc": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "prev_sha256": hashes[-1] if hashes else GENESIS,
-        }
-        line = json.dumps(entry, sort_keys=True, separators=(",", ":")).encode("utf-8")
-        _append(paths.ledger, line + b"\n")
-        tip = {"seq": entry["seq"], "sha256": hashlib.sha256(line).hexdigest()}
-        _append(paths.tip, json.dumps(tip, sort_keys=True, separators=(",", ":")).encode("utf-8") + b"\n")
+        _write_entry(paths, entries, hashes, manifest, len(items), label, seeds)
     return Reservation(campaign_id, len(items), before, before + len(items), manifest.max_runs, items)
 
 

@@ -74,6 +74,20 @@ Para subir o limite, fazer um novo commit do manifesto com `max_runs` maior e um
 
 Os `max_runs` das adendas têm de crescer, o último tem de coincidir com `max_runs` e a razão não pode estar vazia. O histórico git do ficheiro (`--full-history`) é verificado em cada reserva, e o último registo guarda `max_runs` e o número de adendas: um `max_runs` maior só é aceite com mais adendas do que as registadas, o que cobre históricos órfãos, superficiais ou reescritos. Em cada reserva: cada versão anterior tem de ser prefixo da seguinte, `max_runs` não pode descer e só pode subir com uma adenda nova. Apagar e recriar o manifesto, ou reescrever uma adenda, é recusado. O total acumulado transita; só o teto muda. O responsável pode proteger `budgets/**` com uma regra de permissões ou com proteção de ramo; esta salvaguarda **não consegue verificar** que o commit de uma adenda foi aprovado por ele.
 
+## Encerrar uma campanha
+
+Uma campanha encerra-se por adenda, nunca por apagar o manifesto: acrescentar uma última adenda com `"closes": true`, o mesmo `max_runs`, uma razão e uma data, e pôr `"status": "closed"`:
+
+```json
+"status": "closed",
+"max_runs": 50000,
+"amendments": [{"max_runs": 50000, "reason": "encerrada: não avançar", "date": "2026-11-24", "closes": true}]
+```
+
+Uma campanha fechada recusa todas as reservas (e portanto todo o lançamento); `guard_report` continua a funcionar. A mudança só vai de aberta para fechada: `status: closed` sem a adenda de fecho, ou o inverso, é inválido; uma versão posterior que reabra é recusada pelo histórico git; e a primeira tentativa de reserva numa campanha fechada grava no registo um evento `closed`, que recusa um manifesto «reaberto» em histórico reescrito ou órfão. O evento só fica gravado se alguém tentar reservar depois do fecho.
+
+**Apagar ou renomear um manifesto bloqueia todas as campanhas, por desenho.** Qualquer `budgets/*.json` apagado ou renomeado no histórico faz recusar todas as reservas; não há exceção, porque seria a via para repor um orçamento. Quem quiser retirar uma campanha usa a adenda de fecho.
+
 ## Contagem a partir dos artefactos
 
 Antes de escrever um relatório, chamar:
