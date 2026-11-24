@@ -12,7 +12,7 @@ Findings, most severe first:
 
 2. `:177` (also `:161`, `:329`) - MAJOR - H1a is titled "mascaramento" in the primary family. Lines 185 and 373 say only the McNemar gate licenses that word. A line such as "H1a, mascaramento: confirmada" would leak it through the Holm result alone. Fix: rename H1a "R1 falha com início tardio" everywhere, and remove "mascaramento" from the hypothesis labels and the power-table header.
 
-3. `:7,437` - MAJOR - "Incorpora as decisões de desenho desta revisão" and "Decisões desta revisão (tomadas)" sit under the heading "Decisão do responsável". This reads as owner decisions. The project memory lists five owner decisions as pending. Fix: write "escolhas de desenho propostas pelo autor do candidato, não decididas pelo responsável", and move the "tomadas" list out of that section.
+3. `:7,437` - MAJOR - "Incorpora as decisões de desenho desta revisão" and "Decisões desta revisão (tomadas)" sit under the heading "Decisão do responsável". This reads as owner decisions. The owner decisions were still pending. Fix: write "escolhas de desenho propostas pelo autor do candidato, não decididas pelo responsável", and move the "tomadas" list out of that section.
 
 4. `:11` and `tests/test_m19_g3_power.py:329-334` - MINOR - The text says "nenhuma semente de 44000 a 44999 foi usada". The test instantiates SplitMix64 states for seeds 44000 and 44128, and the script computes stream positions for every seed in that range. No simulation ran, but the claim is overstated to a literal reader. Fix: "nenhuma simulação correu com essas sementes; a aritmética do PRNG e um teste leem os seus estados iniciais".
 
