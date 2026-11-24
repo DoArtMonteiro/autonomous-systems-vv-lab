@@ -1,6 +1,6 @@
 """Orçamento de execuções de uma campanha pré-registada, aplicado antes de cada execução.
 
-Uma campanha declara o seu limite num manifesto `budgets/<campaign_id>.json` (committed e limpo).
+Uma campanha declara o seu limite num manifesto `budgets/<campaign_id>.json` (registado em commit e limpo).
 Antes de lançar qualquer execução, o script reserva `n` execuções com `reserve` (ou usa
 `run_budgeted`, que reserva e só depois chama a função de lançamento injetada). `n` é o tamanho da
 matriz planeada, nunca um número escrito à mão. As reservas ficam num registo JSONL só de
@@ -140,14 +140,14 @@ def load_manifest(campaign_id: str, repo: Path = ROOT) -> Manifest:
     try:
         blob = _git(repo, "cat-file", "blob", f"HEAD:{rel}")
     except BudgetError as error:
-        raise BudgetError(f"o manifesto {rel} não está committed em HEAD: {error}") from error
+        raise BudgetError(f"o manifesto {rel} não está registado em HEAD: {error}") from error
     path = repo / rel
     try:
         disk = path.read_bytes()
     except OSError as error:
         raise BudgetError(f"o manifesto {rel} não pode ser lido: {error}") from error
     if disk != blob:
-        raise BudgetError(f"o manifesto {rel} difere do blob em HEAD (alteração por committar)")
+        raise BudgetError(f"o manifesto {rel} difere do blob em HEAD (alteração por registar em commit)")
     head = _git(repo, "rev-parse", "HEAD").decode("utf-8").strip()
     try:
         data = json.loads(blob.decode("utf-8"))

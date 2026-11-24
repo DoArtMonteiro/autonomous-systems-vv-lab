@@ -11,7 +11,7 @@
 
 ## Declarar um orçamento
 
-Criar `budgets/<campaign_id>.json` (identificador em minúsculas, dígitos, `-` e `_`), committed e sem alterações pendentes:
+Criar `budgets/<campaign_id>.json` (identificador em minúsculas, dígitos, `-` e `_`), registado em commit e sem alterações pendentes:
 
 ```json
 {
@@ -26,7 +26,7 @@ Criar `budgets/<campaign_id>.json` (identificador em minúsculas, dígitos, `-` 
 
 `reserve` recusa quando:
 
-- o manifesto não existe em HEAD ou não é byte a byte igual ao blob de HEAD (alteração por committar);
+- o manifesto não existe em HEAD ou não é byte a byte igual ao blob de HEAD (alteração por registar em commit);
 - falta um campo, há um campo desconhecido ou um valor inválido;
 - uma semente está fora de `allowed_seeds`, ou dentro de um intervalo protegido: os de `exec/src/seeds.rs` (lidos do texto do ficheiro; se não se encontrar nenhum, recusa) mais 44000 a 44999 (reserva M13), 50000 a 59999 (M14, gasta) e 81000 a 81999 (bloco candidato do G3). Um intervalo permitido que cubra um protegido não o liberta;
 - o total já reservado mais o pedido excede `max_runs`.
@@ -60,7 +60,7 @@ Para subir o limite, fazer um novo commit do manifesto com `max_runs` maior e um
 "amendments": [{"max_runs": 50000, "reason": "razão concreta", "date": "2026-11-25"}]
 ```
 
-Os `max_runs` das adendas têm de crescer, o último tem de coincidir com `max_runs` e a razão não pode estar vazia. Subir `max_runs` sem adenda é recusado assim que o registo já tiver visto um limite menor. O total acumulado transita; só o teto muda. O proprietário pode proteger `budgets/**` com uma regra de permissões ou com proteção de ramo; esta salvaguarda **não consegue verificar** que o commit de uma adenda foi aprovado por ele.
+Os `max_runs` das adendas têm de crescer, o último tem de coincidir com `max_runs` e a razão não pode estar vazia. Subir `max_runs` sem adenda é recusado assim que o registo já tiver visto um limite menor. O total acumulado transita; só o teto muda. O responsável pode proteger `budgets/**` com uma regra de permissões ou com proteção de ramo; esta salvaguarda **não consegue verificar** que o commit de uma adenda foi aprovado por ele.
 
 ## Contagem a partir dos artefactos
 

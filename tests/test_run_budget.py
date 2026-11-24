@@ -1,4 +1,4 @@
-"""Orçamento de execuções: limite acumulado, concorrência, manifesto committed, sementes e contagem."""
+"""Orçamento de execuções: limite acumulado, concorrência, manifesto registado em commit, sementes e contagem."""
 
 from __future__ import annotations
 
@@ -170,10 +170,10 @@ class ManifestTests(BudgetCase):
         with self.assertRaisesRegex(rb.BudgetError, "difere do blob"):
             self.reserve([5000])
 
-    def test_uncommitted_manifest_is_refused(self):
+    def test_unregistered_manifest_is_refused(self):
         path = self.repo / "budgets" / "other.json"
         path.write_bytes(self.manifest.read_bytes().replace(b"demo-campaign", b"other"))
-        with self.assertRaisesRegex(rb.BudgetError, "não está committed"):
+        with self.assertRaisesRegex(rb.BudgetError, "não está registado"):
             rb.reserve("other", [5000], repo=self.repo, ledger_dir=self.ledger)
 
     def test_restoring_the_committed_bytes_makes_it_valid_again(self):
@@ -240,6 +240,19 @@ class SeedTests(BudgetCase):
             self.reserve([{"cell": "a"}])
         with self.assertRaises(rb.BudgetError):
             self.reserve([True])
+
+
+class WorktreeTests(BudgetCase):
+    def test_ledger_is_shared_by_linked_worktrees(self):
+        other = self.tmp / "linked"
+        git(self.repo, "worktree", "add", "-q", "-b", "linked-branch", str(other))
+        self.assertEqual(rb.default_ledger_dir(self.repo), rb.default_ledger_dir(other))
+        self.assertEqual(rb.default_ledger_dir(other), (self.repo / ".git").resolve() / rb.LEDGER_DIRNAME)
+        rb.reserve(CAMPAIGN, [5000 + i for i in range(6)], "a", repo=self.repo)  # localização predefinida
+        with self.assertRaises(rb.BudgetExceeded):
+            rb.reserve(CAMPAIGN, [5000 + i for i in range(6)], "b", repo=other)
+        self.assertEqual(rb.reserve(CAMPAIGN, [5000 + i for i in range(4)], "c", repo=other).total_after, 10)
+        self.assertEqual(rb.ledger_total(CAMPAIGN, repo=self.repo), 10)
 
 
 class LedgerTests(BudgetCase):
@@ -346,36 +359,57 @@ SPAWN_ALLOWLIST = {
     "scripts/adversarial_ablation.py": "ablação limitada por invocação; anterior ao orçamento",
     "scripts/landing_adapter.py": "adaptador de uma execução por pedido; limitado por invocação",
     "scripts/mission_control.py": "interface local sobre o adaptador, uma execução por pedido do utilizador",
+    "scripts/check_platform_artifacts.py": "compara artefactos entre plataformas; importa as campanhas limitadas por invocação",
+    "scripts/failure_signature.py": "assinaturas de falhas; importa a redução de falhas limitada por invocação",
     "scripts/cinematic/bench.py": "mede o renderizador; não executa simulações",
     "scripts/cinematic/package_module.py": "empacota o módulo do renderizador; não executa simulações",
 }
-SPAWN_MODULES = {"subprocess", "multiprocessing", "pty", "process_limits", "sim_adapter", "rocket_adapter"}
+SPAWN_MODULES = {"subprocess", "multiprocessing", "pty"}
 SPAWN_OS = ("system", "popen", "startfile", "fork", "forkpty")
 
 
+def _is_os_spawn(name: str) -> bool:
+    return name in SPAWN_OS or name.startswith(("spawn", "exec"))
+
+
 def spawning_scripts(base: Path = ROOT / "scripts") -> dict[str, set[str]]:
-    found: dict[str, set[str]] = {}
-    for path in sorted(base.rglob("*.py")):
+    """Ficheiros que lançam processos, diretamente ou por importarem um módulo local que lança (ponto fixo)."""
+    paths = sorted(base.rglob("*.py"))
+    direct: dict[Path, set[str]] = {}
+    imports: dict[Path, set[str]] = {}
+    for path in paths:
         tree = ast.parse(path.read_text(encoding="utf-8"))
         hits: set[str] = set()
-        uses_budget = False
+        names: set[str] = set()
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
-                hits |= {a.name for a in node.names if a.name.split(".")[0] in SPAWN_MODULES}
-                uses_budget |= any(a.name == "run_budget" for a in node.names)
-            elif isinstance(node, ast.ImportFrom) and node.module:
-                if node.module.split(".")[0] in SPAWN_MODULES:
-                    hits.add(node.module)
-                uses_budget |= node.module == "run_budget"
+                names |= {a.name.split(".")[0] for a in node.names}
+            elif isinstance(node, ast.ImportFrom):
+                top = (node.module or "").split(".")[0]
+                names.add(top)
+                names |= {a.name for a in node.names}
+                if top == "os":
+                    hits |= {f"os.{a.name}" for a in node.names if _is_os_spawn(a.name)}
             elif isinstance(node, ast.Attribute):
-                if isinstance(node.value, ast.Name) and node.value.id == "os" and (
-                        node.attr in SPAWN_OS or node.attr.startswith(("spawn", "exec"))):
+                if isinstance(node.value, ast.Name) and node.value.id == "os" and _is_os_spawn(node.attr):
                     hits.add(f"os.{node.attr}")
                 elif node.attr.startswith("create_subprocess"):
                     hits.add(node.attr)
-        if hits:
-            found[path.relative_to(base.parent).as_posix()] = hits | ({"<uses run_budget>"} if uses_budget else set())
-    return found
+        hits |= names & SPAWN_MODULES
+        direct[path], imports[path] = hits, names
+    stems = {path.stem: path for path in paths if path.stem != "run_budget"}
+    flagged = {path: set(hits) for path, hits in direct.items() if hits}
+    changed = True
+    while changed:
+        changed = False
+        for path in paths:
+            via = {f"via {stem}" for stem, owner in stems.items()
+                   if stem in imports[path] and owner in flagged and owner != path}
+            if via - flagged.get(path, set()):
+                flagged.setdefault(path, set()).update(via)
+                changed = True
+    return {path.relative_to(base.parent).as_posix(): hits | ({"<uses run_budget>"} if "run_budget" in imports[path] else set())
+            for path, hits in flagged.items()}
 
 
 class SpawnAllowlistTests(unittest.TestCase):
@@ -391,14 +425,18 @@ class SpawnAllowlistTests(unittest.TestCase):
             files = {
                 "new_spawner.py": "import subprocess as sp\nsp.run(['x'])\n",
                 "os_spawner.py": "import os\nos.system('x')\n",
-                "indirect.py": "from process_limits import run_limited\n",
+                "indirect.py": "from helper import go\n",
+                "helper.py": "import subprocess\n",
+                "chain.py": "import indirect\n",
+                "from_os.py": "from os import system\n",
                 "budgeted.py": "import subprocess\nimport run_budget\n",
                 "clean.py": "import json\n",
             }
             for name, text in files.items():
                 (base / name).write_text(text, encoding="utf-8")
             found = spawning_scripts(base)
-            self.assertEqual(sorted(found), ["scripts/budgeted.py", "scripts/indirect.py", "scripts/new_spawner.py", "scripts/os_spawner.py"])
+            self.assertEqual(sorted(found), ["scripts/budgeted.py", "scripts/chain.py", "scripts/from_os.py", "scripts/helper.py", "scripts/indirect.py",
+                          "scripts/new_spawner.py", "scripts/os_spawner.py"])
             self.assertIn("<uses run_budget>", found["scripts/budgeted.py"])
             self.assertNotIn("<uses run_budget>", found["scripts/new_spawner.py"])
 
