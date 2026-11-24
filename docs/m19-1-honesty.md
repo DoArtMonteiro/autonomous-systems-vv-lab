@@ -98,11 +98,11 @@ Testes acrescentados:
 
 - Sem teste com pessoas e sem passagem por leitor de ecrã; o `held` neutro e as pílulas não foram avaliados quanto a contraste.
 - Não foram corridos `m17_cinematic_journey.py`, `review_captures.py` nem `installed_spotcheck.py` (precisam do módulo Cinematic instalado ou de um executável instalado). A Cinematic só foi exercitada pelos testes de `--policy-dump` e por capturas do Godot.
-- O `held` neutro foi visto em capturas da Library, do player (chips), da Compare (`after-1c`) e das pílulas de veredicto do Lab (`after-1d`). Não foram vistos no ecrã: o Flight console, a tabela de comparação do Lab com linhas de regras, a página Runs e a lista «Investigations» do Discover; para estes só há verificação por classes CSS e por testes de código.
+- O `held` neutro foi visto em capturas da Library, do player (chips), da Compare (`after-1c`) e das pílulas de veredicto do Lab (`after-1d`) e, na repetição descrita em «Percursos repetidos com isolamento do perfil», também no Flight console, na tabela de comparação do Lab (células de invariantes `st-held`), na página Runs, na lista «Investigations» e nas peças do Discover, e o anel de foco de uma pílula. Continuam sem captura: a ressalva do Lab «k/n seeds» em ecrã estreito (1024x640), a investigação G3 do Discover em «Investigations» (só se capturou a do corredor; o `ui_smoke` correu as duas, com as capturas `m13-g3-*` fora desta pasta) e as pílulas do Flight console a 1024x640 com o texto mais longo. Os sinais das células de segurança da tabela do Lab são ✓ em cor neutra, enquanto o resto da interface usa o escudo para `held`; é uma diferença visual, não uma falha de verificação, e não foi alterada.
 - 39 testes Python que precisam do binário `vv-rocket` de `crates/vv-rocket` ficam ignorados com o comando do AGENTS.md, antes e depois.
 - A pílula selecionada a 1024x640 ocupa quatro linhas (antes três) e o gráfico 2D perde alguns píxeis de altura; os percursos que medem a altura do gráfico e as sobreposições passaram (`ux2` 90/90).
 - Não foi construído nem testado o instalador, nem a reversão. A Studio 0.18.1 instalada não foi lançada nem alterada, mas ver «Quebra do passo 4».
-- Os percursos anteriores (m15, ux, ux2, m18, m17 Lab, m16, ui_smoke) não foram repetidos depois das correções da revisão nem do seguimento; só se repetiu o `capture.py` isolado, com 20 verificações.
+- Os percursos anteriores (m15, ux, ux2, m18, m17 Lab, m16, ui_smoke) correram sem isolamento do perfil e não tinham sido repetidos depois das correções da revisão e do seguimento. Foram repetidos depois, com isolamento, e passaram todos (ver «Percursos repetidos com isolamento do perfil»). Continuam por correr `m17_cinematic_journey.py`, `review_captures.py` e `installed_spotcheck.py`.
 - Nenhuma revisão foi feita por pessoas. As revisões independentes descritas em «Revisões independentes por agentes» foram feitas por agentes de IA.
 
 ## Seguimento da passagem de especialistas (F01 a F04, F06, F07, F10, F11)
@@ -116,6 +116,24 @@ Aplicadas depois da revisão (veredicto «accept with fixes»): linhas de segura
 ## Revisões independentes por agentes
 
 Foram feitas três rondas de revisão independente por agentes (revisão de agente, não revisão humana): a revisão do ramo, a revisão dos commits de seguimento e a das correções finais menores. Os relatórios das duas primeiras estão em `docs/evidence/m19/reviews/` (`01-independent-review-of-m19-1-honesty-branch.md`, `02-review-m19-1-follow-up-commits.md`), ambas com o veredicto «accept with fixes»; o relatório da terceira ronda não está nessa pasta. As correções da revisão e do seguimento foram, portanto, revistas por agentes. Continuam por fazer a revisão por pessoas e a verificação visual listada em «Limitações».
+
+## Percursos repetidos com isolamento do perfil
+
+Os sete percursos anteriores foram repetidos depois das correções da revisão e do seguimento, contra uma Studio de desenvolvimento com o identificador `org.vvlab.devstudio`, lançada por `desktop/studio/tests/studio_launch.py` (biblioteca, configuração, módulos e perfil do WebView2 temporários; terminada por PID). A construção vem de um ramo descartável (`verify/m19.1-with-isolation`, não enviado) que junta este ramo (`dde0620`) a `feat/m19-studio-isolation` (`51882b1`), de onde vêm o identificador de desenvolvimento, o auxiliar e os percursos adaptados. Este ramo, sozinho, não tem essa salvaguarda.
+
+| Percurso | Resultado | Antes |
+| --- | --- | --- |
+| `ui_smoke.py` | 80/80 | 80/80 |
+| `m15_journeys.py` | 48/48 | 48/48 |
+| `m16_journeys.py` | 78/78 | 78/78 |
+| `m17_lab_journeys.py` | 34/34 | 34/34 |
+| `m18_journeys.py` | 71/71 | 72/72 |
+| `ux_journeys.py` (`--no-cinematic`) | 67/67 | 67/67 |
+| `ux2_journeys.py` | 90/90 | 90/90 |
+| `surfaces.py` (superfícies sem captura anterior) | 14/14 | não existia |
+
+O `m18` tem menos uma verificação porque o módulo Cinematic não está instalado nesta construção e o percurso segue o ramo «não disponível». As listagens só de leitura de `%LOCALAPPDATA%\org.vvlab.studio` e de `%APPDATA%\org.vvlab.studio` ficaram idênticas antes e depois de todos os percursos (914 e 1 entradas; somas em `docs/evidence/m19/honesty/journeys-rerun/README.md`). Resultados, capturas e o programa das superfícies em `docs/evidence/m19/honesty/journeys-rerun/`. Nenhum percurso revelou um defeito.
+
 
 ## Quebra do passo 4
 

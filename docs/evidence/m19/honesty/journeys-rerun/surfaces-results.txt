@@ -1,0 +1,16 @@
+PASS Flight console: the safety rules not broken are held (neutral)
+PASS Flight console: no safety row is drawn as met (green)
+PASS Lab table: the invariant cells are held (neutral)
+PASS Lab table: no safety row is drawn as a requirement that passed
+PASS Runs page: the runs of this session are listed
+PASS Runs page: 'None broken' is neutral, never green
+PASS Runs page: no horizontal scroll at 1024x640
+PASS Discover: the Investigations list has the package
+PASS Discover: evidence integrity is a neutral (held) chip, not a verdict on the claim
+PASS Discover: the tiles say the evidence was recomputed
+PASS Pill focus: a run pill takes keyboard focus
+PASS Pill focus: :focus-visible matches and the ring is drawn
+PASS Pill focus: the ring is not clipped by the pill row
+PASS No page error or console error
+
+14/14 checks passed
