@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """M19: reproducible calculations for the corrected G3 onset protocol candidate.
 
+No output word of any protected or confirmatory seed is generated or inspected here: the RNG analysis is
+start-state and stream-position arithmetic only. numpy is used, if present, only for the exhaustive scan.
+
 Nothing here runs a simulator, `cargo`, `vv-exec` or `vv-rocket`, and no simulator seed is used.
 The inputs are committed blobs (read with `git cat-file blob <commit>:<path>`), recorded evidence
 files at the same commit, and arithmetic. All binomial and multinomial quantities are exact
@@ -58,7 +61,9 @@ SPENT_OR_PROTECTED = {
     "6000-6099 M10": (6000, 6099),
     "50000-59999 M14 split": (50000, 59999),
 }
-SEED_FIRST, SEED_LAST, RESERVE_FIRST, SEED_RANGE_LAST = 44000, 44919, 44920, 44999
+BLOCK_FIRST, BLOCK_LAST = 81000, 81919  # the proposed confirmatory block (assigned and unassigned seeds)
+RESERVE = (80904, 80983)  # just below the block; 81920-81999 overlap themselves and 80920-80999 meets the M6 seed 83017
+OLD_BLOCK = (44000, 44999)  # the earlier candidate block: protected by the repository guard and left unused
 
 # SplitMix64 cross-check parameters (sampling seed of this script, not a simulator seed).
 MC_SEED = 20261123
@@ -350,10 +355,10 @@ def groups_for(onsets: list[float]) -> list[int]:
 # Seed maps (default layout) and their checks
 # ---------------------------------------------------------------------------------------------
 
-def layout(a_high_reps: int = 5, e_points: int = 20) -> dict:
+def layout(first: int = BLOCK_FIRST, a_high_reps: int = 6, e_points: int = 19) -> dict:
     """Stage sizes and first seeds, allocated contiguously from 44000 in the order A, B, C, D, E."""
     stages: dict[str, dict] = {}
-    nxt = SEED_FIRST
+    nxt = first
 
     def add(name: str, size: int, arms: int) -> None:
         nonlocal nxt
@@ -380,9 +385,9 @@ def formulas(st: dict, a_high_reps: int, e_points: int) -> dict:
     }
 
 
-def seed_map(a_high_reps: int = 5, e_points: int = 20) -> tuple[dict[int, tuple], dict]:
+def seed_map(first: int = BLOCK_FIRST, a_high_reps: int = 6, e_points: int = 19) -> tuple[dict[int, tuple], dict]:
     """seed -> condition for every stage, and a per-stage summary."""
-    st = layout(a_high_reps, e_points)
+    st = layout(first, a_high_reps, e_points)
     fm = formulas(st, a_high_reps, e_points)
     cond: dict[int, tuple] = {}
     summary: dict[str, dict] = {}
@@ -430,14 +435,18 @@ def seed_map(a_high_reps: int = 5, e_points: int = 20) -> tuple[dict[int, tuple]
 
 def seed_checks(cond: dict[int, tuple], summary: dict) -> dict:
     seeds = sorted(cond)
-    overlaps = {name: [s for s in seeds if lo <= s <= hi] for name, (lo, hi) in SPENT_OR_PROTECTED.items()}
+    protected = dict(SPENT_OR_PROTECTED)
+    protected["44000-44999 earlier block"] = OLD_BLOCK
+    protected["reserve 80920-80999"] = RESERVE
+    overlaps = {name: [sd for sd in seeds if lo <= sd <= hi] for name, (lo, hi) in protected.items()}
     used_last = max(seeds)
     return {
         "seeds_used": len(seeds),
         "first_seed": seeds[0],
         "last_seed": used_last,
-        "all_within_44000_44919": seeds[0] >= SEED_FIRST and used_last <= SEED_LAST,
-        "no_seed_in_reserve_44920_44999": not any(RESERVE_FIRST <= s <= SEED_RANGE_LAST for s in seeds),
+        "all_within_block": seeds[0] >= BLOCK_FIRST and used_last <= BLOCK_LAST,
+        "no_seed_in_reserve": not any(RESERVE[0] <= sd <= RESERVE[1] for sd in seeds),
+        "no_seed_in_44000_44999": not any(OLD_BLOCK[0] <= sd <= OLD_BLOCK[1] for sd in seeds),
         "each_seed_one_condition": len(seeds) == len(set(seeds)) == len(cond),
         "overlap_with_spent_or_protected": {k: len(v) for k, v in sorted(overlaps.items())},
         "stage_ranges_disjoint": all(
@@ -445,9 +454,9 @@ def seed_checks(cond: dict[int, tuple], summary: dict) -> dict:
             for a, b in (("A_low", "A_high"), ("A_high", "B"), ("B", "C"), ("C", "D"), ("D", "E"))
         ),
         "unassigned_first": used_last + 1,
-        "unassigned_last": SEED_LAST,
-        "unassigned_seeds": SEED_LAST - used_last,
-        "reserve": [RESERVE_FIRST, SEED_RANGE_LAST],
+        "unassigned_last": BLOCK_LAST,
+        "unassigned_seeds": BLOCK_LAST - used_last,
+        "reserve": list(RESERVE),
         "total_runs": sum(v["runs"] for v in summary.values()),
     }
 
@@ -907,47 +916,6 @@ def median_tests() -> dict:
 # Joint rule and budgets
 # ---------------------------------------------------------------------------------------------
 
-JOINT_SCENARIOS = [
-    ("optimistic", F(1), F(1), F(1), F(0)),
-    ("development-like", F("0.99"), F("0.99"), F("0.99"), F(0)),
-    ("moderate", F("0.97"), F("0.99"), F("0.97"), F(1, 4)),
-    ("pessimistic", F("0.95"), F("0.99"), F("0.97"), F(3, 4)),
-]
-
-
-def joint_rule(n_low: int, n_high: int, with_mcnemar: bool = True) -> dict:
-    dist, bstar = bs_distribution()
-    out = {"n_low_band": n_low, "n_high_band": n_high}
-    for alpha_label, a in (("0.01/3", F(1, 300)), ("0.01", F(1, 100))):
-        l, u = os_positions(60, a)
-        rows = {}
-        for name, p0, q, h2, shift in JOINT_SCENARIOS:
-            h3 = F(str(median_interval_power(dist, bstar, 60, l, u, F(1), shift)["confirm"]))
-            h2p = power(n_high, h2, a)
-            opts = option_powers(n_low, a, p0, q, with_mcnemar)
-            h1a = F(str(opts["O1_each"]["late_fails"]))
-            row = {
-                "assumptions": {"p0": float(p0), "q": float(q), "H2_pi": float(h2), "boundary_shift_m": float(shift)},
-                "H2": r6(h2p), "H3": r6(h3),
-                "H1_O0": opts["O0_conjunction"], "H1_O1": opts["O1_split_independent"],
-                "H1_O2": opts["O2_conditional_with_H1b"], "H1_O5": opts["O5_null_0.8_for_H1b_with_O1"],
-                "H1a_alone": opts["O1_each"]["late_fails"],
-                "joint_O0": r6(F(str(opts["O0_conjunction"])) * h2p * h3),
-                "joint_O1_H1a_and_H1b_and_H2_and_H3": r6(F(str(opts["O1_split_independent"])) * h2p * h3),
-                "joint_O1_H1a_only_with_H1b_as_positive_control": r6(h1a * h2p * h3),
-                "joint_O2": r6(F(str(opts["O2_conditional_with_H1b"])) * h2p * h3),
-                "joint_O5": r6(F(str(opts["O5_null_0.8_for_H1b_with_O1"])) * h2p * h3),
-            }
-            if opts["O3_mcnemar_sign_test"] is not None:
-                row["joint_O3"] = r6(F(str(opts["O3_mcnemar_sign_test"])) * h2p * h3)
-            rows[name] = row
-        out[f"alpha_{alpha_label}"] = {"H3_positions": [l, u], "scenarios": rows}
-    out["independence"] = ("H1 (low band), H2 (high band) and H3 (stage B) use disjoint seeds, so the joint "
-                           "power is the product; inside H1 the two arms share seeds, and the split options "
-                           "are reported under independence and as Frechet bounds")
-    return out
-
-
 def budgets(pairs_all: int, pairs_zero: int) -> dict:
     return {
         "pairs_invariants_and_r2_r6": pairs_all,
@@ -1030,117 +998,178 @@ def class_of(count: int, thr3, thr2, thr1) -> int:
     return 0
 
 
-def gates_power(n: int, p0, q, rest: dict[int, F], n_zero_extra: int = 0) -> dict:
-    """Exact power of the serial gates after the Holm family, arms of a seed independent.
+POSTERIOR_SHIFTS = (F(0), F(1, 4), F(1, 2), F(3, 4))  # illustrative prior over the boundary shift of H3
+COMMON_P_GRID = ("0.90", "0.93", "0.95", "0.97", "0.98", "0.99", "0.995", "0.999")
+S4_S5_ASSUMED_RATE = "0.80"
 
-    Seeds are the n of stage A (low band). F = seeds where R1 fails late (H1a), R = seeds where R1
-    holds at 0 s (H1b), a = seeds with both (0 s holds, late fails), b = seeds with neither.
-    Given F = f and R = r, a is hypergeometric(n, r, f) when the arms are independent. Gate (i) is
-    the exact one-sided sign test on (a, b) at 0.01; gate (ii) is H1b at 0.01."""
-    p0, q = frac(p0), frac(q)
+
+def pmf_binom(n: int, p) -> list[F]:
+    p = frac(p)
+    return [comb(n, k) * p**k * (1 - p) ** (n - k) for k in range(n + 1)]
+
+
+def pmf_beta_binom(n: int, a, b) -> list[F]:
+    """Exact beta-binomial pmf (the binomial averaged over a Beta(a, b) prior or posterior), rational a, b."""
+    a, b = frac(a), frac(b)
+    p0 = F(1)
+    for i in range(n):
+        p0 *= (b + i) / (a + b + i)
+    out = [p0]
+    for k in range(n):
+        out.append(out[-1] * F(n - k, k + 1) * (a + k) / (b + n - k - 1))
+    return out
+
+
+def tail_of(pmf: list[F], k) -> F:
+    return F(0) if k is None else sum(pmf[k:], F(0))
+
+
+def class_probs_pmf(n: int, pmf: list[F]) -> dict[int, F]:
     t = [threshold(n, a) for a in LEVELS]
-    n_b = n + n_zero_extra  # H1b pools the 0 s arms of both bands
+    tail = [tail_of(pmf, k) for k in t]
+    return {3: tail[0], 2: tail[1] - tail[0], 1: tail[2] - tail[1], 0: 1 - tail[2]}
+
+
+def beta_half_quantile(x: int, q: float, steps: int = 40000) -> float:
+    """Quantile q of the Jeffreys posterior Beta(x + 1/2, 1/2) for x successes and no failures.
+
+    With p = 1 - t^2 the density in t is proportional to (1 - t^2)^(x - 1/2), smooth on [0, 1]; the
+    quantile is found on a midpoint grid with linear interpolation. Floating point, rounded by the caller."""
+    a1 = x + 0.5 - 1.0
+    w = [(1.0 - ((i + 0.5) / steps) ** 2) ** a1 for i in range(steps)]
+    total = sum(w)
+    acc = 0.0
+    for i in range(steps - 1, -1, -1):
+        wi = w[i] / total
+        if acc + wi >= q:
+            t = (i + 1) / steps - (q - acc) / wi / steps
+            return 1.0 - t * t
+        acc += wi
+    return 0.0
+
+
+def design_power(n_low: int, n_high: int, pmf_q, pmf_r_low, pmf_r_high, pmf_pi2, c_h3: dict) -> dict:
+    """Holm joint power, gate powers and the power of the licensed word for given distributions of the
+    counts: H1a (late fails, n_low), the 0 s arms of both bands (n_low, n_high) and H2 (n_high)."""
+    pa, pb = class_probs_pmf(n_low, pmf_q), class_probs_pmf(n_high, pmf_pi2)
+    joint = holm_joint(pa, pb, c_h3)
+    rest = holm_rest(pb, c_h3)
+    t = [threshold(n_low, a) for a in LEVELS]
+    n_b = n_low + n_high
     t_b = threshold(n_b, F(1, 100))
-    sign = {d: sign_threshold(d, F(1, 100)) for d in range(n + 1)}
-    holm = F(0)
-    mask = F(0)
-    chain = F(0)
-    for f in range(0, n + 1):
+    sign = {d: sign_threshold(d, F(1, 100)) for d in range(n_low + 1)}
+    tail_x = [tail_of(pmf_r_high, k) for k in range(n_high + 2)]
+    holm = mask = chain = F(0)
+    for f in range(n_low + 1):
         cf = class_of(f, *t)
-        if cf == 0 or rest[cf] == 0:
+        if cf == 0 or rest[cf] == 0 or pmf_q[f] == 0:
             continue
-        pf = comb(n, f) * q**f * (1 - q) ** (n - f)
-        holm += pf * rest[cf]
-        tot_m = F(0)
-        tot_c = F(0)
-        for r in range(0, n + 1):
-            pr = comb(n, r) * p0**r * (1 - p0) ** (n - r)
+        holm += pmf_q[f] * rest[cf]
+        tot_m = tot_c = F(0)
+        for r in range(n_low + 1):
+            pr = pmf_r_low[r]
             if pr == 0:
                 continue
             ok = 0
-            for a in range(max(0, f + r - n), min(f, r) + 1):
-                b = n - r - f + a
-                k = sign[a + b]
+            for a in range(max(0, f + r - n_low), min(f, r) + 1):
+                k = sign[a + n_low - r - f + a]
                 if k is not None and a >= k:
-                    ok += comb(r, a) * comb(n - r, f - a)
+                    ok += comb(r, a) * comb(n_low - r, f - a)
             if ok:
-                share = pr * F(ok, comb(n, f))
+                share = pr * F(ok, comb(n_low, f))
                 tot_m += share
-                if t_b is not None:
-                    need = t_b - r  # successes still needed from the extra 0 s seeds of the other band
-                    if need <= 0:
-                        tot_c += share
-                    elif need <= n_zero_extra:
-                        tot_c += share * sf(need, n_zero_extra, p0)
-        mask += pf * rest[cf] * tot_m
-        chain += pf * rest[cf] * tot_c
-    # marginals for the Frechet bounds (no assumption about the dependence of the three events)
-    terms, den = multinomial_terms(n, p0 * q, (1 - p0) * (1 - q))
-    num = sum(x for (a, b, x) in terms if sign[a + b] is not None and a >= sign[a + b])
-    p_m = F(num, den)
-    p_b = power(n_b, p0, F(1, 100))
-    lo2 = max(F(0), holm + p_m - 1)
-    lo3 = max(F(0), holm + p_m + p_b - 2)
+                need = t_b - r
+                if need <= 0:
+                    tot_c += share
+                elif need <= n_high:
+                    tot_c += share * tail_x[need]
+        mask += pmf_q[f] * rest[cf] * tot_m
+        chain += pmf_q[f] * rest[cf] * tot_c
+    p_b = sum((pmf_r_low[r] * (tail_x[max(0, t_b - r)] if t_b - r <= n_high else F(0))
+               for r in range(n_low + 1)), F(0))
+    s45 = s4_s5_mcnemar()["power_by_predicted_rate"][S4_S5_ASSUMED_RATE]["both_conditions"]
+    p_s6 = tail_of(pmf_pi2, threshold(n_high, F(1, 700)))
+    word_lo = max(F(0), mask + F(str(s45)) * 2 + p_s6 - 3)
+    word_hi = min(mask, F(str(s45)), p_s6)
     return {
+        "holm_joint_power": r6(joint),
+        "bonferroni_lower_bound_all_at_0.01/3": r6(pa[3] * pb[3] * c_h3[3]),
+        "all_at_0.01_upper_bound": r6((1 - pa[0]) * (1 - pb[0]) * (1 - c_h3[0])),
+        "classes": {"H1a": {str(k): r6(v) for k, v in pa.items()}, "H2": {str(k): r6(v) for k, v in pb.items()},
+                    "H3": {str(k): r6(v) for k, v in c_h3.items()}},
         "headline_R1_fails_late_(Holm)": r6(holm),
         "R1_worse_late_than_0s_(Holm_and_McNemar)": r6(mask),
         "G3_replicado_(Holm_and_McNemar_and_H1b_pooled)": r6(chain),
-        "frechet_R1_worse_late": [r6(lo2), r6(min(holm, p_m))],
-        "frechet_G3_replicado": [r6(lo3), r6(min(holm, p_m, p_b))],
-        "marginals": {"holm": r6(holm), "mcnemar_alone_0.01": r6(p_m), "H1b_alone_0.01": r6(p_b),
-                      "H1b_n": n_b, "H1b_threshold_0.01": t_b},
+        "frechet_G3_replicado": [r6(max(F(0), mask + p_b - 1)), r6(min(mask, p_b))],
+        "H1b_pooled_alone_0.01": r6(p_b),
+        "mascaramento_word": {"S4_S5_power_each_at_rate_" + S4_S5_ASSUMED_RATE: r6(F(str(s45))),
+                              "S6_power": r6(p_s6), "frechet_bounds": [r6(word_lo), r6(word_hi)]},
     }
 
 
-def holm_design(n_low: int, n_high: int) -> dict:
+def evidence_posteriors(ev: dict) -> dict:
+    """Per-seed (distinct seeds) and per-run Jeffreys posteriors for the three rates, with quantiles."""
+    ds = ev["distinct_seed_bounds"]
+    rows = {
+        "p0_0s_R1_holds": {"per_seed": (ds["p0_all_magnitudes_0s_distinct_seeds"]["x"], ds["p0_all_magnitudes_0s_distinct_seeds"]["n"]),
+                           "per_run": (ev["p0_all_magnitudes_0s"]["pooled"]["x"], ev["p0_all_magnitudes_0s"]["pooled"]["n"])},
+        "q_late_R1_fails_low_band": {"per_seed": (ds["q_late_fails_low_band_distinct_seeds"]["x"], ds["q_late_fails_low_band_distinct_seeds"]["n"]),
+                                     "per_run": (ev["q_late_fails_low_band"]["pooled"]["x"], ev["q_late_fails_low_band"]["pooled"]["n"])},
+        "pi2_late_R1_holds_high_band": {"per_seed": (ds["h2_late_holds_high_band_distinct_seeds"]["x"], ds["h2_late_holds_high_band_distinct_seeds"]["n"]),
+                                        "per_run": (ev["h2_late_holds_high_band"]["pooled"]["x"], ev["h2_late_holds_high_band"]["pooled"]["n"])},
+    }
+    out = {}
+    for name, d in rows.items():
+        out[name] = {}
+        for basis, (x, n) in d.items():
+            assert x == n, "the quantile routine covers the no-failure case only"
+            out[name][basis] = {
+                "successes": x, "trials": n, "jeffreys_posterior": f"Beta({x + 0.5}, 0.5)",
+                "cp99_lower": r6(cp_lower(x, n)),
+                "jeffreys_quantiles": {"1%": round(beta_half_quantile(x, 0.01), 4), "5%": round(beta_half_quantile(x, 0.05), 4),
+                                        "25%": round(beta_half_quantile(x, 0.25), 4), "50%": round(beta_half_quantile(x, 0.5), 4)},
+            }
+    return out
+
+
+def power_scenarios(n_low: int, n_high: int, ev: dict) -> dict:
+    """Power of the proposed design for scenarios grounded in the recorded evidence, not at 100 %."""
     dist, bstar = bs_distribution()
-    n_b = n_low + n_high
-    out = {
-        "ladder": ["0.01/3", "0.01/2", "0.01"],
-        "n_low": n_low, "n_high": n_high,
-        "thresholds": {
-            "H1a_n%d" % n_low: [threshold(n_low, a) for a in LEVELS],
-            "H2_n%d" % n_high: [threshold(n_high, a) for a in LEVELS],
-            "H3_order_statistic_positions_n60": [list(os_positions(60, a)) for a in LEVELS],
-            "H1b_pooled_n%d_0.01" % n_b: threshold(n_b, F(1, 100)),
-            "S6_n%d_0.01/7" % n_high: threshold(n_high, F(1, 700)),
-            "mcnemar_gate_min_discordant_0.01": sign_min_d(F(1, 100)),
-        },
-        "scenarios": {},
-    }
-    s45 = s4_s5_mcnemar()["power_by_predicted_rate"]["0.95"]["both_conditions"]
-    for name, p0, q, h2, shift in JOINT_SCENARIOS:
-        pa, pb = class_probs_binom(n_low, q), class_probs_binom(n_high, h2)
-        pc = class_probs_h3(dist, bstar, 60, F(1), shift)
-        joint = holm_joint(pa, pb, pc)
-        lower = pa[3] * pb[3] * pc[3]
-        upper = (1 - pa[0]) * (1 - pb[0]) * (1 - pc[0])
-        gates = gates_power(n_low, p0, q, holm_rest(pb, pc), n_zero_extra=n_high)
-        mc = F(str(gates["R1_worse_late_than_0s_(Holm_and_McNemar)"]))
-        p_s6 = power(n_high, h2, F(1, 700))
-        p_s4 = p_s5 = F(str(s45))  # each of S4 and S5 needs both of its conditions
-        word_ind = mc * p_s4 * p_s5 * p_s6
-        word_lo = max(F(0), mc + p_s4 + p_s5 + p_s6 - 3)
-        word_hi = min(mc, p_s4, p_s5, p_s6)
-        out["scenarios"][name] = {
-            "assumptions": {"p0": float(p0), "q": float(q), "H2_pi": float(h2), "boundary_shift_m": float(shift)},
-            "classes_H1a": {str(k): r6(v) for k, v in pa.items()},
-            "classes_H2": {str(k): r6(v) for k, v in pb.items()},
-            "classes_H3": {str(k): r6(v) for k, v in pc.items()},
-            "holm_joint_power": r6(joint),
-            "bonferroni_lower_bound_all_at_0.01/3": r6(lower),
-            "all_at_0.01_upper_bound": r6(upper),
-            "gates": gates,
-            "mascaramento_word": {
-                "S4_power": r6(p_s4), "S5_power": r6(p_s5), "S6_power_pi_equal_H2_pi": r6(p_s6),
-                "independent_point": r6(word_ind), "frechet_bounds": [r6(word_lo), r6(word_hi)],
-                "note": "S4 and S5 at predicted rate 0.95 with 1 % contrary pairs; S6 on the A_high seeds, "
-                        "positively dependent on H2 (same seeds), so only the bounds are free of an assumption"},
-        }
-    out["illustrative"] = ("Powers use the b_s distribution reconstructed from 20 seeds (shifted by the "
-                           "stated amount), independence between the arms of a seed, and, for the gate "
-                           "bounds, Frechet limits; they illustrate the risk of an inconclusive run and "
-                           "say nothing about the risk of a false claim, which the procedure controls")
+    c_h3 = {s: class_probs_h3(dist, bstar, 60, F(1), s) for s in POSTERIOR_SHIFTS}
+
+    def mix(shifts):
+        return {c: sum((c_h3[s][c] for s in shifts), F(0)) / len(shifts) for c in range(4)}
+
+    post = evidence_posteriors(ev)
+    out = {"posteriors": post, "assumptions": {
+        "H3_shift_grid_m": [float(s) for s in POSTERIOR_SHIFTS],
+        "independence": "H1a, H2 and H3 use disjoint seeds; the 0 s arms of the two bands and the posteriors of p0, q and "
+                        "pi2 are taken as independent; the two arms of a seed are independent given the rates",
+        "labels": "illustrative; the b_s distribution is reconstructed from 20 seeds; no rate is taken as exactly 1"},
+        "common_rate_grid": {}, "posterior_averaged": {}, "quantile_scenarios": {}}
+    for ps in COMMON_P_GRID:
+        pm = pmf_binom
+        for s in (F(1, 4), F(3, 4)):
+            out["common_rate_grid"][f"p={ps};shift={float(s)}"] = design_power(
+                n_low, n_high, pm(n_low, ps), pm(n_low, ps), pm(n_high, ps), pm(n_high, ps), c_h3[s])
+    for basis in ("per_seed", "per_run"):
+        def bb(n, name):
+            x, trials = post[name][basis]["successes"], post[name][basis]["trials"]
+            return pmf_beta_binom(n, F(2 * x + 1, 2), F(1, 2))
+        for label, h3 in (("shift=0.25", c_h3[F(1, 4)]), ("shift=0.75", c_h3[F(3, 4)]), ("shift_uniform_0_to_0.75", mix(POSTERIOR_SHIFTS))):
+            out["posterior_averaged"][f"{basis};{label}"] = design_power(
+                n_low, n_high, bb(n_low, "q_late_R1_fails_low_band"), bb(n_low, "p0_0s_R1_holds"),
+                bb(n_high, "p0_0s_R1_holds"), bb(n_high, "pi2_late_R1_holds_high_band"), h3)
+    for basis in ("per_seed", "per_run"):
+        for qlabel in ("5%", "50%", "cp99_lower"):
+            def val(name):
+                d = post[name][basis]
+                return d["cp99_lower"] if qlabel == "cp99_lower" else d["jeffreys_quantiles"][qlabel]
+            p0, q, p2 = (F(str(val(n))) for n in ("p0_0s_R1_holds", "q_late_R1_fails_low_band", "pi2_late_R1_holds_high_band"))
+            out["quantile_scenarios"][f"{basis};{qlabel};shift=0.25"] = {
+                "rates": {"p0": float(p0), "q": float(q), "pi2": float(p2)},
+                **design_power(n_low, n_high, pmf_binom(n_low, q), pmf_binom(n_low, p0), pmf_binom(n_high, p0),
+                               pmf_binom(n_high, p2), c_h3[F(1, 4)])}
     return out
 
 
@@ -1363,159 +1392,268 @@ def _block_vs_index(first: int, last: int, index: tuple, used: dict) -> list:
     return found
 
 
-def cross_independence(cycles: int, fixes: int, ranges: dict | None = None) -> dict:
-    """Overlap between the used output ranges of the 44000-44919 streams and those of every seed of the
-    ranges the protocol lists as seen or protected (the same draw counts for both sides)."""
-    used = used_draws(cycles, fixes)
-    ranges = ranges or protocol_seen_ranges()
-    found = _block_vs_index(SEED_FIRST, SEED_LAST, _seen_index(ranges, used), used)
-    cond, _ = seed_map()
-    by_pair: dict[str, int] = {}
-    by_stage: dict[str, set] = {}
-    for sd, src, sd2, src2, name, shared in found:
-        key = f"new source {src} x seen source {src2} ({name})"
-        by_pair[key] = by_pair.get(key, 0) + 1
-        by_stage.setdefault(cond.get(sd, ("unassigned",))[0], set()).add(sd)
-    shared_all = [f[5] for f in found]
-    largest = max(found, key=lambda f: f[5], default=None)
-    return {"seen_ranges": {k: list(v) for k, v in ranges.items()},
-            "seen_seeds": sum(hi - lo + 1 for lo, hi in ranges.values()),
-            "streams_checked": 920 * 12, "draws_used_per_source": {str(k): v for k, v in used.items()},
-            "pairs_overlapping_in_the_outputs_actually_used": len(found),
-            "distinct_new_seeds_affected": len({f[0] for f in found}),
-            "new_seeds_affected_by_stage_layout_A_only": {k: len(v) for k, v in sorted(by_stage.items())},
-            "pairs_by_source_pair_and_seen_range": dict(sorted(by_pair.items())),
-            "shared_output_words_per_pair": {"min": min(shared_all, default=0), "max": max(shared_all, default=0),
-                                             "total": sum(shared_all)},
-            "examples": [list(f) for f in sorted(found)[:3]],
-            "largest_example": list(largest) if largest else None}
+try:  # numpy is used only for the exhaustive partner-seed scan; the scan reports itself skipped without it
+    import numpy as _np
+except ImportError:  # pragma: no cover
+    _np = None
+
+TEXT_EXT = (".md", ".json", ".rs", ".py", ".toml", ".txt", ".js", ".gd", ".yml", ".html", ".css", ".sh", ".ts", ".cfg")
+SCAN_TOP = 1 << 24  # every seed below this bound is scanned
 
 
-def seen_internal_overlaps(ranges: dict, cycles: int, fixes: int) -> dict:
-    """Overlap between the streams of different seeds inside and between the seen ranges themselves."""
-    import bisect
-    used = used_draws(cycles, fixes)
-    seen = []
-    for name, (lo, hi) in ranges.items():
-        for sd in range(lo, hi + 1):
+def inventory_scan() -> dict:
+    """Over-approximate inventory of the seeds the repository text mentions, from the blobs of BASE.
+
+    Every integer of at most nine digits on a line that contains `seed` or `semente` is a candidate seed;
+    ranges are read from `a a b`, `a-b`, `a to b`, `a..b` on such lines and from JSON dictionaries (under a
+    key containing `seed`) with first and count, low and high, or start and end. Not found by construction:
+    seeds derived in code from other numbers, seeds on lines without the word, binary files, untracked or
+    other-branch files."""
+    import re
+    files = [f for f in git("ls-tree", "-r", "--name-only", BASE).decode().split("\n") if f.endswith(TEXT_EXT)]
+    base = full_sha(BASE)
+    req = "\n".join(f"{base}:{f}" for f in files).encode() + b"\n"
+    raw = subprocess.run(["git", "-C", str(ROOT), "cat-file", "--batch"], input=req, capture_output=True, check=True).stdout
+    pos = 0
+    contents = {}
+    for f in files:
+        nl = raw.index(b"\n", pos)
+        header = raw[pos:nl].split()
+        size = int(header[2])
+        contents[f] = raw[nl + 1:nl + 1 + size].decode("utf-8", "ignore")
+        pos = nl + 1 + size + 1
+    word = re.compile(r"seed|semente", re.I)
+    num = re.compile(r"(?<![\w.])(\d{1,9})(?![\w.]*\d)")
+    rng = re.compile(r"(?<![\w.])(\d{1,9})\s*(?:a|to|ate|\.\.=?|-)\s*(\d{1,9})(?![\w.]*\d)")
+    ints: dict[int, set] = {}
+    ranges: dict[tuple, set] = {}
+    lines = 0
+
+    def add_range(a, b, f):
+        if 0 <= a <= b and b - a <= 10_000_000:
+            ranges.setdefault((a, b), set()).add(f)
+
+    def walk(o, f, in_seed=False):
+        if isinstance(o, dict):
+            keys = {str(k).lower(): v for k, v in o.items()}
+            if in_seed or any("seed" in k for k in keys):
+                if isinstance(keys.get("first"), int) and isinstance(keys.get("count"), int) and keys["count"] > 0:
+                    add_range(keys["first"], keys["first"] + keys["count"] - 1, f)
+                if isinstance(keys.get("low"), int) and isinstance(keys.get("high"), int):
+                    add_range(keys["low"], keys["high"], f)
+                if isinstance(keys.get("start"), int) and isinstance(keys.get("end"), int):
+                    add_range(keys["start"], keys["end"], f)
+            for k, v in o.items():
+                if isinstance(v, int) and not isinstance(v, bool) and "seed" in str(k).lower():
+                    ints.setdefault(v, set()).add(f)
+                walk(v, f, in_seed or "seed" in str(k).lower())
+        elif isinstance(o, list):
+            for v in o:
+                if in_seed and isinstance(v, int) and not isinstance(v, bool):
+                    ints.setdefault(v, set()).add(f)
+                walk(v, f, in_seed)
+
+    for f, text in contents.items():
+        for ln in text.split("\n"):
+            if word.search(ln) and len(ln) < 4000:
+                lines += 1
+                for mt in num.finditer(ln):
+                    ints.setdefault(int(mt.group(1)), set()).add(f)
+                for mt in rng.finditer(ln):
+                    add_range(int(mt.group(1)), int(mt.group(2)), f)
+        if f.endswith(".json"):
+            try:
+                walk(json.loads(text), f)
+            except ValueError:
+                pass
+    return {"files_scanned": len(files), "seed_lines": lines, "ints": ints, "ranges": ranges}
+
+
+def _merge(iv: list[tuple[int, int]]) -> list[tuple[int, int]]:
+    out: list[tuple[int, int]] = []
+    for a, b in sorted(iv):
+        if out and a <= out[-1][1] + 1:
+            out[-1] = (out[-1][0], max(out[-1][1], b))
+        else:
+            out.append((a, b))
+    return out
+
+
+def _target_intervals(targets: dict, used: dict) -> dict[int, list[tuple[int, int]]]:
+    """For every partner source: positions p whose used output range meets a target stream's used range."""
+    tpos = [(stream_position(sd, src), used[src]) for lo, hi in targets.values() for sd in range(lo, hi + 1) for src in SOURCES]
+    out = {}
+    for src in SOURCES:
+        iv = [(t - used[src] + 1, t + nt - 1) for t, nt in tpos]
+        assert all(a >= 0 and b < (1 << 64) for a, b in iv), "interval crosses the end of the cycle"
+        out[src] = _merge(iv)
+    return out
+
+
+def partner_mask(seeds, intervals: dict) -> "list[bool]":
+    """For each seed: does any of its 12 streams overlap a target stream (used ranges, exact)?"""
+    if _np is None:  # pragma: no cover
+        import bisect
+        res = []
+        for sd in seeds:
+            hit = False
             for src in SOURCES:
-                seen.append((stream_position(sd, src), used[src], sd, src, name))
-    seen.sort()
-    span = 1 << 64
-    keys = [x[0] - span for x in seen] + [x[0] for x in seen] + [x[0] + span for x in seen]
-    meta = seen * 3
-    reach = max(used.values())
-    pairs: dict[str, int] = {}
-    seeds: dict[str, set] = {}
-    for pi, ni, sd, src, name in seen:
-        lo = bisect.bisect_left(keys, pi + 1)
-        hi = bisect.bisect_right(keys, pi + reach)
-        for idx in range(lo, hi):
-            d = keys[idx] - pi
-            if 0 < d <= ni - 1:
-                _, _, sd2, src2, name2 = meta[idx]
-                a, b = sorted((name, name2))
-                kind = "dispersion words only" if (src <= 6 and src2 <= 6) else "a sensor stream involved"
-                key = f"{a} | {b} | {kind}"
-                pairs[key] = pairs.get(key, 0) + 1
-                seeds.setdefault(key, set()).update({(name, sd), (name2, sd2)})
-    return {"definition": "stream pairs of different seeds or sources whose used output ranges intersect; "
-                          "counted once, from the stream that starts first",
-            "pairs_and_distinct_seeds_by_range_pair": {k: {"pairs": pairs[k], "distinct_seeds": len(seeds[k])}
-                                                       for k in sorted(pairs)}}
+                p = stream_position(int(sd), src)
+                iv = intervals[src]
+                i = bisect.bisect_right([a for a, _ in iv], p) - 1
+                if i >= 0 and p <= iv[i][1]:
+                    hit = True
+                    break
+            res.append(hit)
+        return res
+    sd = _np.asarray(seeds, dtype=_np.uint64)
+    hit = _np.zeros(sd.shape, dtype=bool)
+    ginv = _np.uint64(GOLDEN_INV)
+    with _np.errstate(over="ignore"):
+        for src in SOURCES:
+            starts = _np.array([a for a, _ in intervals[src]], dtype=_np.uint64)
+            ends = _np.array([b for _, b in intervals[src]], dtype=_np.uint64)
+            pos = (sd ^ _np.uint64((src * GOLDEN) & MASK64)) * ginv
+            idx = _np.searchsorted(starts, pos, side="right") - 1
+            ok = idx >= 0
+            hit |= ok & (pos <= ends[_np.clip(idx, 0, len(ends) - 1)])
+    return hit
 
 
-def clean_block(size: int, ranges: dict, cycles: int, fixes: int, first: int = 60000, step: int = 1000,
-                tries: int = 400) -> dict:
-    """First block of `size` consecutive seeds, starting at multiples of `step` from `first`, whose streams
-    overlap neither each other nor the streams of any seed in `ranges` (used outputs, same draw counts).
-    Only reported, never assigned."""
+def _compress(seeds: list[int]) -> list[list[int]]:
+    out: list[list[int]] = []
+    for s in sorted(seeds):
+        if out and s == out[-1][1] + 1:
+            out[-1][1] = s
+        else:
+            out.append([s, s])
+    return out
+
+
+def partner_scan(targets: dict, used: dict, inv: dict, top: int = SCAN_TOP) -> dict:
+    """Seeds below `top` (outside the targets) whose streams share used output positions with a target stream."""
+    if _np is None:  # pragma: no cover
+        return {"skipped": "numpy not available; the exhaustive scan was not run"}
+    intervals = _target_intervals(targets, used)
+    inside = [(lo, hi) for lo, hi in targets.values()]
+    partners: list[int] = []
+    chunk = 1 << 20
+    for lo in range(0, top, chunk):
+        arr = _np.arange(lo, min(top, lo + chunk), dtype=_np.uint64)
+        mask = partner_mask(arr, intervals)
+        for sd in arr[mask].tolist():
+            if not any(a <= sd <= b for a, b in inside):
+                partners.append(int(sd))
+    comp = _compress(partners)
+    flagged_ints = sorted(s for s in inv["ints"] if s < top and any(a <= s <= b for a, b in comp))
+    flagged_ranges = sorted([list(r) for r in inv["ranges"]
+                             if any(not (r[1] < a or b < r[0]) for a, b in comp)])
+    high = sorted(s for s in inv["ints"] if s >= top)
+    high_hits = [s for s, h in zip(high, partner_mask(high, intervals)) if h and not any(a <= s <= b for a, b in inside)] if high else []
+    return {"scanned_seeds": f"0 to {top - 1}", "partner_seeds": len(partners), "partner_ranges": len(comp),
+            "partner_ranges_list": comp, "inventory_integers_in_partner_set": flagged_ints,
+            "inventory_ranges_meeting_partner_set": flagged_ranges, "inventory_integers_at_or_above_scan_top": len(high),
+            "of_which_partners": high_hits}
+
+
+def used_overlap_between(a: tuple, b: tuple, cycles: int, fixes: int) -> int:
+    """Overlapping stream pairs between two seed blocks (used outputs)."""
     used = used_draws(cycles, fixes)
-    index = _seen_index(ranges, used)
-    n_checked = 0
-    for k in range(tries):
-        a = first + k * step
-        b = a + size - 1
-        if any(lo <= b and a <= hi for lo, hi in ranges.values()):
-            continue
-        n_checked += 1
-        if _block_vs_index(a, b, index, used):
-            continue
-        if seed_independence(a, b, cycles, fixes)["pairs_overlapping_in_the_outputs_actually_used"]:
-            continue
-        return {"first_seed": a, "last_seed": b, "size": size, "candidates_checked": n_checked,
-                "searched_from": first, "step": step,
-                "note": "reported only; no seed is reassigned; the block is outside every range listed as seen or protected"}
-    return {"first_seed": None, "candidates_checked": n_checked}
+    return len(_block_vs_index(b[0], b[1], _seen_index({"a": a}, used), used))
 
 
-def option_c_costs(summary: dict, cross: dict) -> dict:
-    """Option (c): exclude the seeds that share output words, option A only."""
-    aff = cross["new_seeds_affected_by_stage_layout_A_only"]
-    rows = {}
-    for stage in ("A_low", "A_high", "B", "C", "D", "E"):
-        n0 = summary[stage]["seeds"]
-        n1 = n0 - aff.get(stage, 0)
-        rows[stage] = {"seeds": n0, "affected": aff.get(stage, 0), "remaining": n1}
-    lo, hi = rows["A_low"]["remaining"], rows["A_high"]["remaining"]
-    e_left, d_n = rows["E"]["remaining"], rows["D"]["remaining"]
-    pairs = d_n + e_left
-    return {"stages": rows,
-            "H1a_threshold_at_0.01/3_with_remaining_A_low": threshold(lo, F(1, 300)),
-            "H1a_min_n_at_0.01/3": min_n_all_success(F(1, 300)),
-            "H2_threshold_at_0.01/3_with_remaining_A_high": threshold(hi, F(1, 300)),
-            "H2_power_pi_0.97_with_remaining_A_high": r6(power(hi, F("0.97"), F(1, 300))),
-            "H1b_pooled_n": lo + hi, "H1b_threshold_0.01": threshold(lo + hi, F(1, 100)),
-            "mitigation_pairs": pairs, "min_pairs_for_zero_events_within_1pct": 459,
-            "invariants_budget_feasible": pairs >= 459}
+def synthetic_overlap_pairs(first: int, last: int, max_gap: int, min_gap: int = 1, limit: int = 3,
+                            sources: tuple = SOURCES) -> list:
+    """Pairs ((seed, source), (seed', source'), k) of the same XOR relation in a synthetic block, k outputs apart,
+    found by position arithmetic only. Used by the tests on non-protected, non-confirmatory seeds."""
+    pos = sorted((stream_position(s, src), s, src) for s in range(first, last + 1) for src in sources)
+    out = []
+    for i in range(len(pos) - 1):
+        k = pos[i + 1][0] - pos[i][0]
+        if min_gap <= k <= max_gap:
+            out.append(((pos[i][1], pos[i][2]), (pos[i + 1][1], pos[i + 1][2]), k))
+            if len(out) >= limit:
+                break
+    return out
+
+
+def block_verification(inv: dict) -> dict:
+    case, code = (2000, 400), (MAX_STEPS // CONTROL_PERIOD, MAX_STEPS // CONTROL_PERIOD // GNSS_PERIOD_CYCLES)
+    protocol_ranges = {**protocol_seen_ranges(), **EXTRA_PROTECTED, "44000-44999 earlier block, protected and unused": OLD_BLOCK}
+    out = {"block": [BLOCK_FIRST, BLOCK_LAST], "reserve": list(RESERVE),
+           "method": "start-state and position arithmetic only (seed ^ source*G, increment G, used draw counts); "
+                     "no output word of any stream is generated",
+           "declared_ranges_checked": {k: list(v) for k, v in protocol_ranges.items()},
+           "declared_seeds_checked": sum(b - a + 1 for a, b in protocol_ranges.values())}
+    for label, (cyc, fx) in (("case_40s", case), ("code_limit", code)):
+        used = used_draws(cyc, fx)
+        idx = _seen_index(protocol_ranges, used)
+        out[f"within_block_{label}"] = seed_independence(BLOCK_FIRST, BLOCK_LAST, cyc, fx)
+        out[f"within_reserve_{label}"] = seed_independence(RESERVE[0], RESERVE[1], cyc, fx)
+        out[f"block_against_declared_ranges_{label}"] = len(_block_vs_index(BLOCK_FIRST, BLOCK_LAST, idx, used))
+        out[f"reserve_against_declared_ranges_{label}"] = len(_block_vs_index(RESERVE[0], RESERVE[1], idx, used))
+        out[f"reserve_against_block_{label}"] = used_overlap_between((BLOCK_FIRST, BLOCK_LAST), RESERVE, cyc, fx)
+    out["same_seed_pairing"] = ("the two or more arms of one seed use the identical streams (same positions): intentional "
+                                "pairing inside an experiment; the checks above compare different seeds, and different "
+                                "sources of one seed, so they exclude it")
+    out["inventory"] = {"files_scanned": inv["files_scanned"], "seed_lines": inv["seed_lines"],
+                        "distinct_integers": len(inv["ints"]), "ranges": len(inv["ranges"]),
+                        "integers_above_scan_top": sorted(s for s in inv["ints"] if s >= SCAN_TOP)[:50]}
+    targets = {"block": (BLOCK_FIRST, BLOCK_LAST), "reserve": RESERVE}
+    out["exhaustive_partner_scan_code_limit"] = partner_scan(targets, used_draws(*code), inv)
+    out["not_established"] = [
+        "seeds derived in code from other numbers (offsets, hashes, loops) that appear in no text line with the word",
+        "seeds in untracked files (for example runs/), in other branches or worktrees, in pull-request text or in notes",
+        "binary files",
+        "seeds at or above 2^24 that are not integers on a seed line"]
+    return out
+
+
+def synthetic_arithmetic_check() -> dict:
+    """Validation of the position arithmetic on a synthetic, non-protected block (90000 to 99999); the tests
+    generate explicit output words there, never for protected or confirmatory seeds."""
+    dispersion = synthetic_overlap_pairs(90000, 99999, max_gap=2, limit=2, sources=(1, 2, 3, 4, 5, 6))
+    sensor = synthetic_overlap_pairs(90000, 99999, max_gap=4, limit=2, sources=(7, 8, 9, 10, 11, 12))
+    return {"block": [90000, 99999], "dispersion_pairs_found": len(dispersion), "sensor_pairs_found": len(sensor)}
 
 
 def independence() -> dict:
-    return {
-        "method": "integer arithmetic on the SplitMix64 definition only (state0 = seed ^ source * G, state += G); "
-                  "no simulator code path is called; verified against explicit generator outputs in the tests",
-        "sources": list(SOURCES),
-        "bound_derivation": {"max_steps": MAX_STEPS, "control_period_steps": CONTROL_PERIOD,
-                             "case_40s": {"control_cycles": 2000, "gnss_fixes": 400},
-                             "code_limit": {"control_cycles": MAX_STEPS // CONTROL_PERIOD,
-                                            "gnss_fixes": MAX_STEPS // CONTROL_PERIOD // GNSS_PERIOD_CYCLES}},
-        "seeds_44000_44919_case_40s": seed_independence(44000, 44919, 2000, 400),
-        "seeds_44000_44919_code_limit": seed_independence(
-            44000, 44919, MAX_STEPS // CONTROL_PERIOD, MAX_STEPS // CONTROL_PERIOD // GNSS_PERIOD_CYCLES),
-        "seeds_44000_44999_code_limit": seed_independence(
-            44000, 44999, MAX_STEPS // CONTROL_PERIOD, MAX_STEPS // CONTROL_PERIOD // GNSS_PERIOD_CYCLES),
-        "against_seen_and_protected_ranges_case_40s": cross_independence(2000, 400),
-        "against_seen_and_protected_ranges_code_limit": cross_independence(
-            MAX_STEPS // CONTROL_PERIOD, MAX_STEPS // CONTROL_PERIOD // GNSS_PERIOD_CYCLES),
-        "inside_and_between_seen_ranges_case_40s": seen_internal_overlaps(protocol_seen_ranges(), 2000, 400),
-        "against_extended_list_case_40s": cross_independence(2000, 400, {**protocol_seen_ranges(), **EXTRA_PROTECTED}),
-        "extended_list_adds": {k: list(v) for k, v in EXTRA_PROTECTED.items()},
-        "not_checked": "seeds used by other scripts or documents of the repository that are not in the protocol list, "
-                       "in exec/src/seeds.rs or in AGENTS.md; seed 0 (nominal case, no dispersion draws)",
-        "zero_overlap_block_candidate": clean_block(
-            920, {**protocol_seen_ranges(), **EXTRA_PROTECTED}, 2000, 400),
-    }
+    inv = inventory_scan()
+    return block_verification(inv)
 
 
-def layout_option_b() -> dict:
-    """Option B (costed, not adopted): E with 19 points per family and A_high with 6 repetitions."""
-    cond, summary = seed_map(a_high_reps=6, e_points=19)
-    checks = seed_checks(cond, summary)
+def layout_previous_allocation_a() -> dict:
+    """Allocation A (A_high 5 repetitions, E 20 points), superseded; costed on the same block for comparison."""
+    cond, summary = seed_map(BLOCK_FIRST, 5, 20)
     n_low, n_high = summary["A_low"]["seeds"], summary["A_high"]["seeds"]
     pairs = summary["D"]["seeds"] + summary["E"]["seeds"]
-    return {
-        "stages": summary, "checks": checks, "n_low": n_low, "n_high": n_high,
-        "tests": {k: v for k, v in tests_table(n_low, n_high, 231, 77).items()
-                  if k in ("H2_late_holds_high_band", "S3_R5_fails_at_0s_high_band", "S6_first_rejection_in_window")},
-        "holm_design": holm_design(n_low, n_high),
-        "cell_tolerance": cell_tolerance(n_low, n_high, 6),
-        "budgets": {"pairs_invariants_and_r2_r6": pairs,
-                    "invariants_cp99_upper_at_0": r6(cp_upper(0, pairs)),
-                    "invariants_feasible_within_1pct": cp_upper(0, pairs) <= 0.01,
-                    "r2_r6_max_events_5pct": max_events(pairs, 0.05),
-                    "r2_r6_cp99_upper_at_max": r6(cp_upper(max_events(pairs, 0.05), pairs)),
-                    "r1_at_0s_pairs": summary["D"]["seeds"]},
-    }
+    t = tests_table(n_low, n_high, 231, 77)
+    return {"stages": summary, "checks": seed_checks(cond, summary), "n_high": n_high,
+            "tests": {k: t[k] for k in ("H2_late_holds_high_band", "S3_R5_fails_at_0s_high_band", "S6_first_rejection_in_window",
+                                        "H1b_pooled_zero_s_both_bands_0.01")},
+            "cell_tolerance": cell_tolerance(n_low, n_high, 5),
+            "budgets": {"pairs_invariants_and_r2_r6": pairs, "invariants_cp99_upper_at_0": r6(cp_upper(0, pairs))}}
+
+
+RNG_OPERATIONS_DISCLOSED = [
+    {"revision": "1", "operation": "SplitMix64 reference vector (seed 0, public) in a test; Monte Carlo cross-check of the H3 "
+                                    "median interval with a generator seeded 20261123 (a sampling seed)", "protected_seeds": False},
+    {"revision": "2", "operation": "start-state and stream-position arithmetic for seeds 44000-44919 (and 44000-44999), sources 1 to 12; "
+                                    "sorted gaps; no output words", "protected_seeds": True, "output_words": 0},
+    {"revision": "2", "operation": "explicit generation of output words for the streams (44000, source 2) and (44128, source 6): "
+                                    "8 and 4 words in one interactive check, the first 6 and 2 printed to the console; the test generated "
+                                    "the same 6 and 2 words on every run", "protected_seeds": True,
+     "words_generated_interactively": 12, "words_printed_interactively": 8, "words_generated_per_test_run": 8,
+     "stored_in_files": False, "printed": True},
+    {"revision": "3 and 4", "operation": "position arithmetic of the 44000-44919 streams against the seen and protected ranges, "
+                                         "against the extended list and inside the seen ranges; no output words", "protected_seeds": True, "output_words": 0},
+    {"revision": "4", "operation": "test generating explicit output words for the pairs (44000, 1) and (42016, 3) (3 and 1 words) and "
+                                    "(44804, 10) and (41212, 12) (7 and 5 words) on every run; asserted equal, not printed or stored",
+     "protected_seeds": True, "words_generated_per_test_run": 16, "stored_in_files": False, "printed": False},
+    {"revision": "5", "operation": "position arithmetic only for 81000-81999, 80920-80999 and the candidate blocks scanned from 60000; "
+                                    "no output word of those seeds; tests generate words only on the synthetic block 90000-91999",
+     "protected_seeds": False, "output_words": 0},
+]
 
 
 # ---------------------------------------------------------------------------------------------
@@ -1524,7 +1662,6 @@ def layout_option_b() -> dict:
 
 
 def build() -> dict:
-    ind = independence()
     cond, summary = seed_map()
     checks = seed_checks(cond, summary)
     n_low = summary["A_low"]["seeds"]
@@ -1534,8 +1671,9 @@ def build() -> dict:
     n_d_pair = 7 * 11
     n_e = summary["E"]["seeds"]
     assert (n_d_low, n_d_pair) == (231, 77) and n_d == 4 * n_d_pair
+    ev = evidence()
     return {
-        "schema": "vv-m19-g3-candidate-calculations.v1",
+        "schema": "vv-m19-g3-candidate-calculations.v2",
         "no_simulator_run": True,
         "base_commit": full_sha(BASE),
         "provenance": provenance(),
@@ -1546,26 +1684,21 @@ def build() -> dict:
         "layout": {"stages": summary, "checks": checks, "m15_for_comparison": m15_layout_totals(),
                    "band_sizes": {"A_low": n_low, "A_high": n_high, "D_late_per_mitigation": n_d,
                                   "E_per_mitigation": n_e, "M1": n_d_low, "M2": n_d_pair, "S7_each": n_d_pair}},
-        "evidence": evidence(),
+        "layout_previous_allocation_A": layout_previous_allocation_a(),
+        "evidence": ev,
         "tests": tests_table(n_low, n_high, n_d_low, n_d_pair),
         "s4_s5": s4_s5(),
         "exposure_rule": first_rejection_times(),
         "h1_options": h1_options(n_low),
         "h1_options_pooled_A_and_D_n399": h1_options(3 * 7 * 11 + n_low, with_mcnemar=False),
-        "h1_options_m15_n160_for_comparison": {
-            label: option_powers(160, F(1, 300), p0, q) for label, p0, q in SCENARIOS
-            if label in ("p0=0.93 q=1.00", "p0=0.99 q=0.99")},
         "median_tests": median_tests(),
-        "joint_rule": joint_rule(n_low, n_high),
-        "joint_rule_pooled_A_and_D": joint_rule(3 * 7 * 11 + n_low, 77 + n_high, with_mcnemar=False),
         "budgets": budgets(n_d + n_e, n_d),
-        "layout_option_B_E19_Ahigh168": layout_option_b(),
-        "holm_design": holm_design(n_low, n_high),
+        "power_scenarios": power_scenarios(n_low, n_high, ev),
         "s4_s5_mcnemar": s4_s5_mcnemar(),
-        "cell_tolerance": cell_tolerance(n_low, n_high),
-        "seed_independence": ind,
-        "option_c_exclude_overlapping_seeds": option_c_costs(
-            summary, ind["against_seen_and_protected_ranges_case_40s"]),
+        "cell_tolerance": cell_tolerance(n_low, n_high, 6),
+        "seed_independence": independence(),
+        "synthetic_arithmetic_check": synthetic_arithmetic_check(),
+        "rng_operations_disclosed": RNG_OPERATIONS_DISCLOSED,
     }
 
 
