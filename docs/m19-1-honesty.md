@@ -102,7 +102,7 @@ Testes acrescentados:
 - 39 testes Python que precisam do binário `vv-rocket` de `crates/vv-rocket` ficam ignorados com o comando do AGENTS.md, antes e depois.
 - A pílula selecionada a 1024x640 ocupa quatro linhas (antes três) e o gráfico 2D perde alguns píxeis de altura; os percursos que medem a altura do gráfico e as sobreposições passaram (`ux2` 90/90).
 - Não foi construído nem testado o instalador, nem a reversão. A Studio 0.18.1 instalada não foi lançada nem alterada, mas ver «Quebra do passo 4».
-- Os percursos anteriores (m15, ux, ux2, m18, m17 Lab, m16, ui_smoke) correram sem isolamento do perfil e não tinham sido repetidos depois das correções da revisão e do seguimento. Foram repetidos depois, com isolamento, e passaram todos (ver «Percursos repetidos com isolamento do perfil»). Continuam por correr `m17_cinematic_journey.py`, `review_captures.py` e `installed_spotcheck.py`.
+- Os percursos anteriores (m15, ux, ux2, m18, m17 Lab, m16, ui_smoke) correram sem isolamento do perfil e não tinham sido repetidos depois das correções da revisão e do seguimento. Foram repetidos depois, com isolamento, e passaram todos (ver «Percursos repetidos com isolamento do perfil»). Continuam por correr `m17_cinematic_journey.py`, `review_captures.py` e `installed_spotcheck.py`; o primeiro não se correu de propósito, porque o Godot escreveria em `%APPDATA%\VV Lab Cinematic`, que a Studio instalada também usa (razão em `docs/evidence/m19/honesty/journeys-rerun/README.md`).
 - Nenhuma revisão foi feita por pessoas. As revisões independentes descritas em «Revisões independentes por agentes» foram feitas por agentes de IA.
 
 ## Seguimento da passagem de especialistas (F01 a F04, F06, F07, F10, F11)

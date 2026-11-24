@@ -23,7 +23,9 @@ Os percursos da interface e as capturas de superfícies nunca vistas foram repet
 
 Saída de cada um em `suites/`. O `m18` tem menos uma verificação porque o módulo Cinematic não está instalado nesta construção (o perfil de desenvolvimento não tem módulos) e o percurso segue o ramo «não disponível», com o mesmo resultado esperado; antes, o executável usava o perfil instalado, que tinha o módulo.
 
-Não foram corridos: `m17_cinematic_journey.py` (precisa do ficheiro zip do módulo e da janela de ficheiros nativa, e numa construção em modo de lançamento `VVLAB_MODULES` não se aplica: o módulo ficaria na pasta `%LOCALAPPDATA%\org.vvlab.devstudio`, não numa pasta temporária), `review_captures.py` e `installed_spotcheck.py` (precisam do módulo Cinematic instalado ou da Studio instalada, que não se tocou).
+Não foram corridos: `m17_cinematic_journey.py`, `review_captures.py` e `installed_spotcheck.py` (precisam do módulo Cinematic instalado ou da Studio instalada, que não se tocou).
+
+Tentou-se planear `m17_cinematic_journey.py` contra uma construção de depuração (que respeita `VVLAB_MODULES`, `cfg!(debug_assertions)` em `main.rs`) com uma pasta de módulos temporária, e **não se correu**, porque não é seguro: o módulo Cinematic arranca o Godot, que escreve os registos em `%APPDATA%\VV Lab Cinematic` (`config/custom_user_dir_name` de `desktop/cinematic/project.godot`), a pasta `app_userdata` do Godot que a Studio instalada também usa, e o percurso lê esses registos. `VVLAB_MODULES` só redireciona a pasta do módulo, não a `app_userdata`. Redirecioná-la exigiria definir `APPDATA` para o processo da Studio, o que tira ao auxiliar a referência do perfil real, e o percurso carrega o módulo por uma janela de ficheiros nativa respondida com teclas simuladas, que podem ir parar a outra janela do ambiente de trabalho. Fica por correr até haver uma forma de isolar `app_userdata`.
 
 ## Superfícies que nunca tinham sido vistas
 
