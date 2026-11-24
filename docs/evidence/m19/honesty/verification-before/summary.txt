@@ -1,0 +1,19 @@
+=== fmt: cargo fmt --check
+exit 0
+=== clippy: cargo clippy --all-targets -- -D warnings
+exit 0
+=== test: cargo test
+exit 0
+=== python: python -m unittest discover -s tests -p test_*.py
+exit 0
+=== release: cargo build --release
+exit 0
+=== campaign: python scripts/run_campaign.py --seeds 42,1337,2026 --output-root runs/campaign
+exit 0
+=== d_fmt: cargo fmt --check
+exit 0
+=== d_clippy: cargo clippy --all-targets -- -D warnings
+exit 0
+=== d_test: cargo test
+exit 0
+finished

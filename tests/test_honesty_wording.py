@@ -215,6 +215,9 @@ WORDING_FAMILY = ("safetyWording", "summarySafetyText")
 
 # Bare 'safe' strings that are not verdicts: file, the exact expression, why.
 BARE_ALLOW = {
+    "requirements.js": [("const EXPECTATION_GLOSS = '\"safe\" here means only that no safety rule was broken, and \"unsafe\" that one was; requirements are separate verdicts.';", "the gloss under a domain demonstration text quotes the domain's own words to say what they mean; shown only next to a text that uses them"),
+        ("return new RegExp('\\\\b(safe|unsafe|safety)\\\\b', 'i').test(String(text || '')) ? EXPECTATION_GLOSS : null;", "the test that decides whether a domain text talks about safety; it reads the words, it does not print them"),
+    ],
     "views/library.js": [("[['safe', 'none broken'], ['unsafe', 'a rule broken']]", "the options of the Safety rules filter; the value is the summary's status, the words are the labels")],
 }
 

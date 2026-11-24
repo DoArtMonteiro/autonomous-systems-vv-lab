@@ -7,6 +7,7 @@ import { api } from '../api.js';
 import { state, pref, setPref, visibleDomains, domainById, on, emit } from '../store.js';
 import { toast, errorText, askName } from '../ui.js';
 import { faultText, conditionsName } from '../model.js';
+import { expectationGloss } from '../requirements.js';
 
 const REQUEST_SCHEMA = 'vv-run-request.v1';
 const MAX_COMPARE = 8;
@@ -273,7 +274,8 @@ function demoCard(d, demo) {
         h('p', null, prose(demo.narrative)),
         demo.look_at.length ? [h('h4', null, 'What to look at'), h('ul', null, demo.look_at.map((x) => h('li', null, prose(x))))] : null,
         h('h4', null, 'Expected result, stated by the domain'),
-        h('p', { class: 'expect' }, prose(demo.expectation)))),
+        h('p', { class: 'expect' }, prose(demo.expectation)),
+        expectationGloss(demo.expectation) ? h('p', { class: 'small dim demo-gloss' }, expectationGloss(demo.expectation)) : null)),
     h('div', null, runBtn));
 }
 

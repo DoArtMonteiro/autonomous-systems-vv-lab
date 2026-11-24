@@ -28,8 +28,8 @@ import { buildControl } from './control.js';
 import { sourcesInfo } from '../sources-info.js';
 import { openCatalogue } from '../env-catalogue.js';
 import { cinematicButton } from '../cinematic.js';
-import { reqView, safetyWording, SAFETY_NOTE, failureSentence, indexNumbers, statusLine, requirementWording, endChip } from '../requirements.js';
-import { conditionsName } from '../model.js';
+import { reqView, safetyWording, SAFETY_NOTE, failureSentence, indexNumbers, statusLine, requirementWording, endChip, noFailureSentence, completionFacts, missionTone, SAFETY_SCOPE } from '../requirements.js';
+import { conditionsName, conditionsBrief } from '../model.js';
 
 let root;
 let navigate = () => {};
@@ -49,7 +49,7 @@ export function initPlayer(el, nav) {
 export function playerState() {
   if (!pl) return null;
   return { experience: pl.exp.id, runs: pl.runs.map((r) => r.runId), active: pl.active, t: pl.cursor.t, t1: pl.cursor.t1, revealed: pl.revealed, analysis: !!pl.analysis, playing: pl.cursor.playing, scene: pl.scene ? (pl.scene.ok === false ? 'fallback' : pl.kind) : null,
-    view: pl.view, environment: pl.envId, renderer: pl.renderer || null, geoError: pl.geoError || null, geoStats: pl.scene && pl.scene.stats ? pl.scene.stats() : null, mounts: pl.mounts || 0,
+    view: pl.view, plumeM: pl.scene && typeof pl.scene.plume === 'function' ? pl.scene.plume() : null, environment: pl.envId, renderer: pl.renderer || null, geoError: pl.geoError || null, geoStats: pl.scene && pl.scene.stats ? pl.scene.stats() : null, mounts: pl.mounts || 0,
     findings: pl.gated ? pl.gated.length : 0, findingsDrawn: pl.gated ? pl.gated.filter((m) => m.el).length : 0 };
 }
 
@@ -420,14 +420,16 @@ function build() {
 
   const stage = h('div', { class: 'pl-stage', id: 'pl-stage' });
   const viewport = h('div', { class: ['pl-viewport', rocket ? 'is-3d' : 'is-2d'], id: 'pl-viewport' });
-  const hud = h('div', { class: 'pl-hud', role: 'group', 'aria-label': 'Readouts at the playback time' });
+  const hud = h('div', { class: ['pl-hud', rocket ? 'is-rocket' : 'is-ground'], role: 'group', 'aria-label': 'Readouts at the playback time' });
   const phaseTag = h('div', { class: ['pl-phase', rocket ? '' : 'is-2d'], 'aria-hidden': 'true' });
   const runBar = runs.length > 1 ? h('div', { class: 'pl-runs', role: 'radiogroup', 'aria-label': 'Run shown in the scene' },
-    runs.map((r, i) => h('button', { type: 'button', role: 'radio', class: 'pl-run', 'aria-checked': String(i === pl.active), dataset: { run: String(i) }, onclick: () => setActive(i) },
+    runs.map((r, i) => h('button', { type: 'button', role: 'radio', class: 'pl-run', 'aria-checked': String(i === pl.active), dataset: { run: String(i) }, title: `${runFullName(r)} · ${shortId(r)}`, onclick: () => setActive(i) },
       h('span', { class: 'pl-swatch', style: { background: r.colour } }),
       h('span', { class: 'pl-run-t' },
         h('span', { class: 'pl-run-l' }, r.label),
         runFullName(r) !== r.label ? h('span', { class: 'pl-run-c small' }, ` · ${runConditions(r)}`) : null,
+        // On a short, narrow window the conditions are kept for assistive technology and for the tooltip, and the pill shows their exact count, never a cut list.
+        runFullName(r) !== r.label ? h('span', { class: 'pl-run-n small', 'aria-hidden': 'true' }, ` · ${conditionsBrief(r.record.request, (domainById(r.record.request.domain) || {}).catalog)}`) : null,
         h('span', { class: 'pl-run-id mono small', title: `Run ${r.runId}` }, ` · ${shortId(r)}`),
         h('span', { class: 'pl-run-v small', dataset: { v: String(i) } }))))) : null;
   const note = sceneNote();
@@ -592,7 +594,7 @@ function onTime(t) {
   if (pl.dom.hud.hidden) { updateTransport(t); return; }
   pl.dom.hud.replaceChildren(
     h('p', { class: 'pl-hud-h' }, h('span', { class: 'pl-swatch', style: { background: run.colour } }), runFullName(run), ph.end && td ? h('span', { class: 'pl-hud-at' }, 'at contact') : null),
-    h('dl', null, readouts(run, t, rocket).map(([k, v, u, kind, title]) => h('div', { class: 'pl-hud-row', title },
+    h('dl', null, readouts(run, t, rocket).map(([k, v, u, kind, title], i) => h('div', { class: ['pl-hud-row', rocket && (i === 3 || i === 4) ? 'is-minor' : ''], title },
       h('dt', null, h('abbr', { class: `kind kind-${kind}`, title: KIND_WORD[kind] }, kind), k),
       h('dd', { class: 'mono' }, v === null ? '—' : typeof v === 'string' ? v : `${hudNum(v)}${u ? ` ${u}` : ''}`)))),
     h('p', { class: 'pl-hud-key' }, 'T true state · E controller estimate · O sensor · D derived'));
@@ -783,7 +785,8 @@ function reveal() {
 }
 
 function tone(status) {
-  if (status === 'success' || status === 'safe' || status === 'pass') return 'ok';
+  if (status === 'held') return 'held';
+  if (status === 'success' || status === 'pass') return 'ok';
   if (status === 'unsafe') return 'bad';
   if (status === 'partial' || status === 'failure' || status === 'fail') return 'warn';
   return 'neutral';
@@ -798,24 +801,26 @@ function runResult(run) {
   const reqs = rec.requirements || [];
   const failed = reqs.filter((q) => q.status === 'fail');
   const missionReqs = reqs.filter((q) => q.category === 'requirement');
-  const metFail = missionReqs.filter((q) => q.status === 'fail');
   const metrics = pl.kind === 'rocket-3d' ? ROCKET_METRICS.map((id) => rec.metrics.find((m) => m.id === id)).filter(Boolean) : [];
   const missionText = requirementWording(rec) || 'no mission requirement listed';
   const sw = safetyWording(rec);
   const safetyText = sw.text;
   // The chip's colour comes from the same reading as its words: a broken rule is never drawn green, an unjudged run is never drawn as a pass.
-  const safetyTone = sw.verdict === 'unsafe' ? 'unsafe' : sw.verdict === 'neutral' ? 'neutral' : 'pass';
+  const safetyTone = sw.verdict;
   return h('div', { class: 'pl-run-result', dataset: { outcome: rec.outcome.code, safety: rec.safety.status } },
     h('p', { class: 'pl-run-name' }, h('span', { class: 'pl-swatch', style: { background: run.colour } }), run.label),
     h('p', { class: 'pl-run-cond small dim', dataset: { run: run.runId, conditions: conditionsName(rec.request, (domainById(rec.request.domain) || {}).catalog) } }, `Conditions: ${conditionsName(rec.request, (domainById(rec.request.domain) || {}).catalog)}`),
     h('p', { class: 'pl-run-head' }, rec.outcome.label),
     h('div', { class: 'pl-verdicts' },
-      verdictChip(missionText, metFail.length ? 'fail' : /not evaluated/.test(missionText) ? 'neutral' : 'pass', 'Mission'),
+      verdictChip(missionText, missionTone(rec), 'Mission'),
       verdictChip(safetyText, safetyTone, 'Safety rules', SAFETY_NOTE)),
+    // The scope of the safety chip, next to it: a mission requirement failed while no safety rule was broken.
+    sw.verdict === 'held' && missionTone(rec) === 'fail' ? h('p', { class: 'pl-fine pl-scope', dataset: { scope: '1' } }, SAFETY_SCOPE) : null,
+    completionFacts(rec) ? h('p', { class: 'pl-run-clause small dim', dataset: { clause: '1' } }, completionFacts(rec).text) : null,
     metrics.length ? h('dl', { class: 'pl-metrics' }, metrics.map((m) => h('div', null, h('dt', null, m.label), h('dd', { class: 'mono' }, m.value === null ? '—' : `${hudNum(m.value)} ${m.unit}`)))) : null,
     failed.length ? h('ul', { class: 'pl-failed' }, failed.map((q) => h('li', null,
       h('button', { type: 'button', class: 'link', title: 'Move the playback to the decisive instant', onclick: () => { if (Number.isFinite(q.t)) { pl.cursor.pause(); pl.cursor.set(q.t); } } }, q.label),
-      (() => { const rv = reqView(q); return h('span', { class: 'small dim', title: rv.full }, ` ${q.category === 'invariant' ? 'safety rule' : 'requirement'}: limit ${rv.limitText}, observed ${rv.obsText}`); })()))) : h('p', { class: 'small ok-text' }, 'Every requirement and safety rule met.'));
+      (() => { const rv = reqView(q); return h('span', { class: 'small dim', title: rv.full }, ` ${q.category === 'invariant' ? 'safety rule' : 'requirement'}: limit ${rv.limitText}, observed ${rv.obsText}`); })()))) : (() => { const nf = noFailureSentence(rec, ['requirement', 'invariant']); return h('p', { class: /^Every /.test(nf) ? 'small ok-text' : 'small dim' }, nf); })());
 }
 
 function changeSummary() {
@@ -828,7 +833,7 @@ function changeSummary() {
       ? `${pl.runs[i].label} stays within ${d.tol} ${d.unit} of ${pl.runs[0].label} for the whole run.`
       : `${pl.runs[i].label} departs from ${pl.runs[0].label} by more than ${d.tol} ${d.unit} at ${timeText(d.t, pl.unit)}.`,
     d.t !== null ? ' ' : null,
-    d.t !== null ? h('button', { type: 'button', class: 'link small', onclick: () => { pl.cursor.pause(); pl.cursor.set(d.t); } }, 'Go there') : null));
+    d.t !== null ? h('button', { type: 'button', class: 'link small', title: 'Move the playback to the instant where the runs part', onclick: () => { pl.cursor.pause(); pl.cursor.set(d.t); } }, `Go to ${timeText(d.t, pl.unit)}`) : null));
   }
   return rows.length ? h('section', { class: 'pl-card' }, h('h2', null, 'Where the runs part'), h('ul', { class: 'pl-list' }, rows),
     h('p', { class: 'pl-fine' }, 'Derived from the recorded true positions, sample by sample. It marks where the motion differs, not why.')) : null;
@@ -843,11 +848,9 @@ function fillResult() {
       h('button', { type: 'button', class: 'btn', dataset: { action: 'reveal' }, onclick: () => revealNow() }, 'Show the result now')));
     return;
   }
-  const reqOnly = pl.runs.some((r) => r.record.safety.status === 'safe' && (r.record.requirements || []).some((q) => q.status === 'fail'));
   const heading = h('h2', { id: 'pl-result-h', tabindex: '-1' }, 'Result');
   pl.dom.resultHeading = heading;
-  clear(live).append(h('section', { class: 'pl-card pl-result', 'aria-labelledby': 'pl-result-h' }, heading, pl.runs.map((r) => runResult(r)),
-    reqOnly ? h('p', { class: 'pl-fine' }, 'A requirement can fail without any safety rule being broken. Mission requirements judge the landing or the goal; safety rules are judged on the true state throughout the run, so a hard or off-target landing can fail a requirement and still break no safety rule.') : null));
+  clear(live).append(h('section', { class: 'pl-card pl-result', 'aria-labelledby': 'pl-result-h' }, heading, pl.runs.map((r) => runResult(r))));
 }
 
 /** What follows the result: where the runs part and why it happened. Empty until the result is shown. */

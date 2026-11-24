@@ -32,9 +32,10 @@ export function provenancePanel(runId, record, meta) {
       const reeval = earlier ? rep.checks.find((c) => c.name === 'verdicts re-evaluated under current rules') : null;
       markStoredVerdicts(reeval ? reeval.detail : null);
       clear(replayOut).append(
-        h('div', { class: ['replay-verdict', reeval ? 'v-partial' : ok ? 'v-pass' : 'v-unsafe'] },
-          h('span', { class: 'glyph' }, icon(ok && !reeval ? 'check' : 'warn')),
-          h('strong', null, reeval ? 'Verified, but the stored verdicts are not the current ones' : earlier ? 'Verified against its own record' : ok ? 'Verified' : 'Rejected'),
+        // What was recomputed is the evidence, not the run's result: a pass is drawn neutral, not in the green of a met requirement.
+        h('div', { class: ['replay-verdict', reeval ? 'v-partial' : ok ? 'v-held' : 'v-unsafe'] },
+          h('span', { class: 'glyph' }, icon(ok && !reeval ? 'shield' : 'warn')),
+          h('strong', null, reeval ? 'Evidence integrity: verified, but the stored verdicts are not the current ones' : earlier ? 'Evidence integrity: verified against its own record' : ok ? 'Evidence integrity: verified' : 'Evidence integrity: rejected'),
           h('span', { class: 'dim' }, reeval
             ? 'Recorded by an earlier build. The timebases, channels, other metrics and events agree with the recomputation, but the verdicts listed below differ from the ones the current rules give; the outcome, requirements and metrics shown for this run are the stored ones.'
             : earlier

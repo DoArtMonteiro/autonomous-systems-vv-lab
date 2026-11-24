@@ -895,6 +895,8 @@ export function mountGeo(host, models, active, cursor, colours, pack) {
     redraw: () => { r3.applyTheme(); r3.setTime(cursor.t); },
     preset: (m) => { r3.preset(m); r3.setTime(cursor.t); },
     get mode() { return r3.mode; },
+    /** The plume length drawn now, in metres (0 when none): read by the journeys. */
+    plume: () => r3.plumeLength || 0,
     stats: () => ({
       renders: r3.rendered || 0, triangles: r3.renderer.info.render.triangles, geometries: r3.renderer.info.memory.geometries, textures: r3.renderer.info.memory.textures,
       camera: r3.ok ? { mode: r3.mode, position: v3(r3.camera.position), target: v3(r3.controls.target), fov: Math.round(r3.camera.fov * 10) / 10, distance: r3.cur ? Math.round(r3.camera.position.distanceTo(r3.cur)) : null, stageFraction: (() => { const f = r3.stageScreenFraction(); return f === null ? null : Math.round(f * 1000) / 1000; })(), observer: r3.observerInfo || null, shot: r3.mode === 'director' ? r3.directorShot || null : null } : null,

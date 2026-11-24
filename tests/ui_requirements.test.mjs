@@ -8,9 +8,9 @@ import path from 'node:path';
 // fileURLToPath keeps a path with spaces or '&' (for example "v&v lab") intact.
 const here = path.dirname(fileURLToPath(import.meta.url));
 const mod = await import(pathToFileURL(path.join(here, '..', 'desktop', 'studio', 'ui', 'js', 'requirements.js')).href);
-const { safetyWording, reqView, failureSentence, plainName, headlineChange, indexNumbers, shortText, SAFETY_NOTE, requirementWording, statusLine, endChip } = mod;
+const { SAFETY_SCOPE, expectationGloss, missionTone, completionFacts, noFailureSentence, safetyWording, reqView, failureSentence, plainName, headlineChange, indexNumbers, shortText, SAFETY_NOTE, requirementWording, statusLine, endChip } = mod;
 const model = await import(pathToFileURL(path.join(here, '..', 'desktop', 'studio', 'ui', 'js', 'model.js')).href);
-const { conditionsName, conditionsShared, displayRunLabel } = model;
+const { conditionsName, conditionsShared, displayRunLabel, verdictOfSafety, verdictOfOutcome, conditionsBrief, verdictOfRequirement, statusClassOf, plumeLengthAt } = model;
 
 const inv = (id, status) => ({ id, label: `Rule ${id}`, category: 'invariant', status, expected: '<= 1 m', observed: '0.5 m' });
 const req = (id, status, label = `Req ${id}`) => ({ id, label, category: 'requirement', status, expected: '<= 3 m/s', observed: '1.654537 m/s' });
@@ -40,13 +40,13 @@ test('a failing row is never neutral, even when the class says not evaluated', (
 test('safe with all rows evaluated says how many were checked', () => {
   const w = safetyWording(rec('safe', null, [inv('S1', 'pass'), inv('S2', 'pass'), inv('S3', 'pass')]));
   assert.equal(w.text, 'No safety rule broken (3 checked)');
-  assert.equal(w.verdict, 'pass');
+  assert.equal(w.verdict, 'held');
 });
 
 test('safe with some rows not evaluated counts only the evaluated ones and says so', () => {
   const w = safetyWording(rec('safe', null, [inv('S1', 'pass'), inv('S2', 'not_evaluated'), inv('S3', 'pass')]));
   assert.equal(w.text, 'No safety rule broken (2 of 3 checked; 1 not evaluated)');
-  assert.equal(w.verdict, 'pass');
+  assert.equal(w.verdict, 'held');
   assert.equal(w.checked, 2);
 });
 
@@ -66,7 +66,7 @@ test('a record whose safety class is not_evaluated is neutral', () => {
 test('safe with no rows at all writes no count', () => {
   const w = safetyWording(rec('safe', null, []));
   assert.equal(w.text, 'No safety rule broken');
-  assert.equal(w.verdict, 'pass');
+  assert.equal(w.verdict, 'held');
 });
 
 test('the safety note is generic and says requirements are judged separately', () => {
@@ -242,5 +242,120 @@ test('the end chip names the failed requirement and the broken rule', () => {
   assert.match(chip.text, /^Not met: Vertical speed at contact 24\.23 m\/s \(limit <= 3 m\/s\); safety rule broken: Climb under power; impact not modelled$/);
 });
 
+// ----------------------------------------------------------------------------- M19.1: the safety chip is never the green of a requirement
+
+test('a safety rule that held is neutral and never the green class of a requirement that was met', () => {
+  for (const rows of [[], [inv('S1', 'pass')], [inv('S1', 'pass'), inv('S2', 'not_evaluated')], [req('R1', 'fail'), inv('S1', 'pass')]]) {
+    const w = safetyWording(rec('safe', null, rows));
+    assert.equal(w.verdict, 'held', JSON.stringify(rows));
+    assert.notEqual(w.verdict, 'pass');
+  }
+  assert.equal(verdictOfSafety('safe'), 'held');
+  assert.equal(verdictOfSafety('unsafe'), 'unsafe');
+  assert.equal(verdictOfSafety('not_evaluated'), 'neutral');
+  // the mission outcome keeps its own green
+  assert.equal(verdictOfOutcome('success'), 'pass');
+});
+
+test('beside failed requirements the safety verdict is held and the requirement wording says failed', () => {
+  const r = rec('safe', null, [req('R1', 'fail'), req('R2', 'fail'), inv('S1', 'pass'), inv('S2', 'pass')]);
+  assert.equal(requirementWording(r), '2 of 2 requirements failed');
+  assert.equal(safetyWording(r).verdict, 'held');
+  assert.equal(safetyWording(r).text, 'No safety rule broken (2 checked)');
+});
+test('a record with a row that was not evaluated never says every requirement met', () => {
+  const rows = [req('R1', 'pass'), req('R2', 'not_evaluated', 'Mission starts and completes'), inv('S1', 'pass')];
+  const r = rec('safe', null, rows);
+  assert.equal(noFailureSentence(r, ['requirement', 'invariant']), 'No requirement or safety rule failed, but 1 was not evaluated: Mission starts and completes (requirement).');
+  const two = rec('safe', null, [req('R1', 'pass'), inv('S1', 'not_evaluated'), req('R2', 'not_evaluated', 'Apoapsis')]);
+  assert.equal(noFailureSentence(two, ['requirement', 'invariant']), 'No requirement or safety rule failed, but 2 were not evaluated: Rule S1 (safety rule), Apoapsis (requirement).');
+  assert.doesNotMatch(noFailureSentence(r, ['requirement']), /^Every/);
+  assert.equal(noFailureSentence(rec('safe', null, [req('R1', 'pass'), inv('S1', 'pass')]), ['requirement', 'invariant']), 'Every requirement and safety rule met.');
+  assert.equal(noFailureSentence(rec('safe', null, [req('R1', 'pass')]), ['requirement']), 'Every requirement met.');
+  assert.equal(noFailureSentence(rec('safe', null, []), ['requirement', 'invariant']), 'The record lists no requirement and safety rule.');
+});
+// The two texts below are the ones the ground-vehicle host writes (corridor demonstration, 1 mm of GPS noise).
+const completion = (status, observed) => ({ id: 'mission_completion', label: 'Mission completion', category: 'requirement', status, expected: 'all 1 waypoint(s) reached, confirmed on the true position, with no stall of 8 ticks', observed });
+
+test('a failed mission completion at the goal says that the record does not name the failed clause', () => {
+  const r = rec('unsafe', null, [completion('fail', 'incomplete; 1 of 1 waypoint(s) reached; 0 mm from the goal at the end')]);
+  const f = completionFacts(r);
+  assert.equal(f.allReached, true);
+  assert.match(f.text, /^Recorded: 1 of 1 waypoint reached, 0 mm from the goal at the end, outcome incomplete\./);
+  assert.match(f.text, /does not say which part of "Mission completion" failed \(it expects all 1 waypoint\(s\) reached, confirmed on the true position, with no stall of 8 ticks\)/);
+  assert.match(f.text, /Reaching the goal is not the same as completing the mission\./);
+});
+
+test('a failed mission completion with waypoints missing needs no apology, and a pass or another shape gives nothing', () => {
+  const short = completionFacts(rec('safe', null, [completion('fail', 'stalled; 0 of 2 waypoint(s) reached; 2250 mm from the goal at the end')]));
+  assert.equal(short.allReached, false);
+  assert.equal(short.text, 'Recorded: 0 of 2 waypoints reached, 2250 mm from the goal at the end, outcome stalled.');
+  assert.equal(completionFacts(rec('safe', null, [completion('pass', 'completed; 1 of 1 waypoint(s) reached; 250 mm from the goal at the end')])), null);
+  assert.equal(completionFacts(rec('safe', null, [completion('fail', 'something else')])), null);
+  assert.equal(completionFacts(rec('safe', null, [])), null);
+});
+test('the compact run pill counts the conditions exactly and never lists a cut text', () => {
+  const catalog = { parameters: [{ id: 'arrival_radius_mm', label: 'Arrival radius', unit: 'mm', default: 0 }], faults: [], time: { unit: 'tick' } };
+  assert.equal(conditionsBrief({ parameters: {}, faults: [] }, catalog), 'default conditions');
+  assert.equal(conditionsBrief({ parameters: { arrival_radius_mm: 0 }, faults: [] }, catalog), 'default conditions');
+  assert.equal(conditionsBrief({ parameters: { arrival_radius_mm: 250 }, faults: [] }, catalog), '1 condition');
+  assert.equal(conditionsBrief({ parameters: { arrival_radius_mm: 250 }, faults: [{ kind: 'gps_noise', magnitude: 1, start: 0, end: 32 }] }, catalog), '2 conditions');
+  // the full text it stands for is the one name of the conditions
+  assert.match(conditionsName({ parameters: { arrival_radius_mm: 250 }, faults: [{ kind: 'gps_noise', magnitude: 1, start: 0, end: 32 }] }, catalog), /^Arrival radius 250 mm .* Gps noise 1/i);
+});
+
+test('a safety rule that held is neutral wherever a row is drawn: verdictOfRequirement and statusClassOf', () => {
+  // These two functions feed the Safety rules section (verification.js), the Compare matrix (compare.js), the
+  // Experiment Lab cells (lab.js) and the ascent scene (scenes/ascent.js); tests/test_m191_honesty.py checks that each one uses them.
+  assert.equal(verdictOfRequirement(inv('S1', 'pass')), 'held');
+  assert.equal(statusClassOf(inv('S1', 'pass')), 'held');
+  assert.equal(verdictOfRequirement(inv('S1', 'fail')), 'unsafe');
+  assert.equal(verdictOfRequirement(inv('S1', 'not_evaluated')), 'neutral');
+  assert.equal(verdictOfRequirement(req('R1', 'pass')), 'pass');
+  assert.equal(statusClassOf(req('R1', 'pass')), 'pass');
+  assert.equal(verdictOfRequirement(req('R1', 'fail')), 'fail');
+  assert.equal(statusClassOf(req('R1', 'fail')), 'fail');
+  assert.equal(statusClassOf(inv('S1', 'fail')), 'fail');
+  assert.equal(verdictOfRequirement(decl('D1', 'pass')), 'pass');
+});
+
+test('the Mission chip tone is read from the statuses of the mission rows', () => {
+  assert.equal(missionTone(rec('safe', null, [req('R1', 'pass'), req('R2', 'pass'), inv('S1', 'pass')])), 'pass');
+  assert.equal(missionTone(rec('safe', null, [req('R1', 'pass'), req('R2', 'fail')])), 'fail');
+  assert.equal(missionTone(rec('safe', null, [req('R1', 'pass'), req('R2', 'not_evaluated')])), 'neutral');
+  assert.equal(missionTone(rec('safe', null, [inv('S1', 'pass')])), 'neutral');
+  assert.equal(missionTone(rec('safe', null, [])), 'neutral');
+  // a label that happens to say "not evaluated" does not decide it
+  assert.equal(missionTone(rec('safe', null, [req('R1', 'pass', 'Not evaluated twice')])), 'pass');
+});
+
+test('no plume is drawn after the last sample, and it is drawn at and before it', () => {
+  const ch = { times: [0, 0.1, 0.2, 0.3], throttle: [0.5, 0.5, 0.4, 0.4], engine: [1, 1, 1, 1] };
+  assert.equal(plumeLengthAt(ch, 0.05), 6 + 22 * 0.5);
+  assert.equal(plumeLengthAt(ch, 0.3), 6 + 22 * 0.4);   // the last sample itself: the contact instant
+  assert.equal(plumeLengthAt(ch, 0.3 + 1e-12), 6 + 22 * 0.4);
+  assert.equal(plumeLengthAt(ch, 0.31), 0);              // the playback of a longer run goes on: nothing is recorded
+  assert.equal(plumeLengthAt(ch, 30), 0);
+  assert.equal(plumeLengthAt({ times: [0, 1], throttle: [0.5, 0], engine: [1, 1] }, 1), 0);
+  assert.equal(plumeLengthAt({ times: [0, 1], throttle: [0.5, 0.5], engine: [1, 2] }, 1), 0);   // engine off
+  assert.equal(plumeLengthAt({ times: [0, 1], throttle: [0.5, 0.5] }, 0.5), 6 + 22 * 0.5);     // no engine channel: throttle decides
+  assert.equal(plumeLengthAt({ times: [] }, 0), 0);
+});
+
+test('the scope sentence names safety rules and requirements apart and never writes a bare safe', () => {
+  assert.match(SAFETY_SCOPE, /not the mission result/);
+  assert.match(SAFETY_SCOPE, /a requirement can fail without any safety rule being broken/);
+  assert.doesNotMatch(SAFETY_SCOPE, /\bsafe\b/i);
+});
+
+test('the gloss quotes the domain words, says what they mean, and appears only next to a text that uses them', () => {
+  const g = expectationGloss('Baseline: hard landing, safe, R1 vertical speed fails.');
+  assert.equal(g, '"safe" here means only that no safety rule was broken, and "unsafe" that one was; requirements are separate verdicts.');
+  assert.equal(expectationGloss('Threshold 3 m: hard landing, unsafe, R1 fails.'), g);
+  assert.equal(expectationGloss('The vehicle ends 2250 mm from the goal; the safety rules hold.'), g);
+  assert.equal(expectationGloss('Reaches orbit with every requirement met.'), null);
+  assert.equal(expectationGloss('The unsafely named thing'), null);
+  assert.equal(expectationGloss(undefined), null);
+});
 
 console.log(`${n} tests passed`);

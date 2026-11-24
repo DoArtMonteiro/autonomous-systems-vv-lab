@@ -73,7 +73,7 @@ function chip(code, extra) {
 }
 
 function glyph(tone) {
-  const g = { ok: '✓', bad: '✕', warn: '◐', neutral: '○' }[tone] || '○';
+  const g = { ok: '✓', bad: '✕', warn: '◐', neutral: '○', held: '◇' }[tone] || '○';
   return h('span', { class: 'dl-glyph', 'aria-hidden': 'true' }, g);
 }
 
@@ -181,8 +181,9 @@ function rail() {
       h('span', { class: 'dl-item-title' }, p.title),
       h('span', { class: 'dl-item-sub mono' }, stamp(p.name)),
       h('span', { class: 'dl-item-chips' }, chip(verdictOf(p)),
-        vr ? h('span', { class: `dl-chip ${vr.pass ? 'ok' : 'bad'}` }, glyph(vr.pass ? 'ok' : 'bad'), vr.pass ? 'Recomputed' : 'Failed check')
-          : h('span', { class: `dl-chip ${stale ? 'warn' : 'neutral'}` }, glyph(stale ? 'warn' : 'neutral'), stale ? 'Changed since recomputed' : 'Not recomputed'))));
+        // Evidence integrity is not the verdict on the claim: a recomputation that passed is neutral, never the green of an approval.
+        vr ? h('span', { class: `dl-chip ${vr.pass ? 'held' : 'bad'}`, title: 'Whether the stored evidence was recomputed and agrees. It says nothing about whether the claim holds.' }, glyph(vr.pass ? 'held' : 'bad'), vr.pass ? 'Evidence integrity: recomputed' : 'Evidence integrity: a check failed')
+          : h('span', { class: `dl-chip ${stale ? 'warn' : 'neutral'}` }, glyph(stale ? 'warn' : 'neutral'), stale ? 'Evidence integrity: changed since recomputed' : 'Evidence integrity: not recomputed'))));
     }) : h('li', { class: 'empty small' }, 'No investigation yet. Choose a claim and challenge it.'));
   return h('aside', { class: 'dl-rail' },
     h('h2', { class: 'dl-rail-h' }, 'Claims'), claims,
@@ -410,7 +411,7 @@ function acceptance(p, vr) {
     tile('Evidence integrity', verified === null
       ? h('div', null, h('b', null, vr && vr.stale ? 'Changed since it was recomputed' : 'Not recomputed yet'), h('button', { type: 'button', class: 'btn btn-small', onclick: verify }, 'Recompute now'))
       : h('div', null, h('b', null, verified ? 'Recomputed, every check passed' : 'A check failed'), h('span', { class: 'small dim' }, `${vr.report.probes_recomputed.toLocaleString('en')} probes rerun · ${vr.verified_at_utc}`)),
-    verified === null ? (vr && vr.stale ? 'warn' : 'neutral') : verified ? 'ok' : 'bad'),
+    verified === null ? (vr && vr.stale ? 'warn' : 'neutral') : verified ? 'held' : 'bad'),
     tile('Claim', withdrawn ? gone('verdict') : h('div', null, h('b', null, word(f.verdict.claim)[0]), h('span', { class: 'small dim' }, word(f.verdict.claim)[2]), stated), withdrawn ? 'bad' : word(f.verdict.claim)[1]),
     tile('Mechanism', withdrawn ? gone('mechanism') : h('div', null, mech.length ? mech.map(([id, s2]) => h('div', { class: 'dl-tile-line' }, h('span', { class: 'mono small' }, id), chip(s2))) : h('b', null, 'No hypothesis declared')), withdrawn ? 'bad' : worst(mech)),
     tile('Mitigation', withdrawn ? gone('mitigation result') : h('div', null, mit.length ? mit.map(([id, s2]) => h('div', { class: 'dl-tile-line' }, h('span', { class: 'mono small' }, id), chip(s2))) : h('b', null, 'No mitigation declared')), withdrawn ? 'bad' : worst(mit)),

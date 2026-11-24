@@ -1,0 +1,586 @@
+{
+ "compare_gloss": "Words about safety in this text mean only that no safety rule was broken; the mission requirements are separate verdicts.",
+ "corridor_flight_readout": [
+  {
+   "text": "T East 5000 mm",
+   "title": "True position"
+  },
+  {
+   "text": "T North 2000 mm",
+   "title": "True position"
+  },
+  {
+   "text": "O GPS north 2001 mm",
+   "title": "GPS sample, empty when no sample arrived"
+  },
+  {
+   "text": "D To goal 0.00 mm",
+   "title": "Manhattan distance to the final goal at this tick. It does not say whether the mission completed: that is the Mission completion requirement."
+  },
+  {
+   "text": "E Confidence 500.0 permille",
+   "title": "Confidence in the last accepted fix"
+  },
+  {
+   "text": "D Mode normal",
+   "title": "Safety fallback of the controller"
+  }
+ ],
+ "corridor_second_run": [
+  {
+   "allMet": [
+    "Every requirement and safety rule met."
+   ],
+   "chips": [
+    {
+     "border": "color(srgb 0.239216 0.74902 0.596078 / 0.45)",
+     "cls": "vchip v-ok",
+     "colour": "rgb(61, 191, 152)",
+     "text": "MISSION all 8 requirements met"
+    },
+    {
+     "border": "rgb(42, 50, 60)",
+     "cls": "vchip v-held",
+     "colour": "rgb(228, 233, 239)",
+     "text": "SAFETY RULES No safety rule broken (4 checked)"
+    }
+   ],
+   "clause": null,
+   "failed": [],
+   "run": "Exact GPS",
+   "scope": null
+  },
+  {
+   "allMet": [],
+   "chips": [
+    {
+     "border": "color(srgb 0.890196 0.639216 0.231373 / 0.45)",
+     "cls": "vchip v-warn",
+     "colour": "rgb(227, 163, 59)",
+     "text": "MISSION 2 of 8 requirements failed, 1 not evaluated, 5 met"
+    },
+    {
+     "border": "color(srgb 0.941176 0.419608 0.294118 / 0.5)",
+     "cls": "vchip v-bad",
+     "colour": "rgb(240, 107, 75)",
+     "text": "SAFETY RULES 1 of 4 safety rules broken"
+    }
+   ],
+   "clause": "Recorded: 1 of 1 waypoint reached, 0 mm from the goal at the end, outcome incomplete. The record does not say which part of \"Mission completion\" failed (it expects all 1 waypoint(s) reached, confirmed on the true position, with no stall of 8 ticks). Reaching the goal is not the same as completing the mission.",
+   "failed": [
+    "Truth stays outside the restricted zone safety rule: limit truth position and swept segment outside restricted polygon, observed from=(5000,2000); to=(5000,1750)",
+    "Restricted zone stays clear (contract) requirement: limit restricted zone clear holds at every tick, observed predicate false; violated at tick 21",
+    "Mission completion requirement: limit all 1 waypoint(s) reached, confirmed on the true position, with no stall of 8 ticks, observed incomplete; 1 of 1 waypoint(s) reached; 0 mm from the goal at the end"
+   ],
+   "run": "1 mm of GPS noise",
+   "scope": null
+  },
+  {
+   "allMet": [
+    "Every requirement and safety rule met."
+   ],
+   "chips": [
+    {
+     "border": "color(srgb 0.239216 0.74902 0.596078 / 0.45)",
+     "cls": "vchip v-ok",
+     "colour": "rgb(61, 191, 152)",
+     "text": "MISSION all 8 requirements met"
+    },
+    {
+     "border": "rgb(42, 50, 60)",
+     "cls": "vchip v-held",
+     "colour": "rgb(228, 233, 239)",
+     "text": "SAFETY RULES No safety rule broken (4 checked)"
+    }
+   ],
+   "clause": null,
+   "failed": [],
+   "run": "1 mm noise, 250 mm arrival radius",
+   "scope": null
+  }
+ ],
+ "errors": [],
+ "exe": "vv-studio-m191-review.exe",
+ "go_to_buttons": [
+  "Go to 4.70 s"
+ ],
+ "held_rows_compare": {
+  "cells": [
+   {
+    "cells": [
+     "cell v-fail",
+     "cell v-pass"
+    ],
+    "row": "Mission outcome"
+   },
+   {
+    "cells": [
+     "cell v-held",
+     "cell v-held"
+    ],
+    "row": "Safety rules"
+   },
+   {
+    "cells": [],
+    "row": "VERDICT CHANGES BETWEEN THE RUNS"
+   },
+   {
+    "cells": [
+     "cell v-fail",
+     "cell v-pass"
+    ],
+    "row": "R1_vertical_speed"
+   },
+   {
+    "cells": [
+     "cell v-fail",
+     "cell v-pass"
+    ],
+    "row": "R2_horizontal_speed"
+   },
+   {
+    "cells": [],
+    "row": "SAFETY RULES"
+   },
+   {
+    "cells": [
+     "cell v-held",
+     "cell v-held"
+    ],
+    "row": "S1_tilt_envelope"
+   },
+   {
+    "cells": [
+     "cell v-held",
+     "cell v-held"
+    ],
+    "row": "S2_keep_out"
+   },
+   {
+    "cells": [
+     "cell v-held",
+     "cell v-held"
+    ],
+    "row": "S3_axial_load"
+   },
+   {
+    "cells": [
+     "cell v-held",
+     "cell v-held"
+    ],
+    "row": "S4_no_relight"
+   },
+   {
+    "cells": [
+     "cell v-held",
+     "cell v-held"
+    ],
+    "row": "S5_no_powered_ascent"
+   },
+   {
+    "cells": [],
+    "row": "MISSION REQUIREMENTS"
+   },
+   {
+    "cells": [
+     "cell v-pass",
+     "cell v-pass"
+    ],
+    "row": "R3_tilt"
+   },
+   {
+    "cells": [
+     "cell v-pass",
+     "cell v-pass"
+    ],
+    "row": "R4_angular_rate"
+   }
+  ]
+ },
+ "held_rows_lab": {
+  "pills": [
+   "mini v-fail",
+   "mini v-held"
+  ]
+ },
+ "held_rows_run": [
+  {
+   "rows": [
+    "req v-held",
+    "req v-held",
+    "req v-held",
+    "req v-held",
+    "req v-held"
+   ],
+   "title": "Safety rules"
+  },
+  {
+   "rows": [
+    "req v-fail",
+    "req v-fail",
+    "req v-pass",
+    "req v-pass",
+    "req v-pass",
+    "req v-pass"
+   ],
+   "title": "Mission requirements"
+  }
+ ],
+ "hud_rows_1024x640": [
+  "T East 5000 mm",
+  "T North 2000 mm",
+  "O GPS north 2001 mm",
+  "D To goal 0.00 mm",
+  "E Confidence 500.0 permille",
+  "D Mode normal"
+ ],
+ "library_safety_cells": [
+  {
+   "cls": "cell v-fail",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Reached the ground, requirements not met"
+  },
+  {
+   "cls": "cell v-pass",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Landed"
+  },
+  {
+   "cls": "cell v-held",
+   "colour": "rgb(228, 233, 239)",
+   "text": "No safety rule broken (5 checked)"
+  },
+  {
+   "cls": "cell v-held",
+   "colour": "rgb(228, 233, 239)",
+   "text": "No safety rule broken (5 checked)"
+  },
+  {
+   "cls": "cell v-fail",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Fail \u00b7 33.03 m/sD margin -30.03 m/s"
+  },
+  {
+   "cls": "cell v-pass",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 2.672 m/sD margin +0.3285 m/s"
+  },
+  {
+   "cls": "cell v-fail",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Fail \u00b7 1.151 m/sD margin -0.151 m/s"
+  },
+  {
+   "cls": "cell v-pass",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 0.2932 m/sD margin +0.7068 m/s"
+  },
+  {
+   "cls": "cell v-held",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 10.31 \u00b0D margin +19.69 \u00b0"
+  },
+  {
+   "cls": "cell v-held",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 10.25 \u00b0D margin +19.75 \u00b0"
+  },
+  {
+   "cls": "cell v-held",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 4.745 mD margin +45.25 m"
+  },
+  {
+   "cls": "cell v-held",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 2.923 mD margin +47.08 m"
+  },
+  {
+   "cls": "cell v-held",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 2.196 g0D margin +0.8037 g0"
+  },
+  {
+   "cls": "cell v-held",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 2.294 g0D margin +0.7059 g0"
+  },
+  {
+   "cls": "cell v-held",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 1 ignitionsD margin +0 ignitions"
+  },
+  {
+   "cls": "cell v-held",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 1 ignitionsD margin +0 ignitions"
+  },
+  {
+   "cls": "cell v-held",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 0 mD margin +5 m"
+  },
+  {
+   "cls": "cell v-held",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 0 mD margin +5 m"
+  },
+  {
+   "cls": "cell v-pass",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 0.5843 \u00b0D margin +4.416 \u00b0"
+  },
+  {
+   "cls": "cell v-pass",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 0.6431 \u00b0D margin +4.357 \u00b0"
+  },
+  {
+   "cls": "cell v-pass",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 0.006374 rad/sD margin +0.09363 rad/s"
+  },
+  {
+   "cls": "cell v-pass",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 0.003141 rad/sD margin +0.09686 rad/s"
+  },
+  {
+   "cls": "cell v-pass",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 4.745 mD margin +5.255 m"
+  },
+  {
+   "cls": "cell v-pass",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 2.923 mD margin +7.077 m"
+  },
+  {
+   "cls": "cell v-pass",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 4799 kgD margin +4721 kg"
+  },
+  {
+   "cls": "cell v-pass",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Pass \u00b7 4266 kgD margin +4188 kg"
+  },
+  {
+   "cls": "cell v-pass",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Mission completed"
+  },
+  {
+   "cls": "cell v-held",
+   "colour": "rgb(228, 233, 239)",
+   "text": "None broken"
+  },
+  {
+   "cls": "cell v-pass",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Mission completed"
+  },
+  {
+   "cls": "cell v-held",
+   "colour": "rgb(228, 233, 239)",
+   "text": "None broken"
+  },
+  {
+   "cls": "cell v-partial",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Mission incomplete"
+  },
+  {
+   "cls": "cell v-unsafe",
+   "colour": "rgb(228, 233, 239)",
+   "text": "1 safety rule broken"
+  },
+  {
+   "cls": "cell v-fail",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Reached the ground, requirements not met"
+  },
+  {
+   "cls": "cell v-held",
+   "colour": "rgb(228, 233, 239)",
+   "text": "None broken"
+  },
+  {
+   "cls": "cell v-fail",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Reached the ground, requirements not met"
+  },
+  {
+   "cls": "cell v-held",
+   "colour": "rgb(228, 233, 239)",
+   "text": "None broken"
+  },
+  {
+   "cls": "cell v-pass",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Landed"
+  },
+  {
+   "cls": "cell v-held",
+   "colour": "rgb(228, 233, 239)",
+   "text": "None broken"
+  },
+  {
+   "cls": "cell v-fail",
+   "colour": "rgb(228, 233, 239)",
+   "text": "Reached the ground, requirements not met"
+  },
+  {
+   "cls": "cell v-held",
+   "colour": "rgb(228, 233, 239)",
+   "text": "None broken"
+  }
+ ],
+ "pills_corridor_1024x640": [
+  {
+   "aria": null,
+   "checked": "false",
+   "clipped": [],
+   "text": "Exact GPS \u00b7 default conditions \u00b7 default conditions \u00b7 18c64804",
+   "title": "Exact GPS \u00b7 default conditions \u00b7 18c64804",
+   "visible": "",
+   "width": 286
+  },
+  {
+   "aria": null,
+   "checked": "true",
+   "clipped": [],
+   "text": "1 mm of GPS noise \u00b7 GPS noise 1 mm \u00b7 56053196 \u00b7 2 of 8 requirements failed, 1 not evaluated, 5 met \u00b7 1 of 4 safety rules broken",
+   "title": "1 mm of GPS noise \u00b7 GPS noise 1 mm \u00b7 56053196",
+   "visible": "|",
+   "width": 282
+  },
+  {
+   "aria": null,
+   "checked": "false",
+   "clipped": [],
+   "text": "1 mm noise, 250 mm arrival radius \u00b7 Arrival radius 250 mm \u00b7 GPS noise 1 mm \u00b7 2 conditions \u00b7 50fa92c7",
+   "title": "1 mm noise, 250 mm arrival radius \u00b7 Arrival radius 250 mm \u00b7 GPS noise 1 mm \u00b7 50fa92c7",
+   "visible": "",
+   "width": 397
+  }
+ ],
+ "pills_corridor_first_selected_1024x640": [
+  {
+   "aria": null,
+   "checked": "true",
+   "clipped": [],
+   "text": "Exact GPS \u00b7 default conditions \u00b7 18c64804 \u00b7 all 8 requirements met \u00b7 4 of 4 safety rules held",
+   "title": "Exact GPS \u00b7 default conditions \u00b7 18c64804",
+   "visible": "",
+   "width": 243
+  },
+  {
+   "aria": null,
+   "checked": "false",
+   "clipped": [],
+   "text": "1 mm of GPS noise \u00b7 GPS noise 1 mm \u00b7 1 condition \u00b7 56053196",
+   "title": "1 mm of GPS noise \u00b7 GPS noise 1 mm \u00b7 56053196",
+   "visible": "|",
+   "width": 325
+  },
+  {
+   "aria": null,
+   "checked": "false",
+   "clipped": [],
+   "text": "1 mm noise, 250 mm arrival radius \u00b7 Arrival radius 250 mm \u00b7 GPS noise 1 mm \u00b7 2 conditions \u00b7 50fa92c7",
+   "title": "1 mm noise, 250 mm arrival radius \u00b7 Arrival radius 250 mm \u00b7 GPS noise 1 mm \u00b7 50fa92c7",
+   "visible": "",
+   "width": 397
+  }
+ ],
+ "pills_late_gnss_1024x640": [
+  {
+   "aria": null,
+   "checked": "true",
+   "clipped": [],
+   "text": "Registered: 15 m from 0 s \u00b7 GNSS bias 15 m [0, 40] s \u00b7 de79b813 \u00b7 1 of 6 requirements failed \u00b7 5 of 5 safety rules held",
+   "title": "Registered: 15 m from 0 s \u00b7 GNSS bias 15 m [0, 40] s \u00b7 de79b813",
+   "visible": "",
+   "width": 636
+  },
+  {
+   "aria": null,
+   "checked": "false",
+   "clipped": [],
+   "text": "Later: 9.72 m from 0.02 s \u00b7 GNSS bias 9.72 m [0.02, 40] s \u00b7 1 condition \u00b7 b05e049e",
+   "title": "Later: 9.72 m from 0.02 s \u00b7 GNSS bias 9.72 m [0.02, 40] s \u00b7 b05e049e",
+   "visible": "",
+   "width": 335
+  }
+ ],
+ "plume_before_contact": {
+  "plumeM": 19.97829812562892,
+  "t": 23.1
+ },
+ "plume_past_end": {
+  "run": "de79b813e2617e18",
+  "run_ended_at_s": 30.33836014269004,
+  "state": {
+   "plumeM": 0,
+   "t": 30.33836014269004,
+   "t1": 30.33836014269004,
+   "view": "engineering"
+  }
+ },
+ "replay_verdict": {
+  "cls": "replay-verdict v-held",
+  "colour": "rgb(42, 50, 60)",
+  "text": "EVIDENCE INTEGRITY: VERIFIED THE RUN WAS RECOMPUTED FROM ITS INPUTS AND EVERY CHECK PASSED."
+ },
+ "safety_chip": [
+  {
+   "allMet": [],
+   "chips": [
+    {
+     "border": "color(srgb 0.890196 0.639216 0.231373 / 0.45)",
+     "cls": "vchip v-warn",
+     "colour": "rgb(227, 163, 59)",
+     "text": "MISSION 2 of 6 requirements failed"
+    },
+    {
+     "border": "rgb(42, 50, 60)",
+     "cls": "vchip v-held",
+     "colour": "rgb(228, 233, 239)",
+     "text": "SAFETY RULES No safety rule broken (5 checked)"
+    }
+   ],
+   "clause": null,
+   "failed": [
+    "Vertical speed at contact requirement: limit <= 3 m/s, observed 33.03 m/s",
+    "Horizontal speed at contact requirement: limit <= 1 m/s, observed 1.151 m/s"
+   ],
+   "run": "Baseline: trusts the altimeter",
+   "scope": "Safety rules are judged on the true state throughout the run and are not the mission result: a requirement can fail without any safety rule being broken."
+  },
+  {
+   "allMet": [
+    "Every requirement and safety rule met."
+   ],
+   "chips": [
+    {
+     "border": "color(srgb 0.239216 0.74902 0.596078 / 0.45)",
+     "cls": "vchip v-ok",
+     "colour": "rgb(61, 191, 152)",
+     "text": "MISSION all 6 requirements met"
+    },
+    {
+     "border": "rgb(42, 50, 60)",
+     "cls": "vchip v-held",
+     "colour": "rgb(228, 233, 239)",
+     "text": "SAFETY RULES No safety rule broken (5 checked)"
+    }
+   ],
+   "clause": null,
+   "failed": [],
+   "run": "Robust: cross-checks it",
+   "scope": null
+  }
+ ],
+ "tag": "after"
+}

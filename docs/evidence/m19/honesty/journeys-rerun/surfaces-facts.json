@@ -1,0 +1,318 @@
+{
+ "discover_chips": [
+  {
+   "cls": "dl-chip bad",
+   "text": "\u2715 Refuted"
+  },
+  {
+   "cls": "dl-chip bad",
+   "text": "\u2715 Refuted"
+  },
+  {
+   "cls": "dl-chip held",
+   "text": "\u25c7 Evidence integrity: recomputed"
+  },
+  {
+   "cls": "dl-chip ok",
+   "text": "\u2713 Experimentally supported"
+  },
+  {
+   "cls": "dl-chip ok",
+   "text": "\u2713 Effective, no regression observed"
+  },
+  {
+   "cls": "dl-chip warn",
+   "text": "\u25d0 Effective, residual counterexamples"
+  },
+  {
+   "cls": "dl-chip ok",
+   "text": "\u2713 Necessary"
+  },
+  {
+   "cls": "dl-chip neutral",
+   "text": "\u25cb Not required"
+  },
+  {
+   "cls": "dl-chip ok",
+   "text": "\u2713 Experimentally supported"
+  },
+  {
+   "cls": "dl-chip ok",
+   "text": "\u2713 General 175 of 175 failing pairs fixed"
+  },
+  {
+   "cls": "dl-chip ok",
+   "text": "\u2713 Supported"
+  },
+  {
+   "cls": "dl-chip ok",
+   "text": "\u2713 Effective, no regression observed"
+  },
+  {
+   "cls": "dl-chip warn",
+   "text": "\u25d0 Effective, residual counterexamples"
+  }
+ ],
+ "discover_list": [
+  "Corridor safety under GPS noise 2026-11-24 01:05 UTC \u2715 Refuted \u25c7 Evidence integrity: recomputed"
+ ],
+ "discover_tiles": "EVIDENCE INTEGRITY Recomputed, every check passed 1,761 probes rerun \u00b7 2026-11-24T01:05:18Z CLAIM Refuted A reproduced counterexample breaks the claim beyond its tolerance. MECHANISM exact-arrival \u2713 Experimentally supported MITIGATION arrival-radius-250 \u2713 Effective, no regression observed arrival-radius-10 \u25d0 Effective, residual counterexamples EVIDENCE GRADE Exploratory Simulation, development seeds. Not a confirmation, not a certification.",
+ "errors": [],
+ "exe": "vv-studio.exe",
+ "flight_console_rows": [
+  {
+   "cls": "mc-v v-ok",
+   "state": "met",
+   "text": "R1 Vertical speed at contact met",
+   "title": "Vertical speed at contact: expected <= 3 m/s, observed 2.020072 m/s (decisive instant 23.40 s)"
+  },
+  {
+   "cls": "mc-v v-ok",
+   "state": "met",
+   "text": "R2 Horizontal speed at contact met",
+   "title": "Horizontal speed at contact: expected <= 1 m/s, observed 0.315675 m/s (decisive instant 23.40 s)"
+  },
+  {
+   "cls": "mc-v v-ok",
+   "state": "met",
+   "text": "R3 Tilt at contact met",
+   "title": "Tilt at contact: expected >= 0.9961946981 cos, observed 0.999962 cos (decisive instant 23.40 s)"
+  },
+  {
+   "cls": "mc-v v-ok",
+   "state": "met",
+   "text": "R4 Angular rate at contact met",
+   "title": "Angular rate at contact: expected <= 0.1 rad/s, observed 0.003517 rad/s (decisive instant 23.40 s)"
+  },
+  {
+   "cls": "mc-v v-warn",
+   "state": "failed",
+   "text": "R5 Distance from pad centre failed",
+   "title": "Distance from pad centre: expected <= 10 m, observed 14.417242 m (decisive instant 23.40 s)"
+  },
+  {
+   "cls": "mc-v v-ok",
+   "state": "met",
+   "text": "R6 Propellant margin met",
+   "title": "Propellant margin: expected >= 78.62536290451422 kg, observed 4255.690641 kg (decisive instant 23.40 s)"
+  },
+  {
+   "cls": "mc-v v-held",
+   "state": "held",
+   "text": "S1 Tilt envelope while thrusting held",
+   "title": "Tilt envelope while thrusting: expected >= 0.8660254038 cos, observed 0.986166 cos"
+  },
+  {
+   "cls": "mc-v v-held",
+   "state": "held",
+   "text": "S2 Keep-out radius at contact held",
+   "title": "Keep-out radius at contact: expected <= 50 m, observed 14.417242 m"
+  },
+  {
+   "cls": "mc-v v-held",
+   "state": "held",
+   "text": "S3 Axial load held",
+   "title": "Axial load: expected <= 3 g0, observed 2.264255 g0"
+  },
+  {
+   "cls": "mc-v v-held",
+   "state": "held",
+   "text": "S4 No relight held",
+   "title": "No relight: expected <= 1 ignitions, observed 1.000000 ignitions"
+  },
+  {
+   "cls": "mc-v v-held",
+   "state": "held",
+   "text": "S5 Climb under power held",
+   "title": "Climb under power: expected <= 5 m, observed 0.000000 m"
+  }
+ ],
+ "lab_table_cells": [
+  {
+   "cells": [
+    {
+     "cls": "mono small st-fail",
+     "text": "\u2715 33.03 m/s D margin -30.03 m/s"
+    },
+    {
+     "cls": "mono small st-pass",
+     "text": "\u2713 2.672 m/s D margin +0.3285 m/s"
+    }
+   ],
+   "req": "R1_vertical_speed"
+  },
+  {
+   "cells": [
+    {
+     "cls": "mono small st-fail",
+     "text": "\u2715 1.151 m/s D margin -0.151 m/s"
+    },
+    {
+     "cls": "mono small st-pass",
+     "text": "\u2713 0.2932 m/s D margin +0.7068 m/s"
+    }
+   ],
+   "req": "R2_horizontal_speed"
+  },
+  {
+   "cells": [
+    {
+     "cls": "mono small st-pass",
+     "text": "\u2713 0.5843 \u00b0 D margin +4.416 \u00b0"
+    },
+    {
+     "cls": "mono small st-pass",
+     "text": "\u2713 0.6431 \u00b0 D margin +4.357 \u00b0"
+    }
+   ],
+   "req": "R3_tilt"
+  },
+  {
+   "cells": [
+    {
+     "cls": "mono small st-pass",
+     "text": "\u2713 0.006374 rad/s D margin +0.09363 rad/s"
+    },
+    {
+     "cls": "mono small st-pass",
+     "text": "\u2713 0.003141 rad/s D margin +0.09686 rad/s"
+    }
+   ],
+   "req": "R4_angular_rate"
+  },
+  {
+   "cells": [
+    {
+     "cls": "mono small st-pass",
+     "text": "\u2713 4.745 m D margin +5.255 m"
+    },
+    {
+     "cls": "mono small st-pass",
+     "text": "\u2713 2.923 m D margin +7.077 m"
+    }
+   ],
+   "req": "R5_position"
+  },
+  {
+   "cells": [
+    {
+     "cls": "mono small st-pass",
+     "text": "\u2713 4799 kg D margin +4721 kg"
+    },
+    {
+     "cls": "mono small st-pass",
+     "text": "\u2713 4266 kg D margin +4188 kg"
+    }
+   ],
+   "req": "R6_propellant_margin"
+  },
+  {
+   "cells": [
+    {
+     "cls": "mono small st-held",
+     "text": "\u2713 10.31 \u00b0 D margin +19.69 \u00b0"
+    },
+    {
+     "cls": "mono small st-held",
+     "text": "\u2713 10.25 \u00b0 D margin +19.75 \u00b0"
+    }
+   ],
+   "req": "S1_tilt_envelope"
+  },
+  {
+   "cells": [
+    {
+     "cls": "mono small st-held",
+     "text": "\u2713 4.745 m D margin +45.25 m"
+    },
+    {
+     "cls": "mono small st-held",
+     "text": "\u2713 2.923 m D margin +47.08 m"
+    }
+   ],
+   "req": "S2_keep_out"
+  },
+  {
+   "cells": [
+    {
+     "cls": "mono small st-held",
+     "text": "\u2713 2.196 g0 D margin +0.8037 g0"
+    },
+    {
+     "cls": "mono small st-held",
+     "text": "\u2713 2.294 g0 D margin +0.7059 g0"
+    }
+   ],
+   "req": "S3_axial_load"
+  },
+  {
+   "cells": [
+    {
+     "cls": "mono small st-held",
+     "text": "\u2713 1 ignitions D margin +0 ignitions"
+    },
+    {
+     "cls": "mono small st-held",
+     "text": "\u2713 1 ignitions D margin +0 ignitions"
+    }
+   ],
+   "req": "S4_no_relight"
+  },
+  {
+   "cells": [
+    {
+     "cls": "mono small st-held",
+     "text": "\u2713 0 m D margin +5 m"
+    },
+    {
+     "cls": "mono small st-held",
+     "text": "\u2713 0 m D margin +5 m"
+    }
+   ],
+   "req": "S5_no_powered_ascent"
+  }
+ ],
+ "pill_focus": {
+  "boxShadow": "none",
+  "focusVisible": true,
+  "insideRow": true,
+  "offset": "1px",
+  "outline": "solid 2px rgb(121, 195, 214)",
+  "text": "Exact GPS \u00b7 default conditions \u00b7 966af379"
+ },
+ "runs_page_cells": [
+  {
+   "cls": "cell v-fail",
+   "text": "Reached the ground, requirements not met"
+  },
+  {
+   "cls": "cell v-held",
+   "text": "None broken"
+  },
+  {
+   "cls": "cell v-pass",
+   "text": "Landed"
+  },
+  {
+   "cls": "cell v-held",
+   "text": "None broken"
+  },
+  {
+   "cls": "cell v-fail",
+   "text": "Reached the ground, requirements not met"
+  },
+  {
+   "cls": "cell v-held",
+   "text": "None broken"
+  },
+  {
+   "cls": "cell v-fail",
+   "text": "Reached the ground, requirements not met"
+  },
+  {
+   "cls": "cell v-held",
+   "text": "None broken"
+  }
+ ],
+ "runs_page_rows": 4
+}

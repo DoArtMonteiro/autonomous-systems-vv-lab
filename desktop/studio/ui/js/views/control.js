@@ -22,7 +22,7 @@ const SEVERITY = {
 };
 const VSTATE = {
   pending: { word: 'pending', tone: 'neutral' }, met: { word: 'met', tone: 'ok' }, failed: { word: 'failed', tone: 'warn' },
-  holding: { word: 'holding', tone: 'neutral' }, held: { word: 'held', tone: 'ok' }, violated: { word: 'violated', tone: 'bad' },
+  holding: { word: 'holding', tone: 'neutral' }, held: { word: 'held', tone: 'held' }, violated: { word: 'violated', tone: 'bad' },
   'not-evaluated': { word: 'not evaluated', tone: 'neutral' },
 };
 

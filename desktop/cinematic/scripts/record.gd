@@ -331,6 +331,23 @@ func entity_value(e: Dictionary, name: String, t: float) -> Variant:
 	return sample_arr(e["times"], e["ch"][name], t)
 
 
+# A metric of the record by id (the verifier's own number, for example the speed at contact), or null.
+func metric(id: String) -> Variant:
+	var ms = data.get("metrics", [])
+	if typeof(ms) != TYPE_ARRAY:
+		return null
+	for m in ms:
+		if typeof(m) == TYPE_DICTIONARY and str(m.get("id", "")) == id and (typeof(m.get("value")) == TYPE_FLOAT or typeof(m.get("value")) == TYPE_INT):
+			return float(m["value"])
+	return null
+
+
+# True when the record states a ground contact (a landing: its scene has a touchdown block).
+func has_contact() -> bool:
+	var sc = data.get("scene", {})
+	return typeof(sc) == TYPE_DICTIONARY and sc.get("touchdown") != null
+
+
 func t0() -> float:
 	return times[0]
 

@@ -1,0 +1,20 @@
+PASS the safety chip beside failed requirements is neutral, not green
+PASS the failed mission chip keeps its failure class
+PASS no 'Every requirement' sentence beside a failed requirement
+PASS the plume is not drawn after the last sample
+PASS the plume is still drawn just before the contact
+PASS the failed mission completion says what the record says and does not say
+PASS the goal distance readout says it is not completion
+PASS 1024x640: no pill has clipped text
+PASS 1024x640: an unselected pill gives an exact count of conditions
+PASS 1024x640: the tooltip of every pill has the whole identity
+PASS the Library cell 'None broken' is neutral, never the green class
+PASS the Safety rules section of the run workspace has held rows and no green row
+PASS the Compare matrix has held (neutral) safety cells
+PASS the Lab verdict pills for safety are held
+PASS the safety scope sentence sits in the run's result next to the chip
+PASS the jump button names the instant
+PASS the Compare banner carries the gloss on words about safety
+PASS the ground HUD keeps To goal and Confidence at 1024x640
+PASS the replay verdict is evidence integrity, neutral
+PASS no script error

@@ -151,10 +151,13 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width
 .v-unsafe .glyph, .glyph.v-unsafe { background: var(--unsafe-wash); color: var(--unsafe); border-radius: 3px; }
 .v-partial .glyph, .glyph.v-partial { background: var(--fail-wash); color: var(--fail); }
 .v-neutral .glyph, .glyph.v-neutral { background: var(--neutral-wash); color: var(--neutral); }
+/* A safety rule that held: outlined, neutral, a shield. Green is kept for a requirement that was met. */
+.v-held .glyph, .glyph.v-held { background: transparent; color: var(--fg-2); box-shadow: inset 0 0 0 1px var(--rule-strong); }
 .v-pass-text { color: var(--pass); }
 .v-fail-text { color: var(--fail); }
 .v-unsafe-text { color: var(--unsafe); }
 .v-neutral-text { color: var(--neutral); }
+.v-held-text { color: var(--fg-1); }
 .v-partial-text { color: var(--fail); }
 
 .kind-badge { display: inline-grid; place-items: center; width: 15px; height: 15px; font: 600 12px/1 var(--mono); border: 1px solid var(--rule-strong); border-radius: 2px; color: var(--fg-3); flex: none; }
@@ -270,6 +273,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width
 .verdict.v-unsafe::before { background: var(--unsafe); }
 .verdict.v-unsafe { background: linear-gradient(90deg, var(--unsafe-wash), transparent 70%); }
 .verdict.v-neutral::before { background: var(--neutral); }
+.verdict.v-held::before { background: var(--fg-3); }
 .verdict-k { font: 600 12px/1.2 var(--sans); text-transform: uppercase; letter-spacing: .08em; color: var(--fg-3); margin-bottom: 4px; }
 .verdict-v { display: flex; align-items: center; gap: 8px; font: 600 16px/1.2 var(--display); }
 .verdict-v .glyph { width: 20px; height: 20px; }
@@ -391,6 +395,7 @@ span.req-t { border-color: transparent; color: var(--fg-3); cursor: default; }
 .cmds code { display: block; background: var(--bg-2); border: 1px solid var(--rule); border-radius: var(--r); padding: 5px 8px; overflow-wrap: anywhere; font-size: 12px; }
 .replay-verdict { display: flex; gap: 8px; align-items: center; padding: 8px 10px; border-radius: var(--r); border: 1px solid var(--rule); }
 .replay-verdict.v-pass { border-color: var(--pass); background: var(--pass-wash); }
+.replay-verdict.v-held { border-color: var(--rule-strong); background: transparent; }
 .replay-verdict.v-unsafe { border-color: var(--unsafe); background: var(--unsafe-wash); }
 .replay-verdict.v-partial { border-color: var(--fail); background: var(--fail-wash); }
 .replay-reeval { margin: 6px 0 0; padding: 6px 10px; border-left: 3px solid var(--fail); background: var(--fail-wash); font-size: 13px; }

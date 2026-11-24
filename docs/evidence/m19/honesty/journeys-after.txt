@@ -1,0 +1,10 @@
+Journeys of the older Studio suites, run against a Studio built from this worktree (copy named vv-studio-m191-after.exe, scratch library and configuration; the WebView2 profile was NOT redirected, see the report).
+Counts from the final line of each run:
+m15_journeys: 48 of 48 checks passed
+ux_journeys (--no-cinematic): 67/67 checks passed
+ux2: 90/90 checks passed
+m18: 72/72 checks passed
+m17lab: 34/34 checks passed
+m16: 78 of 78 checks passed
+smoke: 80 of 80 checks passed
+Note: ux_journeys and m17_lab_journeys first stopped on a console encoding error while printing an arrow (cp1252); both were repeated with PYTHONIOENCODING=utf-8 and passed.

@@ -7,7 +7,7 @@ import * as THREE from '../../vendor/three/three.module.min.js';
 import { OrbitControls } from '../../vendor/three/OrbitControls.js';
 import { h, clear, lowerIndex, sampleAt, num, timeText } from '../dom.js';
 import { cssVar } from '../charts.js';
-import { runDash } from '../model.js';
+import { runDash, plumeLengthAt } from '../model.js';
 import { Plot2D, polyline, extent } from './plot2d.js';
 
 const BODY_LENGTH = 40; // illustration only
@@ -282,9 +282,8 @@ export class Rocket3D {
     } else q.copy(qa.normalize());
     if (nx !== null && ny !== null && nz !== null) this.vehicle.position.set(nx, ny, nz);
     this.vehicle.quaternion.copy(q);
-    const thr = ch.throttle ? ch.throttle[i] : null;
-    const on = ch.engine ? ch.engine[i] === 1 : thr > 0;
-    const len = on && thr ? 6 + 22 * thr : 0;
+    // No plume after the last sample (see plumeLengthAt).
+    const len = plumeLengthAt(ch, t);
     this.plumeLength = len;
     this.plume.visible = len > 0;
     this.plume.scale.set(len || 1, 1, 1);

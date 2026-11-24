@@ -1,7 +1,7 @@
 // Generic reading of a vv-run.v1 record. Nothing here knows a domain: channels, timebases, events and
 // requirements are taken from the record itself (never from the catalog, which may list fewer).
 
-import { words, num } from './dom.js';
+import { words, num, lowerIndex } from './dom.js';
 
 export const KINDS = ['truth', 'observation', 'estimate', 'uncertainty', 'command', 'metric', 'limit'];
 export const KIND_LETTER = { truth: 'T', observation: 'O', estimate: 'E', uncertainty: 'U', command: 'C', metric: 'M', limit: 'L' };
@@ -82,14 +82,36 @@ export function verdictOfOutcome(status) {
   return { success: 'pass', partial: 'partial', failure: 'fail' }[status] || 'neutral';
 }
 
+/** A rule that held is `held`: a neutral tone of its own, never the green `pass` of a requirement that was met. */
 export function verdictOfSafety(status) {
-  return status === 'safe' ? 'pass' : status === 'unsafe' ? 'unsafe' : 'neutral';
+  return status === 'safe' ? 'held' : status === 'unsafe' ? 'unsafe' : 'neutral';
 }
 
 export function verdictOfRequirement(r) {
-  if (r.status === 'pass') return 'pass';
+  // A safety rule that held is `held` (neutral); `pass` (green) is for a requirement that was met.
+  if (r.status === 'pass') return r.category === 'invariant' ? 'held' : 'pass';
   if (r.status === 'fail') return r.category === 'invariant' ? 'unsafe' : 'fail';
   return 'neutral';
+}
+
+/**
+ * Plume length in metres at time t from the recorded channels {times, throttle, engine}: 6 + 22 times the applied
+ * throttle while the engine is on. The record ends at its last sample (the contact, for a landing). The playback of a
+ * longer run goes on and the stage stays where it ended, but the record says nothing about the engine after that
+ * sample, so no plume is drawn.
+ */
+export function plumeLengthAt(ch, t) {
+  const times = ch.times || [];
+  if (!times.length || t > times[times.length - 1] + 1e-9) return 0;
+  const i = lowerIndex(times, t);
+  const thr = ch.throttle ? ch.throttle[i] : null;
+  const on = ch.engine ? ch.engine[i] === 1 : thr > 0;
+  return on && thr ? 6 + 22 * thr : 0;
+}
+
+/** The status of a row as a CSS class suffix: a safety rule that held is `held`, every other row keeps its status. */
+export function statusClassOf(r) {
+  return verdictOfRequirement(r) === 'held' ? 'held' : r.status;
 }
 
 export const STATUS_TEXT = { pass: 'Pass', fail: 'Fail', not_evaluated: 'Not evaluated' };
@@ -126,6 +148,12 @@ export function conditionParts(req, catalog) {
 export function conditionsName(req, catalog) {
   const parts = conditionParts(req, catalog);
   return parts.length ? parts.map((p) => p.text).join(' · ') : 'default conditions';
+}
+
+/** How many conditions a run has beyond the defaults, as words ("default conditions", "2 conditions"): exact, for a place too narrow for the list. */
+export function conditionsBrief(req, catalog) {
+  const n = conditionParts(req, catalog).length;
+  return n === 0 ? 'default conditions' : `${n} condition${n === 1 ? '' : 's'}`;
 }
 
 /** What the runs share and what tells them apart: {shared: [text], differ: [label], text}. */

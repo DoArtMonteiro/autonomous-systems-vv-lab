@@ -140,7 +140,9 @@ export function reqLabel(r) {
  * many broke, never a bare "safe". Only evaluated invariants are counted (a rule the run never judged
  * is neither checked nor passed), a broken rule is looked at before anything else so it never reads as
  * neutral, and no count is written that the record's own rows do not give. `verdict` is the glyph
- * class (pass, unsafe or neutral).
+ * class: `unsafe`, `neutral` or `held`. "No safety rule broken" is never `pass`: that class is green and belongs to
+ * a requirement that was met, while a rule that held is a bounded statement (judged on the true state, only the
+ * rules the domain lists) and is drawn in a neutral tone of its own, so it never reads as the outcome of the mission.
  */
 export function safetyWording(record) {
   const inv = (record.requirements || []).filter((q) => q.category === 'invariant');
@@ -156,9 +158,9 @@ export function safetyWording(record) {
   }
   const unjudged = (record.safety.status === 'safe' && record.safety.class === 'not_evaluated') || (inv.length > 0 && judged.length === 0);
   if (unjudged) return { ...base, text: 'Safety not evaluated', heldText: 'safety not evaluated', verdict: 'neutral', unjudged: true };
-  if (!inv.length) return { ...base, text: 'No safety rule broken', heldText: 'no safety rule broken', verdict: 'pass', unjudged: false };
+  if (!inv.length) return { ...base, text: 'No safety rule broken', heldText: 'no safety rule broken', verdict: 'held', unjudged: false };
   const count = notEvaluated ? `${judged.length} of ${inv.length} checked; ${notEvaluated} not evaluated` : `${judged.length} checked`;
-  return { ...base, text: `No safety rule broken (${count})`, heldText: held, verdict: 'pass', unjudged: false };
+  return { ...base, text: `No safety rule broken (${count})`, heldText: held, verdict: 'held', unjudged: false };
 }
 
 /**
@@ -184,6 +186,49 @@ export function requirementWording(record) {
   return `${failed} of ${m.length} requirements failed${unknown ? `, ${unknown} not evaluated, ${met} met` : ''}`;
 }
 
+/**
+ * The sentence for a record in which no row failed: "Every requirement met." only when every row of those
+ * categories passed. A row that was not evaluated is neither met nor failed, so it is named instead of being counted
+ * as met; a record with no row of the category says so. `categories` is ['requirement'] or ['requirement', 'invariant'].
+ */
+export function noFailureSentence(record, categories) {
+  const rows = (record.requirements || []).filter((q) => categories.includes(q.category));
+  const what = categories.length === 1 ? 'requirement' : 'requirement and safety rule';
+  if (!rows.length) return `The record lists no ${what}.`;
+  const unknown = rows.filter((q) => q.status !== 'pass' && q.status !== 'fail');
+  if (!unknown.length) return `Every ${what} met.`;
+  const kind = (q) => (q.category === 'invariant' ? 'safety rule' : 'requirement');
+  return `No ${what.replace(' and ', ' or ')} failed, but ${unknown.length} ${unknown.length === 1 ? 'was' : 'were'} not evaluated: ${unknown.map((q) => `${plainName(q)} (${kind(q)})`).join(', ')}.`;
+}
+
+/**
+ * What the record says about a failed ground-vehicle "Mission completion" row, and what it leaves out. The row's
+ * observed text reads "<outcome code>; <n> of <m> waypoint(s) reached; <d> mm from the goal at the end". The record
+ * does not name the clause of the requirement that failed (waypoints reached, confirmed on the true position, no
+ * stall), so when every waypoint was reached the sentence says so instead of leaving a distance of 0 mm to read as
+ * a completed mission. Null when the row is absent, did not fail, or its text has another shape.
+ */
+export function completionFacts(record) {
+  const q = (record.requirements || []).find((x) => x.id === 'mission_completion' && x.status === 'fail');
+  const m = q && /^\s*([a-z_]+);\s*(\d+) of (\d+) waypoint\(s\) reached;\s*(-?\d+(?:\.\d+)?) mm from the goal at the end/.exec(q.observed || '');
+  if (!m) return null;
+  const [, code, done, total, mm] = m;
+  const all = done === total;
+  const goal = `${fmtSig(Number(mm))} mm from the goal at the end`;
+  const recorded = `Recorded: ${done} of ${total} waypoint${total === '1' ? '' : 's'} reached, ${goal}, outcome ${code}.`;
+  const gap = all && code !== 'stalled'
+    ? ` The record does not say which part of "${q.label}" failed (it expects ${q.expected}). Reaching the goal is not the same as completing the mission.`
+    : '';
+  return { allReached: all, code, text: `${recorded}${gap}` };
+}
+
+/** The tone of the Mission chip from the statuses of the mission requirement rows: fail, neutral (none listed or one not evaluated) or pass. */
+export function missionTone(record) {
+  const rows = (record.requirements || []).filter((q) => q.category === 'requirement');
+  if (rows.some((q) => q.status === 'fail')) return 'fail';
+  return rows.length && rows.every((q) => q.status === 'pass') ? 'pass' : 'neutral';
+}
+
 /** The combined status, failure first, with the two kinds of verdict kept apart: "2 of 6 requirements failed · 5 of 5 safety rules held". */
 export function statusLine(record) {
   return [requirementWording(record), safetyWording(record).heldText].filter(Boolean).join(' · ');
@@ -193,6 +238,17 @@ export function statusLine(record) {
 export const DERIVED_NOTE = 'D: derived by Studio from the recorded values (the limit minus the observed value, or a cosine shown as an angle). A margin without D is the one the domain publishes.';
 
 export const SAFETY_NOTE = 'Safety rules are judged on the true state throughout the run. Mission requirements are judged separately: a requirement can fail without any safety rule being broken.';
+
+/** Said next to the safety chip of a run that failed a requirement: the scope of "no safety rule broken". */
+export const SAFETY_SCOPE = 'Safety rules are judged on the true state throughout the run and are not the mission result: a requirement can fail without any safety rule being broken.';
+
+/** Said under a demonstration text written by a domain, whose words about safety mean only that no safety rule was broken. */
+const EXPECTATION_GLOSS = '"safe" here means only that no safety rule was broken, and "unsafe" that one was; requirements are separate verdicts.';
+
+/** The gloss for a domain's demonstration text, or null when the text says nothing about safety. */
+export function expectationGloss(text) {
+  return new RegExp('\\b(safe|unsafe|safety)\\b', 'i').test(String(text || '')) ? EXPECTATION_GLOSS : null;
+}
 
 /** The name of a requirement for people: the label, never the id ("R1_vertical_speed"). */
 export function plainName(q) {

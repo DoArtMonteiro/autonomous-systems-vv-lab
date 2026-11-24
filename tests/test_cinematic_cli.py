@@ -6,6 +6,7 @@ Needs Godot 4.7.2: set VV_GODOT to the console executable; without it the tests 
 import json
 import os
 import subprocess
+import tempfile
 import unittest
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -138,6 +139,65 @@ class DisplayArguments(unittest.TestCase):
         self.assertEqual(self.run_with("--seed", "-1").returncode, 2)
         self.assertEqual(self.run_with("--seed", "five").returncode, 2)
         self.assertEqual(self.run_with("--seed", "1" * 19).returncode, 2)
+
+
+ASCENT = os.path.join(REPO, "tests", "fixtures", "cinematic", "ascent-run")
+
+
+class HonestPanels(unittest.TestCase):
+    """M19.1: what the Cinematic View's panels say about the end of a run. The 0.18.1 panel of a launch did not say that the
+    booster's impact is not modelled, and the landing readout showed the last sample's speed as if it were the contact speed."""
+
+    def setUp(self):
+        self.godot = os.environ.get("VV_GODOT", "")
+        if not self.godot or not os.path.isfile(self.godot):
+            self.skipTest("VV_GODOT is not set to a Godot 4.7.2 console executable")
+
+    def policy(self, run):
+        out = subprocess.run([self.godot, "--headless", "--path", PROJECT, "--", "--run", run, "--policy-dump"],
+                             capture_output=True, text=True, timeout=120, encoding="utf-8", errors="replace")
+        self.assertEqual(out.returncode, 0, out.stderr[-500:])
+        line = next(ln for ln in out.stdout.splitlines() if ln.startswith("POLICY "))
+        return json.loads(line[len("POLICY "):])
+
+    def test_the_launch_panel_says_the_booster_impact_is_not_modelled(self):
+        verdict = self.policy(ASCENT)["verdict"]
+        self.assertIn("Booster impact: its recorded path ends at the surface (t 617.2 s).", verdict)
+        self.assertIn("The impact itself is not modelled and nothing is drawn for it", verdict)
+        self.assertIn("no landing burn, break-up or recovery is simulated", verdict)
+        # verified in ascent.gd and record.gd: a node is visible only while entity_active (t within its first and last sample)
+        self.assertIn("vehicle is not drawn after its last sample (its recorded path line stays)", verdict)
+        # the landing sentence is about a stage drawn at its contact and does not belong to a launch
+        self.assertNotIn("the stage is drawn intact", verdict)
+        self.assertNotIn("Booster impact", self.policy(RUN)["verdict"])
+
+    def test_the_landing_readout_at_the_end_does_not_pass_the_last_sample_off_as_a_contact_speed(self):
+        d = self.policy(RUN)
+        end = d["readout_end"]["readout"]
+        self.assertIn("ground contact, end of the record", end)
+        self.assertNotRegex(end, r"-0\.0")
+        # this fixture carries no touchdown metric: the line says so and names the number as the last sample's
+        self.assertIn("the record has no contact speed; speed of the last sample:", end)
+        self.assertIn("(the last one, not a contact measurement)", d["readout_end"]["sample"])
+        # before the end the readout is the plain recorded sample
+        before = d["readout_before_end"]["readout"]
+        self.assertRegex(before, r"altitude [\d.]+ m   speed [\d.]+ m/s   throttle \d+ %")
+        self.assertNotIn("ground contact", before)
+
+    def test_with_the_verifier_speeds_the_end_readout_shows_them_and_names_them(self):
+        with open(os.path.join(RUN, "record.json"), encoding="utf-8") as f:
+            rec = json.load(f)
+        rec["metrics"] = rec.get("metrics", []) + [
+            {"id": "touchdown_vertical_speed", "label": "Vertical speed at contact", "value": 2.6745, "unit": "m/s"},
+            {"id": "touchdown_horizontal_speed", "label": "Horizontal speed at contact", "value": 0.2912, "unit": "m/s"}]
+        with tempfile.TemporaryDirectory() as tmp:
+            with open(os.path.join(tmp, "record.json"), "w", encoding="utf-8") as f:
+                json.dump(rec, f)
+            d = self.policy(tmp)
+        end = d["readout_end"]["readout"]
+        self.assertIn("at contact, the verifier's values: descent 2.7 m/s, horizontal 0.3 m/s", end)
+        self.assertNotIn("speed of the last sample", end)
+        self.assertIn("speeds: the verifier's, at the contact", d["readout_end"]["sample"])
 
 
 if __name__ == "__main__":
