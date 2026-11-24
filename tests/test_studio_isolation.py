@@ -319,6 +319,57 @@ class NetworkPathsAndDocuments(unittest.TestCase):
         with self.assertRaises(sl.IsolationError):
             plan({"VVLAB_CONFIG": rf"\\?\{LOCAL}\{RELEASE}\x"})
 
+    def test_device_paths_that_do_not_continue_with_a_drive_letter_are_refused(self):
+        for value in (
+            r"\\?\Volume{01234567-89ab-cdef-0123-456789abcdef}\FakeUser\AppData\Local\org.vvlab.studio",
+            r"\\?\GLOBALROOT\Device\HarddiskVolume3\FakeUser",
+            r"\\.\PhysicalDrive0",
+            r"\\.\GLOBALROOT\Device\x",
+            r"\\?\Global\C:\x",
+        ):
+            with self.subTest(value=value):
+                with self.assertRaises(sl.IsolationError):
+                    sl.normalise(value)
+                with self.assertRaises(sl.IsolationError):
+                    plan({"VVLAB_LIBRARY": value})
+        self.assertEqual(sl.normalise("\\\\?\\C:"), "c:")
+
+    @unittest.skipUnless(os.name == "nt", "the Windows known folder exists only on Windows")
+    def test_documents_folders_include_the_real_known_folder(self):
+        import subprocess
+
+        real = subprocess.run(["powershell", "-NoProfile", "-Command", "[Environment]::GetFolderPath('MyDocuments')"],
+                              capture_output=True, text=True).stdout.strip()
+        self.assertTrue(real, "PowerShell reports the Documents folder")
+        self.assertEqual(sl.known_documents_folder(), real)
+        self.assertIn(sl.normalise(real), [sl.normalise(d) for d in sl.documents_folders()])
+        self.assertIn(sl.normalise(os.path.join(real, sl.LIBRARY_FOLDER)), [sl.normalise(r) for r in sl.protected_roots(LOCAL, ROAM, sl.documents_folders())])
+
+    def test_the_known_folder_guid_is_encoded_as_a_windows_guid(self):
+        import uuid
+
+        self.assertEqual(sl.FOLDERID_DOCUMENTS, "FDD39AD0-238F-46AF-ADB4-6C85480369C7")
+        self.assertEqual(uuid.UUID(sl.FOLDERID_DOCUMENTS).bytes_le.hex().upper(), "D09AD3FD8F23AF46ADB46C85480369C7")
+
+    @unittest.skipUnless(os.name == "nt", "the Windows known folder exists only on Windows")
+    def test_a_failed_known_folder_call_is_visible(self):
+        import warnings
+        from unittest import mock
+
+        with mock.patch("ctypes.windll") as windll:
+            windll.shell32.SHGetKnownFolderPath.return_value = -2147024809  # E_INVALIDARG
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                self.assertIsNone(sl.known_documents_folder())
+        self.assertTrue([w for w in caught if issubclass(w.category, RuntimeWarning) and "Documents" in str(w.message)])
+
+    def test_no_known_documents_folder_at_all_refuses(self):
+        from unittest import mock
+
+        with mock.patch.object(sl, "known_documents_folder", return_value=None), mock.patch.dict("os.environ", {}, clear=True):
+            with self.assertRaises(sl.IsolationError):
+                sl.documents_folders()
+
     def test_every_given_documents_folder_protects_its_library(self):
         redirected = r"D:\Redirected\Documents"
         for documents in ([DOCS, redirected], (DOCS, redirected)):
@@ -377,16 +428,72 @@ def _dotted(node) -> str:
 
 
 SPAWNERS = {"subprocess.Popen", "subprocess.run", "subprocess.call", "subprocess.check_call", "subprocess.check_output",
+            "subprocess.getoutput", "subprocess.getstatusoutput",
             "os.system", "os.startfile", "os.popen", "asyncio.create_subprocess_exec", "asyncio.create_subprocess_shell"}
-ALWAYS_FORBIDDEN = {"subprocess.Popen", "os.system", "os.startfile", "os.popen",
-                    "asyncio.create_subprocess_exec", "asyncio.create_subprocess_shell"}
+ALWAYS_FORBIDDEN = {"subprocess.Popen", "subprocess.getoutput", "subprocess.getstatusoutput", "os.system", "os.startfile", "os.popen",
+                    "asyncio.create_subprocess_exec", "asyncio.create_subprocess_shell",
+                    "importlib.import_module", "exec", "eval", "compile"}
+NATIVE_LAUNCHERS = re.compile(r"ShellExecute|CreateProcess|WinExec")
+# PowerShell text that could start or run something else: the command must be a literal without these.
+POWERSHELL_FORBIDDEN = ("&", "Invoke-Item", "Start-Process", "Invoke-Expression", "iex ", "Invoke-Command", "Stop-Process")
 
 
-def _allowed_spawn(call) -> str | None:
+# This lint guards against accidents (a script, or an agent writing one, that launches the wrong
+# executable by habit), not against an adversary: code can always be written that no syntax check sees.
+
+
+def _module_facts(tree):
+    """Assignments and function bodies of a script, to resolve the name of a PowerShell command."""
+    assigns, defs = {}, {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            for t in node.targets:
+                if isinstance(t, ast.Name):
+                    assigns.setdefault(t.id, []).append(node.value)
+        elif isinstance(node, ast.FunctionDef):
+            defs[node.name] = [r.value for r in ast.walk(node) if isinstance(r, ast.Return) and r.value is not None]
+    return assigns, defs
+
+
+def _literal_text(node, facts, depth=0):
+    """The literal text pieces of a command expression, or None when any part is not a literal:
+    string constants, f-strings (their fixed parts), concatenations, names assigned only such values,
+    and calls to local functions that return such values."""
+    assigns, defs = facts
+    if depth > 5:
+        return None
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return [node.value]
+    if isinstance(node, ast.JoinedStr):
+        return [v.value for v in node.values if isinstance(v, ast.Constant)]
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        left, right = _literal_text(node.left, facts, depth + 1), _literal_text(node.right, facts, depth + 1)
+        return None if left is None or right is None else left + right
+    if isinstance(node, ast.Name) and node.id in assigns:
+        out = []
+        for value in assigns[node.id]:
+            part = _literal_text(value, facts, depth + 1)
+            if part is None:
+                return None
+            out += part
+        return out
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in defs and defs[node.func.id]:
+        out = []
+        for value in defs[node.func.id]:
+            part = _literal_text(value, facts, depth + 1)
+            if part is None:
+                return None
+            out += part
+        return out
+    return None
+
+
+def _allowed_spawn(call, facts) -> str | None:
     """The reason a subprocess call in a UI test script is allowed, or None. The allowlist is closed:
     a call that is not one of these four shapes is a violation, whatever it runs.
       1. taskkill /F /PID <pid>: ends one process by its PID.
-      2. powershell with a fixed command line (the script text is checked by the text rules).
+      2. powershell with a literal command (-Command) containing none of POWERSHELL_FORBIDDEN, or -File
+         with a script named *.ps1 (the file itself is covered by the text rules).
       3. tasklist, a read-only listing.
       4. `[console] + args + [...]`: the Cinematic module's own console executable (Godot), not a Studio.
     """
@@ -399,7 +506,17 @@ def _allowed_spawn(call) -> str | None:
         if head == "taskkill" and consts[1:3] == ["/F", "/PID"]:
             return "taskkill by PID"
         if head == "powershell" and consts[1:2] == ["-NoProfile"]:
-            return "powershell, fixed command line"
+            flags = [i for i, e in enumerate(first.elts) if isinstance(e, ast.Constant) and e.value in ("-Command", "-File")]
+            if len(flags) == 1 and flags[0] + 1 < len(first.elts):
+                target = first.elts[flags[0] + 1]
+                if first.elts[flags[0]].value == "-Command":
+                    pieces = _literal_text(target, facts)
+                    if pieces is not None and not any(bad.lower() in "".join(pieces).lower() for bad in POWERSHELL_FORBIDDEN):
+                        return "powershell, literal command"
+                else:
+                    script = [ast.unparse(v) for v in facts[0].get(target.id, [])] if isinstance(target, ast.Name) else [ast.unparse(target)]
+                    if script and all(".ps1" in x for x in script):
+                        return "powershell, script file"
         if head == "tasklist":
             return "read-only listing"
     if (isinstance(first, ast.BinOp) and isinstance(first.left, ast.BinOp) and isinstance(first.left.left, ast.List)
@@ -411,23 +528,26 @@ def _allowed_spawn(call) -> str | None:
 def launch_violations(source: str) -> list[str]:
     """Ways a UI test script could start a Studio, or end a process, outside the helper."""
     tree = ast.parse(source)
+    facts = _module_facts(tree)
     found = []
     for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.module in ("subprocess", "os", "asyncio"):
+        if isinstance(node, ast.ImportFrom) and node.module in ("subprocess", "os", "asyncio", "importlib", "ctypes"):
             for alias in node.names:
-                if f"{node.module}.{alias.name}" in SPAWNERS or alias.name.startswith(("spawn", "exec")):
+                if f"{node.module}.{alias.name}" in SPAWNERS | ALWAYS_FORBIDDEN or alias.name.startswith(("spawn", "exec")) or NATIVE_LAUNCHERS.search(alias.name):
                     found.append(f"line {node.lineno}: imports {node.module}.{alias.name} by name")
         if isinstance(node, ast.Import):
             for alias in node.names:
-                if alias.name in ("subprocess", "os", "asyncio") and alias.asname:
+                if alias.name in ("subprocess", "os", "asyncio", "importlib", "ctypes") and alias.asname:
                     found.append(f"line {node.lineno}: aliases {alias.name}")
         if isinstance(node, (ast.Assign, ast.AnnAssign)) and node.value is not None:
             value = _dotted(node.value)
-            if value in SPAWNERS or value.endswith("Popen") or re.match(r"os\.(spawn|exec)", value):
+            if value in SPAWNERS or value.endswith("Popen") or re.match(r"os\.(spawn|exec)", value) or NATIVE_LAUNCHERS.search(value):
                 found.append(f"line {node.lineno}: {value} bound to a name")
+        if isinstance(node, ast.Attribute) and NATIVE_LAUNCHERS.search(node.attr):
+            found.append(f"line {node.lineno}: native launcher {node.attr}")
     for call in _calls(tree):
         name = _dotted(call.func)
-        if name == "getattr" and call.args and _dotted(call.args[0]) in ("subprocess", "os", "asyncio"):
+        if name == "getattr" and call.args and _dotted(call.args[0]) in ("subprocess", "os", "asyncio", "importlib", "ctypes"):
             found.append(f"line {call.lineno}: getattr on {_dotted(call.args[0])}")
         if name == "__import__":
             found.append(f"line {call.lineno}: __import__")
@@ -438,7 +558,7 @@ def launch_violations(source: str) -> list[str]:
                 found.append(f"line {call.lineno}: shell=True")
         if name in ALWAYS_FORBIDDEN or name.endswith("Popen") or re.match(r"os\.(spawn|exec)", name):
             found.append(f"line {call.lineno}: {name} outside the helper")
-        elif name in SPAWNERS and _allowed_spawn(call) is None:
+        elif name in SPAWNERS and _allowed_spawn(call, facts) is None:
             found.append(f"line {call.lineno}: {name}({ast.unparse(call.args[0])[:60] if call.args else ''}) is not on the allowlist")
     return found
 
@@ -507,13 +627,29 @@ class LaunchDiscipline(unittest.TestCase):
             "import subprocess as sp\nsp.run(['x'])\n",
             "import os\nos.startfile(exe)\n",
             "import studio_launch\nstudio_launch.launch(exe, env, 1, allow_release=True)\n",
+            "import subprocess\nsubprocess.getoutput(cmd)\n",
+            "import subprocess\nsubprocess.getstatusoutput('x')\n",
+            "import importlib\nimportlib.import_module('subprocess').run(['x'])\n",
+            "exec(code)\n",
+            "eval(code)\n",
+            "import ctypes\nctypes.windll.shell32.ShellExecuteW(0, 'open', exe, None, None, 1)\n",
+            "from ctypes import windll\nwindll.shell32.ShellExecuteW\n",
+            "import subprocess\nsubprocess.run(['powershell', '-NoProfile', '-Command', cmd])\n",
+            "import subprocess\nsubprocess.run(['powershell', '-NoProfile', '-Command', 'Start-Process vv-studio.exe'])\n",
+            "import subprocess\nsubprocess.run(['powershell', '-NoProfile', '-Command', '& $exe'])\n",
+            "import subprocess\nsubprocess.run(['powershell', '-NoProfile', '-Command', 'Invoke-Item x'])\n",
+            "import subprocess\nps = 'ok'\nps = ps + '; & x'\nsubprocess.run(['powershell', '-NoProfile', '-Command', ps])\n",
+            "import subprocess\nsubprocess.run(['powershell', '-NoProfile', '-File', script])\n",
         ]
         for src in bad:
             with self.subTest(src=src):
                 self.assertTrue(launch_violations(src), src)
         good = [
             "import subprocess\nsubprocess.run(['taskkill', '/F', '/PID', str(pid)], capture_output=True)\n",
-            "import subprocess\nsubprocess.run(['powershell', '-NoProfile', '-Command', ps])\n",
+            "import subprocess\nps = 'Get-Date'\nsubprocess.run(['powershell', '-NoProfile', '-Command', ps])\n",
+            "import subprocess\npid = 1\nsubprocess.run(['powershell', '-NoProfile', '-Command', f\"Get-Process -Id {pid}\"])\n",
+            "import subprocess\ndef tree(x):\n    return 'Get-CimInstance Win32_Process'\nsubprocess.run(['powershell', '-NoProfile', '-Command', tree(1) + '; 1'])\n",
+            "import subprocess\nscript = os.path.join(d, 'x.ps1')\nsubprocess.run(['powershell', '-NoProfile', '-File', script])\n",
             "import subprocess\nsubprocess.run(['tasklist', '/FO', 'CSV', '/NH'], capture_output=True)\n",
             "import subprocess\nsubprocess.run([console] + args + ['--t', '1'])\n",
             "import studio_launch\nproc = studio_launch.launch(exe, env, 1, allow_release=a.owner_allow_release_exe)\n",

@@ -35,6 +35,7 @@ import subprocess
 import tempfile
 import time
 import urllib.request
+import warnings
 
 RELEASE_IDENTIFIER = "org.vvlab.studio"
 DEV_IDENTIFIER = "org.vvlab.devstudio"
@@ -69,16 +70,17 @@ def _expand(value, environ):
 
 def normalise(path, environ=None):
     """A comparable form of a Windows path: absolute, real, lower case, single backslashes, no
-    trailing separator, no device prefix, no trailing dots or spaces in any component. A network path
-    (double backslash or double slash followed by a server, or the device prefix followed by UNC) raises
-    IsolationError: it could name the installed profile by another route (localhost and an
-    administrative share) and is never a scratch folder."""
+    trailing separator, no device prefix, no trailing dots or spaces in any component. A network
+    path (double backslash or double slash followed by a server) or a device path that does not continue
+    with a drive letter (UNC, Volume{...}, GLOBALROOT, PhysicalDrive) raises IsolationError: it could name
+    the installed profile by another route and is never a scratch folder."""
     if environ is not None:
         path = _expand(path, environ)
     unc = path.replace("/", "\\")
     device = unc[:4] in ("\\\\?\\", "\\\\.\\")
-    if unc.startswith("\\\\") and (not device or unc[4:8].upper() == "UNC\\"):
-        raise IsolationError(f"network path refused: {path}")
+    if unc.startswith("\\\\") and (not device or not re.match(r"[A-Za-z]:(\\|$)", unc[4:])):
+        # A network path, `UNC\...`, `Volume{...}`, `GLOBALROOT\...` or any other device path: only a drive letter is accepted.
+        raise IsolationError(f"network or device path refused: {path}")
     if os.name == "nt":
         path = os.path.realpath(path)
     path = ntpath.normpath(ntpath.abspath(path))
@@ -106,26 +108,45 @@ def protected_roots(local_appdata, appdata, documents=None):
     return roots
 
 
-def documents_folders():
-    """The Documents folder the Studio uses for its library: the Windows known folder (it can be
-    redirected, to OneDrive for example), plus the default under the user profile as a second guard."""
-    found = []
-    if os.name == "nt":
-        try:
-            import ctypes
-            from ctypes import wintypes
+FOLDERID_DOCUMENTS = "FDD39AD0-238F-46AF-ADB4-6C85480369C7"
 
-            folder_id = (ctypes.c_byte * 16)(*bytes.fromhex("D039DDFD8F23AF46ADB46C85480369C7"))  # FOLDERID_Documents
-            out = ctypes.c_wchar_p()
-            get = ctypes.windll.shell32.SHGetKnownFolderPath
-            get.argtypes = [ctypes.c_void_p, wintypes.DWORD, wintypes.HANDLE, ctypes.POINTER(ctypes.c_wchar_p)]
-            if get(ctypes.byref(folder_id), 0, None, ctypes.byref(out)) == 0 and out.value:
-                found.append(out.value)
-            ctypes.windll.ole32.CoTaskMemFree(out)
-        except Exception:  # noqa: BLE001
-            pass
+
+def known_documents_folder():
+    """The Windows Documents known folder (SHGetKnownFolderPath), or None with a warning when the call
+    fails or this is not Windows. Never silent: a wrong answer here would leave the library unprotected."""
+    if os.name != "nt":
+        return None
+    try:
+        import ctypes
+        import uuid
+        from ctypes import wintypes
+
+        folder_id = (ctypes.c_byte * 16)(*uuid.UUID(FOLDERID_DOCUMENTS).bytes_le)
+        out = ctypes.c_wchar_p()
+        get = ctypes.windll.shell32.SHGetKnownFolderPath
+        get.argtypes = [ctypes.c_void_p, wintypes.DWORD, wintypes.HANDLE, ctypes.POINTER(ctypes.c_wchar_p)]
+        status = get(ctypes.byref(folder_id), 0, None, ctypes.byref(out))
+        value = out.value
+        ctypes.windll.ole32.CoTaskMemFree(out)
+        if status == 0 and value:
+            return value
+        warnings.warn(f"SHGetKnownFolderPath(Documents) returned {status & 0xFFFFFFFF:#010x}; only the user-profile guess protects the library", RuntimeWarning, stacklevel=2)
+    except Exception as e:  # noqa: BLE001
+        warnings.warn(f"cannot resolve the Documents known folder ({e!r}); only the user-profile guess protects the library", RuntimeWarning, stacklevel=2)
+    return None
+
+
+def documents_folders():
+    """The Documents folders whose `VV Lab Library` the Studio would use: the Windows known folder (it can
+    be redirected, to OneDrive for example) and the default under the user profile as a second guard."""
+    found = []
+    known = known_documents_folder()
+    if known:
+        found.append(known)
     if os.environ.get("USERPROFILE"):
         found.append(os.path.join(os.environ["USERPROFILE"], "Documents"))
+    if not found:
+        raise IsolationError("no Documents folder is known (no known folder, no USERPROFILE): the research library cannot be protected")
     return list(dict.fromkeys(found))
 
 
