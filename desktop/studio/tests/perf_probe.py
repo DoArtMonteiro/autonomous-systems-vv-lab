@@ -4,7 +4,7 @@ r"""Measures V&V Lab Studio from the outside: cold start, the path to the first 
 Nothing here runs inside the simulation; every number is wall-clock time or operating-system memory
 of the desktop shell on the machine that runs the script. The script prints one JSON document.
 
-    python desktop/studio/tests/perf_probe.py --exe desktop\target\debug\vv-studio.exe --flow m11
+    python desktop/studio/tests/perf_probe.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --owner-allow-release-exe --flow m11
     python desktop/studio/tests/perf_probe.py --exe desktop/target/release/vv-studio.exe --domains desktop/target/release/domains --flow m15
 
 `--flow m11` drives the 0.11 interface (Prepare, rocket domain, nominal demonstration). `--flow m15`
@@ -255,8 +255,8 @@ def main():
     env["VVLAB_CONFIG"] = tempfile.mkdtemp(prefix="vv-perf-cfg-")
     env["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = f"--remote-debugging-port={a.port}"
     report = {"flow": a.flow, "exe": os.path.basename(exe), "machine": {"cpu": platform.processor(), "os": platform.platform(), "python": platform.python_version()}}
-    t_launch = time.time()
     proc = studio_launch.launch(exe, env, a.port, allow_release=a.owner_allow_release_exe, wait_seconds=0)
+    t_launch = proc.spawn_time  # taken at spawn, so the checks before it are not counted as start-up time
     try:
         for _ in range(400):
             try:
@@ -295,7 +295,7 @@ def main():
             if a.flow == "m16":
                 m16_flow(page, proc, report, requests)
     finally:
-        proc.kill()
+        studio_launch.stop(proc)
     print(json.dumps(report, indent=2))
 
 

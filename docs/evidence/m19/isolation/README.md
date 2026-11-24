@@ -1,6 +1,6 @@
 # Verificação ao vivo do isolamento
 
-Uma construção de desenvolvimento (`cargo build -p vv-studio` em `desktop/`, identificador `org.vvlab.devstudio`) foi lançada uma vez, por `desktop/studio/tests/studio_launch.py`, com a Studio instalada fechada. Os perfis da instalação foram listados antes e depois, só com metadados (caminho, tipo, tamanho dos ficheiros, data de modificação em ns). Resultado completo em `result.json`; o programa que o produziu é `live_check.py`.
+Uma construção de desenvolvimento (`cargo build -p vv-studio` em `desktop/`, identificador `org.vvlab.devstudio`) foi lançada três vezes (ver «história da medição»), por `desktop/studio/tests/studio_launch.py`, com a Studio instalada fechada. O resultado abaixo é o da terceira execução, a de `live_check.py`. Os perfis da instalação foram listados antes e depois, só com metadados (caminho, tipo, tamanho dos ficheiros, data de modificação em ns). Resultado completo em `result.json`; o programa que o produziu é `live_check.py`.
 
 ## Resultado
 
@@ -23,7 +23,7 @@ As somas completas estão em `result.json`. As listagens em si não são publica
 
 ## Limitações e história da medição
 
-- Uma máquina (Windows 11 Pro 10.0.26300, Python 3.14.6), um lançamento, cerca de 14 s, sem domínios nem ficheiros de missão. Não prova que nenhum percurso longo escreve fora das pastas temporárias; prova que o arranque e o encerramento não tocam no perfil instalado.
-- Uma primeira tentativa, antes do controlo, deu somas diferentes em `%LOCALAPPDATA%\org.vvlab.studio`. A diferença eram só 27 diretorias vazias a mudar de 0 para 4096 no campo «tamanho», sem nenhuma data de modificação alterada e em pastas que o lançamento não podia ter tocado (por exemplo `modules\cinematic`). É um artefacto da leitura do tamanho de diretorias. O método foi alterado para não registar o tamanho de diretorias, e a verificação repetida desde o início, com o controlo, deu as listagens idênticas acima. A tentativa original não faz parte do resultado.
+- Uma máquina (Windows 11 Pro 10.0.26300, Python 3.14.6), cerca de 14 s por lançamento, sem domínios nem ficheiros de missão. Não prova que nenhum percurso longo escreve fora das pastas temporárias; prova que o arranque e o encerramento não tocam no perfil instalado.
+- Uma primeira tentativa, antes do controlo, deu somas diferentes em `%LOCALAPPDATA%\org.vvlab.studio`. A diferença eram só 27 diretorias vazias a mudar de 0 para 4096 no campo «tamanho», sem nenhuma data de modificação alterada e em pastas que o lançamento não podia ter tocado (por exemplo `modules\cinematic`). É um artefacto da leitura do tamanho de diretorias. O método foi alterado para não registar o tamanho de diretorias, e a verificação repetida desde o início, com o controlo, deu as listagens idênticas acima. A tentativa original não faz parte do resultado. A repetição com o método corrigido foi feita com um programa igual ao que está aqui (`live_check.py` é a sua versão limpa) e deu o mesmo resultado; o `result.json` é da terceira execução, a de `live_check.py`, com o mesmo executável.
 - O executável instalado não foi lido, lançado nem alterado; nenhuma listagem escreveu em nenhuma pasta de dados.
 - O encerramento foi pelo PID do processo lançado. O executável instalado tem o mesmo nome de imagem, por isso nenhum comando usou o nome da imagem.

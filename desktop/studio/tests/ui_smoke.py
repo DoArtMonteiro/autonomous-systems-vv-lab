@@ -13,7 +13,7 @@ Usage (from the repository root, after `cargo build -p vv-studio` in desktop/):
 
 Against the installed application, using the domain hosts installed next to it:
 
-    python desktop/studio/tests/ui_smoke.py --exe desktop\target\debug\vv-studio.exe --domains ""
+    python desktop/studio/tests/ui_smoke.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --owner-allow-release-exe --domains ""
 
 `--domains ""` leaves VVLAB_DOMAINS unset, so the studio uses its own resource directory.
 Window sizes are set on the real window (Tauri setSize); DevTools viewport emulation is used only
@@ -664,7 +664,7 @@ def main():
                     pass
             check("no script error in the page", not console_errors, "; ".join(console_errors[:5]))
     finally:
-        proc.kill()
+        studio_launch.stop(proc)
         proc.wait(timeout=10)
         if not a.keep_library:
             shutil.rmtree(library, ignore_errors=True)

@@ -6,7 +6,7 @@ row, the Home statistics block, an unsafe run and a thrust consistency check rea
 uses a scratch library; page screenshots (dark and light) go to --shots and show the Studio window, so
 they stay out of the repository.
 
-    python desktop/studio/tests/ux2_journeys.py --exe desktop\target\debug\vv-studio.exe --shots <scratch folder>
+    python desktop/studio/tests/ux2_journeys.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --owner-allow-release-exe --shots <scratch folder>
 
 Scripted checks of what the screen shows, not observations of people.
 """
@@ -532,7 +532,7 @@ def main():
             check("No page error or console error", not errors, "; ".join(errors)[:300])
             browser.close()
     finally:
-        proc.kill()
+        studio_launch.stop(proc)
     with open(os.path.join(a.shots, "ux2-facts.json"), "w", encoding="utf-8") as f:
         json.dump(FACTS, f, indent=1, sort_keys=True)
     failed = [r for r in results if not r[1]]

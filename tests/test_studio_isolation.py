@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import ast
 import json
+import os
 import re
 import sys
 import tempfile
@@ -403,8 +404,9 @@ class LaunchDiscipline(unittest.TestCase):
     def test_no_image_name_kill_anywhere_in_the_test_scripts_or_build_tooling(self):
         files = []
         for base in (STUDIO_TESTS, ROOT / "scripts", ROOT / ".github" / "workflows", ROOT / "desktop"):
-            for pattern in ("*.py", "*.ps1", "*.yml", "*.sh", "*.cmd", "*.bat"):
-                files += [p for p in base.rglob(pattern) if "target" not in p.parts and "node_modules" not in p.parts]
+            for folder, dirs, names in os.walk(base):
+                dirs[:] = [d for d in dirs if d not in ("target", "node_modules", ".git", "__pycache__")]
+                files += [Path(folder) / n for n in names if n.endswith((".py", ".ps1", ".yml", ".sh", ".cmd", ".bat"))]
         self.assertTrue(files)
         forbidden = [
             (re.compile(r"(?<![\w.])/IM(?![\w])", re.I), "taskkill /IM"),

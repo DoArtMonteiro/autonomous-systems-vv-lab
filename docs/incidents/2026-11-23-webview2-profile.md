@@ -31,13 +31,13 @@ Em 2026-11-24 o responsável decidiu deixar `EBWebView` como está: nada é apag
 
 ## Salvaguardas
 
-Três camadas, cada uma suficiente para impedir uma repetição.
+Três camadas. A identidade e o lançamento impedem, cada uma por si, uma escrita no perfil instalado; a terceira impede que os testes terminem o processo errado; os testes mantêm as três.
 
 **Identidade.** `desktop/studio/tauri.conf.json` tem agora o identificador `org.vvlab.devstudio` e o nome de produto `VV Lab Studio (dev)`. O identificador de lançamento, `org.vvlab.studio`, existe só em `desktop/studio/tauri.release.conf.json`, que `desktop/build.ps1 -Release` aplica com `tauri build --config`. O identificador de desenvolvimento não contém o de lançamento (não é uma extensão por sufixo), para que procurar um no outro nunca confunda os dois. O script confirma o identificador antes de compilar e confirma depois que o `vv-studio.exe` compilado só contém o esperado; recusa-se a correr com `TAURI_CONFIG` herdado do ambiente.
 
 **Lançamento.** Todos os percursos lançam o executável por `desktop/studio/tests/studio_launch.py`. A função pura `plan_launch(exe, environ, local_appdata, appdata)`:
 
-- põe em pastas temporárias `WEBVIEW2_USER_DATA_FOLDER`, `VVLAB_LIBRARY`, `VVLAB_CONFIG` e `VVLAB_MODULES`, quando o chamador não as definiu;
+- põe em pastas temporárias `WEBVIEW2_USER_DATA_FOLDER`, `VVLAB_LIBRARY`, `VVLAB_CONFIG` e `VVLAB_MODULES`, quando o chamador não as definiu (`VVLAB_MODULES` só vale em construções de depuração; numa construção em modo de lançamento com o identificador de desenvolvimento a pasta do módulo Cinematic fica em `%LOCALAPPDATA%\org.vvlab.devstudio`, nunca no perfil instalado);
 - recusa, depois de normalizar (maiúsculas, barras, separador final, `..`, prefixo `\\?\`, pontos e espaços finais, `%VAR%`), qualquer valor de qualquer variável de ambiente que aponte para `%LOCALAPPDATA%\org.vvlab.studio`, `%APPDATA%\org.vvlab.studio` ou `Documentos\VV Lab Library`, e qualquer `--user-data-dir` nos argumentos do navegador;
 - recusa um executável dentro de `%LOCALAPPDATA%\VV Lab Studio`, um que contenha o identificador de lançamento e um de origem desconhecida (sem nenhum dos dois identificadores), lendo o identificador compilado no próprio ficheiro;
 - só levanta as recusas sobre o executável com a opção `--owner-allow-release-exe`, reservada ao responsável. As recusas sobre caminhos nunca se levantam. Nesse modo, o executável de lançamento ignora `VVLAB_MODULES` (só de depuração) e a pasta do módulo Cinematic continua a ser a do perfil instalado.
@@ -57,7 +57,7 @@ O lançamento recusa-se a arrancar se o mesmo executável já está em execuçã
 
 ## Verificação ao vivo
 
-Uma construção de desenvolvimento foi lançada uma vez pelo auxiliar, com a Studio instalada fechada. As listagens (caminho, tamanho dos ficheiros, data) de `%LOCALAPPDATA%\org.vvlab.studio` e de `%APPDATA%\org.vvlab.studio` ficaram idênticas antes e depois, com um controlo de duas listagens idênticas sem lançamento. O arranque criou `%LOCALAPPDATA%\org.vvlab.devstudio`, vazia. Detalhes, limitações e a nota sobre a primeira tentativa em `docs/evidence/m19/isolation/README.md`. Esta verificação mostra que um arranque e um encerramento não tocam no perfil instalado; não cobre os percursos longos.
+Uma construção de desenvolvimento foi lançada três vezes pelo auxiliar, com a Studio instalada fechada: uma primeira tentativa, uma repetição com outro método de listagem e a execução final de `live_check.py`, cujo resultado está no repositório. As listagens (caminho, tamanho dos ficheiros, data) de `%LOCALAPPDATA%\org.vvlab.studio` e de `%APPDATA%\org.vvlab.studio` ficaram idênticas antes e depois, com um controlo de duas listagens idênticas sem lançamento. O arranque criou `%LOCALAPPDATA%\org.vvlab.devstudio`, vazia. Detalhes, limitações e a nota sobre a primeira tentativa em `docs/evidence/m19/isolation/README.md`. Esta verificação mostra que um arranque e um encerramento não tocam no perfil instalado; não cobre os percursos longos.
 
 ## Riscos que ficam
 

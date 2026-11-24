@@ -5,19 +5,22 @@ Why this exists: the Studio keeps real data in the profile of the installed appl
 in the first of them). A development build that shared that identifier, started by a suite that did
 not redirect `WEBVIEW2_USER_DATA_FOLDER`, wrote into it (docs/incidents/2026-11-23-webview2-profile.md).
 
-Three layers, each enough on its own to stop a repeat:
+Three layers. The first two each stop a write into the installed profile by themselves; the third
+stops the tests from ending the wrong process; the tests keep all three in place.
 
 1. Identity. The base `tauri.conf.json` has the development identifier `org.vvlab.devstudio`; only
    `tauri.release.conf.json`, applied by `desktop/build.ps1 -Release`, has `org.vvlab.studio`. A normal
    build therefore never has the installed profile's name. `embedded_identifiers` reads which of the
    two a given executable carries (Tauri compiles the identifier into the binary as a UTF-8 string).
-2. Launch. `plan_launch` is pure. It points every folder the Studio writes at scratch folders
-   (`WEBVIEW2_USER_DATA_FOLDER`, `VVLAB_LIBRARY`, `VVLAB_CONFIG`, `VVLAB_MODULES`) and raises when any
-   resolved path, an inherited variable or a `--user-data-dir` argument lies in the installed profile,
-   or when the executable is the installed one or carries the release identifier. Only the explicit
-   `allow_release` flag (command line `--owner-allow-release-exe`) lifts the executable refusals; it
-   never lifts the path refusals. In that mode a release executable ignores `VVLAB_MODULES`
-   (debug-only in the Studio), so the Cinematic module folder still resolves to the installed profile.
+2. Launch. `plan_launch` is pure. It points the folders the Studio is told to redirect at scratch
+   folders (`WEBVIEW2_USER_DATA_FOLDER`, `VVLAB_LIBRARY`, `VVLAB_CONFIG`, `VVLAB_MODULES`) and raises
+   when any variable, resolved path or `--user-data-dir` argument lies in the installed profile, or
+   when the executable is the installed one, carries the release identifier or has no known one. Only
+   the explicit `allow_release` flag (command line `--owner-allow-release-exe`) lifts the executable
+   refusals; it never lifts the path refusals. `VVLAB_MODULES` is honoured only by debug builds: a
+   release-profile build with the development identifier keeps its Cinematic module folder under
+   `%LOCALAPPDATA%\org.vvlab.devstudio` (never the installed profile), and an executable started with the
+   owner flag resolves it to the installed profile.
 3. Teardown. Only the process this module started is killed, by PID. Nothing here or in the other
    scripts kills by image name: the owner's installed Studio has the same image name, `vv-studio.exe`.
 
@@ -208,6 +211,7 @@ def launch(exe, env, port, *, allow_release=False, wait_seconds=20):
     if running:
         raise IsolationError(f"{plan.exe} is already running (PID {', '.join(map(str, running))}); close it, this script never kills it")
     proc = subprocess.Popen([plan.exe], env=plan.env)
+    proc.spawn_time = time.time()  # for start-up measurements: the checks above are not part of the start
     deadline = time.time() + wait_seconds
     while time.time() < deadline:
         try:

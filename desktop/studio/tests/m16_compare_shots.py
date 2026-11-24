@@ -1,7 +1,7 @@
 r"""Fixed-framing screenshots of the geospatial view, for a fair before-and-after comparison between
 Studio versions: the same mission, environment, playback time, camera preset and window size.
 
-    python desktop/studio/tests/m16_compare_shots.py --exe desktop\target\debug\vv-studio.exe --out docs/evidence/m16/before
+    python desktop/studio/tests/m16_compare_shots.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --owner-allow-release-exe --out docs/evidence/m16/before
     python desktop/studio/tests/m16_compare_shots.py --exe desktop/target/release/vv-studio.exe --domains desktop/target/release/domains --environments desktop/environments --out docs/evidence/m16/after
 
 Each shot is named <environment>-<camera>-<time>-<w>x<h>.jpg (JPEG quality 85). The script writes shots.json with
@@ -102,7 +102,7 @@ def main():
                 s.resize(1440, 900)
             browser.close()
     finally:
-        proc.kill()
+        studio_launch.stop(proc)
     with open(os.path.join(out, "shots.json"), "w", encoding="utf-8") as f:
         json.dump(meta, f, indent=1)
 

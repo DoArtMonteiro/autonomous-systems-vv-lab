@@ -5,7 +5,7 @@ requirement limit, and the layout at a narrow window. Every new run is replayed 
 show it is a recomputable record. Screenshots go to --shots. It uses a scratch library.
 
     python desktop/studio/tests/m17_lab_journeys.py --exe desktop/target/release/vv-studio.exe --domains desktop/target/release/domains
-    python desktop/studio/tests/m17_lab_journeys.py --exe desktop\target\debug\vv-studio.exe --domains ""
+    python desktop/studio/tests/m17_lab_journeys.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --owner-allow-release-exe --domains ""
 
 These are scripted checks of what the screen shows. They are not observations of people using it.
 """
@@ -270,7 +270,7 @@ def main():
             check("No page error or console error", not errors, "; ".join(errors)[:300])
             browser.close()
     finally:
-        proc.kill()
+        studio_launch.stop(proc)
     failed = [r for r in results if not r[1]]
     print(f"\n{len(results) - len(failed)}/{len(results)} checks passed")
     sys.exit(1 if failed else 0)

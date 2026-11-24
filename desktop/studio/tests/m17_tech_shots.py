@@ -1,9 +1,9 @@
 r"""Technical-view screenshots for the M17 comparison with the Cinematic View: the installed Studio's
 geospatial view of the mission "A sensor that lies" on one environment, at given playback times and
-camera presets, 1440x900. Unlike m16_journeys.launch, it does not kill other Studio processes; it
-refuses to start if one is running (the single-instance plugin would hand the launch to it).
+camera presets, 1440x900. Started through studio_launch, which refuses to start while the same
+executable is already running (the single-instance plugin would hand the launch to it) and never kills it.
 
-    python desktop/studio/tests/m17_tech_shots.py --exe desktop\target\debug\vv-studio.exe --out docs/evidence/m17/cinematic --shots follow:7.31,follow:16.29,closeup:23.336
+    python desktop/studio/tests/m17_tech_shots.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --owner-allow-release-exe --out docs/evidence/m17/cinematic --shots follow:7.31,follow:16.29,closeup:23.336
 
 Also writes the run's record to --record-out (when given), so the Cinematic View can be shown the
 same record (by default the robust run, which lands). These are pictures, not measurements.
@@ -95,7 +95,7 @@ def main():
                 print("shot", name, st.get("t"), flush=True)
             browser.close()
     finally:
-        proc.kill()
+        studio_launch.stop(proc)
     with open(os.path.join(a.out, "technical-shots.json"), "w", encoding="utf-8") as f:
         json.dump(meta, f, indent=1)
 

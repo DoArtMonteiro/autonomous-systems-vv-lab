@@ -5,7 +5,7 @@ narrow-window navigation (More menu, keyboard), the Lab's run bar, numbers and t
 environments page, one colour for Exploratory, text size and the 1024x640 player. It uses a scratch
 library; page screenshots go to --shots (they show the Studio window, keep them out of the repository).
 
-    python desktop/studio/tests/ux_journeys.py --exe desktop\target\debug\vv-studio.exe --shots <scratch folder>
+    python desktop/studio/tests/ux_journeys.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --owner-allow-release-exe --shots <scratch folder>
 
 Scripted checks of what the screen and the process list show, not observations of people.
 """
@@ -441,7 +441,7 @@ def main():
     finally:
         for k in godot_children(proc.pid):
             subprocess.run(["taskkill", "/F", "/PID", str(k["pid"])], capture_output=True)
-        proc.kill()
+        studio_launch.stop(proc)
     with open(os.path.join(a.shots, "ux-facts.json"), "w", encoding="utf-8") as f:
         json.dump(FACTS, f, indent=1, sort_keys=True)
     failed = [r for r in results if not r[1]]

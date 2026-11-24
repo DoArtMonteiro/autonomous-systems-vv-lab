@@ -5,7 +5,7 @@ geospatial renderer when the player is left, and the behaviour with no environme
 tampered one. Screenshots go to --shots. It uses a scratch library and configuration.
 
     python desktop/studio/tests/m16_journeys.py --exe desktop/target/release/vv-studio.exe --domains desktop/target/release/domains --environments desktop/environments
-    python desktop/studio/tests/m16_journeys.py --exe desktop\target\debug\vv-studio.exe --domains "" --environments ""
+    python desktop/studio/tests/m16_journeys.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --owner-allow-release-exe --domains "" --environments ""
 
 These are scripted checks of what the screen shows. They are not observations of people using it.
 """
@@ -421,7 +421,7 @@ def main():
                             pass
                 browser.close()
         finally:
-            proc.kill()
+            studio_launch.stop(proc)
     if not only or "fallback" in only:
         # Offline with no environment at all, and with a tampered pack: the Studio still works.
         empty = tempfile.mkdtemp(prefix="vv-m16-noenv-")
@@ -456,7 +456,7 @@ def main():
                         check(f"{label} completed", False, repr(e)[:300])
                     browser.close()
             finally:
-                proc.kill()
+                studio_launch.stop(proc)
     real = [e for e in errors if "Failed to load resource" not in e]
     check("no script error or console error", not real, "; ".join(real[:3]))
     failed = [r for r in results if not r[1]]

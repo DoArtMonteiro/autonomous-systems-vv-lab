@@ -3,7 +3,7 @@ the real file dialog, read its verified status, launch it on a stored run from t
 its window and process, close it, uninstall it and check the player falls back. The native dialog
 is answered with keystrokes. Screenshots go to --shots.
 
-    python desktop/studio/tests/m17_cinematic_journey.py --exe desktop\target\debug\vv-studio.exe --zip <vv-cinematic-x.y.z.zip>
+    python desktop/studio/tests/m17_cinematic_journey.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --owner-allow-release-exe --zip <vv-cinematic-x.y.z.zip>
 
 Scripted checks of what the screen and the process list show, not observations of people.
 """
@@ -187,7 +187,7 @@ def main():
             check("No page error or console error", not errors, "; ".join(errors)[:300])
             browser.close()
     finally:
-        proc.kill()
+        studio_launch.stop(proc)
     failed = [r for r in results if not r[1]]
     print(f"\n{len(results) - len(failed)}/{len(results)} checks passed")
     sys.exit(1 if failed else 0)

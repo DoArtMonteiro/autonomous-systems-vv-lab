@@ -4,7 +4,7 @@ behind it, the ground-vehicle mission, the library filters, keyboard playback an
 Screenshots go to --shots. It uses a scratch library and configuration (VVLAB_LIBRARY, VVLAB_CONFIG).
 
     python desktop/studio/tests/m15_journeys.py --exe desktop/target/release/vv-studio.exe --domains desktop/target/release/domains
-    python desktop/studio/tests/m15_journeys.py --exe desktop\target\debug\vv-studio.exe --domains ""
+    python desktop/studio/tests/m15_journeys.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --owner-allow-release-exe --domains ""
 
 These are scripted checks of what the screen shows. They are not observations of people using it.
 """
@@ -319,7 +319,7 @@ def main():
                         pass
             check("no script error or console error", not errors, "; ".join(errors[:3]))
     finally:
-        proc.kill()
+        studio_launch.stop(proc)
     failed = [r for r in results if not r[1]]
     print(f"\n{len(results) - len(failed)} of {len(results)} checks passed; screenshots in {a.shots}")
     return 1 if failed else 0
