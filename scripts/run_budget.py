@@ -1,19 +1,20 @@
 """Orçamento de execuções de uma campanha pré-registada, aplicado antes de cada execução.
 
-Uma campanha declara o seu limite num manifesto `budgets/<campaign_id>.json` (registado em commit e limpo).
-Antes de lançar qualquer execução, o script reserva `n` execuções com `reserve` (ou usa
-`run_budgeted`, que reserva e só depois chama a função de lançamento injetada). `n` é o tamanho da
-matriz planeada, nunca um número escrito à mão. As reservas ficam num registo JSONL só de
-acréscimo, sob um bloqueio exclusivo entre processos, em `<git-common-dir>/vvlab-budget/`, partilhado
-por todas as worktrees e fora de qualquer pasta de execuções. Não há reembolsos: uma execução
-falhada, descartada ou repetida conta como qualquer outra.
+Uma campanha declara o seu limite num manifesto `budgets/<campaign_id>.json` (registado em commit e
+limpo). Antes de lançar qualquer execução, o script reserva `n` execuções com `run_budgeted`, que
+reserva e só depois chama a função de lançamento injetada. `n` é o tamanho da matriz planeada,
+nunca um número escrito à mão. As reservas ficam num registo JSONL de só acréscimo, sob um bloqueio
+exclusivo entre processos, em `<git-common-dir>/vvlab-budget/`, partilhado por todas as worktrees e
+fora de qualquer pasta de execuções. Não há reembolsos: uma execução falhada, descartada ou repetida
+conta como qualquer outra.
 
 O registo e o instante da reserva nunca entram em artefactos com hash nem em identificadores de
-execução. `recount` e `guard_report` contam as execuções nos artefactos e recusam o relatório se
-a contagem exceder o limite ou divergir do registo (controlo detetivo).
+execução. `guard_report` conta as execuções nos artefactos e recusa o relatório se a contagem
+exceder o limite ou divergir do registo (controlo detetivo).
 
-Não há opção de linha de comandos nem variável de ambiente que mude a localização do registo; só os
-testes a indicam, por argumento de função. Ver `docs/run-budget.md`.
+A API pública (`reserve`, `run_budgeted`, `ledger_total`, `recount`, `guard_report`) não aceita
+repositório nem diretório do registo, e não há opção de linha de comandos nem variável de ambiente
+que os mude; as funções com prefixo `_` existem só para os testes. Ver `docs/run-budget.md`.
 """
 
 from __future__ import annotations
@@ -44,15 +45,24 @@ DEFAULT_MARKER = "verification.json"
 
 # Blocos que nenhuma campanha orçamentada pode usar, além dos de `exec/src/seeds.rs`.
 EXTRA_PROTECTED: tuple[tuple[int, int, str], ...] = (
+    (3_000, 3_099, "sementes de avaliação do M10"),
+    (6_000, 6_099, "sementes de reserva do M10"),
     (44_000, 44_999, "reserva M13 para uma confirmação futura pré-registada"),
     (50_000, 59_999, "divisão reservada do M14, já gasta"),
     (81_000, 81_999, "bloco candidato do G3"),
 )
+# Intervalos que `exec/src/seeds.rs` tem de conter; se faltarem, o ficheiro foi alterado e recusa-se.
+REQUIRED_IN_SOURCE = ((3_000, 3_099), (6_000, 6_099), (44_000, 44_999))
 
 _ID = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _COMMIT = re.compile(r"^[0-9a-f]{7,40}$")
-_PROTECTED_RS = re.compile(r"start:\s*([0-9_]+)\s*,\s*end:\s*([0-9_]+)")
+_RS_TOKENS = re.compile(r'"(?:[^"\\]|\\.)*"|//[^\n]*|/\*.*?\*/', re.S)
+_RS_STRUCT = re.compile(r"\bstruct\s+Protected\s*\{")
+_RS_ANY = re.compile(r"\bProtected\s*\{")
+_RS_LITERAL = re.compile(r"\bProtected\s*\{([^{}]*)\}")
+_RS_BODY = re.compile(
+    r'^\s*start:\s*(\d+(?:_\d+)*)\s*,\s*end:\s*(\d+(?:_\d+)*)\s*,\s*reason:\s*""\s*,?\s*$')
 _MANIFEST_KEYS = {"schema", "campaign_id", "max_runs", "allowed_seeds", "preregistration", "created", "amendments"}
 _AMENDMENT_KEYS = {"max_runs", "reason", "date"}
 
@@ -102,11 +112,17 @@ class Recount:
     ledger_total: int
     max_runs: int
     declared_unrecorded: int
+    unrecorded_run_ids: tuple[str, ...]
+
+
+# --- git ----------------------------------------------------------------------------------------
 
 
 def _git(repo: Path, *args: str) -> bytes:
+    # Variáveis GIT_* (GIT_DIR, GIT_COMMON_DIR, GIT_WORK_TREE, ...) redirecionariam o repositório lido.
+    env = {k: v for k, v in os.environ.items() if not k.upper().startswith("GIT_")}
     try:
-        done = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, timeout=30)
+        done = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, timeout=30, env=env)
     except (OSError, subprocess.TimeoutExpired) as error:
         raise BudgetError(f"git indisponível: {error}") from error
     if done.returncode != 0:
@@ -114,7 +130,7 @@ def _git(repo: Path, *args: str) -> bytes:
     return done.stdout
 
 
-def default_ledger_dir(repo: Path = ROOT) -> Path:
+def _default_ledger_dir(repo: Path) -> Path:
     """`<git-common-dir>/vvlab-budget`: o mesmo para todas as worktrees do repositório."""
     out = _git(repo, "rev-parse", "--git-common-dir").decode("utf-8").strip()
     common = Path(out)
@@ -132,28 +148,36 @@ def _is_int(value: Any) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
 
 
-def load_manifest(campaign_id: str, repo: Path = ROOT) -> Manifest:
+# --- manifesto ----------------------------------------------------------------------------------
+
+
+def _load_manifest(campaign_id: str, repo: Path) -> Manifest:
     """Lê o manifesto; recusa se não for byte a byte igual ao blob em HEAD."""
     _check_id(campaign_id)
-    repo = Path(repo)
     rel = f"{MANIFEST_DIR}/{campaign_id}.json"
     try:
         blob = _git(repo, "cat-file", "blob", f"HEAD:{rel}")
     except BudgetError as error:
         raise BudgetError(f"o manifesto {rel} não está registado em HEAD: {error}") from error
-    path = repo / rel
     try:
-        disk = path.read_bytes()
+        disk = (repo / rel).read_bytes()
     except OSError as error:
         raise BudgetError(f"o manifesto {rel} não pode ser lido: {error}") from error
     if disk != blob:
         raise BudgetError(f"o manifesto {rel} difere do blob em HEAD (alteração por registar em commit)")
     head = _git(repo, "rev-parse", "HEAD").decode("utf-8").strip()
+    data = _parse_json(blob, rel)
+    manifest = _validate_manifest(data, campaign_id, rel, hashlib.sha256(blob).hexdigest(), head)
+    _check_history(repo, rel, data)
+    _check_other_manifests(repo, manifest)
+    return manifest
+
+
+def _parse_json(blob: bytes, what: str) -> Any:
     try:
-        data = json.loads(blob.decode("utf-8"))
+        return json.loads(blob.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise BudgetError(f"o manifesto {rel} não é JSON válido: {error}") from error
-    return _validate_manifest(data, campaign_id, rel, hashlib.sha256(blob).hexdigest(), head)
+        raise BudgetError(f"{what} não é JSON válido: {error}") from error
 
 
 def _validate_manifest(data: Any, campaign_id: str, rel: str, sha: str, head: str) -> Manifest:
@@ -205,17 +229,74 @@ def _validate_manifest(data: Any, campaign_id: str, rel: str, sha: str, head: st
                     tuple(amendments), sha, head)
 
 
-def protected_ranges(repo: Path = ROOT) -> list[tuple[int, int, str]]:
-    """Intervalos de `exec/src/seeds.rs` (lidos por análise do texto) mais os blocos extra."""
-    path = Path(repo) / SEEDS_SOURCE
+def _check_history(repo: Path, rel: str, current: dict[str, Any]) -> None:
+    """As adendas só crescem: cada versão anterior no histórico é prefixo da seguinte."""
+    shas = _git(repo, "log", "--format=%H", "HEAD", "--", rel).decode("utf-8").split()
+    newer = current
+    for sha in shas[1:]:
+        try:
+            blob = _git(repo, "cat-file", "blob", f"{sha}:{rel}")
+        except BudgetError as error:
+            raise BudgetError(f"o manifesto {rel} foi apagado e recriado no histórico ({sha[:9]}): {error}") from error
+        old = _parse_json(blob, f"{rel} em {sha[:9]}")
+        if not isinstance(old, dict) or not _is_int(old.get("max_runs")) or not isinstance(old.get("amendments", []), list):
+            raise BudgetError(f"o manifesto {rel} em {sha[:9]} é ilegível")
+        old_amendments, new_amendments = old.get("amendments", []), newer.get("amendments", [])
+        if new_amendments[:len(old_amendments)] != old_amendments:
+            raise BudgetError(f"as adendas de {rel} não são só de acréscimo (versão {sha[:9]})")
+        if newer["max_runs"] < old["max_runs"]:
+            raise BudgetError(f"max_runs de {rel} desceu face à versão {sha[:9]}")
+        if newer["max_runs"] > old["max_runs"] and len(new_amendments) <= len(old_amendments):
+            raise BudgetError(f"max_runs de {rel} subiu sem adenda nova face à versão {sha[:9]}")
+        newer = old
+
+
+def _check_other_manifests(repo: Path, manifest: Manifest) -> None:
+    """Outro identificador não pode reaproveitar o pré-registo nem as sementes de uma campanha."""
+    own = f"{MANIFEST_DIR}/{manifest.campaign_id}.json"
+    listing = _git(repo, "ls-tree", "--name-only", "HEAD", f"{MANIFEST_DIR}/").decode("utf-8").split("\n")
+    for rel in (line.strip() for line in listing):
+        if not rel.endswith(".json") or rel == own:
+            continue
+        data = _parse_json(_git(repo, "cat-file", "blob", f"HEAD:{rel}"), rel)
+        try:
+            other_path = data["preregistration"]["path"]
+            other_ranges = [(lo, hi) for lo, hi in data["allowed_seeds"]]
+        except (KeyError, TypeError, ValueError) as error:
+            raise BudgetError(f"o manifesto {rel} é ilegível; a recusar por segurança: {error!r}") from error
+        if other_path == manifest.preregistration_path:
+            raise BudgetError(f"o pré-registo {other_path} já pertence ao manifesto {rel}")
+        for lo, hi in manifest.allowed_seeds:
+            for olo, ohi in other_ranges:
+                if lo <= ohi and olo <= hi:
+                    raise BudgetError(f"as sementes {lo}-{hi} sobrepõem-se às de {rel} ({olo}-{ohi}); "
+                                      "uma campanha nova não repõe o registo de outra")
+
+
+def _protected_ranges(repo: Path) -> list[tuple[int, int, str]]:
+    """Intervalos de `exec/src/seeds.rs` em HEAD, por análise estrita do texto, mais os blocos extra."""
     try:
-        text = path.read_text(encoding="utf-8")
-    except OSError as error:
-        raise BudgetError(f"não foi possível ler {SEEDS_SOURCE}: {error}") from error
-    found = [(int(a.replace("_", "")), int(b.replace("_", "")), f"{SEEDS_SOURCE}")
-             for a, b in _PROTECTED_RS.findall(text)]
-    if not found:
-        raise BudgetError(f"nenhum intervalo protegido encontrado em {SEEDS_SOURCE}; a recusar")
+        text = _git(repo, "cat-file", "blob", f"HEAD:{SEEDS_SOURCE}").decode("utf-8")
+    except (BudgetError, UnicodeDecodeError) as error:
+        raise BudgetError(f"não foi possível ler {SEEDS_SOURCE} em HEAD: {error}") from error
+    clean = _RS_TOKENS.sub(lambda m: '""' if m.group(0).startswith('"') else " ", text)
+    clean = _RS_STRUCT.sub("struct Definition {", clean)  # a definição do tipo não é um literal
+    occurrences = len(_RS_ANY.findall(clean))
+    literals = [m.group(1) for m in _RS_LITERAL.finditer(clean)]
+    if occurrences < 1 or len(literals) != occurrences:
+        raise BudgetError(f"{SEEDS_SOURCE}: formato de `Protected` não suportado; a recusar")
+    found: list[tuple[int, int, str]] = []
+    for body in literals:
+        match = _RS_BODY.match(body)
+        if not match:
+            raise BudgetError(f"{SEEDS_SOURCE}: literal `Protected` não suportado ({body.strip()[:60]!r}); a recusar")
+        start, end = (int(g.replace("_", "")) for g in match.groups())
+        if start > end:
+            raise BudgetError(f"{SEEDS_SOURCE}: intervalo protegido com início {start} acima do fim {end}")
+        found.append((start, end, SEEDS_SOURCE))
+    missing = [r for r in REQUIRED_IN_SOURCE if not any((lo, hi) == r for lo, hi, _ in found)]
+    if missing:
+        raise BudgetError(f"{SEEDS_SOURCE}: faltam intervalos protegidos obrigatórios {missing}; a recusar")
     return found + list(EXTRA_PROTECTED)
 
 
@@ -277,95 +358,139 @@ else:
         fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
-def _paths(campaign_id: str, ledger_dir: Path | None, repo: Path) -> tuple[Path, Path]:
-    base = Path(ledger_dir) if ledger_dir is not None else default_ledger_dir(Path(repo))
-    return base / f"{campaign_id}.jsonl", base / f"{campaign_id}.lock"
+@dataclass(frozen=True)
+class _Paths:
+    ledger: Path
+    tip: Path
+    lock: Path
 
 
-def _read_ledger(path: Path, campaign_id: str) -> list[dict[str, Any]]:
-    """Lê e valida a cadeia de hashes; qualquer anomalia recusa (falha fechada)."""
-    if not path.exists():
-        return []
+def _paths(campaign_id: str, ledger_dir: Path | None, repo: Path) -> _Paths:
+    base = Path(ledger_dir) if ledger_dir is not None else _default_ledger_dir(repo)
+    return _Paths(base / f"{campaign_id}.jsonl", base / f"{campaign_id}.tip", base / f"{campaign_id}.lock")
+
+
+def _fsync_dir(directory: Path) -> None:
+    try:
+        fd = os.open(directory, os.O_RDONLY)
+    except OSError:
+        return  # Windows não abre diretórios assim
+    try:
+        os.fsync(fd)
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
+
+
+def _append(path: Path, data: bytes) -> None:
+    created = not path.exists()
+    with open(path, "ab") as handle:
+        handle.write(data)
+        handle.flush()
+        os.fsync(handle.fileno())
+    if created:
+        _fsync_dir(path.parent)
+
+
+def _read_ledger(paths: _Paths, campaign_id: str) -> tuple[list[dict[str, Any]], list[str]]:
+    """Lê e valida a cadeia de hashes e o registo de ponta; qualquer anomalia recusa (falha fechada)."""
     entries: list[dict[str, Any]] = []
+    hashes: list[str] = []
     previous, total = GENESIS, 0
-    raw = path.read_bytes()
+    raw = paths.ledger.read_bytes() if paths.ledger.exists() else b""
+    name = paths.ledger.name
     if raw and not raw.endswith(b"\n"):
-        raise BudgetError(f"registo {path.name}: linha final incompleta; investigar antes de continuar")
-    for number, line in enumerate(raw.split(b"\n")[:-1], start=1):
+        raise BudgetError(f"registo {name}: linha final incompleta; ver a recuperação manual em docs/run-budget.md")
+    for number, line in enumerate(raw.split(b"\n")[:-1] if raw else [], start=1):
         try:
             entry = json.loads(line.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as error:
-            raise BudgetError(f"registo {path.name}: linha {number} ilegível: {error}") from error
+            raise BudgetError(f"registo {name}: linha {number} ilegível: {error}") from error
         if (not isinstance(entry, dict) or entry.get("schema") != LEDGER_SCHEMA or entry.get("seq") != number
                 or entry.get("campaign_id") != campaign_id or entry.get("prev_sha256") != previous
                 or not _is_int(entry.get("runs")) or entry["runs"] < 1):
-            raise BudgetError(f"registo {path.name}: linha {number} inconsistente com a cadeia")
+            raise BudgetError(f"registo {name}: linha {number} inconsistente com a cadeia")
         total += entry["runs"]
         if entry.get("total_after") != total:
-            raise BudgetError(f"registo {path.name}: linha {number} com total acumulado errado")
+            raise BudgetError(f"registo {name}: linha {number} com total acumulado errado")
         previous = hashlib.sha256(line).hexdigest()
         entries.append(entry)
-    return entries
+        hashes.append(previous)
+    _check_tip(paths, hashes)
+    return entries, hashes
 
 
-def ledger_total(campaign_id: str, *, repo: Path = ROOT, ledger_dir: Path | None = None) -> int:
+def _check_tip(paths: _Paths, hashes: list[str]) -> None:
+    """O registo de ponta lembra o maior `seq` e o hash: apagar linhas finais ou o registo é detetado."""
+    raw = paths.tip.read_bytes() if paths.tip.exists() else b""
+    if raw and not raw.endswith(b"\n"):
+        raise BudgetError(f"registo de ponta {paths.tip.name}: linha final incompleta; ver docs/run-budget.md")
+    last = 0
+    for number, line in enumerate(raw.split(b"\n")[:-1] if raw else [], start=1):
+        try:
+            record = json.loads(line.decode("utf-8"))
+            seq, sha = record["seq"], record["sha256"]
+        except (UnicodeDecodeError, json.JSONDecodeError, KeyError, TypeError) as error:
+            raise BudgetError(f"registo de ponta {paths.tip.name}: linha {number} ilegível") from error
+        if not _is_int(seq) or seq <= last:
+            raise BudgetError(f"registo de ponta {paths.tip.name}: linha {number} fora de ordem")
+        if seq > len(hashes):
+            raise BudgetError(f"o registo de reservas está atrás do registo de ponta (seq {len(hashes)} < {seq}): "
+                              "linhas apagadas ou registo apagado")
+        if hashes[seq - 1] != sha:
+            raise BudgetError(f"o registo de reservas diverge do registo de ponta na linha {seq}")
+        last = seq
+
+
+@contextmanager
+def _state(campaign_id: str, repo: Path | None, ledger_dir: Path | None, need_manifest: bool = True
+           ) -> Iterator[tuple[Manifest | None, list[dict[str, Any]], list[str], _Paths]]:
     _check_id(campaign_id)
-    ledger, lock = _paths(campaign_id, ledger_dir, repo)
-    with _locked(lock):
-        entries = _read_ledger(ledger, campaign_id)
-    return entries[-1]["total_after"] if entries else 0
+    repo = Path(repo) if repo is not None else ROOT
+    paths = _paths(campaign_id, ledger_dir, repo)
+    with _locked(paths.lock):
+        manifest = _load_manifest(campaign_id, repo) if need_manifest else None
+        entries, hashes = _read_ledger(paths, campaign_id)
+        yield manifest, entries, hashes, paths
 
 
-def reserve(campaign_id: str, planned: Iterable[Any], label: str = "", *, repo: Path = ROOT,
-            ledger_dir: Path | None = None) -> Reservation:
-    """Reserva uma execução por elemento de `planned` (um inteiro semente ou um dict com `seed`).
+def _ledger_total(campaign_id: str, repo: Path | None = None, ledger_dir: Path | None = None) -> int:
+    with _state(campaign_id, repo, ledger_dir, need_manifest=False) as (_, entries, _hashes, _paths_):
+        return entries[-1]["total_after"] if entries else 0
 
-    Tem de ser chamada antes de lançar qualquer execução. Sem reembolso.
-    """
-    _check_id(campaign_id)
+
+def _reserve(campaign_id: str, planned: Iterable[Any], label: str = "", repo: Path | None = None,
+             ledger_dir: Path | None = None) -> Reservation:
     items = tuple(planned)
     if not items:
         raise BudgetError("plano vazio: nada a reservar")
-    repo = Path(repo)
-    manifest = load_manifest(campaign_id, repo)
     seeds = [_seed_of(item) for item in items]
-    _check_seeds(seeds, manifest, protected_ranges(repo))
-    ledger, lock = _paths(campaign_id, ledger_dir, repo)
-    with _locked(lock):
-        entries = _read_ledger(ledger, campaign_id)
+    repo_path = Path(repo) if repo is not None else ROOT
+    with _state(campaign_id, repo, ledger_dir) as (manifest, entries, hashes, paths):
+        _check_seeds(seeds, manifest, _protected_ranges(repo_path))
         before = entries[-1]["total_after"] if entries else 0
-        seen_max = max((e.get("max_runs", 0) for e in entries), default=0)
-        if manifest.max_runs > seen_max > 0 and not (manifest.amendments and manifest.amendments[-1]["max_runs"] == manifest.max_runs):
-            raise BudgetError(f"max_runs subiu de {seen_max} para {manifest.max_runs} sem adenda com razão")
         if before + len(items) > manifest.max_runs:
             raise BudgetExceeded(
                 f"campanha {campaign_id}: já reservadas {before}, pedidas {len(items)}, limite {manifest.max_runs}")
-        previous = GENESIS
-        if entries:
-            previous = hashlib.sha256(ledger.read_bytes().split(b"\n")[-2]).hexdigest()
         entry = {
             "schema": LEDGER_SCHEMA, "seq": len(entries) + 1, "campaign_id": campaign_id, "label": str(label),
             "runs": len(items), "total_after": before + len(items), "max_runs": manifest.max_runs,
             "seed_min": min(seeds), "seed_max": max(seeds), "manifest_sha256": manifest.sha256,
             "head": manifest.head, "pid": os.getpid(),
             "utc": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "prev_sha256": previous,
+            "prev_sha256": hashes[-1] if hashes else GENESIS,
         }
-        line = (json.dumps(entry, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
-        with open(ledger, "ab") as handle:
-            handle.write(line)
-            handle.flush()
-            os.fsync(handle.fileno())
+        line = json.dumps(entry, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        _append(paths.ledger, line + b"\n")
+        tip = {"seq": entry["seq"], "sha256": hashlib.sha256(line).hexdigest()}
+        _append(paths.tip, json.dumps(tip, sort_keys=True, separators=(",", ":")).encode("utf-8") + b"\n")
     return Reservation(campaign_id, len(items), before, before + len(items), manifest.max_runs, items)
 
 
-def run_budgeted(campaign_id: str, planned: Iterable[Any], spawn: Callable[[Any], Any], label: str = "", *,
-                 jobs: int = 1, repo: Path = ROOT, ledger_dir: Path | None = None) -> list[Outcome]:
-    """Reserva e só depois chama `spawn(item)` para cada execução reservada, pela ordem do plano.
-
-    Uma exceção de `spawn` fica em `Outcome.error` e a execução continua a contar.
-    """
-    reservation = reserve(campaign_id, planned, label, repo=repo, ledger_dir=ledger_dir)
+def _run_budgeted(campaign_id: str, planned: Iterable[Any], spawn: Callable[[Any], Any], label: str = "",
+                  jobs: int = 1, repo: Path | None = None, ledger_dir: Path | None = None) -> list[Outcome]:
+    reservation = _reserve(campaign_id, planned, label, repo, ledger_dir)
 
     def one(item: Any) -> Outcome:
         try:
@@ -395,29 +520,27 @@ def _count_artefacts(roots: Sequence[Path], marker: str, ledger: Path) -> int:
     return sum(1 for a in resolved for _, _, files in os.walk(a) for name in files if name == marker)
 
 
-def recount(campaign_id: str, artefact_roots: Path | Sequence[Path], *, marker: str = DEFAULT_MARKER,
-            declared_unrecorded: int = 0, repo: Path = ROOT, ledger_dir: Path | None = None) -> Recount:
-    """Conta as execuções nos artefactos (um ficheiro `marker` por execução) e compara com o registo."""
-    _check_id(campaign_id)
+def _recount(campaign_id: str, artefact_roots: Path | Sequence[Path], marker: str = DEFAULT_MARKER,
+             declared_unrecorded: int = 0, unrecorded_run_ids: Sequence[str] = (),
+             repo: Path | None = None, ledger_dir: Path | None = None) -> Recount:
     roots = [artefact_roots] if isinstance(artefact_roots, (str, Path)) else list(artefact_roots)
-    manifest = load_manifest(campaign_id, Path(repo))
-    ledger, _ = _paths(campaign_id, ledger_dir, repo)
-    total = ledger_total(campaign_id, repo=repo, ledger_dir=ledger_dir)
-    return Recount(campaign_id, _count_artefacts([Path(r) for r in roots], marker, ledger), total,
-                   manifest.max_runs, declared_unrecorded)
+    with _state(campaign_id, repo, ledger_dir) as (manifest, entries, _hashes, paths):
+        total = entries[-1]["total_after"] if entries else 0
+        runs = _count_artefacts([Path(r) for r in roots], marker, paths.ledger)
+    return Recount(campaign_id, runs, total, manifest.max_runs, declared_unrecorded, tuple(unrecorded_run_ids))
 
 
-def guard_report(campaign_id: str, artefact_roots: Path | Sequence[Path], *, marker: str = DEFAULT_MARKER,
-                 declared_unrecorded: int = 0, repo: Path = ROOT, ledger_dir: Path | None = None) -> Recount:
-    """Chamar antes de escrever qualquer relatório. Recusa se a contagem exceder o limite ou divergir.
-
-    `declared_unrecorded` é o número de execuções reservadas cujo artefacto não existe (falhadas,
-    descartadas ou apagadas); aparece no relatório e tem de fechar a conta com o registo.
-    """
+def _guard_report(campaign_id: str, artefact_roots: Path | Sequence[Path], marker: str = DEFAULT_MARKER,
+                  declared_unrecorded: int = 0, unrecorded_run_ids: Sequence[str] = (),
+                  repo: Path | None = None, ledger_dir: Path | None = None) -> Recount:
+    ids = tuple(unrecorded_run_ids)
     if not _is_int(declared_unrecorded) or declared_unrecorded < 0:
         raise BudgetError("declared_unrecorded tem de ser um inteiro não negativo")
-    result = recount(campaign_id, artefact_roots, marker=marker, declared_unrecorded=declared_unrecorded,
-                     repo=repo, ledger_dir=ledger_dir)
+    if (not all(isinstance(i, str) and i for i in ids) or len(set(ids)) != len(ids)
+            or declared_unrecorded != len(ids)):
+        raise BudgetError(
+            f"declared_unrecorded={declared_unrecorded} não coincide com os {len(ids)} run_ids distintos indicados")
+    result = _recount(campaign_id, artefact_roots, marker, declared_unrecorded, ids, repo, ledger_dir)
     if result.runs > result.max_runs:
         raise BudgetExceeded(f"{result.runs} execuções nos artefactos, acima do limite {result.max_runs}")
     if result.runs + declared_unrecorded != result.ledger_total:
@@ -425,3 +548,44 @@ def guard_report(campaign_id: str, artefact_roots: Path | Sequence[Path], *, mar
             f"contagem nos artefactos {result.runs} (+{declared_unrecorded} declaradas) difere do registo "
             f"{result.ledger_total}")
     return result
+
+
+# --- API pública: sem repositório nem diretório do registo -------------------------------------
+
+
+def reserve(campaign_id: str, planned: Iterable[Any], label: str = "") -> Reservation:
+    """Reserva uma execução por elemento de `planned` (um inteiro semente ou um dict com `seed`).
+
+    Tem de ser chamada antes de lançar qualquer execução. Sem reembolso.
+    """
+    return _reserve(campaign_id, planned, label)
+
+
+def run_budgeted(campaign_id: str, planned: Iterable[Any], spawn: Callable[[Any], Any], label: str = "", *,
+                 jobs: int = 1) -> list[Outcome]:
+    """Reserva e só depois chama `spawn(item)` para cada execução reservada, pela ordem do plano.
+
+    Uma exceção de `spawn` fica em `Outcome.error` e a execução continua a contar.
+    """
+    return _run_budgeted(campaign_id, planned, spawn, label, jobs)
+
+
+def ledger_total(campaign_id: str) -> int:
+    return _ledger_total(campaign_id)
+
+
+def recount(campaign_id: str, artefact_roots: Path | Sequence[Path], *, marker: str = DEFAULT_MARKER) -> Recount:
+    """Conta as execuções nos artefactos (um ficheiro `marker` por execução) e compara com o registo."""
+    return _recount(campaign_id, artefact_roots, marker)
+
+
+def guard_report(campaign_id: str, artefact_roots: Path | Sequence[Path], *, marker: str = DEFAULT_MARKER,
+                 declared_unrecorded: int = 0, unrecorded_run_ids: Sequence[str] = ()) -> Recount:
+    """Controlo detetivo: chamar antes de escrever qualquer relatório.
+
+    Recusa se a contagem exceder o limite ou se contagem mais `declared_unrecorded` diferir do total do
+    registo. Deteta excesso líquido de execuções face ao registo, não uma execução concreta fora dele.
+    `unrecorded_run_ids` lista os identificadores das execuções reservadas sem artefacto (falhadas ou
+    descartadas) e o seu tamanho tem de ser igual a `declared_unrecorded`.
+    """
+    return _guard_report(campaign_id, artefact_roots, marker, declared_unrecorded, unrecorded_run_ids)
