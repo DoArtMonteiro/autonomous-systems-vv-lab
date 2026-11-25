@@ -179,3 +179,14 @@ Passagem feita depois da avaliação da iteração 2. Uma classificação indepe
 14. Todas as figuras SVG têm `role="img"` e `aria-label` próprio, verificado no DOM por teste.
 
 Testes: 73 no ficheiro, todos passam. Capturas em `docs/evidence/m19/belief-truth/final/`. A 1440x900 a tira x deixou de caber por inteiro no primeiro ecrã (os cartões ficaram mais altos); mantém-se à vista a parte de cima.
+
+## Novo instrumento de avaliação (2026-11-25)
+
+O instrumento original (chave de respostas e perguntas em `docs/evidence/m19/belief-truth/evaluation/`) está publicamente exposto. Fica preservado como evidência histórica, por decisão do responsável de 2026-11-25, e não serve para uma avaliação humana a frio.
+
+Foi preparado um instrumento novo, escrito por um agente que não viu nenhuma das versões do protótipo nem a avaliação anterior, a partir só do registo e do código do simulador: 14 perguntas neutras, 6 armadilhas, em duas formas equivalentes de 7, com chave verificada contra o registo e regras de pontuação fixadas antes. Está congelado desde 2026-11-25 e guardado fora do repositório público, para não ficar exposto; não pode ser mostrado a quem construa uma vista candidata. Não foi aplicado a ninguém. Identidade (sha256):
+
+- README: `77bdaa3dc3fdfa43bc2c1a3b9b1aa66344a4713e3ffe913d72a6be420e1e4a49`
+- instrumento: `e9e41bfb1ecd97a1a23ab990355f80f30ea92445e090b0f275c7a51434bd4599`
+- chave de respostas: `b80873f6ff6e75d410e584ab620c1b88ed9e84cf443603cbbee4745278ebfbd4`
+- regras de pontuação: `80b90f7635bb2e9301d9863e4e479f290267d2addaf4d958baa075cb38e83c4d`
