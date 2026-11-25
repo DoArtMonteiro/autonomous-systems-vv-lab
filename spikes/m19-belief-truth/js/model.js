@@ -123,7 +123,7 @@ export class Model {
   /** Whether the entry is derived with an approximate derivation (proxy or unrecorded term). */
   approx(ref) {
     const e = this.entry(ref);
-    return Boolean(e.approx || (e.derivation && this.data.derivations[e.derivation.name].approx));
+    return Boolean(e.derivation && this.data.derivations[e.derivation.name].approx);
   }
 
   render(v, d) {

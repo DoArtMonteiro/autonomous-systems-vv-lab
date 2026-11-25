@@ -262,13 +262,6 @@ SOURCE_FACTS = [
         "It is filled in whether the requirement passed or failed, so it is not an attribution.",
     },
     {
-        "id": "S_gnss_ungated",
-        "file": SOURCES[0],
-        "anchors": ["self.p = self.p + (gp - self.p) * g.gnss_position_gain;"],
-        "claim": "Every GNSS fix is blended into the estimated position with a fixed gain. Nothing compares GNSS "
-        "x or y with another sensor, and nothing can reject it; only the altimeter is gated, in z.",
-    },
-    {
         "id": "S_replay_host_sdk",
         "file": "desktop/platform/src/host_sdk.rs",
         "anchors": [
@@ -507,10 +500,6 @@ class Builder:
         if source_facts:
             entry["source_facts"] = source_facts
         self.scalars[sid] = entry
-
-
-def gains_fraction_check(case: dict) -> float:
-    return case["requirements"]["r6_propellant_margin_fraction"]
 
 
 def build() -> dict:
@@ -856,21 +845,6 @@ def build() -> dict:
                  "trace.json#/samples/{i}/estimate/ascent_abort", render="none")
     b.rec_series("active_faults", "Faults active at the sample", "", "T", "trace.json#/samples/{i}/active_faults",
                  render="none")
-    for k, ax in enumerate("xy"):
-        b.rec_series(f"base_v{ax}", f"True nozzle-plane velocity {ax}", "m/s", "T",
-                     f"trace.json#/samples/{{i}}/truth/base_velocity_mps/{k}", ref="nozzle plane",
-                     render="none", cls_by_index=td_override)
-    for k, ax in enumerate("xyz"):
-        b.rec_series(f"gnss_v{ax}", f"GNSS velocity {ax} (observation)", "m/s", "O",
-                     f"trace.json#/samples/{{i}}/observation/gnss_velocity_mps/{k}", ref="centre of mass",
-                     render="points", null_parent=True,
-                     note="Null where GNSS delivered nothing in that control cycle. GNSS velocity carries no bias.")
-    b.der_series("err_gnss_vz", "GNSS vertical velocity - true vertical velocity", "m/s", "obs_minus_truth",
-                 ["gnss_vz", "truth_vz"],
-                 [None if g is None else g - t_ for g, t_ in zip(v("gnss_vz"), v("truth_vz"))],
-                 ref="centre of mass", render="points")
-    S["gnss_vx"]["null_text"] = S["gnss_vy"]["null_text"] = S["gnss_vz"]["null_text"] = "no fix on this cycle"
-    S["err_gnss_vz"]["null_text"] = "no fix on this cycle"
     S["gnss_x"]["null_text"] = "no fix on this cycle"
     S["gnss_y"]["null_text"] = "no fix on this cycle"
     S["gnss_z"]["null_text"] = "no fix on this cycle"
@@ -959,49 +933,6 @@ def build() -> dict:
                  scalar_inputs=["case.gnss_position_gain", "case.fault_magnitude_m"], digits=2,
                  source_facts=["S_estimator_fixed_gain"],
                  note="Inference from the fixed gain: the estimate moves by gain x (GNSS - estimate) per fix.")
-
-    # First recorded sample over the rejection threshold (approximate residual)
-    thr_m = gains["altimeter_residual_threshold_m"]
-    first_over = next(i for i, x in enumerate(v("alt_residual")) if abs(x) > thr_m)
-    b.der_scalar("lane.first_over_threshold_t", "First recorded sample with the altimeter residual over the threshold (approx.)",
-                 "s", "first_over_threshold", t_vals[first_over], series_inputs=["alt_residual"],
-                 scalar_inputs=["case.altimeter_threshold_m"], digits=1, at=first_over, source_facts=["S_rejection_not_fused"])
-
-    # Ignition: a truth event; the first samples with the engine on and with a throttle command
-    first_on = next(i for i, x in enumerate(v("engine")) if x != "off")
-    first_cmd = next(i for i, x in enumerate(v("cmd_throttle")) if x > 0)
-    b.der_scalar("ign.first_engine_on_t", "First recorded sample with the engine on", "s", "first_sample_where",
-                 t_vals[first_on], series_inputs=["engine"], digits=1, at=first_on, params={"where": "not off"})
-    b.der_scalar("ign.first_command_t", "First recorded sample with a throttle command above zero", "s", "first_sample_where",
-                 t_vals[first_cmd], series_inputs=["cmd_throttle"], digits=1, at=first_cmd, params={"where": "above zero"})
-
-    # R2 judges the nozzle plane; centre of mass and nozzle plane differ by rotation about the lever arm
-    cm_h = math.hypot(v("truth_vx")[last], v("truth_vy")[last])
-    dv = math.hypot(v("base_vx")[last] - v("truth_vx")[last], v("base_vy")[last] - v("truth_vy")[last])
-    lever = b.scalars["req.R4_angular_rate.value"]["v"] * s_cm[last]
-    if abs(dv - lever) > 0.01 * max(1.0, lever):
-        raise SystemExit("nozzle minus centre-of-mass speed is not angular rate times lever arm")
-    b.der_scalar("td.cm_horizontal_speed", "Horizontal speed of the centre of mass at touchdown", "m/s",
-                 "horizontal_speed_at_touchdown", cm_h, series_inputs=["truth_vx", "truth_vy"], digits=3, at=last)
-    b.der_scalar("td.nozzle_minus_cm_speed", "Nozzle-plane minus centre-of-mass velocity at touchdown (magnitude)", "m/s",
-                 "velocity_difference_at_touchdown", dv, series_inputs=["base_vx", "base_vy", "truth_vx", "truth_vy"],
-                 digits=3, at=last)
-    b.der_scalar("td.angular_rate_times_lever", "Angular rate times lever arm at touchdown", "m/s",
-                 "angular_rate_times_lever", lever, series_inputs=["s_cm"], scalar_inputs=["req.R4_angular_rate.value"],
-                 digits=3, at=last)
-
-    # R6: limit is a fraction of the initial propellant; the value is the propellant left at touchdown
-    csc("case.r6_margin_fraction", "R6 margin fraction", "", "case.json#/requirements/r6_propellant_margin_fraction", 2)
-    b.rec_scalar("init.propellant_kg", "Propellant at the first sample", "kg", "T",
-                 "trace.json#/samples/0/truth/propellant_kg", digits=1)
-    r6 = [r for r in ver["requirements"] if r["id"] == "R6_propellant_margin"][0]
-    ok6 = abs(gains_fraction_check(case) * b.scalars["init.propellant_kg"]["v"] - r6["limit"]) < 1e-6
-    if not ok6:
-        raise SystemExit("R6 limit is not margin fraction times initial propellant")
-    b.der_scalar("check.r6_limit_is_fraction_of_initial", "R6 limit equals margin fraction times initial propellant", "",
-                 "product_check", ok6, scalar_inputs=["case.r6_margin_fraction", "init.propellant_kg", "req.R6_propellant_margin.limit"])
-    b.rec_scalar("req.R6.explanation", "Record's explanation of the R6 row", "", "D-host",
-                 "record.json#/requirements/5/explanation")
 
     # Divergence panel: no divergence instant is recorded; first recorded sample above a threshold.
     thresholds = [1, 3, 5, 10]
@@ -1148,7 +1079,7 @@ def build() -> dict:
             e["digits"] = 2
 
     # ---- views of the sample grid ----------------------------------------------------------
-    result = {
+    return {
         "schema": SCHEMA,
         "generator": "spikes/m19-belief-truth/extract.py",
         "fixture": FIXTURE_REL,
@@ -1200,27 +1131,6 @@ def build() -> dict:
                 "formula": "gnss_position_gain * bias magnitude: the step in the estimate caused by one GNSS fix "
                            "that carries the bias, when the estimate had been at the truth.", "approx": True},
             "count_keys": {"formula": "Number of entries.", "approx": False},
-            "first_sample_where": {
-                "formula": "t_s of the first recorded sample whose series value satisfies params.where "
-                           "(engine on, or command above zero). A recorded sample, not an instant between samples.",
-                "approx": False},
-            "first_over_threshold": {
-                "formula": "t_s of the first recorded sample whose absolute altimeter residual (approximate, see "
-                           "altimeter_residual) exceeds the rejection threshold. The controller's own first "
-                           "over-threshold cycle lies within a recorded sample interval of this.", "approx": True},
-            "horizontal_speed_at_touchdown": {
-                "formula": "hypot of the two horizontal velocity components of the named series at the touchdown "
-                           "sample (host-interpolated truth).", "approx": False},
-            "velocity_difference_at_touchdown": {
-                "formula": "hypot(base_vx - truth_vx, base_vy - truth_vy) at the touchdown sample: nozzle-plane "
-                           "velocity minus centre-of-mass velocity.", "approx": False},
-            "angular_rate_times_lever": {
-                "formula": "R4 angular rate (the host's norm of the true angular velocity) times s_cm at the "
-                           "touchdown sample (lever arm from centre of mass to nozzle plane). For a rotating body the "
-                           "nozzle velocity differs from the centre-of-mass velocity by about this much.", "approx": True},
-            "product_check": {
-                "formula": "True when params.factor times the first scalar equals the second to the stated "
-                           "tolerance (R6 limit = margin fraction times initial propellant).", "approx": False},
             "evidence_file_line": {
                 "formula": "The first line starting with params.line_starts_with in the committed evidence file "
                            "params.file, written by running the test named by the source fact.", "approx": False},
@@ -1257,25 +1167,6 @@ def build() -> dict:
         "requirements": req_rows,
         "invariants": inv_rows,
     }
-
-    # An entry derived from an approximate entry is approximate itself (set until stable).
-    regs = result["derivations"]
-
-    def is_approx(e):
-        return bool(e.get("approx") or (e.get("derivation") and regs[e["derivation"]["name"]]["approx"]))
-
-    changed = True
-    while changed:
-        changed = False
-        for e in list(b.series.values()) + list(b.scalars.values()):
-            d_ = e.get("derivation")
-            if not d_ or e.get("approx"):
-                continue
-            ins = [b.series[i] for i in d_["series_inputs"]] + [b.scalars[i] for i in d_["scalar_inputs"]]
-            if any(is_approx(x) for x in ins):
-                e["approx"] = True
-                changed = True
-    return result
 
 
 _UNIT_DIGITS = {"m": 2, "m/s": 2, "rad/s": 4, "cos": 5, "kg": 1, "g0": 2, "ignitions": 0}

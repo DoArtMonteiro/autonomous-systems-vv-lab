@@ -163,7 +163,7 @@ export function drawStrip(svg, cfg) {
   const xs = model.t;
   const inView = visible(xs, t0, t1);
   const mt = 10;
-  const mb = 28;
+  const mb = 16;
   const vals = [];
   for (const L of layers) {
     const s = model.series(L.series);
@@ -188,12 +188,6 @@ export function drawStrip(svg, cfg) {
   if (inView.length > 1 && Math.abs(X(xs[inView[1]]) - X(xs[inView[0]])) >= 3) {
     for (const i of inView) el("line", { x1: X(xs[i]), y1: height - mb, x2: X(xs[i]), y2: height - mb + 4, class: "ax-tick" }, svg);
   }
-  // Time labels under every strip, so a strip reads on its own without the axis above.
-  const tstep = niceStep(t1 - t0, Math.max(3, (width - ML - MR) / 80));
-  const tdg = decimals(tstep);
-  for (let tt = Math.ceil(t0 / tstep - 1e-9) * tstep; tt <= t1 + 1e-9; tt += tstep) {
-    text(svg, X(tt), height - 8, formatNumber(Number(tt.toFixed(6)), tdg), { class: "ax-label", "text-anchor": "middle" }, true);
-  }
   for (const b of bands) {
     el("line", { x1: ML, y1: Y(b.y), x2: width - MR, y2: Y(b.y), class: b.cls }, svg);
   }
@@ -210,20 +204,7 @@ export function drawStrip(svg, cfg) {
     const s = model.series(L.series);
     if (L.kind === "line") {
       // A recorded value at every sample (the markers); the thin connector is a reading aid only.
-      const split = [];
       for (const run of lineRuns(s, xs)) {
-        // Break the connector where the layer asks (before the first faulted sample): nothing joins across it.
-        let cur = [];
-        for (const p of run) {
-          if (L.breakBefore !== undefined && p[2] === L.breakBefore && cur.length) {
-            split.push(cur);
-            cur = [];
-          }
-          cur.push(p);
-        }
-        if (cur.length) split.push(cur);
-      }
-      for (const run of split) {
         const pts = run.filter(([t]) => t >= t0 - 1e-9 && t <= t1 + 1e-9);
         if (pts.length >= 2) {
           el("polyline", { points: pts.map(([t, y]) => `${X(t).toFixed(1)},${Y(y).toFixed(1)}`).join(" "), class: "connector" }, svg);
@@ -346,10 +327,8 @@ export function drawPlan(svg, { model, size, half, cursor }) {
   el("line", { x1: px(tx), y1: py(ty), x2: px(bx), y2: py(by), class: "plan-gap" }, svg);
   shape(svg, "diamond", px(bx), py(by), 6, "plan-belief");
   shape(svg, "circle", px(tx), py(ty), 6, "plan-truth");
-  if (half <= 40) {
-    text(svg, px(tx) - 10, py(ty) + 4, "true", { class: "plan-label", "text-anchor": "end" });
-    text(svg, px(bx), py(by) - 12, "believed", { class: "plan-label", "text-anchor": "middle" });
-  }
+  text(svg, px(tx) - 10, py(ty) + 4, "true", { class: "plan-label", "text-anchor": "end" });
+  text(svg, px(bx), py(by) - 12, "believed", { class: "plan-label", "text-anchor": "middle" });
   // Cursor markers when inside the window.
   const cur = (sx, sy, kind, cls, r) => {
     const x = model.value(sx, cursor);

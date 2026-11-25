@@ -1,16 +1,18 @@
 {
   "files": {
-    "spikes/m19-belief-truth/css/style.css": "d3e2eea2e99173be6a83c5d4fafd2cc6f9499d23b7dfbd75eece569c213c78de",
-    "spikes/m19-belief-truth/data.json": "a69da8661741e56a6ab844d3c86579e93180052f6102c4ca9ac6f58a4c503f78",
-    "spikes/m19-belief-truth/extract.py": "f6da0e3be755939e0afcf9a06573383e041719659136d90bc5c7d03cc74eb8e6",
-    "spikes/m19-belief-truth/index.html": "093c032a0082a61ccbeae43ef32ace7df21d5c4b954718c5e665c45d9c8b16ba",
-    "spikes/m19-belief-truth/js/app.js": "09e61278e807061032b60d36bbf8744977823037313bcdcdfb910385268bf5e0",
-    "spikes/m19-belief-truth/js/charts.js": "84d734bc6a58f17e55b9d78cff65d2eadde4f98814a473ff5ad5f51661dcd78d",
-    "spikes/m19-belief-truth/js/model.js": "35c12fbfcf1f0aebfb12c93fff668c04fc561f8665d9a04b82c4531b64a881cf"
+    "spikes/m19-belief-truth/css/style.css": "e320ffef6133bc2922b34dfcf1e18dcbc79547e1d1fe0466fce053a38295d327",
+    "spikes/m19-belief-truth/data.json": "70927bd3710aacdda95a5c0c6bddcbdf7b4c6ff2f19aaab42aae8585cabe72f7",
+    "spikes/m19-belief-truth/extract.py": "301772de8c49056fbf3426fb59390e17f1ad615141e36165ef1a655fc90931fe",
+    "spikes/m19-belief-truth/index.html": "9bf2ca5e31e9a33edaddb0bcd466dd3b54c44016241b77600d5467d6dd8eaf4d",
+    "spikes/m19-belief-truth/js/app.js": "718b16edbe1766d95d6139803926e64b213e519cb9a528e2df1f8b93911f364e",
+    "spikes/m19-belief-truth/js/charts.js": "b435f41fbb2691ab835197fcf0141ada579a5ecae6dae50f621e118cebb16342",
+    "spikes/m19-belief-truth/js/model.js": "35410d853748585c64d7c5d8fe5e42bd2e358e10c01105897c0a39b13df64f41"
   },
-  "frozen_on": "2026-11-24",
+  "frozen_on": "2026-11-25",
   "hash_note": "sha256 of file bytes with CRLF normalised to LF",
+  "iteration": 2,
   "iteration_limit": 2,
-  "iterations": 3,
-  "status": "frozen experimental candidate pending human testing; not an accepted usability improvement"
+  "iterations": 2,
+  "restored_from_commit": "dae67fa",
+  "status": "primary experimental candidate, iteration 2, frozen 2026-11-25, pending human testing; not an accepted usability improvement"
 }
