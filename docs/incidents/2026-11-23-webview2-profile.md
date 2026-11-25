@@ -6,7 +6,7 @@ Em 2026-11-23, entre as 18:55 e as 19:01, suítes de percursos da interface corr
 
 ## Factos
 
-Os factos vêm da secção «Quebra do passo 4» de `docs/m19-1-honesty.md` do ramo `fix/m19.1-honesty` e de uma verificação só de leitura feita em 2026-11-24.
+Os factos vêm de duas fontes externas a este ramo e de uma verificação só de leitura feita em 2026-11-24: a secção «Quebra do passo 4» de `docs/m19-1-honesty.md`, que existe no ramo `fix/m19.1-honesty` e não neste; e a listagem `appdata-before.txt`, que está fora do repositório. Os factos usados são repetidos abaixo.
 
 - Correram sete suítes (m15, ux, ux2, m18, m17 Lab, m16 e `ui_smoke`) ao longo de cerca de seis minutos, contra um executável construído a partir do ramo do M19.1.
 - Cada suíte criava uma biblioteca (`VVLAB_LIBRARY`) e uma configuração (`VVLAB_CONFIG`) temporárias. Nenhuma definia `WEBVIEW2_USER_DATA_FOLDER`.
@@ -25,7 +25,7 @@ Em 2026-11-24 o responsável decidiu deixar `EBWebView` como está: nada é apag
 
 ## Segunda escrita: dados do Godot do módulo Cinematic
 
-**Factos** (verificação só de leitura do coordenador, 2026-11-24). A pasta de dados do Godot do módulo, `%APPDATA%\VV Lab Cinematic`, foi escrita em 2026-11-23 durante o trabalho do M19.1: a cache de *shaders* e a cache de *pipelines* Vulkan às 18:39:36 a 18:39:38, e os registos `godot.log` e `godot2026-11-23T20.17.51..54.log` às 20:17:51 a 20:17:55. São 8 ficheiros escritos depois das 18:00, de 377 no total; nada foi escrito depois das 20:17:55 desse dia. Isto contradiz a afirmação anterior de que `app_userdata` do Godot não tinha sido tocada (a secção «Factos» e `docs/m19-1-honesty.md` diziam-no). A pasta é partilhada com a Studio instalada, cujo módulo Cinematic também escreve nela quando o responsável o usa; o conteúdo escrito é cache e registos, não dados de trabalho. Decisão do responsável de 2026-11-24 (comunicada pelo coordenador): os dados instalados ficam como estão, sem apagar nem repor nada. O responsável decidiu deixá-la como está.
+**Factos** (verificação só de leitura de 2026-11-24). A pasta de dados do Godot do módulo, `%APPDATA%\VV Lab Cinematic`, foi escrita em 2026-11-23 durante o trabalho do M19.1: a cache de *shaders* e a cache de *pipelines* Vulkan às 18:39:36 a 18:39:38, e os registos `godot.log` e `godot2026-11-23T20.17.51..54.log` às 20:17:51 a 20:17:55. São 8 ficheiros escritos depois das 18:00, de 377 no total; nada foi escrito depois das 20:17:55 desse dia. Isto contradiz a afirmação anterior de que `app_userdata` do Godot não tinha sido tocada (a secção «Factos» e `docs/m19-1-honesty.md` diziam-no). A pasta é partilhada com a Studio instalada, cujo módulo Cinematic também escreve nela quando o responsável o usa; o conteúdo escrito é cache e registos, não dados de trabalho. Decisão do responsável de 2026-11-24: os dados instalados ficam como estão. O responsável decidiu deixá-la como está.
 
 **Causa.** `desktop/cinematic/project.godot` define `config/custom_user_dir_name="VV Lab Cinematic"`. O Godot 4.7.2 no Windows põe os dados do utilizador em `%APPDATA%\<esse nome>` e a cache em `%LOCALAPPDATA%`, lidos das variáveis de ambiente. Qualquer execução, mesmo `--headless`, escreve `logs/godot.log` e um registo rodado com data (observado num projeto de sonda); só uma execução que desenha escreve as caches de *shaders* e de *pipelines*. Nenhuma salvaguarda cobria o Godot: o auxiliar de lançamento da Studio redirecionava o perfil do WebView2, não os dados do Godot.
 

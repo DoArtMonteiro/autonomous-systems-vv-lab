@@ -314,7 +314,9 @@ def launch(exe, env, port, *, allow_release=False, wait_seconds=20):
     if running:
         raise IsolationError(f"{plan.exe} is already running (PID {', '.join(map(str, running))}); close it, this script never kills it")
     proc = subprocess.Popen([plan.exe], env=plan.env)
-    proc.redirect_dirs = list(plan.redirects.values())  # temporary APPDATA and LOCALAPPDATA of the child, removed by stop()
+    # Temporary folders of the child (APPDATA and LOCALAPPDATA, and the scratch ones this plan created for
+    # WEBVIEW2_USER_DATA_FOLDER, VVLAB_LIBRARY, VVLAB_CONFIG, VVLAB_MODULES), removed by stop().
+    proc.redirect_dirs = list(plan.redirects.values()) + list(plan.scratch.values())
     proc.godot_appdata = plan.redirects.get("APPDATA")  # where a Godot started by this Studio writes its user data
     proc.spawn_time = time.time()  # for start-up measurements: the checks above are not part of the start
     deadline = time.time() + wait_seconds

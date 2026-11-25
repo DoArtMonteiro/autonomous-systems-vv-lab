@@ -603,6 +603,33 @@ class ScratchRemoval(unittest.TestCase):
             shutil.rmtree(other, ignore_errors=True)
 
 
+class StopRemovesEveryScratchFolder(unittest.TestCase):
+    def test_launch_hands_stop_the_redirects_and_the_plan_scratch_folders(self):
+        tree = ast.parse((STUDIO_TESTS / "studio_launch.py").read_text(encoding="utf-8"))
+        launch = next(f for f in ast.walk(tree) if isinstance(f, ast.FunctionDef) and f.name == "launch")
+        assigned = [ast.unparse(n.value) for n in ast.walk(launch) if isinstance(n, ast.Assign)
+                    and any(ast.unparse(t) == "proc.redirect_dirs" for t in n.targets)]
+        self.assertEqual(assigned, ["list(plan.redirects.values()) + list(plan.scratch.values())"])
+
+    def test_stop_removes_a_real_plan_s_folders_and_nothing_else(self):
+        import tempfile as _t
+        from types import SimpleNamespace
+
+        keep = _t.mkdtemp(prefix="notvv-")
+        plan_ = sl.plan_launch(EXE, {"VVLAB_LIBRARY": keep}, LOCAL, ROAM, identifier_reader=lambda _e: {DEV})
+        try:
+            folders = list(plan_.redirects.values()) + list(plan_.scratch.values())
+            self.assertEqual({os.path.basename(f).split("-")[0] for f in folders}, {"vv"})
+            self.assertTrue(all(os.path.isdir(f) for f in folders))
+            self.assertNotIn("VVLAB_LIBRARY", plan_.scratch)  # the caller's own folder is not the plan's to remove
+            sl.stop(SimpleNamespace(poll=lambda: 0, redirect_dirs=folders))
+            self.assertFalse([f for f in folders if os.path.exists(f)])
+            self.assertTrue(os.path.isdir(keep))
+        finally:
+            for f in list(plan_.redirects.values()) + list(plan_.scratch.values()) + [keep]:
+                shutil.rmtree(f, ignore_errors=True)
+
+
 class GodotOffWindows(unittest.TestCase):
     def shim(self, environ):
         from types import SimpleNamespace
