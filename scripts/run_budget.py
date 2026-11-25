@@ -669,6 +669,8 @@ def guard_report(campaign_id: str, artefact_roots: Path | Sequence[Path], *, mar
                  declared_unrecorded: int = 0, unrecorded_run_ids: Sequence[str] = ()) -> Recount:
     """Controlo detetivo: chamar antes de escrever qualquer relatório.
 
+    Não é uma leitura pura: na primeira leitura de um manifesto fechado escreve o evento `closed` no registo.
+
     Recusa se a contagem exceder o limite ou se contagem mais `declared_unrecorded` diferir do total do
     registo. Deteta excesso líquido de execuções face ao registo, não uma execução concreta fora dele.
     `unrecorded_run_ids` lista os identificadores das execuções reservadas sem artefacto (falhadas ou
