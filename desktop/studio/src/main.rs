@@ -23,6 +23,7 @@
 
 mod discovery;
 mod geo;
+mod guard;
 mod modules;
 mod packages;
 
@@ -615,7 +616,15 @@ fn self_test(report_path: &Path) -> i32 {
 }
 
 fn main() {
+    // The runtime guard comes first: before --self-test, Tauri, WebView2 or anything that reads or
+    // writes data. `generate_context!` only builds the compiled-in configuration in memory (it writes
+    // nothing), so the identifier can be read from it first. The release identifier skips the guard;
+    // every other build needs the launch token of the authorised launcher (see `guard.rs`).
+    let context: tauri::Context<tauri::Wry> = tauri::generate_context!();
+    let identifier = context.config().identifier.clone();
     let args: Vec<String> = std::env::args().collect();
+    guard::enforce(&identifier, &args);
+    let development = identifier != guard::release_identifier();
     if args.get(1).map(String::as_str) == Some("--self-test") {
         let path = args
             .get(2)
@@ -633,7 +642,7 @@ fn main() {
         }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        .setup(|app| {
+        .setup(move |app| {
             let paths = resolve_paths(app);
             log_line(&paths.log, &format!("start {VERSION}"));
             let disc = discovery::Discovery::new(discovery_paths(app, &paths.library));
@@ -642,10 +651,11 @@ fn main() {
                 &format!("engine {}", disc.paths.engine.display()),
             );
             let geo = Arc::new(geo::Geo::new(geo_paths(app, &paths.library)));
-            // VVLAB_MODULES replaces the modules folder, for development builds only: the module
-            // is an executable the Studio launches, so an installed Studio must never take its
-            // location from the environment. No release-build test uses it.
-            let modules_root = cfg!(debug_assertions)
+            // VVLAB_MODULES replaces the modules folder, for development identities only (the guard
+            // has checked it lies in the launch token's folder): the module is an executable the
+            // Studio launches, so the installed Studio, which has the release identifier, never takes
+            // its location from the environment. It is keyed on the identity, not on the build profile.
+            let modules_root = development
                 .then(|| std::env::var_os("VVLAB_MODULES"))
                 .flatten()
                 .map(PathBuf::from)
@@ -719,7 +729,7 @@ fn main() {
             modules::cinematic_uninstall,
             modules::cinematic_launch,
         ])
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("the studio could not start")
         .run(|app, event| {
             if let tauri::RunEvent::Exit = event
