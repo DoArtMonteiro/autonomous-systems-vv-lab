@@ -1,0 +1,55 @@
+{
+  "machine": {
+    "os": "Windows-11-10.0.26300-SP0",
+    "python": "3.14.6"
+  },
+  "exe": "vv-studio.exe",
+  "exe_sha256": "6975d8690c1bfcb7b4081f8e2c67a7cad71161fc385b2b8f76c3f37dd9d65e65",
+  "identifiers_in_exe": [
+    "org.vvlab.devstudio"
+  ],
+  "roots": {
+    "local": "%LOCALAPPDATA%\\org.vvlab.studio",
+    "roaming": "%APPDATA%\\org.vvlab.studio"
+  },
+  "control_listings_identical": true,
+  "before": {
+    "local": {
+      "sha256": "cd81f5b033bc64a90deefa37aa763a41feaba95e835213096e4ac84d03712917",
+      "entries": 914
+    },
+    "roaming": {
+      "sha256": "d9c0a4377b57449dee4e32e3385db063f9f18911a0b3a6360048d7b234e0a829",
+      "entries": 1
+    }
+  },
+  "after": {
+    "local": {
+      "sha256": "cd81f5b033bc64a90deefa37aa763a41feaba95e835213096e4ac84d03712917",
+      "entries": 914
+    },
+    "roaming": {
+      "sha256": "d9c0a4377b57449dee4e32e3385db063f9f18911a0b3a6360048d7b234e0a829",
+      "entries": 1
+    }
+  },
+  "installed_profile_identical": true,
+  "devtools_endpoint_up": true,
+  "alive_before_stop": true,
+  "ended_by_own_pid": true,
+  "processes_left_on_scratch_profile": [],
+  "scratch_redirected": [
+    "VVLAB_CONFIG",
+    "VVLAB_LIBRARY",
+    "VVLAB_MODULES",
+    "WEBVIEW2_USER_DATA_FOLDER"
+  ],
+  "scratch_webview2_top_level": [
+    "EBWebView"
+  ],
+  "launch_token_consumed_by_the_guard": true,
+  "token_directory_removed": true,
+  "devstudio_folder_exists_local": true,
+  "devstudio_files_local": 0,
+  "devstudio_folder_exists_roaming": false
+}
