@@ -17,10 +17,12 @@ stops the tests from ending the wrong process; the tests keep all three in place
    when any variable, resolved path or `--user-data-dir` argument lies in the installed profile, or
    when the executable is the installed one, carries the release identifier or has no known one. Only
    the explicit `allow_release` flag (command line `--owner-allow-release-exe`) lifts the executable
-   refusals; it never lifts the path refusals. `VVLAB_MODULES` is honoured only by debug builds: a
-   release-profile build with the development identifier keeps its Cinematic module folder under
-   `%LOCALAPPDATA%\org.vvlab.devstudio` (never the installed profile), and an executable started with the
-   owner flag resolves it to the installed profile.
+   refusals; it never lifts the path refusals. `VVLAB_MODULES` is honoured by any build whose identifier
+   is not the release one (the Studio keys it on identity, not on the build profile), so a development
+   build, debug or release profile, keeps its Cinematic module folder in the launch's token directory.
+   An executable started with the owner flag has the release identifier, ignores the variable and
+   resolves the module folder to the installed profile. It also writes the single-use launch token that
+   the development Studio's runtime guard requires (desktop/studio/src/guard.rs).
 3. Teardown. Only the process this module started is killed, by PID. Nothing here or in the other
    scripts kills by image name: the owner's installed Studio has the same image name, `vv-studio.exe`.
 
@@ -28,9 +30,11 @@ stops the tests from ending the wrong process; the tests keep all three in place
 starts a Studio executable anywhere else or uses an image-name kill.
 """
 
+import json
 import ntpath
 import os
 import re
+import secrets
 import shutil
 import subprocess
 import tempfile
@@ -48,6 +52,13 @@ OWNER_FLAG = "--owner-allow-release-exe"
 # Folders the Studio writes, by the variable that redirects them.
 SCRATCH_VARIABLES = ("WEBVIEW2_USER_DATA_FOLDER", "VVLAB_LIBRARY", "VVLAB_CONFIG", "VVLAB_MODULES")
 BROWSER_ARGUMENTS = "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"
+ENV_LAUNCH = "VVLAB_DEV_LAUNCH"  # the launch token file, read and consumed by the Studio's runtime guard
+ENV_NONCE = "VVLAB_DEV_NONCE"
+TOKEN_FILE = "launch.json"
+REFUSED_EXIT = 78  # exit code of a refused start (desktop/studio/src/guard.rs)
+# Folder of each redirected variable inside the token directory.
+TOKEN_SUBFOLDERS = {"WEBVIEW2_USER_DATA_FOLDER": "webview2", "VVLAB_LIBRARY": "library", "VVLAB_CONFIG": "config",
+                    "VVLAB_MODULES": "modules", "APPDATA": "appdata", "LOCALAPPDATA": "localappdata"}
 
 
 class IsolationError(RuntimeError):
@@ -166,12 +177,14 @@ def embedded_identifiers(exe):
 
 
 class LaunchPlan:
-    def __init__(self, exe, env, scratch, identifiers, redirects=None):
+    def __init__(self, exe, env, scratch, identifiers, redirects=None, token_dir=None, token=None):
         self.exe = exe
         self.env = env
         self.scratch = scratch
         self.identifiers = identifiers
         self.redirects = redirects or {}  # APPDATA and LOCALAPPDATA of the child, for Godot's user data
+        self.token_dir = token_dir  # the one folder that holds everything this launch writes, and the token
+        self.token = token  # nonce, token_dir and the path of every redirected variable
 
 
 def _mentions(value, roots, environ):
@@ -253,14 +266,21 @@ def _plan_launch(exe, environ, local_appdata, appdata, port, allow_release, docu
     if "user-data-dir" in args.lower():
         raise IsolationError(f"{BROWSER_ARGUMENTS} sets a user data directory, which would override the scratch profile: {args}")
 
-    scratch = {}
+    # A folder the caller already chose for one of these variables is replaced below, but one that lies
+    # in the installed data is a mistake worth refusing loudly, whatever way it is spelled.
     for name in SCRATCH_VARIABLES:
-        if env.get(name):
-            continue
-        folder = make_scratch(name) if make_scratch else tempfile.mkdtemp(prefix=f"vv-{name.lower().replace('_', '-')}-")
-        created.append(folder)
-        env[name] = folder
-        scratch[name] = folder
+        value = environ.get(name)
+        if value and any(is_under(_expand(value, environ), r) for r in roots):
+            raise IsolationError(f"{name} resolves into the installed application's data: {value}")
+    # One token directory per launch holds every folder the Studio writes and the launch token. The
+    # development Studio's runtime guard (desktop/studio/src/guard.rs) refuses to start unless each of
+    # these variables is the value recorded in the token and lies inside the token directory, so folders
+    # chosen by the caller are replaced by folders under it.
+    root = make_scratch("TOKEN_DIR") if make_scratch else tempfile.mkdtemp(prefix="vv-launch-")
+    created.append(root)
+    scratch = {name: os.path.join(root, TOKEN_SUBFOLDERS[name]) for name in SCRATCH_VARIABLES}
+    redirects = {name: os.path.join(root, TOKEN_SUBFOLDERS[name]) for name in ("APPDATA", "LOCALAPPDATA")}
+    env.update(scratch)
     for name in SCRATCH_VARIABLES:
         if any(is_under(env[name], r) for r in roots):
             raise IsolationError(f"{name} resolves into the installed application's data: {env[name]}")
@@ -269,17 +289,26 @@ def _plan_launch(exe, environ, local_appdata, appdata, port, allow_release, docu
     # Godot, when the Studio starts the Cinematic View, keeps its user data under APPDATA and its cache
     # under LOCALAPPDATA (read from the environment). The Studio and WebView2 take their folders from the
     # known-folder API and from the variables above, so redirecting these two for the child only sends
-    # the Cinematic View's user data to scratch folders. See godot_launch.py.
-    redirects = {}
-    for name in ("APPDATA", "LOCALAPPDATA"):
-        redirects[name] = make_scratch(name) if make_scratch else tempfile.mkdtemp(prefix=f"vv-{name.lower()}-")
-        created.append(redirects[name])
-        env[name] = redirects[name]
+    # the Cinematic View's user data to the token directory. See godot_launch.py.
+    for name, folder in redirects.items():
+        env[name] = folder
         for real in (appdata, local_appdata):
-            if (is_under(redirects[name], ntpath.join(real, CINEMATIC_FOLDER)) or any(is_under(redirects[name], r) for r in roots)
-                    or normalise(redirects[name]) in (normalise(appdata), normalise(local_appdata))):
-                raise IsolationError(f"{name} for the child resolves to {redirects[name]}, the installed data or the real profile root")
-    return LaunchPlan(os.path.abspath(exe), env, scratch, ids, redirects)
+            if (is_under(folder, ntpath.join(real, CINEMATIC_FOLDER)) or any(is_under(folder, r) for r in roots)
+                    or normalise(folder) in (normalise(appdata), normalise(local_appdata))):
+                raise IsolationError(f"{name} for the child resolves to {folder}, the installed data or the real profile root")
+    token = {"nonce": secrets.token_hex(16), "token_dir": root, "paths": {**scratch, **redirects}}
+    env[ENV_LAUNCH] = os.path.join(root, TOKEN_FILE)
+    env[ENV_NONCE] = token["nonce"]
+    return LaunchPlan(os.path.abspath(exe), env, scratch, ids, redirects, root, token)
+
+
+def write_token(plan):
+    """Creates the token directory's folders and writes the single-use launch token the guard reads."""
+    for folder in [plan.token_dir, *plan.token["paths"].values()]:
+        os.makedirs(folder, exist_ok=True)
+    with open(plan.env[ENV_LAUNCH], "w", encoding="utf-8", newline="\n") as f:
+        json.dump(plan.token, f, indent=1)
+        f.write("\n")
 
 
 def same_exe_running(exe):
@@ -312,11 +341,15 @@ def launch(exe, env, port, *, allow_release=False, wait_seconds=20):
     )
     running = same_exe_running(plan.exe)
     if running:
+        remove_scratch(plan.token_dir)
         raise IsolationError(f"{plan.exe} is already running (PID {', '.join(map(str, running))}); close it, this script never kills it")
+    write_token(plan)
     proc = subprocess.Popen([plan.exe], env=plan.env)
-    # Temporary folders of the child (APPDATA and LOCALAPPDATA, and the scratch ones this plan created for
-    # WEBVIEW2_USER_DATA_FOLDER, VVLAB_LIBRARY, VVLAB_CONFIG, VVLAB_MODULES), removed by stop().
-    proc.redirect_dirs = list(plan.redirects.values()) + list(plan.scratch.values())
+    # The token directory holds every temporary folder of the child (the redirected APPDATA and
+    # LOCALAPPDATA and the scratch ones for WEBVIEW2_USER_DATA_FOLDER, VVLAB_LIBRARY, VVLAB_CONFIG,
+    # VVLAB_MODULES) and the token; stop() removes it.
+    proc.launch_plan = plan
+    proc.redirect_dirs = [plan.token_dir]
     proc.godot_appdata = plan.redirects.get("APPDATA")  # where a Godot started by this Studio writes its user data
     proc.spawn_time = time.time()  # for start-up measurements: the checks above are not part of the start
     deadline = time.time() + wait_seconds
@@ -340,7 +373,24 @@ def stop(proc):
         except subprocess.TimeoutExpired:
             pass
     for folder in getattr(proc, "redirect_dirs", []):
-        remove_scratch(folder)
+        # WebView2's child processes can keep files open for a moment after the Studio ends: retry briefly.
+        for _ in range(20):
+            if not remove_scratch(folder) or not os.path.exists(folder):
+                break
+            time.sleep(0.5)
+
+
+def guard_probe(exe, env, *, args=("--guard-only",), timeout=30):
+    """Runs a DEVELOPMENT executable with `args` (by default `--guard-only`: the runtime guard prints its
+    decision and exits before Tauri) in exactly the environment `env`, and returns the CompletedProcess.
+    For the guard's tests only: the executable must carry the development identifier (checked), and the
+    environment is the caller's, so tests pass disposable folders. With another argument list the
+    executable would start normally if the guard allowed it; it is killed at `timeout`."""
+    exe = os.path.abspath(exe)
+    ids = embedded_identifiers(exe)
+    if RELEASE_IDENTIFIER in ids or DEV_IDENTIFIER not in ids:
+        raise IsolationError(f"{exe} is not a development build (identifiers {sorted(ids)}); the guard probe refuses it")
+    return subprocess.run([exe, *args], env=env, capture_output=True, text=True, timeout=timeout)
 
 
 def child_pids(parent_pid, name_prefix):

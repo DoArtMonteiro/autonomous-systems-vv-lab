@@ -5,17 +5,21 @@ config_version=5
 
 [application]
 
-config/name="VV Lab Cinematic View"
+config/name="VV Lab Cinematic Dev"
 config/description="High-fidelity replay of a recorded powered landing on a geographic environment pack. Read-only: poses come from the record."
 config/version="0.2.8"
 run/main_scene="res://main.tscn"
 config/use_custom_user_dir=true
-config/custom_user_dir_name="VV Lab Cinematic"
+config/custom_user_dir_name="VV Lab Cinematic Dev"
 boot_splash/show_image=true
 boot_splash/image="res://assets/boot-splash.png"
 boot_splash/use_filter=true
 boot_splash/bg_color=Color(0.055, 0.067, 0.086, 1)
 run/low_processor_mode=false
+
+[autoload]
+
+RuntimeGuard="*res://scripts/guard.gd"
 
 [display]
 

@@ -405,8 +405,7 @@ def main():
         env["VVLAB_CLAIMS"] = os.path.join(root, "discovery", "claims")
     if a.environments:
         env["VVLAB_ENVIRONMENTS"] = os.path.abspath(a.environments)
-    env["VVLAB_LIBRARY"] = tempfile.mkdtemp(prefix="vv-m16-lib-")
-    env["VVLAB_CONFIG"] = tempfile.mkdtemp(prefix="vv-m16-cfg-")
+    # The library and the configuration are folders of the launch token directory (studio_launch.launch).
     env["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = f"--remote-debugging-port={a.port}"
     only = [x for x in a.only.split(",") if x]
     parts = [p for p in (home_and_library, geospatial, gating, control_rocket, control_ground, layout) if not only or p.__name__ in only]
@@ -444,7 +443,6 @@ def main():
         for label, folder in (("No environment", empty), ("Tampered pack", tampered)):
             env2 = dict(env)
             env2["VVLAB_ENVIRONMENTS"] = folder
-            env2["VVLAB_CONFIG"] = tempfile.mkdtemp(prefix="vv-m16-cfg-")
             proc = launch(exe, env2, a.port, allow_release=a.owner_allow_release_exe)
             try:
                 with sync_playwright() as pw:
