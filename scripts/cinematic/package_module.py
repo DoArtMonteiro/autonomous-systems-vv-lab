@@ -43,6 +43,50 @@ MIN_VRAM_BYTES = 2 * 1000 ** 3
 STUDIO_CONTRACT = {"interface": "vv-cinematic-launch.v1", "studio_min": "0.16.2"}
 PROJECT_FILES = ("project.godot", "main.tscn")
 PROJECT_DIRS = ("scripts", "shaders", "assets")
+# The repository project is the DEVELOPMENT one: its names are the development names and it has the runtime
+# guard as an autoload, so a run from the repository never writes into the installed module's user data
+# folder. Only packaging stamps the release names back, and leaves the guard out of the module.
+RELEASE_APP_NAME = "VV Lab Cinematic View"
+RELEASE_USER_DIR = "VV Lab Cinematic"
+DEV_NAME = "VV Lab Cinematic Dev"
+GUARD_SCRIPT = "guard.gd"
+GUARD_AUTOLOAD = '[autoload]\n\nRuntimeGuard="*res://scripts/guard.gd"\n\n'
+
+
+def release_project_godot(data):
+    """The release project.godot: the development project's bytes with the release names put back and the
+    guard autoload removed. Refuses anything that is not exactly the expected development project, so a
+    change to the names or the autoload cannot slip into a module unnoticed."""
+    text = data.decode("utf-8")
+    newline = "\r\n" if "\r\n" in text else "\n"
+    lf = text.replace("\r\n", "\n")
+    for old, new in (
+        (f'config/name="{DEV_NAME}"\n', f'config/name="{RELEASE_APP_NAME}"\n'),
+        (f'config/custom_user_dir_name="{DEV_NAME}"\n', f'config/custom_user_dir_name="{RELEASE_USER_DIR}"\n'),
+        (GUARD_AUTOLOAD, ""),
+    ):
+        if lf.count(old) != 1:
+            sys.exit(f"project.godot is not the expected development project: {old.strip()!r} found {lf.count(old)} times")
+        lf = lf.replace(old, new)
+    if DEV_NAME in lf or "RuntimeGuard" in lf:
+        sys.exit("project.godot still has a development name or the guard after stamping")
+    return lf.replace("\n", newline).encode("utf-8")
+
+
+def stage_project(proj):
+    """Copies the Cinematic project into `proj` as it ships: release names stamped, no guard script."""
+    os.makedirs(proj, exist_ok=True)
+    for name in PROJECT_FILES:
+        src = os.path.join(PROJECT, name)
+        if name == "project.godot":
+            with open(src, "rb") as f:
+                data = release_project_godot(f.read())
+            with open(os.path.join(proj, name), "wb") as f:
+                f.write(data)
+        else:
+            shutil.copy2(src, os.path.join(proj, name))
+    for d in PROJECT_DIRS:
+        shutil.copytree(os.path.join(PROJECT, d), os.path.join(proj, d), ignore=shutil.ignore_patterns("*.uid", "*.import", GUARD_SCRIPT))
 
 MODULE_LICENCE = """MIT License
 
@@ -77,12 +121,7 @@ def stage(godot_dir, root):
     os.makedirs(os.path.join(root, "godot"))
     for name in (GODOT_EXE, GODOT_CONSOLE):
         shutil.copy2(os.path.join(godot_dir, name), os.path.join(root, "godot", name))
-    proj = os.path.join(root, "project")
-    os.makedirs(proj)
-    for name in PROJECT_FILES:
-        shutil.copy2(os.path.join(PROJECT, name), os.path.join(proj, name))
-    for d in PROJECT_DIRS:
-        shutil.copytree(os.path.join(PROJECT, d), os.path.join(proj, d), ignore=shutil.ignore_patterns("*.uid", "*.import"))
+    stage_project(os.path.join(root, "project"))
     lic = os.path.join(root, "LICENSES")
     os.makedirs(lic)
     console = os.path.join(godot_dir, GODOT_CONSOLE)
