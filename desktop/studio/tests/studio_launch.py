@@ -17,10 +17,12 @@ stops the tests from ending the wrong process; the tests keep all three in place
    when any variable, resolved path or `--user-data-dir` argument lies in the installed profile, or
    when the executable is the installed one, carries the release identifier or has no known one. Only
    the explicit `allow_release` flag (command line `--owner-allow-release-exe`) lifts the executable
-   refusals; it never lifts the path refusals. `VVLAB_MODULES` is honoured only by debug builds: a
-   release-profile build with the development identifier keeps its Cinematic module folder under
-   `%LOCALAPPDATA%\org.vvlab.devstudio` (never the installed profile), and an executable started with the
-   owner flag resolves it to the installed profile.
+   refusals; it never lifts the path refusals. `VVLAB_MODULES` is honoured by any build whose identifier
+   is not the release one (the Studio keys it on identity, not on the build profile), so a development
+   build, debug or release profile, keeps its Cinematic module folder in the launch's token directory.
+   An executable started with the owner flag has the release identifier, ignores the variable and
+   resolves the module folder to the installed profile. It also writes the single-use launch token that
+   the development Studio's runtime guard requires (desktop/studio/src/guard.rs).
 3. Teardown. Only the process this module started is killed, by PID. Nothing here or in the other
    scripts kills by image name: the owner's installed Studio has the same image name, `vv-studio.exe`.
 

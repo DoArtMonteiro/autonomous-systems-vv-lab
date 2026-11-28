@@ -148,6 +148,17 @@ class StudioGuard(unittest.TestCase):
         env["VVLAB_CONFIG"] = r"\\localhost\c$\vv-guard-decoy"
         self.refused(self.probe(env), "VVLAB_CONFIG")
 
+    def test_a_token_file_kept_outside_its_token_directory_is_refused(self):
+        plan = self.launch_plan()
+        elsewhere = tempfile.mkdtemp(prefix="vv-guard-decoy-")
+        self.made.append(elsewhere)
+        moved = os.path.join(elsewhere, "launch.json")
+        shutil.copy(plan.env[sl.ENV_LAUNCH], moved)
+        env = dict(plan.env)
+        env[sl.ENV_LAUNCH] = moved
+        self.refused(self.probe(env), "not inside its token directory")
+        self.assertTrue(os.path.exists(moved), "a refused token is not consumed")
+
     def test_a_user_data_dir_browser_argument_is_refused(self):
         plan = self.launch_plan()
         env = dict(plan.env)

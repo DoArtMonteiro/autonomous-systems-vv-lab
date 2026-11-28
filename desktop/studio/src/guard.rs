@@ -196,16 +196,22 @@ pub fn decide(
         );
     };
     let release = release_identifier();
-    let protected: Vec<String> = [
+    let protected_paths = [
         format!("{local}\\{release}"),
         format!("{roaming}\\{release}"),
         format!("{documents}\\{LIBRARY_FOLDER}"),
         format!("{roaming}\\{CINEMATIC_FOLDER}"),
         format!("{local}\\{CINEMATIC_FOLDER}"),
-    ]
-    .iter()
-    .filter_map(|p| norm(p))
-    .collect();
+    ];
+    // Each protected folder as named and, when it exists, where it really is: a junction or symlink
+    // from the installed profile to another place must protect that place too.
+    let mut protected: Vec<String> = Vec::new();
+    for p in &protected_paths {
+        protected.extend(norm(p));
+        protected.extend(canon(p).and_then(|c| norm(&c)));
+    }
+    protected.sort();
+    protected.dedup();
     let roots: Vec<String> = [
         Some(local),
         Some(roaming),
@@ -271,6 +277,24 @@ fn real_canon(p: &str) -> Option<String> {
         .map(|c| c.to_string_lossy().into_owned())
 }
 
+/// The token file itself must lie, once resolved, inside the token directory it names: a token file
+/// kept elsewhere is not the one the launcher wrote there.
+pub fn token_file_inside(
+    file: &str,
+    token: &Token,
+    canon: &dyn Fn(&str) -> Option<String>,
+) -> Result<(), String> {
+    let real_file = canon(file).and_then(|c| norm(&c));
+    let real_dir = canon(&token.token_dir).and_then(|c| norm(&c));
+    match (real_file, real_dir) {
+        (Some(f), Some(d)) if is_under(&f, &d) => Ok(()),
+        _ => Err(format!(
+            "the launch token {file} is not inside its token directory {}",
+            token.token_dir
+        )),
+    }
+}
+
 /// Reads the token named by the environment, decides, and for a development start consumes the token
 /// (renames it to `.used`; a failure to do so refuses the start). Touches nothing else.
 pub fn evaluate(
@@ -290,7 +314,8 @@ pub fn evaluate(
             .map_err(|e| {
                 format!("the launch token {f} cannot be read ({e}): missing or already used")
             })
-            .and_then(|t| Token::parse(&t)),
+            .and_then(|t| Token::parse(&t))
+            .and_then(|t| token_file_inside(f, &t, &real_canon).map(|()| t)),
     };
     let decision = decide(identifier, env, token, known, &real_canon);
     if let (Decision::Dev(_), Some(f)) = (&decision, &file) {
@@ -354,12 +379,17 @@ pub fn real_known_folders() -> KnownFolders {
     KnownFolders::default()
 }
 
+/// Whether `--guard-only` is honoured. The release (installed) Studio ignores it and behaves exactly as
+/// it did before the guard existed.
+pub fn guard_only_applies(decision: &Decision, args: &[String]) -> bool {
+    !matches!(decision, Decision::Release) && args.iter().any(|a| a == "--guard-only")
+}
+
 /// The decision for the command line: refuses with the distinct exit code and one line on stderr, prints
 /// the decision for `--guard-only`, and returns only when the start is allowed.
 pub fn enforce(identifier: &str, args: &[String]) {
     let decision = check(identifier);
-    let guard_only = args.iter().any(|a| a == "--guard-only");
-    if guard_only {
+    if guard_only_applies(&decision, args) {
         println!("{}", decision.describe());
         std::process::exit(if matches!(decision, Decision::Refused(_)) {
             REFUSED_EXIT
@@ -670,6 +700,109 @@ mod tests {
         }
     }
 
+    fn args(list: &[&str]) -> Vec<String> {
+        list.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn the_release_studio_ignores_guard_only() {
+        let release = Decision::Release;
+        assert!(!guard_only_applies(
+            &release,
+            &args(&["vv-studio", "--guard-only"])
+        ));
+        assert!(!guard_only_applies(&release, &args(&["vv-studio"])));
+        let dev = Decision::Dev("c:\\x".into());
+        let refused = Decision::Refused("no".into());
+        for d in [&dev, &refused] {
+            assert!(guard_only_applies(d, &args(&["vv-studio", "--guard-only"])));
+            assert!(!guard_only_applies(d, &args(&["vv-studio"])));
+        }
+    }
+
+    #[test]
+    fn a_junction_from_installed_data_protects_its_target() {
+        // The installed profile folder is really somewhere else (a junction or symlink): a token
+        // directory inside that real place is refused although its path never names the profile.
+        let junction_target = "D:\\Elsewhere\\RealProfile";
+        let canon = |p: &str| -> Option<String> {
+            let q = fake_canon(p)?;
+            if norm(&q) == norm("C:\\FakeUser\\AppData\\Local\\org.vvlab.studio") {
+                Some(format!("\\\\?\\{junction_target}"))
+            } else {
+                Some(q)
+            }
+        };
+        for dir in [
+            format!("{junction_target}\\scratch"),
+            junction_target.to_string(),
+            "D:\\Elsewhere".to_string(),
+        ] {
+            let mut t = token();
+            t.token_dir = dir.clone();
+            let p: BTreeMap<String, String> = GUARDED
+                .iter()
+                .map(|n| (n.to_string(), format!("{dir}\\{}", n.to_lowercase())))
+                .collect();
+            t.paths = p.clone();
+            let mut e = env();
+            e.extend(p);
+            let d = decide(DEV, &e, Ok(t), &known(), &canon);
+            refused(&d, "installed data");
+        }
+        // A folder next to it is still accepted.
+        let mut t = token();
+        t.token_dir = "D:\\Elsewhere2\\scratch".into();
+        let p: BTreeMap<String, String> = GUARDED
+            .iter()
+            .map(|n| {
+                (
+                    n.to_string(),
+                    format!("D:\\Elsewhere2\\scratch\\{}", n.to_lowercase()),
+                )
+            })
+            .collect();
+        t.paths = p.clone();
+        let mut e = env();
+        e.extend(p);
+        assert!(matches!(
+            decide(DEV, &e, Ok(t), &known(), &canon),
+            Decision::Dev(_)
+        ));
+    }
+
+    #[test]
+    fn the_token_file_must_lie_inside_its_token_directory() {
+        let t = token();
+        assert!(
+            token_file_inside("C:\\Scratch\\vv-launch-1\\launch.json", &t, &fake_canon).is_ok()
+        );
+        assert!(
+            token_file_inside(
+                "C:\\Scratch\\vv-launch-1\\sub\\launch.json",
+                &t,
+                &fake_canon
+            )
+            .is_ok()
+        );
+        for outside in [
+            "C:\\Elsewhere\\launch.json",
+            "C:\\Scratch\\vv-launch-10\\launch.json",
+            "C:\\Scratch\\vv-launch-1\\..\\other\\launch.json",
+            "C:\\Scratch\\missing\\launch.json",
+        ] {
+            assert!(
+                token_file_inside(outside, &t, &fake_canon).is_err(),
+                "{outside}"
+            );
+        }
+        let mut gone = token();
+        gone.token_dir = "C:\\Scratch\\missing".into();
+        assert!(
+            token_file_inside("C:\\Scratch\\vv-launch-1\\launch.json", &gone, &fake_canon).is_err()
+        );
+    }
+
     /// Process-independent checks of the file handling, in disposable folders (never the real profile).
     mod files {
         use super::*;
@@ -718,6 +851,64 @@ mod tests {
             assert!(dir.join("launch.json.used").exists());
             // The same environment again: the token is gone.
             refused(&evaluate(DEV, &env, &known), "missing or already used");
+        }
+
+        #[test]
+        fn a_token_file_kept_outside_its_token_directory_is_refused_and_not_consumed() {
+            let (dir, mut env, known) = launch("outside-file");
+            let elsewhere = scratch("outside-file-elsewhere");
+            let moved = elsewhere.join("launch.json");
+            fs::copy(dir.join("launch.json"), &moved).unwrap();
+            env.insert(ENV_LAUNCH.into(), moved.to_string_lossy().into_owned());
+            refused(
+                &evaluate(DEV, &env, &known),
+                "is not inside its token directory",
+            );
+            assert!(moved.exists(), "a refused token is not consumed");
+            assert!(!elsewhere.join("launch.json.used").exists());
+        }
+
+        #[test]
+        fn a_real_junction_from_installed_data_protects_its_target() {
+            // A real directory junction (mklink /J), created and removed inside disposable folders.
+            let (_dir, env, mut known) = launch("junction");
+            let target = scratch("junction-target");
+            let local = PathBuf::from(known.local_app_data.clone().unwrap());
+            fs::create_dir_all(&local).unwrap();
+            let link = local.join(release_identifier());
+            let made = std::process::Command::new("cmd")
+                .args(["/C", "mklink", "/J"])
+                .arg(&link)
+                .arg(&target)
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false);
+            if !made {
+                return; // junctions unavailable here: nothing to check
+            }
+            // The token directory is inside the junction's real target.
+            let inner = target.join("tok");
+            fs::create_dir_all(&inner).unwrap();
+            let mut paths = serde_json::Map::new();
+            let mut env2 = env.clone();
+            for name in GUARDED {
+                let p = inner.join(name.to_lowercase());
+                fs::create_dir_all(&p).unwrap();
+                paths.insert(name.into(), p.to_string_lossy().into_owned().into());
+                env2.insert(name.to_string(), p.to_string_lossy().into_owned());
+            }
+            let file = inner.join("launch.json");
+            let body = serde_json::json!({ "nonce": "abc", "token_dir": inner.to_string_lossy(), "paths": paths });
+            fs::write(&file, body.to_string()).unwrap();
+            env2.insert(ENV_LAUNCH.into(), file.to_string_lossy().into_owned());
+            known.local_app_data = Some(local.to_string_lossy().into_owned());
+            let d = evaluate(DEV, &env2, &known);
+            let _ = std::process::Command::new("cmd")
+                .args(["/C", "rmdir"])
+                .arg(&link)
+                .output();
+            refused(&d, "installed data");
+            assert!(file.exists(), "a refused token is not consumed");
         }
 
         #[test]
