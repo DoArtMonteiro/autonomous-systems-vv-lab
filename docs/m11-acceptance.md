@@ -6,7 +6,7 @@ Este ramo integra o M11 em `main` sem o M10 (que fica no PR #15). As verificaç�
 
 ## Instalar
 
-1. Obter o instalador `VV Lab Studio_0.11.0_x64-setup.exe`: o artefacto `vv-lab-studio-installer` do job `installer` da CI, com o ficheiro `.sha256` ao lado, ou uma construção local com `desktop\build.ps1` (em `desktop\target\release\bundle\nsis\`). Duas construções da mesma fonte não são iguais byte a byte (o NSIS e o empacotamento incluem datas); comparar o SHA-256 com o do artefacto que se instala. O instalador não é assinado: o SmartScreen mostra "O Windows protegeu o computador"; escolher "Mais informações" e "Executar mesmo assim".
+1. Obter o instalador `VV Lab Studio_0.11.0_x64-setup.exe`: o artefacto `vv-lab-studio-installer` do job `installer` da CI, com o ficheiro `.sha256` ao lado, ou uma construção local com `desktop\build.ps1 -Release` (sem `-Release` o script constrói uma versão de desenvolvimento, sem instalador; em `desktop\target\release\bundle\nsis\`). Duas construções da mesma fonte não são iguais byte a byte (o NSIS e o empacotamento incluem datas); comparar o SHA-256 com o do artefacto que se instala. O instalador não é assinado: o SmartScreen mostra "O Windows protegeu o computador"; escolher "Mais informações" e "Executar mesmo assim".
 2. Correr o instalador. A instalação é por utilizador (sem pedido de administrador) em `%LOCALAPPDATA%\VV Lab Studio\`, com atalho no menu Iniciar e no ambiente de trabalho. O WebView2 já vem no Windows 11; se faltar, o instalador traz o instalador de arranque do WebView2.
 3. Abrir "VV Lab Studio" no menu Iniciar. Não abre nenhuma consola.
 
@@ -38,7 +38,7 @@ Os 365 testes Python da raiz passam neste ramo (3 ignorados).
 
 #### Verificação num checkout limpo (CI, 03/11/2026)
 
-Job `installer (windows-latest)` do workflow `verification`, no PR #16, sobre o commit `b815bb5`: checkout limpo, Rust 1.99.0, Node 22, `desktop\build.ps1`, instalação silenciosa, verificação dos ficheiros instalados e de `VCRUNTIME140.dll`, `vv-studio.exe --self-test` instalado e desinstalação silenciosa. Resultado do instalador: `VV Lab Studio_0.11.0_x64-setup.exe`, 5 697 238 bytes, SHA-256 `f3ac143685963d4a9b0ff1a73651b9afc853f211f6173259b3b7a57906ee2e82`. Os jobs `ubuntu-latest`, `windows-latest` (verificações da raiz) e `desktop (windows-latest)` passaram no mesmo run.
+Job `installer (windows-latest)` do workflow `verification`, no PR #16, sobre o commit `b815bb5`: checkout limpo, Rust 1.99.0, Node 22, `desktop\build.ps1` (hoje `desktop\build.ps1 -Release`), instalação silenciosa, verificação dos ficheiros instalados e de `VCRUNTIME140.dll`, `vv-studio.exe --self-test` instalado e desinstalação silenciosa. Resultado do instalador: `VV Lab Studio_0.11.0_x64-setup.exe`, 5 697 238 bytes, SHA-256 `f3ac143685963d4a9b0ff1a73651b9afc853f211f6173259b3b7a57906ee2e82`. Os jobs `ubuntu-latest`, `windows-latest` (verificações da raiz) e `desktop (windows-latest)` passaram no mesmo run.
 
 No runner, o teste de interface não corre: a aplicação arranca e fica em execução, com WebView2 156.0.4314.50, mas o WebView2 não abre o endpoint de depuração. Por isso esse passo é informativo na CI, e o teste de interface foi feito nesta máquina contra o artefacto da CI:
 

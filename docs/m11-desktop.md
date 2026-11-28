@@ -107,10 +107,25 @@ Requisitos de construção (não de instalação): a cadeia Rust de `rust-toolch
 
 ```powershell
 cd desktop\studio; npm ci; cd ..\..
-powershell -ExecutionPolicy Bypass -File desktop\build.ps1
+powershell -ExecutionPolicy Bypass -File desktop\build.ps1 -Release   # instalador
+powershell -ExecutionPolicy Bypass -File desktop\build.ps1            # construção de desenvolvimento, sem instalador
 ```
 
-O script constrói `vv-lab.exe` (pacote da raiz), os três anfitriões, monta `desktop\target\release\domains\`, corre `tauri build` e mostra o caminho e o SHA-256 do instalador em `desktop\target\release\bundle\nsis\`. A CLI do Tauri é chamada com `node` diretamente, porque o atalho `npx` falha em caminhos com `&`.
+O script constrói `vv-lab.exe` (pacote da raiz), os anfitriões, monta `desktop\target\release\domains\`, corre `tauri build` e, com `-Release`, mostra o caminho e o SHA-256 do instalador em `desktop\target\release\bundle\nsis\`. Sem `-Release` corre `tauri build --no-bundle` e não produz instalador. A CLI do Tauri é chamada com `node` diretamente, porque o atalho `npx` falha em caminhos com `&`.
+
+### Identificador da aplicação e isolamento dos testes
+
+**Mudança no procedimento de lançamento de uma versão: o instalador só se constrói com `-Release`.** Antes, `build.ps1` sem argumentos construía o instalador; agora constrói uma versão de desenvolvimento sem instalador, e o fluxo da CI usa `-Release`.
+
+- `desktop/studio/tauri.conf.json` tem o identificador de desenvolvimento `org.vvlab.devstudio` e o nome de produto `VV Lab Studio (dev)`. O identificador não contém o de lançamento como prefixo.
+- `desktop/studio/tauri.release.conf.json` repõe `org.vvlab.studio` e `VV Lab Studio`. Só `build.ps1 -Release` o aplica (`tauri build --config`). O script confirma o identificador resultante antes de compilar (`-Release`: exatamente `org.vvlab.studio`; caso contrário: não pode ser esse) e confirma depois que o `vv-studio.exe` compilado só contém o identificador esperado. Recusa-se a correr com `TAURI_CONFIG` definido no ambiente.
+- Os caminhos de dados do Tauri (`%LOCALAPPDATA%\<identificador>`, `%APPDATA%\<identificador>`, incluindo o perfil do WebView2 em `EBWebView`) derivam do identificador. Uma construção de desenvolvimento usa, por isso, as pastas `org.vvlab.devstudio`. O instalador usa o nome de produto para a pasta de instalação, que continua `%LOCALAPPDATA%\VV Lab Studio\`.
+- Os testes de interface em `desktop/studio/tests/` só lançam um executável através de `studio_launch.py`. O auxiliar redireciona `WEBVIEW2_USER_DATA_FOLDER`, `VVLAB_LIBRARY`, `VVLAB_CONFIG` e `VVLAB_MODULES` para pastas temporárias (`VVLAB_MODULES` só vale em construções de depuração; numa construção de desenvolvimento em modo de lançamento a pasta do módulo Cinematic fica em `%LOCALAPPDATA%\org.vvlab.devstudio`, nunca no perfil instalado), recusa qualquer caminho dentro de `%LOCALAPPDATA%\org.vvlab.studio`, de `%APPDATA%\org.vvlab.studio` ou da biblioteca `Documentos\VV Lab Library`, recusa o executável instalado e qualquer executável com o identificador de lançamento, e só termina o processo que ele próprio lançou, por PID.
+- Só o responsável pode usar `--owner-allow-release-exe` (aceite por todos os percursos) para lançar o executável instalado ou de lançamento, e só se deve usar nos percursos auditados para esse modo (`ui_smoke`, `m15_journeys`, `m16_journeys`, `m17_lab_journeys`, `perf_probe`, `m16_compare_shots`, `m17_tech_shots`, que nunca arrancam nem leem o módulo Cinematic). `m17_cinematic_journey` desinstala e reinstala o módulo e recusa a opção sem `--i-accept-installed-module-uninstall`; os restantes percursos (`m18_journeys`, `ux_journeys`, `ux2_journeys`, `review_captures`, `installed_spotcheck`) arrancam o módulo e não estão auditados. Nesse modo o executável de lançamento ignora `VVLAB_MODULES` (é só de depuração) e a pasta do módulo Cinematic continua a ser a do perfil instalado. A CI usa a opção num executor descartável, depois de instalar o instalador acabado de construir.
+- O Godot do módulo Cinematic guarda dados em `%APPDATA%\VV Lab Cinematic`. Os testes e os *scripts* só o arrancam por `desktop/studio/tests/godot_launch.py`, que redireciona `APPDATA` e `LOCALAPPDATA` do processo filho para pastas temporárias; `studio_launch.py` faz o mesmo à Studio lançada, para que o Godot que ela arranca fique igualmente isolado.
+- `tests/test_studio_isolation.py` verifica estas regras sem lançar a aplicação e entra no comando de testes Python do `AGENTS.md`.
+
+O registo do incidente que motivou isto está em `docs/incidents/2026-11-23-webview2-profile.md`.
 
 Verificações do espaço de trabalho do produto:
 

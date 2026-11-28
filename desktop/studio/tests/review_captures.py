@@ -5,7 +5,7 @@ theme and in the light theme at 1440x900. It checks that the pills, the caption 
 not overlap and that no run pill is cut. It uses a scratch library; the pictures show the Studio window,
 so they stay out of the repository.
 
-    python desktop/studio/tests/review_captures.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --shots <scratch folder>
+    python desktop/studio/tests/review_captures.py --exe desktop\target\debug\vv-studio.exe --shots <scratch folder>
 """
 
 import argparse
@@ -19,6 +19,8 @@ import time
 from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import godot_launch  # noqa: E402
+import studio_launch  # noqa: E402
 import installed_spotcheck as spot  # noqa: E402
 import m18_journeys as m18  # noqa: E402
 import ux_journeys as ux1  # noqa: E402
@@ -89,7 +91,7 @@ def studio_panel(s, proc, tag, shots, expect, at="100"):
     exe = cmd.split('"')[1] if cmd.startswith('"') else cmd.split()[0]
     console = os.path.join(os.path.dirname(exe), "Godot_v4.7.2-stable_win64_console.exe")
     out = os.path.join(shots, f"cinematic-panel-{tag}.png")
-    r = subprocess.run([console] + args + ["--t", at, "--shot", out], capture_output=True, text=True, timeout=300)
+    r = godot_launch.run([console] + args + ["--t", at, "--shot", out], capture_output=True, text=True, timeout=300)
     check(f"Cinematic {tag}: the module's own --shot drew the panel of this run", os.path.isfile(out) and os.path.getsize(out) > 10000, f"{os.path.isfile(out) and os.path.getsize(out)} bytes, exit {r.returncode}")
 
 
@@ -98,6 +100,7 @@ def main():
     ap.add_argument("--exe", required=True)
     ap.add_argument("--shots", required=True)
     ap.add_argument("--port", type=int, default=9272)
+    studio_launch.add_arguments(ap)
     a = ap.parse_args()
     os.makedirs(a.shots, exist_ok=True)
     env = dict(os.environ)
@@ -107,7 +110,7 @@ def main():
     env["VVLAB_CONFIG"] = tempfile.mkdtemp(prefix="vv-cap-cfg-")
     env["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = f"--remote-debugging-port={a.port}"
     print("scratch library:", env["VVLAB_LIBRARY"], flush=True)
-    proc = launch(os.path.abspath(os.path.expandvars(a.exe)), env, a.port)
+    proc = launch(os.path.abspath(os.path.expandvars(a.exe)), env, a.port, allow_release=a.owner_allow_release_exe)
     try:
         with sync_playwright() as pw:
             browser, s = session(pw, a.port, a.shots)
@@ -222,7 +225,7 @@ def main():
             check("No page error or console error", not errors, "; ".join(errors)[:300])
             browser.close()
     finally:
-        proc.kill()
+        studio_launch.stop(proc)
     failed = [r for r in results if not r[1]]
     print(f"\n{len(results) - len(failed)}/{len(results)} checks passed")
     sys.exit(1 if failed else 0)

@@ -266,7 +266,7 @@ jobs:
 
       - name: Build the domain hosts, the studio and the NSIS installer
         shell: pwsh
-        run: powershell -NoProfile -ExecutionPolicy Bypass -File desktop/build.ps1
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File desktop/build.ps1 -Release
 
       - name: Record the installer and its SHA-256
         id: installer
@@ -317,11 +317,11 @@ jobs:
           $wv = Get-ItemProperty "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}" -ErrorAction SilentlyContinue
           Write-Host "WebView2 runtime: $($wv.pv); session: $([Environment]::UserInteractive)"
           python -m pip install --disable-pip-version-check playwright==1.64.1
-          python desktop/studio/tests/ui_smoke.py --exe "$env:LOCALAPPDATA\VV Lab Studio\vv-studio.exe" --domains "" --port 9333 --shots "$env:RUNNER_TEMP\ui-shots"
+          python desktop/studio/tests/ui_smoke.py --exe "$env:LOCALAPPDATA\VV Lab Studio\vv-studio.exe" --owner-allow-release-exe --domains "" --port 9333 --shots "$env:RUNNER_TEMP\ui-shots"
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          python desktop/studio/tests/m15_journeys.py --exe "$env:LOCALAPPDATA\VV Lab Studio\vv-studio.exe" --domains "" --port 9334 --shots "$env:RUNNER_TEMP\ui-shots-m15"
+          python desktop/studio/tests/m15_journeys.py --exe "$env:LOCALAPPDATA\VV Lab Studio\vv-studio.exe" --owner-allow-release-exe --domains "" --port 9334 --shots "$env:RUNNER_TEMP\ui-shots-m15"
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          python desktop/studio/tests/m16_journeys.py --exe "$env:LOCALAPPDATA\VV Lab Studio\vv-studio.exe" --domains "" --environments "" --port 9335 --shots "$env:RUNNER_TEMP\ui-shots-m16"
+          python desktop/studio/tests/m16_journeys.py --exe "$env:LOCALAPPDATA\VV Lab Studio\vv-studio.exe" --owner-allow-release-exe --domains "" --environments "" --port 9335 --shots "$env:RUNNER_TEMP\ui-shots-m16"
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
 
       - name: Uninstall silently

@@ -11,9 +11,11 @@ Usage (from the repository root, after `cargo build -p vv-studio` in desktop/):
 
     python desktop/studio/tests/ui_smoke.py [--exe PATH] [--domains DIR] [--shots DIR] [--port N]
 
-Against the installed application, using the domain hosts installed next to it:
+Owner only, audited as safe in this mode (the suite never starts or reads the Cinematic module): against the installed
+application, using the domain hosts installed next to it. The library, the preferences and the WebView2 profile are
+scratch folders; the Cinematic module folder resolves to the installed profile. Not for development:
 
-    python desktop/studio/tests/ui_smoke.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --domains ""
+    python desktop/studio/tests/ui_smoke.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --owner-allow-release-exe --domains ""
 
 `--domains ""` leaves VVLAB_DOMAINS unset, so the studio uses its own resource directory.
 Window sizes are set on the real window (Tauri setSize); DevTools viewport emulation is used only
@@ -33,6 +35,9 @@ import traceback
 import urllib.request
 
 from playwright.sync_api import sync_playwright
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import studio_launch  # noqa: E402
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
@@ -590,6 +595,7 @@ def main():
     ap.add_argument("--shots", default=os.path.join(REPO, "docs", "images", "m11-studio"))
     ap.add_argument("--port", type=int, default=9222)
     ap.add_argument("--keep-library", action="store_true")
+    studio_launch.add_arguments(ap)
     a = ap.parse_args()
     a.exe = os.path.expandvars(a.exe)
     if not os.path.isfile(a.exe):
@@ -614,9 +620,9 @@ def main():
     env["VVLAB_CONFIG"] = config
     print(f"exe {a.exe}\ndomains {a.domains or '(installed resource directory)'}\nlibrary {library}\nconfig {config}")
     env["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = f"--remote-debugging-port={a.port}"
-    # A running instance would swallow the launch (single-instance plugin) and keep its own library.
-    subprocess.run(["taskkill", "/F", "/IM", os.path.basename(a.exe)], capture_output=True)
-    proc = subprocess.Popen([a.exe], env=env)
+    # A running instance of this executable would swallow the launch (single-instance plugin) and
+    # keep its own library: the helper refuses to start, it never kills it.
+    proc = studio_launch.launch(a.exe, env, a.port, allow_release=a.owner_allow_release_exe, wait_seconds=0)
     page = None
     try:
         for _ in range(120):
@@ -660,7 +666,7 @@ def main():
                     pass
             check("no script error in the page", not console_errors, "; ".join(console_errors[:5]))
     finally:
-        proc.kill()
+        studio_launch.stop(proc)
         proc.wait(timeout=10)
         if not a.keep_library:
             shutil.rmtree(library, ignore_errors=True)

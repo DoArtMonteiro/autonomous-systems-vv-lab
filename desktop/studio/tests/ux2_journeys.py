@@ -6,7 +6,7 @@ row, the Home statistics block, an unsafe run and a thrust consistency check rea
 uses a scratch library; page screenshots (dark and light) go to --shots and show the Studio window, so
 they stay out of the repository.
 
-    python desktop/studio/tests/ux2_journeys.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --shots <scratch folder>
+    python desktop/studio/tests/ux2_journeys.py --exe desktop\target\debug\vv-studio.exe --shots <scratch folder>
 
 Scripted checks of what the screen shows, not observations of people.
 """
@@ -22,6 +22,7 @@ import time
 from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import studio_launch  # noqa: E402
 import m18_journeys as m18  # noqa: E402
 import ux_journeys as ux1  # noqa: E402
 from m15_journeys import check, errors, results  # noqa: E402
@@ -492,6 +493,7 @@ def main():
     ap.add_argument("--port", type=int, default=9271)
     ap.add_argument("--domains", default="")
     ap.add_argument("--environments", default="")
+    studio_launch.add_arguments(ap)
     a = ap.parse_args()
     os.makedirs(a.shots, exist_ok=True)
     env = dict(os.environ)
@@ -507,7 +509,7 @@ def main():
     env["VVLAB_LIBRARY"] = tempfile.mkdtemp(prefix="vv-ux2-lib-")
     env["VVLAB_CONFIG"] = tempfile.mkdtemp(prefix="vv-ux2-cfg-")
     env["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = f"--remote-debugging-port={a.port}"
-    proc = launch(os.path.abspath(os.path.expandvars(a.exe)), env, a.port)
+    proc = launch(os.path.abspath(os.path.expandvars(a.exe)), env, a.port, allow_release=a.owner_allow_release_exe)
     try:
         with sync_playwright() as pw:
             browser, s = session(pw, a.port, a.shots)
@@ -530,7 +532,7 @@ def main():
             check("No page error or console error", not errors, "; ".join(errors)[:300])
             browser.close()
     finally:
-        proc.kill()
+        studio_launch.stop(proc)
     with open(os.path.join(a.shots, "ux2-facts.json"), "w", encoding="utf-8") as f:
         json.dump(FACTS, f, indent=1, sort_keys=True)
     failed = [r for r in results if not r[1]]

@@ -11,7 +11,10 @@ Needs Godot 4.7.2: set VV_GODOT to the console executable; without it the tests 
 
 import json
 import os
-import subprocess
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "desktop", "studio", "tests"))
+import godot_launch  # noqa: E402
 import unittest
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -26,7 +29,7 @@ class Policy(unittest.TestCase):
             self.skipTest("VV_GODOT is not set to a Godot 4.7.2 console executable")
 
     def dump(self, run, *extra):
-        out = subprocess.run([self.godot, "--headless", "--path", PROJECT, "--", "--run", os.path.join(FIXTURES, run), "--policy-dump", *extra],
+        out = godot_launch.run([self.godot, "--headless", "--path", PROJECT, "--", "--run", os.path.join(FIXTURES, run), "--policy-dump", *extra],
                              capture_output=True, text=True, timeout=120, encoding="utf-8", errors="replace")
         self.assertEqual(out.returncode, 0, out.stderr[-800:])
         lines = [x for x in out.stdout.splitlines() if x.startswith("POLICY ")]

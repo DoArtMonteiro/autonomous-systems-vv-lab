@@ -1,0 +1,31 @@
+# Verificação ao vivo do isolamento
+
+Uma construção de desenvolvimento (`cargo build -p vv-studio` em `desktop/`, identificador `org.vvlab.devstudio`) foi lançada três vezes (ver «história da medição»), por `desktop/studio/tests/studio_launch.py`, com a Studio instalada fechada. O resultado abaixo é o da terceira execução, a de `live_check.py`. Os perfis da instalação foram listados antes e depois, só com metadados (caminho, tipo, tamanho dos ficheiros, data de modificação em ns). Resultado completo em `result.json`; o programa que o produziu é `live_check.py`.
+
+## Resultado
+
+| Verificação | Resultado |
+| --- | --- |
+| Identificadores no executável (`embedded_identifiers`) | só `org.vvlab.devstudio` |
+| Duas listagens de controlo, com 5 s de intervalo, sem lançamento | idênticas |
+| `%LOCALAPPDATA%\org.vvlab.studio`, antes e depois | idêntica: 914 entradas, SHA-256 `cd81f5b0...2917` |
+| `%APPDATA%\org.vvlab.studio`, antes e depois | idêntica: 1 entrada, SHA-256 `d9c0a437...0a829` |
+| Ponto de ligação das DevTools do WebView2 | abriu; a aplicação ficou viva cerca de 8 s |
+| Fim do processo | por PID próprio; nenhum processo ficou ligado à pasta temporária |
+| Perfil do WebView2 | foi criado dentro da pasta temporária (`EBWebView`) |
+| `%LOCALAPPDATA%\org.vvlab.devstudio` | criada pelo arranque, **vazia** (0 ficheiros); `%APPDATA%\org.vvlab.devstudio` não existe |
+
+As somas completas estão em `result.json`. As listagens em si não são publicadas.
+
+## Também verificado
+
+- Compilar a mesma árvore com a sobreposição de lançamento (`TAURI_CONFIG` com o conteúdo de `desktop/studio/tauri.release.conf.json`) dá um executável que contém só `org.vvlab.studio`; voltar a compilar sem ela volta a dar só `org.vvlab.devstudio`. Cada compilação voltou a compilar o `vv-studio` (4 s), por isso uma alteração do identificador não deixa um executável antigo.
+
+- A CLI do Tauri 2.11.5, chamada como `build.ps1` a chama, sem instalador: `tauri build --no-bundle` deu um `vv-studio.exe` de lançamento (perfil de compilação `release`) que contém só `org.vvlab.devstudio`; `tauri build --no-bundle --config desktop/studio/tauri.release.conf.json` deu um que contém só `org.vvlab.studio`. As construções de lançamento já existentes noutras árvores (`m16`, `m18`, `rel`) contêm só `org.vvlab.studio`, e o leitor de identificador diz o mesmo. O `build.ps1` completo, sem `-Release` e com `-Release`, foi executado depois, de ponta a ponta, com as verificações a passar: ver `build-e2e.md`.
+
+## Limitações e história da medição
+
+- Uma máquina (Windows 11 Pro 10.0.26300, Python 3.14.6), cerca de 14 s por lançamento, sem domínios nem ficheiros de missão. Não prova que nenhum percurso longo escreve fora das pastas temporárias; prova que o arranque e o encerramento não tocam no perfil instalado.
+- Uma primeira tentativa, antes do controlo, deu somas diferentes em `%LOCALAPPDATA%\org.vvlab.studio`. A diferença eram só 27 diretorias vazias a mudar de 0 para 4096 no campo «tamanho», sem nenhuma data de modificação alterada e em pastas que o lançamento não podia ter tocado (por exemplo `modules\cinematic`). A explicação provável é um artefacto da leitura do tamanho de diretorias, mas **não foi verificada**: a primeira listagem foi descartada e não se investigou a causa. O método foi alterado para não registar o tamanho de diretorias, e a verificação repetida desde o início, com o controlo, deu as listagens idênticas acima. A tentativa original não faz parte do resultado. A repetição com o método corrigido foi feita com um programa igual ao que está aqui (`live_check.py` é a sua versão limpa) e deu o mesmo resultado; o `result.json` é da terceira execução, a de `live_check.py`, com o mesmo executável.
+- O executável instalado não foi lido, lançado nem alterado; nenhuma listagem escreveu em nenhuma pasta de dados.
+- O encerramento foi pelo PID do processo lançado. O executável instalado tem o mesmo nome de imagem, por isso nenhum comando usou o nome da imagem.

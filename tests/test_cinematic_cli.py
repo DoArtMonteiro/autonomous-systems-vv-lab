@@ -5,7 +5,10 @@ Needs Godot 4.7.2: set VV_GODOT to the console executable; without it the tests 
 
 import json
 import os
-import subprocess
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "desktop", "studio", "tests"))
+import godot_launch  # noqa: E402
 import unittest
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -20,7 +23,7 @@ class CameraPoseArguments(unittest.TestCase):
             self.skipTest("VV_GODOT is not set to a Godot 4.7.2 console executable")
 
     def refused(self, *extra):
-        out = subprocess.run([self.godot, "--headless", "--path", PROJECT, "--", "--run", RUN, "--pose-dump", "1", *extra],
+        out = godot_launch.run([self.godot, "--headless", "--path", PROJECT, "--", "--run", RUN, "--pose-dump", "1", *extra],
                              capture_output=True, text=True, timeout=120, encoding="utf-8", errors="replace")
         self.assertEqual(out.returncode, 2, out.stderr[-500:])
 
@@ -46,7 +49,7 @@ class CameraPoseArguments(unittest.TestCase):
         self.refused("--camera-pose", "1,2,3,4,5,6,40", "--camera-pose", "1,2,3,1,2,3,40")
 
     def test_usage_names_the_low_camera(self):
-        out = subprocess.run([self.godot, "--headless", "--path", PROJECT, "--", "--run", RUN, "--bogus"],
+        out = godot_launch.run([self.godot, "--headless", "--path", PROJECT, "--", "--run", RUN, "--bogus"],
                              capture_output=True, text=True, timeout=120, encoding="utf-8", errors="replace")
         self.assertEqual(out.returncode, 2)
         self.assertIn("lowwide", out.stderr + out.stdout)
@@ -61,7 +64,7 @@ class DisplayArguments(unittest.TestCase):
             self.skipTest("VV_GODOT is not set to a Godot 4.7.2 console executable")
 
     def run_with(self, *extra):
-        return subprocess.run([self.godot, "--headless", "--path", PROJECT, "--", "--run", RUN, "--pose-dump", "1", *extra],
+        return godot_launch.run([self.godot, "--headless", "--path", PROJECT, "--", "--run", RUN, "--pose-dump", "1", *extra],
                               capture_output=True, text=True, timeout=120, encoding="utf-8", errors="replace")
 
     def test_good_values_are_accepted(self):
@@ -81,7 +84,7 @@ class DisplayArguments(unittest.TestCase):
 
     def test_the_largest_seed_is_accepted_and_bidi_overrides_are_removed_not_refused(self):
         self.assertEqual(self.run_with("--seed", "9" * 18).returncode, 0)
-        out = subprocess.run([self.godot, "--headless", "--path", PROJECT, "--", "--run", RUN, "--policy-dump", "--run-label", "a\u202eb\u2066c", "--vehicle", "x\u202ey", "--conditions", "GPS noise 1 mm \u202e\u00b7 radius", "--seed", "42"],
+        out = godot_launch.run([self.godot, "--headless", "--path", PROJECT, "--", "--run", RUN, "--policy-dump", "--run-label", "a\u202eb\u2066c", "--vehicle", "x\u202ey", "--conditions", "GPS noise 1 mm \u202e\u00b7 radius", "--seed", "42"],
                              capture_output=True, text=True, timeout=120, encoding="utf-8", errors="replace")
         self.assertEqual(out.returncode, 0, out.stderr[-500:])
         line = next(ln for ln in out.stdout.splitlines() if ln.startswith("POLICY "))
@@ -97,7 +100,7 @@ class DisplayArguments(unittest.TestCase):
         self.assertEqual(self.run_with("--conditions", "a	b").returncode, 2)
 
     def policy(self, *extra):
-        out = subprocess.run([self.godot, "--headless", "--path", PROJECT, "--", "--run", RUN, "--policy-dump", *extra],
+        out = godot_launch.run([self.godot, "--headless", "--path", PROJECT, "--", "--run", RUN, "--policy-dump", *extra],
                              capture_output=True, text=True, timeout=120, encoding="utf-8", errors="replace")
         self.assertEqual(out.returncode, 0, out.stderr[-500:])
         line = next(ln for ln in out.stdout.splitlines() if ln.startswith("POLICY "))

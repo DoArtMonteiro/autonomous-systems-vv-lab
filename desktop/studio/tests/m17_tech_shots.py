@@ -1,9 +1,15 @@
 r"""Technical-view screenshots for the M17 comparison with the Cinematic View: the installed Studio's
 geospatial view of the mission "A sensor that lies" on one environment, at given playback times and
-camera presets, 1440x900. Unlike m16_journeys.launch, it does not kill other Studio processes; it
-refuses to start if one is running (the single-instance plugin would hand the launch to it).
+camera presets, 1440x900. Started through studio_launch, which refuses to start while the same
+executable is already running (the single-instance plugin would hand the launch to it) and never kills it.
 
-    python desktop/studio/tests/m17_tech_shots.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --out docs/evidence/m17/cinematic --shots follow:7.31,follow:16.29,closeup:23.336
+    python desktop/studio/tests/m17_tech_shots.py --exe desktop\target\debug\vv-studio.exe --out docs/evidence/m17/cinematic --shots follow:7.31,follow:16.29,closeup:23.336
+
+    Owner only, for suites audited as safe in this mode (this one never starts or reads the Cinematic module): against the
+    installed Studio. The library, the preferences and the WebView2 profile are scratch folders, but the Cinematic module
+    folder resolves to the installed profile. Not for development:
+
+    python desktop/studio/tests/m17_tech_shots.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --owner-allow-release-exe --out docs/evidence/m17/cinematic --shots follow:7.31,follow:16.29,closeup:23.336
 
 Also writes the run's record to --record-out (when given), so the Cinematic View can be shown the
 same record (by default the robust run, which lands). These are pictures, not measurements.
@@ -21,6 +27,7 @@ import urllib.request
 from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import studio_launch  # noqa: E402
 from m16_journeys import open_mission  # noqa: E402
 from m15_journeys import S  # noqa: E402
 
@@ -36,11 +43,9 @@ def main():
     ap.add_argument("--port", type=int, default=9251)
     ap.add_argument("--record-out", default="")
     ap.add_argument("--run-index", type=int, default=1, help="run of the mission shown (1: robust controller)")
+    studio_launch.add_arguments(ap)
     a = ap.parse_args()
     exe = os.path.abspath(os.path.expandvars(a.exe))
-    running = subprocess.run(["tasklist", "/FI", f"IMAGENAME eq {os.path.basename(exe)}", "/NH"], capture_output=True, text=True).stdout
-    if os.path.basename(exe).lower() in running.lower():
-        sys.exit("a Studio is already running; close it first (this script does not kill it)")
     os.makedirs(a.out, exist_ok=True)
     env = dict(os.environ)
     for k in ("VVLAB_DOMAINS", "VVLAB_EXTRA_DOMAINS", "VVLAB_EXEC", "VVLAB_CLAIMS", "VVLAB_ENVIRONMENTS", "VVLAB_MODULES"):
@@ -48,7 +53,7 @@ def main():
     env["VVLAB_LIBRARY"] = tempfile.mkdtemp(prefix="vv-m17-lib-")
     env["VVLAB_CONFIG"] = tempfile.mkdtemp(prefix="vv-m17-cfg-")
     env["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = f"--remote-debugging-port={a.port}"
-    proc = subprocess.Popen([exe], env=env)
+    proc = studio_launch.launch(exe, env, a.port, allow_release=a.owner_allow_release_exe, wait_seconds=0)
     meta = {"exe": os.path.basename(exe), "mission": MISSION, "environment": a.env, "shots": []}
     try:
         for _ in range(400):
@@ -96,7 +101,7 @@ def main():
                 print("shot", name, st.get("t"), flush=True)
             browser.close()
     finally:
-        proc.kill()
+        studio_launch.stop(proc)
     with open(os.path.join(a.out, "technical-shots.json"), "w", encoding="utf-8") as f:
         json.dump(meta, f, indent=1)
 

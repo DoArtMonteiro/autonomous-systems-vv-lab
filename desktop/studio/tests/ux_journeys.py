@@ -5,7 +5,7 @@ narrow-window navigation (More menu, keyboard), the Lab's run bar, numbers and t
 environments page, one colour for Exploratory, text size and the 1024x640 player. It uses a scratch
 library; page screenshots go to --shots (they show the Studio window, keep them out of the repository).
 
-    python desktop/studio/tests/ux_journeys.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --shots <scratch folder>
+    python desktop/studio/tests/ux_journeys.py --exe desktop\target\debug\vv-studio.exe --shots <scratch folder>
 
 Scripted checks of what the screen and the process list show, not observations of people.
 """
@@ -22,6 +22,8 @@ import time
 from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import godot_launch  # noqa: E402
+import studio_launch  # noqa: E402
 import m18_journeys as m18  # noqa: E402
 from installed_spotcheck import godot_children, module_args, newest_log  # noqa: E402
 from m15_journeys import check, errors, results  # noqa: E402
@@ -242,7 +244,7 @@ def player_and_cinematic(s, ids, shots):
     return chooser
 
 
-def cinematic_checks(s, studio_pid, ids, shots):
+def cinematic_checks(s, proc, ids, shots):
     base, exp = ids
     out = {}
     for index, (name, rid) in enumerate((("experiment", exp), ("baseline", base))):
@@ -252,7 +254,7 @@ def cinematic_checks(s, studio_pid, ids, shots):
         s.page.click(".pl-head [data-action='cinematic']")
         kids = []
         while time.time() - t0 < 40 and not kids:
-            kids = godot_children(studio_pid)
+            kids = godot_children(proc.pid)
             time.sleep(0.25)
         check(f"Cinematic ({name}): the module started", bool(kids))
         if not kids:
@@ -271,14 +273,14 @@ def cinematic_checks(s, studio_pid, ids, shots):
             first = None
             text = ""
             while time.time() - t0 < 90:
-                log = newest_log()
+                log = newest_log(proc)
                 text = open(log, encoding="utf-8", errors="replace").read() if log and os.path.getmtime(log) >= t0 - 1 else ""
                 if "FIRST_FRAME" in text:
                     first = time.time() - t0
                     break
                 time.sleep(0.5)
             check("Cinematic (experiment): the first frame was drawn and Direct3D 12 is the renderer", first is not None and "D3D12" in text and "ERROR" not in text, f"{first and round(first, 1)} s")
-            for k in godot_children(studio_pid):
+            for k in godot_children(proc.pid):
                 subprocess.run(["taskkill", "/F", "/PID", str(k["pid"])], capture_output=True)
             time.sleep(1.5)
             exe = cmd.split('"')[1] if cmd.startswith('"') else cmd.split()[0]
@@ -286,10 +288,10 @@ def cinematic_checks(s, studio_pid, ids, shots):
             shot = os.path.join(shots, "cinematic-hud-experiment.png")
             rec = json.load(open(os.path.join(run_dir, "record.json"), encoding="utf-8"))
             span = max((tb[-1] for tb in rec["timebases"].values() if tb), default=10.0)
-            r = subprocess.run([console] + args + ["--t", f"{0.55 * span:.1f}", "--shot", shot], capture_output=True, text=True, timeout=240)
+            r = godot_launch.run([console] + args + ["--t", f"{0.55 * span:.1f}", "--shot", shot], capture_output=True, text=True, timeout=240)
             check("Cinematic (experiment): the module's own --shot wrote the picture with those arguments", os.path.isfile(shot) and os.path.getsize(shot) > 50_000 and "SHOT" in r.stdout, f"{os.path.getsize(shot) if os.path.isfile(shot) else 0} bytes")
         else:
-            for k in godot_children(studio_pid):
+            for k in godot_children(proc.pid):
                 subprocess.run(["taskkill", "/F", "/PID", str(k["pid"])], capture_output=True)
             time.sleep(1.5)
     FACTS["cinematic_args"] = out
@@ -394,6 +396,7 @@ def main():
     ap.add_argument("--no-cinematic", action="store_true")
     ap.add_argument("--domains", default="", help="domain folder of a build-folder run; empty uses the installed ones")
     ap.add_argument("--environments", default="", help="packs folder of a build-folder run; empty uses the installed ones")
+    studio_launch.add_arguments(ap)
     a = ap.parse_args()
     os.makedirs(a.shots, exist_ok=True)
     env = dict(os.environ)
@@ -409,7 +412,7 @@ def main():
     env["VVLAB_LIBRARY"] = tempfile.mkdtemp(prefix="vv-ux-lib-")
     env["VVLAB_CONFIG"] = tempfile.mkdtemp(prefix="vv-ux-cfg-")
     env["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = f"--remote-debugging-port={a.port}"
-    proc = launch(os.path.abspath(os.path.expandvars(a.exe)), env, a.port)
+    proc = launch(os.path.abspath(os.path.expandvars(a.exe)), env, a.port, allow_release=a.owner_allow_release_exe)
     try:
         with sync_playwright() as pw:
             browser, s = session(pw, a.port, a.shots)
@@ -424,7 +427,7 @@ def main():
                 reference_chip(s)
                 player_and_cinematic(s, ids, a.shots)
                 if not a.no_cinematic:
-                    cinematic_checks(s, proc.pid, ids, a.shots)
+                    cinematic_checks(s, proc, ids, a.shots)
                 narrow_player(s)
                 geo_1024(s)
             except Exception as e:  # noqa: BLE001
@@ -439,7 +442,7 @@ def main():
     finally:
         for k in godot_children(proc.pid):
             subprocess.run(["taskkill", "/F", "/PID", str(k["pid"])], capture_output=True)
-        proc.kill()
+        studio_launch.stop(proc)
     with open(os.path.join(a.shots, "ux-facts.json"), "w", encoding="utf-8") as f:
         json.dump(FACTS, f, indent=1, sort_keys=True)
     failed = [r for r in results if not r[1]]

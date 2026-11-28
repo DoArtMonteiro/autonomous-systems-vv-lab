@@ -4,7 +4,12 @@ behind it, the ground-vehicle mission, the library filters, keyboard playback an
 Screenshots go to --shots. It uses a scratch library and configuration (VVLAB_LIBRARY, VVLAB_CONFIG).
 
     python desktop/studio/tests/m15_journeys.py --exe desktop/target/release/vv-studio.exe --domains desktop/target/release/domains
-    python desktop/studio/tests/m15_journeys.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --domains ""
+
+    Owner only, for suites audited as safe in this mode (this one never starts or reads the Cinematic module): against the
+    installed Studio. The library, the preferences and the WebView2 profile are scratch folders, but the Cinematic module
+    folder resolves to the installed profile. Not for development:
+
+    python desktop/studio/tests/m15_journeys.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --owner-allow-release-exe --domains ""
 
 These are scripted checks of what the screen shows. They are not observations of people using it.
 """
@@ -19,6 +24,9 @@ import time
 import urllib.request
 
 from playwright.sync_api import sync_playwright
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import studio_launch  # noqa: E402
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 results = []
@@ -271,6 +279,7 @@ def main():
     ap.add_argument("--domains", default=os.path.join(REPO, "desktop", "target", "release", "domains"))
     ap.add_argument("--shots", default=os.path.join(REPO, "docs", "images", "m15-studio"))
     ap.add_argument("--port", type=int, default=9241)
+    studio_launch.add_arguments(ap)
     a = ap.parse_args()
     exe = os.path.abspath(os.path.expandvars(a.exe))
     os.makedirs(a.shots, exist_ok=True)
@@ -285,9 +294,7 @@ def main():
     env["VVLAB_LIBRARY"] = tempfile.mkdtemp(prefix="vv-m15-lib-")
     env["VVLAB_CONFIG"] = tempfile.mkdtemp(prefix="vv-m15-cfg-")
     env["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = f"--remote-debugging-port={a.port}"
-    subprocess.run(["taskkill", "/F", "/IM", os.path.basename(exe)], capture_output=True)
-    time.sleep(0.5)
-    proc = subprocess.Popen([exe], env=env)
+    proc = studio_launch.launch(exe, env, a.port, allow_release=a.owner_allow_release_exe, wait_seconds=0)
     try:
         for _ in range(400):
             try:
@@ -317,7 +324,7 @@ def main():
                         pass
             check("no script error or console error", not errors, "; ".join(errors[:3]))
     finally:
-        proc.kill()
+        studio_launch.stop(proc)
     failed = [r for r in results if not r[1]]
     print(f"\n{len(results) - len(failed)} of {len(results)} checks passed; screenshots in {a.shots}")
     return 1 if failed else 0

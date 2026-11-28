@@ -9,7 +9,7 @@ Studio-started process), written to --shots. The page screenshots that the share
 --shots/desktop-not-committed (they show the Studio window; keep them out of the repository). It uses a
 scratch library and configuration.
 
-    python desktop/studio/tests/installed_spotcheck.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --shots <scratch folder>
+    python desktop/studio/tests/installed_spotcheck.py --exe desktop\target\debug\vv-studio.exe --shots <scratch folder>
 
 Scripted checks of what the screen and the process list show, not observations of people.
 """
@@ -25,6 +25,8 @@ import time
 from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import godot_launch  # noqa: E402
+import studio_launch  # noqa: E402
 import m18_journeys as m18  # noqa: E402
 from m15_journeys import check, errors, results  # noqa: E402
 from m16_journeys import launch, session  # noqa: E402
@@ -53,8 +55,8 @@ def module_args(cmd):
     return [p.strip('"') for p in parts[1:]]
 
 
-def newest_log():
-    logs = os.path.join(os.environ.get("APPDATA", ""), "VV Lab Cinematic", "logs")
+def newest_log(proc):
+    logs = os.path.join(proc.godot_appdata, "VV Lab Cinematic", "logs")  # the Godot user data of this Studio: a scratch folder
     files = [os.path.join(logs, f) for f in os.listdir(logs)] if os.path.isdir(logs) else []
     return max(files, key=os.path.getmtime) if files else None
 
@@ -76,7 +78,7 @@ def cinematic(s, proc, tag, shots):
     first = None
     text = ""
     while time.time() - t0 < 90:
-        log = newest_log()
+        log = newest_log(proc)
         text = open(log, encoding="utf-8", errors="replace").read() if log else ""
         if "FIRST_FRAME" in text:
             first = time.time() - t0
@@ -97,7 +99,7 @@ def cinematic(s, proc, tag, shots):
     rec = json.load(open(os.path.join(run_dir, "record.json"), encoding="utf-8"))
     span = max((tb[-1] for tb in rec["timebases"].values() if tb), default=10.0)
     out = os.path.join(shots, f"cinematic-{tag}.png")
-    r = subprocess.run([console] + args + ["--t", f"{0.55 * span:.1f}", "--shot", out], capture_output=True, text=True, timeout=240)
+    r = godot_launch.run([console] + args + ["--t", f"{0.55 * span:.1f}", "--shot", out], capture_output=True, text=True, timeout=240)
     shot_line = next((ln for ln in r.stdout.splitlines() if ln.startswith("SHOT")), "")
     ok = os.path.isfile(out) and os.path.getsize(out) > 50_000
     check(f"Cinematic {tag}: the module's own --shot wrote a picture of this run", ok, f"{os.path.getsize(out) if os.path.isfile(out) else 0} bytes at t = {0.55 * span:.1f} s")
@@ -122,6 +124,7 @@ def main():
     ap.add_argument("--exe", required=True)
     ap.add_argument("--shots", required=True)
     ap.add_argument("--port", type=int, default=9265)
+    studio_launch.add_arguments(ap)
     a = ap.parse_args()
     os.makedirs(a.shots, exist_ok=True)
     m18.NUMBERS.clear()
@@ -131,7 +134,7 @@ def main():
     env["VVLAB_LIBRARY"] = tempfile.mkdtemp(prefix="vv-spot-lib-")
     env["VVLAB_CONFIG"] = tempfile.mkdtemp(prefix="vv-spot-cfg-")
     env["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = f"--remote-debugging-port={a.port}"
-    proc = launch(os.path.abspath(os.path.expandvars(a.exe)), env, a.port)
+    proc = launch(os.path.abspath(os.path.expandvars(a.exe)), env, a.port, allow_release=a.owner_allow_release_exe)
     try:
         with sync_playwright() as pw:
             browser, s = session(pw, a.port, os.path.join(a.shots, "desktop-not-committed"))
@@ -159,7 +162,7 @@ def main():
     finally:
         for k in godot_children(proc.pid):
             subprocess.run(["taskkill", "/F", "/PID", str(k["pid"])], capture_output=True)
-        proc.kill()
+        studio_launch.stop(proc)
     with open(os.path.join(a.shots, "spotcheck-facts.json"), "w", encoding="utf-8") as f:
         json.dump({"facts": FACTS, "numbers": m18.NUMBERS}, f, indent=1, sort_keys=True)
     failed = [r for r in results if not r[1]]

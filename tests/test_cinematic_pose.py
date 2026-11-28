@@ -19,7 +19,10 @@ import json
 import math
 import os
 import shutil
-import subprocess
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "desktop", "studio", "tests"))
+import godot_launch  # noqa: E402
 import tempfile
 import unittest
 
@@ -113,7 +116,7 @@ class CinematicPoseParity(unittest.TestCase):
         times = rec["timebases"]["trace"]
         ch = {c["id"]: c["values"] for c in rec["channels"]}
         ts = list(times) + [(a + b) / 2 for a, b in zip(times, times[1:])] + [times[0] - 1.0, times[-1] + 5.0]
-        out = subprocess.run(
+        out = godot_launch.run(
             [self.godot, "--headless", "--path", PROJECT, "--", "--run", RUN, "--pose-dump", ",".join(repr(t) for t in ts)],
             capture_output=True, text=True, timeout=180, encoding="utf-8", errors="replace",
         )
@@ -155,13 +158,13 @@ class CinematicPoseParity(unittest.TestCase):
             data = bytearray(open(p, "rb").read())
             data[-3] = (data[-3] + 1) % 256
             open(p, "wb").write(bytes(data))
-            out = subprocess.run([self.godot, "--headless", "--path", PROJECT, "--", "--run", RUN, "--env", dst],
+            out = godot_launch.run([self.godot, "--headless", "--path", PROJECT, "--", "--run", RUN, "--env", dst],
                                  capture_output=True, text=True, timeout=120, encoding="utf-8", errors="replace")
         self.assertEqual(out.returncode, 4, out.stderr[-1000:])
         self.assertIn("features.json does not match its SHA-256", out.stderr)
 
     def test_bad_arguments_are_refused(self):
-        out = subprocess.run([self.godot, "--headless", "--path", PROJECT, "--", "--run", RUN, "--pose-dump", "x"],
+        out = godot_launch.run([self.godot, "--headless", "--path", PROJECT, "--", "--run", RUN, "--pose-dump", "x"],
                              capture_output=True, text=True, timeout=120, encoding="utf-8", errors="replace")
         self.assertEqual(out.returncode, 2)
         self.assertNotIn("POSE ", out.stdout)

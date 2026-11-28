@@ -5,7 +5,12 @@ requirement limit, and the layout at a narrow window. Every new run is replayed 
 show it is a recomputable record. Screenshots go to --shots. It uses a scratch library.
 
     python desktop/studio/tests/m17_lab_journeys.py --exe desktop/target/release/vv-studio.exe --domains desktop/target/release/domains
-    python desktop/studio/tests/m17_lab_journeys.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --domains ""
+
+    Owner only, for suites audited as safe in this mode (this one never starts or reads the Cinematic module): against the
+    installed Studio. The library, the preferences and the WebView2 profile are scratch folders, but the Cinematic module
+    folder resolves to the installed profile. Not for development:
+
+    python desktop/studio/tests/m17_lab_journeys.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --owner-allow-release-exe --domains ""
 
 These are scripted checks of what the screen shows. They are not observations of people using it.
 """
@@ -20,6 +25,7 @@ import time
 from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import studio_launch  # noqa: E402
 from m15_journeys import check, errors, results  # noqa: E402
 from m16_journeys import launch, open_mission, session  # noqa: E402
 
@@ -228,6 +234,7 @@ def main():
     ap.add_argument("--environments", default=os.path.join(REPO, "desktop", "environments"))
     ap.add_argument("--shots", default=os.path.join(REPO, "docs", "images", "m17-studio"))
     ap.add_argument("--port", type=int, default=9247)
+    studio_launch.add_arguments(ap)
     a = ap.parse_args()
     exe = os.path.abspath(os.path.expandvars(a.exe))
     os.makedirs(a.shots, exist_ok=True)
@@ -244,7 +251,7 @@ def main():
     env["VVLAB_LIBRARY"] = tempfile.mkdtemp(prefix="vv-m17-lib-")
     env["VVLAB_CONFIG"] = tempfile.mkdtemp(prefix="vv-m17-cfg-")
     env["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = f"--remote-debugging-port={a.port}"
-    proc = launch(exe, env, a.port)
+    proc = launch(exe, env, a.port, allow_release=a.owner_allow_release_exe)
     try:
         with sync_playwright() as pw:
             browser, s = session(pw, a.port, a.shots)
@@ -268,7 +275,7 @@ def main():
             check("No page error or console error", not errors, "; ".join(errors)[:300])
             browser.close()
     finally:
-        proc.kill()
+        studio_launch.stop(proc)
     failed = [r for r in results if not r[1]]
     print(f"\n{len(results) - len(failed)}/{len(results)} checks passed")
     sys.exit(1 if failed else 0)

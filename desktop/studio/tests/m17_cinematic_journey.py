@@ -3,7 +3,12 @@ the real file dialog, read its verified status, launch it on a stored run from t
 its window and process, close it, uninstall it and check the player falls back. The native dialog
 is answered with keystrokes. Screenshots go to --shots.
 
-    python desktop/studio/tests/m17_cinematic_journey.py --exe "%LOCALAPPDATA%\VV Lab Studio\vv-studio.exe" --zip <vv-cinematic-x.y.z.zip>
+It installs and uninstalls the Cinematic module, so it is meant for a development build, whose module
+folder is a scratch folder. With --owner-allow-release-exe the module folder is the installed profile's
+(`%LOCALAPPDATA%\org.vvlab.studio\modules`) and the run uninstalls and reinstalls the owner's module; that
+is refused unless --i-accept-installed-module-uninstall is also given.
+
+    python desktop/studio/tests/m17_cinematic_journey.py --exe desktop\target\debug\vv-studio.exe --zip <vv-cinematic-x.y.z.zip>
 
 Scripted checks of what the screen and the process list show, not observations of people.
 """
@@ -20,6 +25,7 @@ import time
 from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import studio_launch  # noqa: E402
 from m15_journeys import check, errors, results  # noqa: E402
 from m16_journeys import launch, open_mission, session  # noqa: E402
 
@@ -86,7 +92,14 @@ def main():
     ap.add_argument("--shots", default=os.path.join(REPO, "docs", "images", "m17-studio"))
     ap.add_argument("--port", type=int, default=9291)
     ap.add_argument("--preinstalled", action="store_true", help="the module was installed by the Studio's install code (modules.rs test with VV_CINEMATIC_INSTALL_TO); skip the native dialog")
+    ap.add_argument("--i-accept-installed-module-uninstall", action="store_true",
+                    help="only with --owner-allow-release-exe: accept that the installed Studio's Cinematic module is uninstalled and reinstalled")
+    studio_launch.add_arguments(ap)
     a = ap.parse_args()
+    if a.owner_allow_release_exe:
+        if not a.i_accept_installed_module_uninstall:
+            sys.exit("refused: with --owner-allow-release-exe this suite uninstalls and reinstalls the Cinematic module in the installed profile; add --i-accept-installed-module-uninstall to accept that")
+        print("WARNING: the installed Studio's Cinematic module will be uninstalled and reinstalled", flush=True)
     os.makedirs(a.shots, exist_ok=True)
     env = dict(os.environ)
     for k in ("VVLAB_DOMAINS", "VVLAB_EXTRA_DOMAINS", "VVLAB_EXEC", "VVLAB_CLAIMS", "VVLAB_ENVIRONMENTS"):
@@ -94,7 +107,7 @@ def main():
     env["VVLAB_LIBRARY"] = tempfile.mkdtemp(prefix="vv-m17c-lib-")
     env["VVLAB_CONFIG"] = tempfile.mkdtemp(prefix="vv-m17c-cfg-")
     env["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = f"--remote-debugging-port={a.port}"
-    proc = launch(os.path.abspath(os.path.expandvars(a.exe)), env, a.port)
+    proc = launch(os.path.abspath(os.path.expandvars(a.exe)), env, a.port, allow_release=a.owner_allow_release_exe)
     try:
         with sync_playwright() as pw:
             browser, s = session(pw, a.port, a.shots)
@@ -140,7 +153,7 @@ def main():
                 # The first frame takes about 12 to 15 s after the click on the reference PC (the module
                 # decodes its CC0 assets at start), so wait for it instead of sleeping a fixed time.
                 # Only a log written after the click counts: an older one may hold an earlier FIRST_FRAME.
-                logs = os.path.join(os.environ.get("APPDATA", ""), "VV Lab Cinematic", "logs")
+                logs = os.path.join(proc.godot_appdata, "VV Lab Cinematic", "logs")  # the Godot user data of this Studio: a scratch folder
                 text = ""
                 newest = None
                 t0 = time.time()
@@ -185,7 +198,7 @@ def main():
             check("No page error or console error", not errors, "; ".join(errors)[:300])
             browser.close()
     finally:
-        proc.kill()
+        studio_launch.stop(proc)
     failed = [r for r in results if not r[1]]
     print(f"\n{len(results) - len(failed)}/{len(results)} checks passed")
     sys.exit(1 if failed else 0)

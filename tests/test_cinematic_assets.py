@@ -12,7 +12,10 @@ hold for the project directory. Needs Godot 4.7.2: set VV_GODOT; without it the 
 
 import json
 import os
-import subprocess
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "desktop", "studio", "tests"))
+import godot_launch  # noqa: E402
 import unittest
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -43,7 +46,7 @@ class StageAssets(unittest.TestCase):
         godot = os.environ.get("VV_GODOT", "")
         if not godot or not os.path.isfile(godot):
             self.skipTest("VV_GODOT is not set to a Godot 4.7.2 console executable")
-        out = subprocess.run([godot, "--headless", "--path", PROJECT, "-s", "res://tools/stage_probe.gd"],
+        out = godot_launch.run([godot, "--headless", "--path", PROJECT, "-s", "res://tools/stage_probe.gd"],
                              capture_output=True, text=True, timeout=180, encoding="utf-8", errors="replace")
         line = [l for l in out.stdout.splitlines() if l.startswith("STAGE ")]
         self.assertTrue(line, out.stdout[-1000:] + out.stderr[-1000:])

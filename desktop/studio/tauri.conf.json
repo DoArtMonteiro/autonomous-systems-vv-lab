@@ -1,9 +1,9 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "VV Lab Studio",
+  "productName": "VV Lab Studio (dev)",
   "mainBinaryName": "vv-studio",
   "version": "0.18.1",
-  "identifier": "org.vvlab.studio",
+  "identifier": "org.vvlab.devstudio",
   "build": {
     "frontendDist": "ui"
   },
