@@ -50,8 +50,7 @@ def main():
     env = dict(os.environ)
     for k in ("VVLAB_DOMAINS", "VVLAB_EXTRA_DOMAINS", "VVLAB_EXEC", "VVLAB_CLAIMS", "VVLAB_ENVIRONMENTS", "VVLAB_MODULES"):
         env.pop(k, None)
-    env["VVLAB_LIBRARY"] = tempfile.mkdtemp(prefix="vv-m17-lib-")
-    env["VVLAB_CONFIG"] = tempfile.mkdtemp(prefix="vv-m17-cfg-")
+    # The library and the configuration are folders of the launch token directory (studio_launch.launch).
     env["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = f"--remote-debugging-port={a.port}"
     proc = studio_launch.launch(exe, env, a.port, allow_release=a.owner_allow_release_exe, wait_seconds=0)
     meta = {"exe": os.path.basename(exe), "mission": MISSION, "environment": a.env, "shots": []}

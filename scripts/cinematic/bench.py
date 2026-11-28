@@ -98,8 +98,7 @@ def run_one(a, profile):
     finally:
         if proc.poll() is None:
             proc.kill()  # only the process started here
-        for folder in proc.godot_plan.scratch.values():  # the scratch user data and cache of this run
-            godot_launch.remove_scratch(folder)
+        godot_launch.remove_scratch(proc.godot_plan.root)  # the scratch user data and cache of this run
 
 
 def main():

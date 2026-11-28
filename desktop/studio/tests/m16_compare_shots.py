@@ -68,8 +68,7 @@ def main():
         env["VVLAB_CLAIMS"] = os.path.join(root, "discovery", "claims")
     if a.environments:
         env["VVLAB_ENVIRONMENTS"] = os.path.abspath(a.environments)
-    env["VVLAB_LIBRARY"] = tempfile.mkdtemp(prefix="vv-shots-lib-")
-    env["VVLAB_CONFIG"] = tempfile.mkdtemp(prefix="vv-shots-cfg-")
+    # The library and the configuration are folders of the launch token directory (studio_launch.launch).
     env["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = f"--remote-debugging-port={a.port}"
     meta = {"exe": os.path.basename(exe), "mission": MISSION, "shots": []}
     proc = launch(exe, env, a.port, allow_release=a.owner_allow_release_exe)

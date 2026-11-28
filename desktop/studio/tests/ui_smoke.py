@@ -602,8 +602,6 @@ def main():
         print(f"studio executable not found: {a.exe} (build it with `cargo build -p vv-studio` in desktop/)")
         return 2
     os.makedirs(a.shots, exist_ok=True)
-    library = tempfile.mkdtemp(prefix="vv-studio-ui-")
-    config = tempfile.mkdtemp(prefix="vv-studio-ui-config-")
     env = dict(os.environ)
     env.pop("VVLAB_DOMAINS", None)
     env.pop("VVLAB_EXTRA_DOMAINS", None)
@@ -616,13 +614,15 @@ def main():
     else:
         env.pop("VVLAB_EXEC", None)
         env.pop("VVLAB_CLAIMS", None)
-    env["VVLAB_LIBRARY"] = library
-    env["VVLAB_CONFIG"] = config
-    print(f"exe {a.exe}\ndomains {a.domains or '(installed resource directory)'}\nlibrary {library}\nconfig {config}")
     env["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = f"--remote-debugging-port={a.port}"
     # A running instance of this executable would swallow the launch (single-instance plugin) and
     # keep its own library: the helper refuses to start, it never kills it.
     proc = studio_launch.launch(a.exe, env, a.port, allow_release=a.owner_allow_release_exe, wait_seconds=0)
+    # The library and the configuration are folders of this launch's token directory (a development
+    # Studio refuses any other): read them from the plan.
+    library = proc.launch_plan.env["VVLAB_LIBRARY"]
+    config = proc.launch_plan.env["VVLAB_CONFIG"]
+    print(f"exe {a.exe}\ndomains {a.domains or '(installed resource directory)'}\nlibrary {library}\nconfig {config}")
     page = None
     try:
         for _ in range(120):
@@ -666,11 +666,13 @@ def main():
                     pass
             check("no script error in the page", not console_errors, "; ".join(console_errors[:5]))
     finally:
+        if a.keep_library and os.path.isdir(library):
+            # stop() removes the token directory; keep a copy of the library for inspection.
+            kept = tempfile.mkdtemp(prefix="vv-studio-ui-kept-")
+            shutil.copytree(library, os.path.join(kept, "library"), dirs_exist_ok=True)
+            print(f"library kept in {kept}")
         studio_launch.stop(proc)
         proc.wait(timeout=10)
-        if not a.keep_library:
-            shutil.rmtree(library, ignore_errors=True)
-            shutil.rmtree(config, ignore_errors=True)
     for req, method, reached in sizing:
         print(f"window {req}: {method} ({reached})")
     failed = [r for r in results if not r[1]]

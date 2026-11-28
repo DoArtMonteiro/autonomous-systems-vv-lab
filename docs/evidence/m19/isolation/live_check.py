@@ -67,10 +67,11 @@ def main():
         os.rmdir(dev_dir)  # our own, empty development folder: so the run shows whether the launch creates it
     env = dict(os.environ)
     env["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = f"--remote-debugging-port={a.port}"
-    plan = sl.plan_launch(exe, env, local, roam, port=a.port, documents=os.path.join(os.environ["USERPROFILE"], "Documents"))
+    proc = sl.launch(exe, env, a.port, wait_seconds=60)  # the helper plans the launch, writes the launch token and starts it
+    plan = proc.launch_plan
     scratch = dict(plan.scratch)
-    proc = sl.launch(exe, {**env, **scratch}, a.port, wait_seconds=60)
     up = False
+    top = None
     try:
         for _ in range(100):
             try:
@@ -81,18 +82,18 @@ def main():
                 time.sleep(0.2)
         time.sleep(8)
         alive = proc.poll() is None
+        webview = scratch["WEBVIEW2_USER_DATA_FOLDER"]
+        top = sorted(os.listdir(webview)) if os.path.isdir(webview) else None
+        token_consumed = not os.path.exists(plan.env[sl.ENV_LAUNCH]) and os.path.exists(plan.env[sl.ENV_LAUNCH] + ".used")
     finally:
-        sl.stop(proc)
+        sl.stop(proc)  # ends this process by its PID and removes the token directory
     time.sleep(5)
-    name = os.path.basename(scratch["WEBVIEW2_USER_DATA_FOLDER"])
+    name = os.path.basename(plan.token_dir)  # unique per launch: every folder of this run, WebView2's included, is inside it
     ps = ("Get-CimInstance Win32_Process | Where-Object { $_.Name -ne 'powershell.exe' -and $_.CommandLine -and $_.CommandLine -like '*" + name +
           "*' } | ForEach-Object { \"$($_.ProcessId) $($_.Name)\" }")
     left = [x for x in subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True).stdout.split("\n") if x.strip()]
     after = snapshot(roots)
     dev_files = sum(len(f) for _, _, f in os.walk(dev_dir))
-    top = sorted(os.listdir(scratch["WEBVIEW2_USER_DATA_FOLDER"])) if os.path.isdir(scratch["WEBVIEW2_USER_DATA_FOLDER"]) else None
-    for v in scratch.values():
-        shutil.rmtree(v, ignore_errors=True)
     with open(exe, "rb") as f:
         exe_sha = hashlib.sha256(f.read()).hexdigest()
     result = {
@@ -104,6 +105,7 @@ def main():
         "devtools_endpoint_up": up, "alive_before_stop": alive, "ended_by_own_pid": True,
         "processes_left_on_scratch_profile": left,
         "scratch_redirected": sorted(scratch), "scratch_webview2_top_level": top,
+        "launch_token_consumed_by_the_guard": token_consumed, "token_directory_removed": not os.path.exists(plan.token_dir),
         "devstudio_folder_exists_local": os.path.isdir(dev_dir), "devstudio_files_local": dev_files,
         "devstudio_folder_exists_roaming": os.path.isdir(os.path.join(roam, sl.DEV_IDENTIFIER)),
     }

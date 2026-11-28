@@ -80,7 +80,8 @@ class IdentityConfig(unittest.TestCase):
         # The compiled-in identifier must come from the configuration only; a literal in the code would
         # make every executable carry both identifiers and defeat the check on the executable.
         for path in list((STUDIO / "src").rglob("*.rs")) + [STUDIO / "build.rs"]:
-            text = path.read_text(encoding="utf-8")
+            # Test modules (`#[cfg(test)]`) are compiled into test executables only, never into vv-studio.exe.
+            text = path.read_text(encoding="utf-8").split("#[cfg(test)]")[0]
             self.assertNotIn("org.vvlab", text, str(path))
 
     def test_no_other_config_in_the_studio_folder_names_the_release_identifier(self):
@@ -170,24 +171,37 @@ class NormalisationAndEmbeddedIdentifier(unittest.TestCase):
 
 
 class PlanLaunch(unittest.TestCase):
-    def test_a_clean_launch_gets_scratch_for_every_folder_the_studio_writes(self):
+    def test_a_clean_launch_gets_one_token_directory_with_every_folder_the_studio_writes(self):
         p = plan({"PATH": r"C:\Windows"}, port=9333)
+        root = fake_scratch("TOKEN_DIR")
+        self.assertEqual(p.token_dir, root)
         for name in sl.SCRATCH_VARIABLES:
-            self.assertEqual(p.env[name], fake_scratch(name))
+            self.assertEqual(p.env[name], os.path.join(root, sl.TOKEN_SUBFOLDERS[name]))
         self.assertEqual(set(p.scratch), set(sl.SCRATCH_VARIABLES))
         self.assertEqual(p.env["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"], "--remote-debugging-port=9333")
         self.assertEqual(p.env["PATH"], r"C:\Windows")
+        # The launch token: a nonce the child also gets in its environment, the directory and every path.
+        self.assertEqual(p.env[sl.ENV_NONCE], p.token["nonce"])
+        self.assertGreaterEqual(len(p.token["nonce"]), 32)
+        self.assertEqual(p.env[sl.ENV_LAUNCH], os.path.join(root, sl.TOKEN_FILE))
+        self.assertEqual(p.token["token_dir"], root)
+        self.assertEqual(set(p.token["paths"]), set(sl.TOKEN_SUBFOLDERS))
+        for name, value in p.token["paths"].items():
+            self.assertEqual(p.env[name], value)
+            self.assertTrue(sl.is_under(value, root))
 
     def test_the_caller_environment_is_not_modified(self):
         environ = {"PATH": "x"}
         plan(environ)
         self.assertEqual(environ, {"PATH": "x"})
 
-    def test_safe_caller_values_are_kept(self):
+    def test_caller_folders_are_replaced_by_folders_in_the_token_directory(self):
         p = plan({"VVLAB_LIBRARY": r"C:\Scratch\lib", "VVLAB_CONFIG": r"C:\Scratch\cfg"})
-        self.assertEqual(p.env["VVLAB_LIBRARY"], r"C:\Scratch\lib")
-        self.assertEqual(p.env["VVLAB_CONFIG"], r"C:\Scratch\cfg")
-        self.assertNotIn("VVLAB_LIBRARY", p.scratch)
+        self.assertEqual(p.env["VVLAB_LIBRARY"], os.path.join(fake_scratch("TOKEN_DIR"), "library"))
+        self.assertEqual(p.env["VVLAB_CONFIG"], os.path.join(fake_scratch("TOKEN_DIR"), "config"))
+
+    def test_every_launch_has_its_own_nonce(self):
+        self.assertNotEqual(plan().token["nonce"], plan().token["nonce"])
 
     def test_hostile_values_are_refused_for_every_redirected_folder(self):
         hostile = [
@@ -232,7 +246,7 @@ class PlanLaunch(unittest.TestCase):
             "VVLAB_CONFIG": rf"{ROAM}\{DEV}",
             "VVLAB_LIBRARY": rf"{DOCS}\VV Lab Library2",
         })
-        self.assertTrue(p.env["VVLAB_CONFIG"].endswith(DEV))
+        self.assertTrue(sl.is_under(p.env["VVLAB_CONFIG"], fake_scratch("TOKEN_DIR")))
 
     def test_a_user_data_dir_browser_argument_is_refused(self):
         for args in (
@@ -279,7 +293,7 @@ class PlanLaunch(unittest.TestCase):
     def test_the_owner_flag_lifts_only_the_executable_refusals(self):
         installed = rf"{LOCAL}\VV Lab Studio\vv-studio.exe"
         p = plan(exe=installed, ids=(RELEASE,), allow_release=True)
-        self.assertEqual(p.env["WEBVIEW2_USER_DATA_FOLDER"], fake_scratch("WEBVIEW2_USER_DATA_FOLDER"))
+        self.assertEqual(p.env["WEBVIEW2_USER_DATA_FOLDER"], os.path.join(fake_scratch("TOKEN_DIR"), "webview2"))
         self.assertIsNone(p.identifiers)
 
     def test_a_development_executable_outside_the_install_folder_is_accepted(self):
@@ -309,14 +323,20 @@ def godot_plan(environ=None, appdata=ROAM, local=LOCAL, **kw):
 
 
 class GodotLaunch(unittest.TestCase):
-    def test_the_child_gets_scratch_user_data_and_cache_folders(self):
+    def test_the_child_gets_scratch_user_data_and_cache_folders_and_a_token(self):
         p = godot_plan({"PATH": "p", "APPDATA": ROAM, "LOCALAPPDATA": LOCAL})
-        self.assertEqual(p.env["APPDATA"], fake_godot_scratch("APPDATA"))
-        self.assertEqual(p.env["LOCALAPPDATA"], fake_godot_scratch("LOCALAPPDATA"))
-        self.assertEqual(p.user_dir, rf"{fake_godot_scratch('APPDATA')}\VV Lab Cinematic")
+        root = fake_godot_scratch("TOKEN_DIR")
+        self.assertEqual(p.root, root)
+        self.assertEqual(p.env["APPDATA"], os.path.join(root, "appdata"))
+        self.assertEqual(p.env["LOCALAPPDATA"], os.path.join(root, "localappdata"))
+        self.assertEqual(p.user_dir, rf"{p.env['APPDATA']}\VV Lab Cinematic")
+        self.assertEqual(p.dev_user_dir, rf"{p.env['APPDATA']}\VV Lab Cinematic Dev")
         self.assertEqual(p.env["PATH"], "p")
         self.assertEqual(p.argv[0], GODOT)
         self.assertFalse(sl.is_under(p.user_dir, CINEMATIC_USER))
+        self.assertEqual(p.env[sl.ENV_NONCE], p.token["nonce"])
+        self.assertEqual(p.token["token_dir"], root)
+        self.assertEqual(p.token["protected"], [CINEMATIC_USER, rf"{LOCAL}\VV Lab Cinematic", rf"{ROAM}\VV Lab Cinematic Dev", rf"{LOCAL}\VV Lab Cinematic Dev"])
 
     def test_the_caller_environment_is_not_modified(self):
         environ = {"APPDATA": ROAM, "LOCALAPPDATA": LOCAL}
@@ -334,14 +354,17 @@ class GodotLaunch(unittest.TestCase):
                     gl.plan_godot([GODOT], {}, ROAM, LOCAL, make_scratch=lambda name, v=value: v)
 
     def test_the_real_profile_roots_are_refused_as_scratch(self):
-        for roam, local in ((ROAM, fake_godot_scratch("LOCALAPPDATA")), (fake_godot_scratch("APPDATA"), LOCAL)):
-            with self.subTest(roam=roam):
+        # A token directory that is the real profile root, or whose children would be, is refused.
+        for root in (ROAM, LOCAL):
+            with self.subTest(root=root):
                 with self.assertRaises(sl.IsolationError):
-                    gl.plan_godot([GODOT], {}, ROAM, LOCAL, make_scratch=lambda name, r=roam, l=local: r if name == "APPDATA" else l)
+                    gl.plan_godot([GODOT], {}, ROAM, LOCAL, make_scratch=lambda name, r=root: r)
+        with self.assertRaises(sl.IsolationError):  # a root whose appdata child is the real APPDATA
+            gl.plan_godot([GODOT], {}, rf"{fake_godot_scratch('TOKEN_DIR')}\appdata", LOCAL, make_scratch=fake_godot_scratch)
 
-    def test_a_child_user_dir_resolving_under_the_real_one_via_a_nested_scratch_is_refused(self):
+    def test_a_token_directory_nested_in_the_installed_data_is_refused(self):
         with self.assertRaises(sl.IsolationError):
-            gl.plan_godot([GODOT], {}, ROAM, LOCAL, make_scratch=lambda name: rf"{ROAM}\VV Lab Cinematic\x" if name == "APPDATA" else fake_godot_scratch(name))
+            gl.plan_godot([GODOT], {}, ROAM, LOCAL, make_scratch=lambda name: rf"{ROAM}\VV Lab Cinematic\x")
 
     def test_neighbouring_scratch_names_are_accepted(self):
         p = gl.plan_godot([GODOT], {}, ROAM, LOCAL, make_scratch=lambda name: rf"{ROAM}\VV Lab Cinematic.scratch\{name}")
@@ -372,13 +395,14 @@ class GodotLaunch(unittest.TestCase):
 
     def test_the_studio_child_is_redirected_the_same_way(self):
         p = plan({"APPDATA": ROAM, "LOCALAPPDATA": LOCAL})
-        self.assertEqual(p.env["APPDATA"], fake_scratch("APPDATA"))
-        self.assertEqual(p.env["LOCALAPPDATA"], fake_scratch("LOCALAPPDATA"))
+        root = fake_scratch("TOKEN_DIR")
+        self.assertEqual(p.env["APPDATA"], os.path.join(root, "appdata"))
+        self.assertEqual(p.env["LOCALAPPDATA"], os.path.join(root, "localappdata"))
         self.assertEqual(set(p.redirects), {"APPDATA", "LOCALAPPDATA"})
-        for hostile in ({"APPDATA": CINEMATIC_USER}, {"LOCALAPPDATA": CINEMATIC_USER}):
-            with self.assertRaises(sl.IsolationError):
-                sl.plan_launch(EXE, {}, LOCAL, ROAM, identifier_reader=lambda _e: {DEV},
-                               make_scratch=lambda name, h=hostile: next(iter(h.values())) if name in h else fake_scratch(name))
+        for hostile_root in (CINEMATIC_USER, rf"{LOCAL}\VV Lab Cinematic", rf"{LOCAL}\{RELEASE}\x", rf"{ROAM}\{RELEASE}"):
+            with self.subTest(root=hostile_root):
+                with self.assertRaises(sl.IsolationError):
+                    sl.plan_launch(EXE, {}, LOCAL, ROAM, identifier_reader=lambda _e: {DEV}, make_scratch=lambda name, h=hostile_root: h)
 
     def test_godot_is_started_only_through_the_helper(self):
         bad = [
@@ -541,51 +565,35 @@ class ScratchRemoval(unittest.TestCase):
             shutil.rmtree(folder, ignore_errors=True)
 
     def test_a_refused_studio_plan_removes_the_folders_it_made(self):
-        made = []
-
-        def make(name):
-            if name == "LOCALAPPDATA":  # asked for last: the hostile child folder
-                return rf"{LOCAL}\{RELEASE}\x"
-            folder = tempfile.mkdtemp(prefix="vv-test-plan-")
-            made.append(folder)
-            return folder
-
+        root = tempfile.mkdtemp(prefix="vv-test-plan-")
         try:
+            # The token directory is real and then refused: the child's APPDATA would be the "real" one.
             with self.assertRaises(sl.IsolationError):
-                sl.plan_launch(EXE, {}, LOCAL, ROAM, identifier_reader=lambda _e: {DEV}, make_scratch=make)
-            self.assertTrue(made)
-            self.assertFalse([d for d in made if os.path.exists(d)])
+                sl.plan_launch(EXE, {}, LOCAL, os.path.join(root, "appdata"), identifier_reader=lambda _e: {DEV}, make_scratch=lambda name: root)
+            self.assertFalse(os.path.exists(root))
         finally:
-            for d in made:
-                shutil.rmtree(d, ignore_errors=True)
+            shutil.rmtree(root, ignore_errors=True)
 
     def test_a_refused_godot_plan_removes_the_folders_it_made(self):
-        made = []
-
-        def make(name):
-            if name == "LOCALAPPDATA":  # asked for second: the hostile folder
-                return CINEMATIC_USER
-            folder = tempfile.mkdtemp(prefix="vv-test-godot-")
-            made.append(folder)
-            return folder
-
+        root = tempfile.mkdtemp(prefix="vv-test-godot-")
         try:
             with self.assertRaises(sl.IsolationError):
-                gl.plan_godot([GODOT], {}, ROAM, LOCAL, make_scratch=make)
-            self.assertTrue(made)
-            self.assertFalse([d for d in made if os.path.exists(d)])
+                gl.plan_godot([GODOT], {}, os.path.join(root, "appdata"), LOCAL, make_scratch=lambda name: root)
+            self.assertFalse(os.path.exists(root))
         finally:
-            for d in made:
-                shutil.rmtree(d, ignore_errors=True)
+            shutil.rmtree(root, ignore_errors=True)
 
-    def test_godot_run_removes_its_scratch_folders(self):
+    def test_godot_run_removes_its_token_directory_and_gives_the_child_a_valid_token(self):
         import sys
 
-        result = gl.run([sys.executable, "-c", "import os; print(os.environ['APPDATA'])"], capture_output=True, text=True)
-        folder = result.stdout.strip()
-        self.assertTrue(os.path.basename(folder).startswith("vv-godot-"), folder)
-        self.assertFalse(os.path.exists(folder))
-        self.assertTrue(all(not os.path.exists(f) for f in result.godot_plan.scratch.values()))
+        code = "import json, os; t = json.load(open(os.environ['VVLAB_DEV_LAUNCH'])); print(json.dumps([os.environ['APPDATA'], t['nonce'] == os.environ['VVLAB_DEV_NONCE'], t['token_dir']]))"
+        result = gl.run([sys.executable, "-c", code], capture_output=True, text=True)
+        appdata, nonce_ok, token_dir = json.loads(result.stdout)
+        self.assertTrue(nonce_ok)
+        self.assertTrue(os.path.basename(token_dir).startswith("vv-godot-"), token_dir)
+        self.assertTrue(sl.is_under(appdata, token_dir))
+        self.assertFalse(os.path.exists(token_dir))
+        self.assertEqual(result.godot_plan.root, token_dir)
 
     def test_stop_removes_the_child_redirect_folders_and_only_those(self):
         from types import SimpleNamespace
@@ -604,31 +612,29 @@ class ScratchRemoval(unittest.TestCase):
 
 
 class StopRemovesEveryScratchFolder(unittest.TestCase):
-    def test_launch_hands_stop_the_redirects_and_the_plan_scratch_folders(self):
+    def test_launch_hands_stop_the_token_directory(self):
         tree = ast.parse((STUDIO_TESTS / "studio_launch.py").read_text(encoding="utf-8"))
         launch = next(f for f in ast.walk(tree) if isinstance(f, ast.FunctionDef) and f.name == "launch")
         assigned = [ast.unparse(n.value) for n in ast.walk(launch) if isinstance(n, ast.Assign)
                     and any(ast.unparse(t) == "proc.redirect_dirs" for t in n.targets)]
-        self.assertEqual(assigned, ["list(plan.redirects.values()) + list(plan.scratch.values())"])
+        self.assertEqual(assigned, ["[plan.token_dir]"])
 
-    def test_stop_removes_a_real_plan_s_folders_and_nothing_else(self):
-        import tempfile as _t
+    def test_stop_removes_a_real_plan_s_token_directory_and_nothing_else(self):
         from types import SimpleNamespace
 
-        keep = _t.mkdtemp(prefix="notvv-")
+        keep = tempfile.mkdtemp(prefix="notvv-")
         plan_ = sl.plan_launch(EXE, {"VVLAB_LIBRARY": keep}, LOCAL, ROAM, identifier_reader=lambda _e: {DEV})
         try:
-            folders = list(plan_.redirects.values()) + list(plan_.scratch.values())
-            self.assertEqual({os.path.basename(f).split("-")[0] for f in folders}, {"vv"})
-            self.assertTrue(all(os.path.isdir(f) for f in folders))
-            self.assertNotIn("VVLAB_LIBRARY", plan_.scratch)  # the caller's own folder is not the plan's to remove
-            sl.stop(SimpleNamespace(poll=lambda: 0, redirect_dirs=folders))
-            self.assertFalse([f for f in folders if os.path.exists(f)])
-            self.assertTrue(os.path.isdir(keep))
+            self.assertTrue(os.path.basename(plan_.token_dir).startswith("vv-launch-"))
+            sl.write_token(plan_)
+            self.assertTrue(all(os.path.isdir(f) for f in plan_.token["paths"].values()))
+            self.assertTrue(os.path.isfile(plan_.env[sl.ENV_LAUNCH]))
+            sl.stop(SimpleNamespace(poll=lambda: 0, redirect_dirs=[plan_.token_dir]))
+            self.assertFalse(os.path.exists(plan_.token_dir))
+            self.assertTrue(os.path.isdir(keep))  # the caller's own folder is not the plan's to remove
         finally:
-            for f in list(plan_.redirects.values()) + list(plan_.scratch.values()) + [keep]:
+            for f in (plan_.token_dir, keep):
                 shutil.rmtree(f, ignore_errors=True)
-
 
 class GodotOffWindows(unittest.TestCase):
     def shim(self, environ):
@@ -649,17 +655,13 @@ class GodotOffWindows(unittest.TestCase):
         from unittest import mock
 
         with mock.patch.object(gl, "os", self.shim({})):
-            p = gl.plan_godot([GODOT], {}, "/home/u/.local/share", "/home/u/.cache", make_scratch=lambda name: f"/scratch/{name.lower()}")
+            p = gl.plan_godot([GODOT], {}, "/home/u/.local/share", "/home/u/.cache", make_scratch=lambda name: "/scratch/token")
             self.assertEqual(set(p.scratch), {"APPDATA", "LOCALAPPDATA", *gl.POSIX_REDIRECTS})
-            self.assertEqual(p.env["XDG_DATA_HOME"], "/scratch/xdg_data_home")
-            self.assertEqual(sl.normalise(p.user_dir), sl.normalise("/scratch/xdg_data_home/VV Lab Cinematic"))
-            with self.assertRaises(sl.IsolationError):
-                gl.plan_godot([GODOT], {}, "/home/u/.local/share", "/home/u/.cache",
-                              make_scratch=lambda name: "/home/u/.local/share/VV Lab Cinematic" if name == "XDG_DATA_HOME" else f"/scratch/{name.lower()}")
-            with self.assertRaises(sl.IsolationError):
-                gl.plan_godot([GODOT], {}, "/home/u/.local/share", "/home/u/.cache",
-                              make_scratch=lambda name: "/home/u/.local/share" if name == "XDG_DATA_HOME" else f"/scratch/{name.lower()}")
-
+            self.assertEqual(sl.normalise(p.env["XDG_DATA_HOME"]), sl.normalise("/scratch/token/xdg_data_home"))
+            self.assertEqual(sl.normalise(p.user_dir), sl.normalise("/scratch/token/xdg_data_home/VV Lab Cinematic"))
+            for hostile in ("/home/u/.local/share/VV Lab Cinematic", "/home/u/.local/share", "/home/u/.cache"):
+                with self.assertRaises(sl.IsolationError):
+                    gl.plan_godot([GODOT], {}, "/home/u/.local/share", "/home/u/.cache", make_scratch=lambda name, h=hostile: h)
 
 class NetworkPathsAndDocuments(unittest.TestCase):
     def test_network_paths_are_refused_in_every_spelling(self):

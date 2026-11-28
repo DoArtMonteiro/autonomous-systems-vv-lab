@@ -291,8 +291,7 @@ def main():
         env["VVLAB_DOMAINS"] = os.path.abspath(a.domains)
         env["VVLAB_EXEC"] = os.path.join(root, "engines", "vv-exec.exe")
         env["VVLAB_CLAIMS"] = os.path.join(root, "discovery", "claims")
-    env["VVLAB_LIBRARY"] = tempfile.mkdtemp(prefix="vv-m15-lib-")
-    env["VVLAB_CONFIG"] = tempfile.mkdtemp(prefix="vv-m15-cfg-")
+    # The library and the configuration are folders of the launch token directory (studio_launch.launch).
     env["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = f"--remote-debugging-port={a.port}"
     proc = studio_launch.launch(exe, env, a.port, allow_release=a.owner_allow_release_exe, wait_seconds=0)
     try:
